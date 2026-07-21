@@ -24,6 +24,7 @@ pub struct FileNode {
 
 pub struct AppState {
     pub pending_confirmation: Arc<Mutex<Option<PendingConfirmation>>>,
+    pub cancel_tokens: Arc<tokio::sync::Mutex<std::collections::HashSet<String>>>,
 }
 
 #[tauri::command]
@@ -85,10 +86,34 @@ async fn send_message(
 ) -> Result<(), String> {
     let config = config::load_config(&app);
     let state_clone = state.pending_confirmation.clone();
+    let cancel_clone = state.cancel_tokens.clone();
+    
+    // Ensure cancellation is reset for this session
+    cancel_clone.lock().await.remove(&session_id);
     
     tokio::spawn(async move {
-        agent::run_agent_loop(app, session_id, config, state_clone).await;
+        agent::run_agent_loop(app, session_id, config, state_clone, cancel_clone).await;
     });
+    
+    Ok(())
+}
+
+#[tauri::command]
+async fn cancel_agent(
+    state: tauri::State<'_, AppState>,
+    session_id: String,
+) -> Result<(), String> {
+    state.cancel_tokens.lock().await.insert(session_id.clone());
+    
+    // Interrupt any pending confirmation
+    let mut lock = state.pending_confirmation.lock().await;
+    if let Some(pending) = lock.take() {
+        if pending.session_id == session_id {
+            let _ = pending.tx.send(false);
+        } else {
+            *lock = Some(pending);
+        }
+    }
     
     Ok(())
 }
@@ -302,6 +327,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(AppState {
             pending_confirmation: Arc::new(Mutex::new(None)),
+            cancel_tokens: Arc::new(tokio::sync::Mutex::new(std::collections::HashSet::new())),
         })
         .invoke_handler(tauri::generate_handler![
             get_config,
@@ -313,6 +339,7 @@ pub fn run() {
             delete_session,
             select_workspace,
             send_message,
+            cancel_agent,
             respond_to_tool,
             get_workspace_tree,
             read_file_raw,

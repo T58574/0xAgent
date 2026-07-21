@@ -278,6 +278,17 @@ export default function App() {
     }
   };
 
+  // Cancel running agent completions
+  const handleCancelAgent = async () => {
+    if (!currentSessionId) return;
+    try {
+      addLog(`Cancellation request submitted for session ${currentSessionId}`);
+      await invoke('cancel_agent', { sessionId: currentSessionId });
+    } catch (err) {
+      addLog(`Failed to cancel agent: ${err}`);
+    }
+  };
+
   // 8. Listen to SSE completions events streamed from Rust Backend
   useEffect(() => {
     let unlisteners: (() => void)[] = [];
@@ -464,6 +475,7 @@ export default function App() {
                 agentStatus={agentStatus}
                 onSendMessage={handleSendMessage}
                 onRespondToTool={handleRespondToTool}
+                onCancelAgent={handleCancelAgent}
               />
             </div>
 
@@ -542,6 +554,7 @@ export default function App() {
                 agentStatus={agentStatus}
                 onSendMessage={handleSendMessage}
                 onRespondToTool={handleRespondToTool}
+                onCancelAgent={handleCancelAgent}
               />
             </div>
 

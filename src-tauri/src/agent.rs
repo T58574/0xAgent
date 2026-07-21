@@ -349,6 +349,7 @@ pub async fn run_agent_loop(
     session_id: String,
     config: AppConfig,
     state: Arc<tokio::sync::Mutex<Option<PendingConfirmation>>>,
+    cancel_tokens: Arc<tokio::sync::Mutex<std::collections::HashSet<String>>>,
 ) {
     let mut session = match crate::session::load_session(&app, &session_id) {
         Ok(s) => s,
@@ -366,6 +367,17 @@ pub async fn run_agent_loop(
     let _ = app.emit("agent-status-changed", "thinking");
 
     loop {
+        // Check cancellation
+        {
+            let tokens = cancel_tokens.lock().await;
+            if tokens.contains(&session_id) {
+                drop(tokens);
+                let mut tokens_write = cancel_tokens.lock().await;
+                tokens_write.remove(&session_id);
+                let _ = app.emit("agent-status-changed", "idle");
+                break;
+            }
+        }
         // Prepare request body
         let mut messages = Vec::new();
         messages.push(json!({
@@ -432,6 +444,11 @@ pub async fn run_agent_loop(
         let mut buffer = String::new();
 
         while let Some(chunk_res) = stream.next().await {
+            // Check cancellation during stream reading
+            if cancel_tokens.lock().await.contains(&session_id) {
+                let _ = app.emit("agent-status-changed", "idle");
+                return;
+            }
             let chunk = match chunk_res {
                 Ok(bytes) => bytes,
                 Err(e) => {
@@ -520,8 +537,19 @@ pub async fn run_agent_loop(
         }));
 
         let mut has_new_tool_executions = false;
+        
+        // Check cancellation before tool runs
+        if cancel_tokens.lock().await.contains(&session_id) {
+            let _ = app.emit("agent-status-changed", "idle");
+            break;
+        }
 
         for tc in parsed_calls {
+            // Check cancellation before running each tool
+            if cancel_tokens.lock().await.contains(&session_id) {
+                let _ = app.emit("agent-status-changed", "idle");
+                return;
+            }
             let is_interactive = tc.name == "write_file" || tc.name == "patch_file" || tc.name == "execute_command";
             
             let mut approved = true;

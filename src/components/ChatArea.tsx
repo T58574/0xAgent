@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Mic, Square } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
@@ -8,6 +9,7 @@ interface ChatAreaProps {
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
   onSendMessage: (text: string) => void;
   onRespondToTool: (toolId: string, approve: boolean) => void;
+  onCancelAgent?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -15,15 +17,105 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   agentStatus,
   onSendMessage,
   onRespondToTool,
+  onCancelAgent,
 }) => {
   const [inputText, setInputText] = useState('');
   const historyEndRef = useRef<HTMLDivElement>(null);
   const mainHistoryRef = useRef<HTMLDivElement>(null);
 
+  // Microphone recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<any>(null);
+
   // Auto-scroll to bottom of history on new messages
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, agentStatus]);
+
+  // Recording timer
+  useEffect(() => {
+    if (isRecording) {
+      timerRef.current = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setRecordingSeconds(0);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isRecording]);
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const options = { mimeType: 'audio/webm' };
+      const recorder = new MediaRecorder(stream, options);
+      
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64data = reader.result as string;
+          const base64Payload = base64data.split(',')[1];
+          if (base64Payload) {
+            setIsTranscribing(true);
+            try {
+              const transcribedText = await import('@tauri-apps/api/core').then(m => 
+                m.invoke<string>('transcribe_audio', { audioBase64: base64Payload })
+              );
+              if (transcribedText.trim()) {
+                setInputText((prev) => {
+                  const spacer = prev.trim() ? ' ' : '';
+                  return prev + spacer + transcribedText;
+                });
+              }
+            } catch (err) {
+              console.error("Transcription failed:", err);
+            } finally {
+              setIsTranscribing(false);
+            }
+          }
+        };
+        // Stop audio tracks to release microphone lock
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error("Failed to start recording:", err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+  const handleMicClick = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,17 +139,33 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       {!hasMessages && (
         <div className="flex-grow flex flex-col items-center justify-center p-6 text-center select-none z-10 w-full">
           <form onSubmit={handleSubmit} className="w-full max-w-2xl flex items-center justify-center gap-4">
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Напиши ченибудь..."
-              className="w-full max-w-lg border border-theme-border rounded-full px-6 py-3 text-sm text-theme-text placeholder-neutral-450 bg-theme-bg focus:outline-none focus:border-theme-text transition-colors"
-            />
+            <div className="relative w-full max-w-lg">
+              <input
+                type="text"
+                value={inputText}
+                disabled={isTranscribing}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={isTranscribing ? "Транскрибируем голос..." : "Напиши ченибудь..."}
+                className="w-full border border-theme-border rounded-full pl-6 pr-12 py-3 text-sm text-theme-text placeholder-neutral-450 bg-theme-bg focus:outline-none focus:border-theme-text transition-colors"
+              />
+              <button
+                type="button"
+                onClick={handleMicClick}
+                disabled={isTranscribing}
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                  isRecording
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : 'text-neutral-500 hover:text-theme-text'
+                }`}
+                title={isRecording ? `Запись: ${recordingSeconds} сек. Кликни чтобы остановить.` : "Голосовой ввод"}
+              >
+                <Mic size={16} />
+              </button>
+            </div>
             <button
               type="submit"
-              disabled={!inputText.trim()}
+              disabled={!inputText.trim() || isTranscribing}
               className="rounded-full border border-theme-border bg-theme-send-btn px-8 py-3 text-sm font-bold text-black hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 transition-colors focus:outline-none"
             >
               Отправить
@@ -139,21 +247,55 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* Locked Bottom Prompt Form */}
           <div className="p-4 border-t border-theme-border bg-theme-bg select-none z-10 w-full">
             <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto flex items-center justify-center gap-4">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Создай скрипт на питоне"
-                className="w-full max-w-lg border border-theme-border rounded-full px-6 py-3 text-sm text-theme-text placeholder-neutral-450 bg-theme-bg focus:outline-none focus:border-theme-text transition-colors"
-              />
-              <button
-                type="submit"
-                disabled={!inputText.trim()}
-                className="rounded-full border border-theme-border bg-theme-send-btn px-8 py-3 text-sm font-bold text-black hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 transition-colors focus:outline-none"
-              >
-                Отправить
-              </button>
+              <div className="relative w-full max-w-lg">
+                <input
+                  type="text"
+                  value={inputText}
+                  disabled={agentStatus !== 'idle' || isTranscribing}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    isTranscribing 
+                      ? "Транскрибируем голос..." 
+                      : agentStatus !== 'idle' 
+                        ? "Агент занят..." 
+                        : "Создай скрипт на питоне"
+                  }
+                  className="w-full border border-theme-border rounded-full pl-6 pr-12 py-3 text-sm text-theme-text placeholder-neutral-450 bg-theme-bg focus:outline-none focus:border-theme-text transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={handleMicClick}
+                  disabled={agentStatus !== 'idle' || isTranscribing}
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                    isRecording
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : 'text-neutral-500 hover:text-theme-text disabled:opacity-30'
+                  }`}
+                  title={isRecording ? `Запись: ${recordingSeconds} сек. Кликни чтобы остановить.` : "Голосовой ввод"}
+                >
+                  <Mic size={16} />
+                </button>
+              </div>
+
+              {agentStatus !== 'idle' ? (
+                <button
+                  type="button"
+                  onClick={onCancelAgent}
+                  className="rounded-full border border-red-500 bg-red-50 hover:bg-red-100 text-red-600 px-8 py-3 text-sm font-bold cursor-pointer shrink-0 transition-colors focus:outline-none flex items-center gap-1.5"
+                >
+                  <Square size={12} className="fill-red-600" />
+                  <span>Остановить</span>
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={!inputText.trim() || isTranscribing}
+                  className="rounded-full border border-theme-border bg-theme-send-btn px-8 py-3 text-sm font-bold text-black hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 transition-colors focus:outline-none"
+                >
+                  Отправить
+                </button>
+              )}
             </form>
           </div>
 
