@@ -5,11 +5,34 @@ use tauri::AppHandle;
 use tauri::Manager;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ThemeColors {
+    pub bg_color: String,
+    pub text_color: String,
+    pub border_color: String,
+    pub active_color: String,
+    pub send_btn_color: String,
+}
+
+impl Default for ThemeColors {
+    fn default() -> Self {
+        Self {
+            bg_color: "#ffffff".to_string(),
+            text_color: "#000000".to_string(),
+            border_color: "#000000".to_string(),
+            active_color: "#f5f5f5".to_string(),
+            send_btn_color: "#86efac".to_string(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppConfig {
     pub api_url: String,
     pub model_name: String,
     pub system_prompt: String,
     pub workspace_dir: Option<String>,
+    pub groq_api_key: Option<String>,
+    pub theme_colors: Option<ThemeColors>,
 }
 
 impl Default for AppConfig {
@@ -58,9 +81,12 @@ Rules:
 - The user will confirm write_file, patch_file, and execute_command before they run. Other tools run automatically.
 - After a tool executes, the system will provide the output. You must analyze the output and continue.".to_string(),
             workspace_dir: None,
+            groq_api_key: None,
+            theme_colors: Some(ThemeColors::default()),
         }
     }
 }
+
 
 pub fn get_config_path(app: &AppHandle) -> Result<PathBuf, String> {
     let mut path = app.path().app_config_dir().map_err(|e| e.to_string())?;

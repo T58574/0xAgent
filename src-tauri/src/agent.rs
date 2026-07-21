@@ -11,7 +11,8 @@ use futures_util::StreamExt;
 use chrono::Utc;
 
 use crate::config::AppConfig;
-use crate::session::{ChatMessage, ChatSession, ToolCallInfo, save_session};
+use crate::session::{ChatMessage, ToolCallInfo, save_session};
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ParsedToolCall {
@@ -357,6 +358,11 @@ pub async fn run_agent_loop(
         }
     };
 
+    if let Ok(mut state) = crate::share::get_share_state().lock() {
+        state.status = "thinking".to_string();
+        state.last_tokens = String::new();
+    }
+
     let _ = app.emit("agent-status-changed", "thinking");
 
     loop {
@@ -455,6 +461,11 @@ pub async fn run_agent_loop(
                                     if let Some(content_val) = delta.get("content") {
                                         if let Some(content_str) = content_val.as_str() {
                                             assistant_message.content.push_str(content_str);
+                                            
+                                            if let Ok(mut state) = crate::share::get_share_state().lock() {
+                                                state.last_tokens.push_str(content_str);
+                                            }
+
                                             // Emit stream to frontend
                                             let _ = app.emit("agent-token-stream", json!({
                                                 "message_id": assistant_message_id.clone(),
@@ -644,6 +655,9 @@ pub async fn run_agent_loop(
         let _ = save_session(&app, &session);
 
         if !has_new_tool_executions {
+            if let Ok(mut state) = crate::share::get_share_state().lock() {
+                state.status = "idle".to_string();
+            }
             let _ = app.emit("agent-status-changed", "idle");
             break;
         }
@@ -652,3 +666,4 @@ pub async fn run_agent_loop(
         // Loop runs again and sends updated chat history to LLM
     }
 }
+

@@ -1,6 +1,8 @@
 mod config;
 mod session;
 mod agent;
+mod share;
+
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -183,6 +185,117 @@ fn write_file_raw(path: String, content: String) -> Result<(), String> {
     fs::write(file_path, content).map_err(|e| format!("Failed to save file: {}", e))
 }
 
+#[tauri::command]
+fn start_share_server(app: tauri::AppHandle, password: Option<String>) -> Result<String, String> {
+    share::start_http_server(app, password)
+}
+
+#[tauri::command]
+fn stop_share_server() -> Result<(), String> {
+    share::stop_http_server()
+}
+
+#[tauri::command]
+fn get_share_status() -> Result<Option<String>, String> {
+    let state = share::get_share_state().lock().unwrap();
+    Ok(state.server_url.clone())
+}
+
+fn decode_base64(s: &str) -> Option<Vec<u8>> {
+    let mut table = [0u8; 256];
+    for (i, &c) in b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".iter().enumerate() {
+        table[c as usize] = i as u8;
+    }
+    let mut clean = String::new();
+    for c in s.chars() {
+        if c.is_alphanumeric() || c == '+' || c == '/' || c == '=' {
+            clean.push(c);
+        }
+    }
+    let bytes = clean.as_bytes();
+    let mut result = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'=' { break; }
+        if i + 1 >= bytes.len() { break; }
+        
+        let mut num = (table[bytes[i] as usize] as u32) << 18;
+        let mut count = 2;
+        num |= (table[bytes[i+1] as usize] as u32) << 12;
+        
+        if i + 2 < bytes.len() && bytes[i + 2] != b'=' {
+            num |= (table[bytes[i+2] as usize] as u32) << 6;
+            count += 1;
+        }
+        if i + 3 < bytes.len() && bytes[i + 3] != b'=' {
+            num |= table[bytes[i+3] as usize] as u32;
+            count += 1;
+        }
+        result.push(((num >> 16) & 0xFF) as u8);
+        if count > 2 { result.push(((num >> 8) & 0xFF) as u8); }
+        if count > 3 { result.push((num & 0xFF) as u8); }
+        i += 4;
+    }
+    Some(result)
+}
+
+#[tauri::command]
+async fn transcribe_audio(app: tauri::AppHandle, audio_base64: String) -> Result<String, String> {
+    let config = config::load_config(&app);
+    let api_key = match config.groq_api_key {
+        Some(ref key) if !key.trim().is_empty() => key.trim().to_string(),
+        _ => return Err("Groq API key is not configured. Please set it in settings.".to_string()),
+    };
+
+    let audio_bytes = decode_base64(&audio_base64)
+        .ok_or_else(|| "Failed to decode base64 audio payload".to_string())?;
+
+    let boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW";
+    let mut body = Vec::new();
+
+    // 1. Model
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(b"Content-Disposition: form-data; name=\"model\"\r\n\r\n");
+    body.extend_from_slice(b"whisper-large-v3\r\n");
+
+    // 2. File
+    body.extend_from_slice(format!("--{}\r\n", boundary).as_bytes());
+    body.extend_from_slice(b"Content-Disposition: form-data; name=\"file\"; filename=\"audio.webm\"\r\n");
+    body.extend_from_slice(b"Content-Type: audio/webm\r\n\r\n");
+    body.extend_from_slice(&audio_bytes);
+    body.extend_from_slice(b"\r\n");
+
+    // End
+    body.extend_from_slice(format!("--{}--\r\n", boundary).as_bytes());
+
+    let client = reqwest::Client::new();
+    let url = "https://api.groq.com/openai/v1/audio/transcriptions";
+
+    let response = client.post(url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .header("Content-Type", format!("multipart/form-data; boundary={}", boundary))
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| format!("Network request failed: {}", e))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let error_body = response.text().await.unwrap_or_default();
+        return Err(format!("Groq API returned error {}: {}", status, error_body));
+    }
+
+    let json_res: serde_json::Value = response.json()
+        .await
+        .map_err(|e| format!("Failed to parse response JSON: {}", e))?;
+
+    let text = json_res.get("text")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "Response did not contain text field".to_string())?;
+
+    Ok(text.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -203,8 +316,14 @@ pub fn run() {
             respond_to_tool,
             get_workspace_tree,
             read_file_raw,
-            write_file_raw
+            write_file_raw,
+            start_share_server,
+            stop_share_server,
+            get_share_status,
+            transcribe_audio
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+
 }
+

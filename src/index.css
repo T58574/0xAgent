@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --color-theme-bg: var(--theme-bg, #ffffff);
+  --color-theme-text: var(--theme-text, #000000);
+  --color-theme-border: var(--theme-border, #000000);
+  --color-theme-active: var(--theme-active, #f5f5f5);
+  --color-theme-send-btn: var(--theme-send-btn, #86efac);
+}
+
+/* Custom Scrollbar Styles for black and white */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  background-color: var(--theme-bg, #ffffff);
+  color: var(--theme-text, #000000);
+  overflow: hidden;
+  margin: 0;
+}
+
+/* Swipe-up entry animation */
+.message-enter {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: swipeUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes swipeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide drawer transitions */
+.drawer-enter {
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.drawer-active {
+  transform: translateX(0);
+}
