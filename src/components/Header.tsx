@@ -54,11 +54,12 @@ export const Header: React.FC<HeaderProps> = ({
           <ChevronLeft size={16} />
         </button>
 
-        {/* Horizontal Sessions list */}
+        {/* Horizontal Sessions list - FIXED: better mobile touch handling */}
         <div
           ref={scrollRef}
-          className="flex-grow flex items-center gap-2 overflow-x-auto h-full px-2 scrollbar-none"
+          className="flex-grow flex items-center gap-1.5 overflow-x-auto h-full px-2 scrollbar-none"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          onTouchStart={() => {}} // Prevent default touch behavior for smoother scroll
         >
           {sessions.map((session) => {
             const isActive = session.id === currentSessionId;

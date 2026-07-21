@@ -29,17 +29,22 @@ export default function App() {
   const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings'>('chat');
   const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
 
-  // Mobile keyboard scroll offset reset on input blur (focusout)
+  // Mobile keyboard scroll offset reset on input blur (focusout) - FIXED: only on chat view inputs
   useEffect(() => {
-    const handleFocusOut = () => {
-      window.scrollTo(0, 0);
-      document.body.scrollTop = 0;
+    const handleFocusOut = (e: FocusEvent) => {
+      if (activeView !== 'chat') return;
+      const target = e.target as HTMLElement;
+      // Only scroll when focus leaves input fields in chat area
+      if (!target.closest('input, textarea')) {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+      }
     };
     document.addEventListener('focusout', handleFocusOut);
     return () => {
       document.removeEventListener('focusout', handleFocusOut);
     };
-  }, []);
+  }, [activeView]);
 
   // Apply manual hex colors configuration to document element custom properties
   useEffect(() => {

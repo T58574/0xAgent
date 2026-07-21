@@ -140,6 +140,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (!inputText.trim()) return;
     onSendMessage(inputText.trim());
     setInputText('');
+    
+    // Auto-focus input after sending message for quick follow-up
+    setTimeout(() => {
+      const input = document.activeElement as HTMLInputElement | null;
+      if (input && input.type === 'text') {
+        input.focus();
+      }
+    }, 100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

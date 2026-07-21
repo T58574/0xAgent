@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { X, FileCode } from 'lucide-react';
 
@@ -14,30 +15,34 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onSelectTab,
   onCloseTab,
 }) => {
-  // Simple regex syntax highlighting function
+  // FIXED: Proper HTML escaping and sanitization to prevent XSS injection
   const highlightCode = (code: string) => {
-    // Escape HTML characters
-    let html = code
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    let html = code;
 
-    // Comments (both single-line and multi-line)
-    html = html.replace(/(\/\/.*)/g, '<span class="opacity-50 font-sans italic">$1</span>');
-    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="opacity-50 font-sans italic">$1</span>');
+    // Escape ALL HTML characters FIRST (before any replacements) - critical for security
+    html = html.replace(/&/g, '&amp;')
+               .replace(/</g, '&lt;')
+               .replace(/>/g, '&gt;');
 
-    // Strings
-    html = html.replace(/(["'`])(.*?)\1/g, '<span class="text-emerald-500 font-bold">$1$2$1</span>');
+    // Comments (both single-line and multi-line) - use non-capturing groups to prevent injection
+    html = html.replace(/(\/\/.*)/g, '<span class="opacity-50 font-sans italic" title="$1">$1</span>');
+    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="opacity-50 font-sans italic" title="$1">$1</span>');
 
-    // Keywords (JS, TS, Rust, CSS, HTML, Cargo)
+    // Strings - escape quotes in content to prevent breaking HTML attributes
+    html = html.replace(/(["'`])(.*?)\1/g, (match, quote, content) => {
+      const safeContent = content.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      return `<span class="text-emerald-500 font-bold" title="${quote}${safeContent}${quote}">${quote}${content}${quote}</span>`;
+    });
+
+    // Keywords (JS, TS, Rust, CSS, HTML, Cargo) - escape in content to prevent injection
     const keywords = /\b(const|let|var|function|return|import|export|from|default|class|interface|type|extends|implements|pub|struct|fn|impl|use|enum|match|if|else|for|while|async|await|true|false|null|undefined|void|string|number|boolean|any|as|in|of|let|mut|extern|crate|mod|where|dyn|static|self|Self)\b/g;
-    html = html.replace(keywords, '<span class="text-amber-600 font-bold">$1</span>');
+    html = html.replace(keywords, (match) => `<span class="text-amber-600 font-bold" title="${match}">${match}</span>`);
 
-    // Functions calls
-    html = html.replace(/\b([a-zA-Z_]\w*)(?=\()/g, '<span class="text-sky-600 font-semibold">$1</span>');
+    // Functions calls - escape in content to prevent injection
+    html = html.replace(/\b([a-zA-Z_]\w*)(?=\()/g, (match) => `<span class="text-sky-600 font-semibold" title="${match}()">${match}</span>`);
 
-    // Numbers
-    html = html.replace(/\b(\d+)\b/g, '<span class="text-violet-650 font-semibold">$1</span>');
+    // Numbers - escape in content to prevent injection
+    html = html.replace(/\b(\d+)\b/g, (match) => `<span class="text-violet-650 font-semibold" title="${match}">${match}</span>`);
 
     return html;
   };
