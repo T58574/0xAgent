@@ -8,12 +8,16 @@ interface BottomPanelProps {
   modelName: string;
   onClearLogs: () => void;
   onSelectWorkspace: () => void;
+  activeView: 'chat' | 'workspace' | 'settings';
+  onChangeView: (view: 'chat' | 'workspace' | 'settings') => void;
 }
 
 export const BottomPanel: React.FC<BottomPanelProps> = ({
   logs,
   modelName,
   onClearLogs,
+  activeView,
+  onChangeView,
 }) => {
   const [activeTab, setActiveTab] = useState<'logs' | 'share' | null>(null);
 
@@ -209,9 +213,44 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
       <div className="w-full flex items-center border border-theme-border rounded-full px-4 py-1.5 bg-theme-bg text-theme-text justify-between shadow-sm select-none">
         <div className="flex items-center gap-3">
           <button
+            onClick={() => onChangeView('chat')}
+            className={`rounded-full border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
+              activeView === 'chat' 
+                ? 'bg-theme-active font-black border-theme-text' 
+                : 'border-theme-border'
+            }`}
+          >
+            чат
+          </button>
+
+          <button
+            onClick={() => onChangeView('workspace')}
+            className={`rounded-full border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
+              activeView === 'workspace' 
+                ? 'bg-theme-active font-black border-theme-text' 
+                : 'border-theme-border'
+            }`}
+          >
+            воркспейс
+          </button>
+
+          <button
+            onClick={() => onChangeView('settings')}
+            className={`rounded-full border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
+              activeView === 'settings' 
+                ? 'bg-theme-active font-black border-theme-text' 
+                : 'border-theme-border'
+            }`}
+          >
+            настройки
+          </button>
+
+          <span className="w-[1px] h-4 bg-theme-border opacity-35" />
+
+          <button
             onClick={() => toggleTab('logs')}
             className={`rounded-full border border-theme-border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
-              activeTab === 'logs' ? 'bg-theme-active font-bold' : ''
+              activeTab === 'logs' ? 'bg-theme-active font-bold border-theme-text' : ''
             }`}
           >
             логи
@@ -220,7 +259,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
           <button
             onClick={() => toggleTab('share')}
             className={`rounded-full border border-theme-border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
-              activeTab === 'share' ? 'bg-theme-active font-bold' : ''
+              activeTab === 'share' ? 'bg-theme-active font-bold border-theme-text' : ''
             }`}
           >
             раздача

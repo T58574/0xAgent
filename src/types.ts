@@ -6,6 +6,34 @@ export interface ThemeColors {
   send_btn_color: string;
 }
 
+export interface LocalServerConfig {
+  exe_path?: string | null;
+  model_path?: string | null;
+  host?: string | null;
+  port?: number | null;
+  ctx_size?: number | null;
+  threads?: number | null;
+  gpu_layers?: number | null;
+  temp?: number | null;
+  predict?: number | null;
+  batch_size?: number | null;
+  ubatch_size?: number | null;
+  min_p?: number | null;
+  top_k?: number | null;
+  top_p?: number | null;
+  repeat_penalty?: number | null;
+  seed?: number | null;
+  presence_penalty?: number | null;
+  frequency_penalty?: number | null;
+  flash_attn?: boolean | null;
+  embedding?: boolean | null;
+  cont_batching?: boolean | null;
+  prompt_cache?: boolean | null;
+  mlock?: boolean | null;
+  mmap?: boolean | null;
+  custom_args?: string | null;
+}
+
 export interface AppConfig {
   api_url: string;
   model_name: string;
@@ -13,6 +41,9 @@ export interface AppConfig {
   workspace_dir?: string | null;
   groq_api_key?: string | null;
   theme_colors?: ThemeColors | null;
+  models_path?: string | null;
+  reasoning_enabled?: boolean | null;
+  local_server?: LocalServerConfig | null;
 }
 
 

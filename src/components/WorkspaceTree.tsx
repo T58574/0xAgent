@@ -16,13 +16,13 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
   onFileClick,
 }) => {
   return (
-    <div className="h-full flex flex-col select-none text-[#cccccc] font-sans bg-[#121214] border-r border-[#2d2d2d]">
+    <div className="h-full flex flex-col select-none text-theme-text font-sans bg-theme-bg border-r border-theme-border">
       {/* Directory Path Selector */}
-      <div className="px-4 py-3 bg-[#181818] border-b border-[#2d2d2d] text-xs">
-        <div className="text-neutral-500 font-semibold mb-1 uppercase tracking-wider text-[9px]">Active Directory</div>
+      <div className="px-4 py-3 bg-theme-bg border-b border-theme-border text-xs">
+        <div className="text-theme-text opacity-60 font-semibold mb-1 uppercase tracking-wider text-[9px]">Active Directory</div>
         <div 
           onClick={onSelectWorkspace}
-          className="truncate font-mono p-2 rounded-full border border-[#2d2d2d] text-[#dddddd] cursor-pointer bg-[#1e1e1e] hover:bg-[#2d2d2d] text-center transition-all"
+          className="truncate font-mono p-2 rounded-full border border-theme-border text-theme-text cursor-pointer bg-theme-bg hover:bg-theme-active text-center transition-all"
           title={workspaceDir || "Click to select a directory"}
         >
           {workspaceDir ? workspaceDir.split('\\').pop() : "No folder selected"}
@@ -38,7 +38,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
             onFileClick={onFileClick} 
           />
         ) : (
-          <div className="text-center py-8 px-4 text-xs text-neutral-500 font-sans">
+          <div className="text-center py-8 px-4 text-xs text-theme-text opacity-50 font-sans">
             {workspaceDir ? "Empty workspace folder" : "Select a folder to view files and allow the AI to write code locally."}
           </div>
         )}
@@ -89,10 +89,10 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({ node, depth, onFileClick })
     <div>
       <div
         onClick={handleToggle}
-        className="flex items-center py-1 px-2 rounded hover:bg-[#2a2a2d] cursor-pointer text-[#cccccc] hover:text-white transition-all text-xs select-none"
+        className="flex items-center py-1 px-2 rounded hover:bg-theme-active cursor-pointer text-theme-text transition-all text-xs select-none"
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
       >
-        <span className="mr-1 text-neutral-600">
+        <span className="mr-1 text-theme-text opacity-60">
           {node.is_dir ? (
             isOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />
           ) : (
@@ -103,12 +103,12 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({ node, depth, onFileClick })
         <span className="mr-2 shrink-0">
           {node.is_dir ? (
             isOpen ? (
-              <FolderOpen size={12} className="text-amber-400" />
+              <FolderOpen size={12} className="text-theme-text opacity-80" />
             ) : (
-              <Folder size={12} className="text-amber-400" />
+              <Folder size={12} className="text-theme-text opacity-85" />
             )
           ) : (
-            <FileCode size={12} className="text-sky-400" />
+            <FileCode size={12} className="text-theme-text opacity-70" />
           )}
         </span>
 

@@ -10,6 +10,7 @@ interface ChatAreaProps {
   onSendMessage: (text: string) => void;
   onRespondToTool: (toolId: string, approve: boolean) => void;
   onCancelAgent?: () => void;
+  reasoningEnabled?: boolean;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -18,6 +19,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onSendMessage,
   onRespondToTool,
   onCancelAgent,
+  reasoningEnabled = true,
 }) => {
   const [inputText, setInputText] = useState('');
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -55,7 +57,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      const options = { mimeType: 'audio/webm' };
+
+      let mimeType = 'audio/webm';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm')) {
+          mimeType = 'audio/webm';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          mimeType = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+          mimeType = 'audio/ogg';
+        } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+          mimeType = 'audio/wav';
+        }
+      }
+
+      const options = { mimeType };
       const recorder = new MediaRecorder(stream, options);
       
       recorder.ondataavailable = (event) => {
@@ -65,7 +81,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       };
 
       recorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
@@ -83,8 +99,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   return prev + spacer + transcribedText;
                 });
               }
-            } catch (err) {
+            } catch (err: any) {
               console.error("Transcription failed:", err);
+              alert("Ошибка транскрибации голоса через Groq:\n" + err.toString());
             } finally {
               setIsTranscribing(false);
             }
@@ -97,8 +114,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       mediaRecorderRef.current = recorder;
       recorder.start();
       setIsRecording(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to start recording:", err);
+      alert("Не удалось включить микрофон:\n" + err.toString() + "\n\nПожалуйста, проверьте:\n1. Подключен ли микрофон к компьютеру.\n2. Разрешен ли доступ к микрофону в настройках конфиденциальности Windows.\n3. Добавлен ли Groq API Key в настройках приложения для распознавания.");
     }
   };
 
@@ -133,7 +151,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex-grow flex flex-col relative h-full overflow-hidden bg-theme-bg select-text w-full text-theme-text">
+    <div className="flex-grow flex flex-col relative overflow-hidden bg-theme-bg select-text w-full text-theme-text">
       
       {/* 1. INITIAL CENTERED VIEW */}
       {!hasMessages && (
@@ -153,7 +171,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 type="button"
                 onClick={handleMicClick}
                 disabled={isTranscribing}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center z-10 hover:scale-110 active:scale-95 duration-150 ${
                   isRecording
                     ? 'bg-red-500 text-white animate-pulse'
                     : 'text-neutral-500 hover:text-theme-text'
@@ -209,23 +227,54 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     )}
 
                     {/* Assistant message */}
-                    {msg.role === 'assistant' && (
-                      <div className="self-start max-w-[90%] w-full rounded-2xl border border-theme-border p-6 bg-theme-bg text-theme-text text-sm leading-relaxed shadow-sm my-2">
-                        {textOutput && (
-                          <div className="whitespace-pre-wrap font-sans prose max-w-none text-theme-text">
-                            {textOutput}
-                          </div>
-                        )}
+                    {msg.role === 'assistant' && (() => {
+                      let thinkText = "";
+                      let bodyText = textOutput;
 
-                        {msg.tool_calls && msg.tool_calls.map((tool) => (
-                          <ToolCard 
-                            key={tool.id} 
-                            tool={tool} 
-                            onRespond={onRespondToTool} 
-                          />
-                        ))}
-                      </div>
-                    )}
+                      if (textOutput) {
+                        const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+                        const match = textOutput.match(thinkRegex);
+                        if (match) {
+                          thinkText = match[1].trim();
+                          bodyText = textOutput.replace(thinkRegex, "").trim();
+                        } else if (textOutput.includes("<think>")) {
+                          const startIdx = textOutput.indexOf("<think>");
+                          thinkText = textOutput.substring(startIdx + 7).trim();
+                          bodyText = textOutput.substring(0, startIdx).trim();
+                        }
+                      }
+
+                      return (
+                        <div className="self-start max-w-[90%] w-full rounded-2xl border border-theme-border p-6 bg-theme-bg text-theme-text text-sm leading-relaxed shadow-sm my-2">
+                          {reasoningEnabled && thinkText && (
+                            <details open className="mb-3 border border-theme-border rounded-xl bg-theme-active/30 overflow-hidden group">
+                              <summary className="px-4 py-2 font-mono text-xs text-theme-text/75 select-none cursor-pointer hover:bg-theme-active transition-colors flex items-center justify-between">
+                                <span className="flex items-center gap-1.5 font-bold uppercase tracking-wide">
+                                  🧠 Ход мыслей (Reasoning)
+                                </span>
+                              </summary>
+                              <div className="px-4 py-3 border-t border-theme-border bg-theme-active/10 font-sans text-xs text-theme-text/80 whitespace-pre-wrap leading-relaxed">
+                                {thinkText}
+                              </div>
+                            </details>
+                          )}
+
+                          {bodyText && (
+                            <div className="whitespace-pre-wrap font-sans prose max-w-none text-theme-text">
+                              {bodyText}
+                            </div>
+                          )}
+
+                          {msg.tool_calls && msg.tool_calls.map((tool) => (
+                            <ToolCard 
+                              key={tool.id} 
+                              tool={tool} 
+                              onRespond={onRespondToTool} 
+                            />
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -267,7 +316,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   type="button"
                   onClick={handleMicClick}
                   disabled={agentStatus !== 'idle' || isTranscribing}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center z-10 hover:scale-110 active:scale-95 duration-150 ${
                     isRecording
                       ? 'bg-red-500 text-white animate-pulse'
                       : 'text-neutral-500 hover:text-theme-text disabled:opacity-30'

@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Folder, Settings } from 'lucide-react';
 import { AppConfig, ChatSession, ChatMessage, FileNode, ToolCallInfo } from './types';
 import { Header } from './components/Header';
 import { WorkspaceTree } from './components/WorkspaceTree';
 import { ChatArea } from './components/ChatArea';
 import { BottomPanel } from './components/BottomPanel';
-import { SettingsModal } from './components/SettingsModal';
+import { SettingsPage } from './components/SettingsModal';
 import { FileViewer } from './components/FileViewer';
 import { CodeEditor } from './components/CodeEditor';
 
@@ -26,11 +25,9 @@ export default function App() {
   const [workspaceTree, setWorkspaceTree] = useState<FileNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; content: string } | null>(null);
   
-  // Modals state
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+  // Navigation view state
+  const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings'>('chat');
   const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
-  const [mobileActiveTab, setMobileActiveTab] = useState<'code' | 'chat'>('chat');
 
   // Mobile keyboard scroll offset reset on input blur (focusout)
   useEffect(() => {
@@ -234,7 +231,7 @@ export default function App() {
       });
 
       setSelectedFile(newFile);
-      setIsWorkspaceOpen(true);
+      setActiveView('workspace');
       addLog(`Opened raw file: ${fileName}`);
     } catch (err) {
       addLog(`Failed to read file contents: ${err}`);
@@ -437,41 +434,43 @@ export default function App() {
   }, [config]);
 
   return (
-    <>
-      {isWorkspaceOpen ? (
-        <div className="fixed inset-0 flex flex-col md:flex-row bg-white text-black overflow-hidden relative select-none">
-          {/* Mobile Responsive Switcher Tabs */}
-          <div className="md:hidden flex border-b border-theme-border bg-theme-bg shrink-0 z-30 w-full">
-            <button
-              onClick={() => setMobileActiveTab('chat')}
-              className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider transition-colors ${
-                mobileActiveTab === 'chat'
-                  ? 'bg-theme-active text-theme-text border-b-2 border-theme-text font-black'
-                  : 'text-neutral-500 hover:text-theme-text opacity-75'
-              }`}
-            >
-              Чат
-            </button>
-            <button
-              onClick={() => setMobileActiveTab('code')}
-              className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider transition-colors ${
-                mobileActiveTab === 'code'
-                  ? 'bg-theme-active text-theme-text border-b-2 border-theme-text font-black'
-                  : 'text-neutral-500 hover:text-theme-text opacity-75'
-              }`}
-            >
-              Код
-            </button>
-          </div>
+    <div className="fixed inset-0 flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans select-none">
+      
+      {/* TOP SESSION HEADER (Hidden on Settings page to keep it clean) */}
+      {activeView !== 'settings' && (
+        <div className="px-4 pt-4 shrink-0 select-none">
+          <Header
+            sessions={sessions}
+            currentSessionId={currentSessionId}
+            onSelectSession={handleSelectSession}
+            onCreateSession={() => handleCreateSession()}
+            onDeleteSession={handleDeleteSession}
+            onOpenSettings={() => setActiveView('settings')}
+          />
+        </div>
+      )}
 
-          {/* Left Split Pane: Dark Mock IDE */}
-          <div className={`w-full md:w-[50%] h-full flex overflow-hidden bg-[#1e1e1e] border-r border-black relative shrink-0 md:flex ${mobileActiveTab === 'code' ? 'flex' : 'hidden'}`}>
-            {/* Sidebar Workspace tree (dark theme) */}
-            <div className="w-56 h-full flex flex-col bg-[#121214] border-r border-[#2d2d2d] overflow-hidden">
-              <div className="p-3 border-b border-[#2d2d2d] flex items-center justify-between shrink-0 select-none text-neutral-400 font-bold uppercase tracking-wider text-[10px]">
-                <span>Explorer</span>
-              </div>
-              <div className="flex-1 overflow-hidden">
+      {/* MAIN VIEWPORT SWITCHER */}
+      <div className="flex-1 w-full min-h-0 relative flex flex-col mt-4 pb-20">
+        
+        {activeView === 'chat' && (
+          <div className="flex-grow w-full h-full flex flex-col relative px-4 md:px-12 overflow-hidden">
+            <ChatArea
+              messages={currentSession ? currentSession.messages : []}
+              agentStatus={agentStatus}
+              onSendMessage={handleSendMessage}
+              onRespondToTool={handleRespondToTool}
+              onCancelAgent={handleCancelAgent}
+              reasoningEnabled={config?.reasoning_enabled !== false}
+            />
+          </div>
+        )}
+
+        {activeView === 'workspace' && (
+          <div className="flex-grow w-full h-full flex overflow-hidden border-t border-theme-border">
+            {/* Sidebar Workspace tree (main theme) */}
+            <div className="w-64 h-full flex flex-col bg-theme-bg border-r border-theme-border overflow-hidden">
+              <div className="flex-grow overflow-hidden">
                 <WorkspaceTree
                   workspaceDir={config?.workspace_dir}
                   treeNodes={workspaceTree}
@@ -491,152 +490,33 @@ export default function App() {
               />
             </div>
           </div>
+        )}
 
-          {/* Right Split Pane: Chat Area (Styled using custom colors) */}
-          <div className={`w-full md:w-[50%] h-full flex flex-col items-center relative overflow-hidden px-4 md:px-6 pt-4 pb-20 bg-theme-bg text-theme-text border-l border-theme-border md:flex ${mobileActiveTab === 'chat' ? 'flex' : 'hidden'}`}>
-            
-            {/* TOP SESSION HEADER */}
-            <Header
-              sessions={sessions}
-              currentSessionId={currentSessionId}
-              onSelectSession={handleSelectSession}
-              onCreateSession={() => handleCreateSession()}
-              onDeleteSession={handleDeleteSession}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-            />
-
-            {/* TIMELINE VIEWPORT */}
-            <div className="flex-1 w-full min-h-0 relative flex flex-col mt-4">
-              <ChatArea
-                messages={currentSession ? currentSession.messages : []}
-                agentStatus={agentStatus}
-                onSendMessage={handleSendMessage}
-                onRespondToTool={handleRespondToTool}
-                onCancelAgent={handleCancelAgent}
-              />
-            </div>
-
-            {/* BOTTOM FLOATING UTILITY STATUS STRIP */}
-            <BottomPanel
-              logs={logs}
-              systemInstructions={config ? config.system_prompt : ''}
-              modelName={config ? config.model_name : 'No model selected'}
-              onClearLogs={handleClearLogs}
-              onSelectWorkspace={handleSelectWorkspace}
+        {activeView === 'settings' && (
+          <div className="flex-grow w-full h-full overflow-hidden border-t border-theme-border bg-theme-bg">
+            <SettingsPage
+              config={config}
+              onSaveConfig={handleSaveConfig}
+              onCancel={() => setActiveView('chat')}
             />
           </div>
+        )}
 
-          {/* Corner Toggles absolute floating - visible on desktop */}
-          <div className="absolute top-4 left-4 z-40 hidden md:block">
-            <button 
-              onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)} 
-              className="w-10 h-10 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
-              title="Toggle Workspace Code View"
-            >
-              <Folder size={16} />
-            </button>
-          </div>
+      </div>
 
-          <div className="absolute top-4 right-4 z-40 hidden md:block">
-            <button 
-              onClick={() => setIsSettingsOpen(true)} 
-              className="w-10 h-10 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
-              title="Developer Settings"
-            >
-              <Settings size={16} />
-            </button>
-          </div>
-
-          {/* Toggles on Mobile - shifted slightly down to clear mobile switcher */}
-          <div className="absolute top-16 left-4 z-40 md:hidden">
-            <button 
-              onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)} 
-              className="w-8 h-8 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
-              title="Close Workspace Code View"
-            >
-              <Folder size={12} />
-            </button>
-          </div>
-          <div className="absolute top-16 right-4 z-40 md:hidden">
-            <button 
-              onClick={() => setIsSettingsOpen(true)} 
-              className="w-8 h-8 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
-              title="Developer Settings"
-            >
-              <Settings size={12} />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="fixed inset-0 flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans relative select-none">
-          
-          {/* Corner Buttons */}
-          <div className="absolute top-4 left-4 z-40">
-            <button 
-              onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)} 
-              className="w-10 h-10 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
-              title="Toggle Workspace Code View"
-            >
-              <Folder size={16} />
-            </button>
-          </div>
-
-          <div className="absolute top-4 right-4 z-40">
-            <button 
-              onClick={() => setIsSettingsOpen(true)} 
-              className="w-10 h-10 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
-              title="Developer Settings"
-            >
-              <Settings size={16} />
-            </button>
-          </div>
-
-          {/* Main Centered Content */}
-          <div className="flex-1 w-full h-full flex flex-col items-center relative overflow-hidden px-4 md:px-12 pt-4 pb-20">
-            
-            {/* TOP SESSION HEADER */}
-            <Header
-              sessions={sessions}
-              currentSessionId={currentSessionId}
-              onSelectSession={handleSelectSession}
-              onCreateSession={() => handleCreateSession()}
-              onDeleteSession={handleDeleteSession}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-            />
-
-            {/* TIMELINE VIEWPORT */}
-            <div className="flex-1 w-full min-h-0 relative flex flex-col mt-4">
-              <ChatArea
-                messages={currentSession ? currentSession.messages : []}
-                agentStatus={agentStatus}
-                onSendMessage={handleSendMessage}
-                onRespondToTool={handleRespondToTool}
-                onCancelAgent={handleCancelAgent}
-              />
-            </div>
-
-            {/* BOTTOM FLOATING UTILITY STATUS STRIP */}
-            <BottomPanel
-              logs={logs}
-              systemInstructions={config ? config.system_prompt : ''}
-              modelName={config ? config.model_name : 'No model selected'}
-              onClearLogs={handleClearLogs}
-              onSelectWorkspace={handleSelectWorkspace}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* settings panel MODAL */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        config={config}
-        onSaveConfig={handleSaveConfig}
+      {/* BOTTOM NAVIGATION FOOTER PANEL */}
+      <BottomPanel
+        logs={logs}
+        systemInstructions={config ? config.system_prompt : ''}
+        modelName={config ? config.model_name : 'No model selected'}
+        onClearLogs={handleClearLogs}
+        onSelectWorkspace={handleSelectWorkspace}
+        activeView={activeView}
+        onChangeView={setActiveView}
       />
 
       {/* raw text file viewer OVERLAY (fallback) */}
-      {!isWorkspaceOpen && selectedFile && (
+      {activeView !== 'workspace' && selectedFile && (
         <FileViewer
           fileName={selectedFile.name}
           filePath={selectedFile.path}
@@ -644,6 +524,6 @@ export default function App() {
           onClose={() => setSelectedFile(null)}
         />
       )}
-    </>
+    </div>
   );
 }

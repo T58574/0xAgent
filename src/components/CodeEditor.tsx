@@ -23,21 +23,21 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       .replace(/>/g, '&gt;');
 
     // Comments (both single-line and multi-line)
-    html = html.replace(/(\/\/.*)/g, '<span class="text-neutral-500">$1</span>');
-    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="text-neutral-500">$1</span>');
+    html = html.replace(/(\/\/.*)/g, '<span class="opacity-50 font-sans italic">$1</span>');
+    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="opacity-50 font-sans italic">$1</span>');
 
     // Strings
-    html = html.replace(/(["'`])(.*?)\1/g, '<span class="text-emerald-400">$1$2$1</span>');
+    html = html.replace(/(["'`])(.*?)\1/g, '<span class="text-emerald-500 font-bold">$1$2$1</span>');
 
     // Keywords (JS, TS, Rust, CSS, HTML, Cargo)
     const keywords = /\b(const|let|var|function|return|import|export|from|default|class|interface|type|extends|implements|pub|struct|fn|impl|use|enum|match|if|else|for|while|async|await|true|false|null|undefined|void|string|number|boolean|any|as|in|of|let|mut|extern|crate|mod|where|dyn|static|self|Self)\b/g;
-    html = html.replace(keywords, '<span class="text-amber-500 font-bold">$1</span>');
+    html = html.replace(keywords, '<span class="text-amber-600 font-bold">$1</span>');
 
     // Functions calls
-    html = html.replace(/\b([a-zA-Z_]\w*)(?=\()/g, '<span class="text-sky-400">$1</span>');
+    html = html.replace(/\b([a-zA-Z_]\w*)(?=\()/g, '<span class="text-sky-600 font-semibold">$1</span>');
 
     // Numbers
-    html = html.replace(/\b(\d+)\b/g, '<span class="text-violet-400">$1</span>');
+    html = html.replace(/\b(\d+)\b/g, '<span class="text-violet-650 font-semibold">$1</span>');
 
     return html;
   };
@@ -45,26 +45,26 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const lines = selectedFile ? selectedFile.content.split('\n') : [];
 
   return (
-    <div className="h-full w-full bg-[#1e1e1e] text-[#d4d4d4] flex flex-col font-mono text-xs overflow-hidden select-text border-r border-black">
+    <div className="h-full w-full bg-theme-bg text-theme-text flex flex-col font-mono text-xs overflow-hidden select-text border-r border-theme-border">
       {/* Editor Tabs Bar */}
-      <div className="flex items-center overflow-x-auto bg-[#181818] border-b border-[#2d2d2d] select-none scrollbar-none shrink-0">
+      <div className="flex items-center overflow-x-auto bg-theme-bg border-b border-theme-border select-none scrollbar-none shrink-0">
         {openTabs.map((tab) => {
           const isActive = selectedFile && selectedFile.path === tab.path;
           return (
             <div
               key={tab.path}
               onClick={() => onSelectTab(tab.path)}
-              className={`group flex items-center gap-2 px-4 py-2 border-r border-[#2b2b2b] cursor-pointer transition-colors ${
+              className={`group flex items-center gap-2 px-4 py-2 border-r border-theme-border cursor-pointer transition-colors ${
                 isActive
-                  ? 'bg-[#1e1e1e] text-white border-t-2 border-orange-500'
-                  : 'bg-[#141414] text-neutral-400 hover:bg-[#1b1b1b] hover:text-neutral-200'
+                  ? 'bg-theme-active text-theme-text border-t-2 border-theme-text font-bold'
+                  : 'bg-theme-bg text-theme-text/60 hover:bg-theme-active hover:text-theme-text'
               }`}
             >
-              <FileCode size={12} className={isActive ? 'text-orange-400' : 'text-neutral-500'} />
+              <FileCode size={12} className={isActive ? 'text-theme-text' : 'text-theme-text/40'} />
               <span className="truncate max-w-[100px]">{tab.name}</span>
               <button
                 onClick={(e) => onCloseTab(tab.path, e)}
-                className="p-0.5 rounded hover:bg-[#2d2d2d] text-neutral-500 hover:text-white transition-colors cursor-pointer"
+                className="p-0.5 rounded hover:bg-theme-active text-theme-text/40 hover:text-theme-text transition-colors cursor-pointer"
               >
                 <X size={10} />
               </button>
@@ -78,7 +78,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         {selectedFile ? (
           <>
             {/* Line Numbers */}
-            <div className="text-right text-neutral-600 select-none pr-4 border-r border-[#2d2d2d] sticky left-0 bg-[#1e1e1e] h-fit">
+            <div className="text-right text-theme-text/40 select-none pr-4 border-r border-theme-border sticky left-0 bg-theme-bg h-fit">
               {lines.map((_, i) => (
                 <div key={i} className="leading-5 h-5 min-w-[20px]">
                   {i + 1}
@@ -102,12 +102,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             </pre>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center select-none text-neutral-500 space-y-3">
-            <div className="w-16 h-16 rounded-full border border-[#2d2d2d] flex items-center justify-center text-neutral-600">
+          <div className="flex-1 flex flex-col items-center justify-center text-center select-none text-theme-text/40 space-y-3">
+            <div className="w-16 h-16 rounded-full border border-theme-border flex items-center justify-center text-theme-text/30">
               <FileCode size={32} />
             </div>
             <div>
-              <div className="font-bold text-neutral-400">No File Open</div>
+              <div className="font-bold text-theme-text/60">No File Open</div>
               <div className="text-[10px] mt-1">Select a file from the sidebar to display it in the editor.</div>
             </div>
           </div>

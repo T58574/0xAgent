@@ -81,6 +81,31 @@ fn select_workspace(app: tauri::AppHandle) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
+fn select_model_file() -> Result<Option<String>, String> {
+    let file = rfd::FileDialog::new()
+        .add_filter("GGUF Model (*.gguf)", &["gguf"])
+        .pick_file();
+        
+    if let Some(path) = file {
+        Ok(Some(path.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+fn select_models_dir() -> Result<Option<String>, String> {
+    let folder = rfd::FileDialog::new()
+        .pick_folder();
+        
+    if let Some(path) = folder {
+        Ok(Some(path.to_string_lossy().to_string()))
+    } else {
+        Ok(None)
+    }
+}
+
+#[tauri::command]
 async fn send_message(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
@@ -326,10 +351,25 @@ async fn transcribe_audio(app: tauri::AppHandle, audio_base64: String) -> Result
 #[tauri::command]
 async fn download_llama_server(
     app: tauri::AppHandle,
-    version: String,
-    build_type: String,
+    url: String,
+    filename: String,
 ) -> Result<String, String> {
-    llama_manager::download_server_release(app, version, build_type).await
+    llama_manager::download_server_release(app, url, filename).await
+}
+
+#[tauri::command]
+async fn get_llama_releases() -> Result<Vec<llama_manager::LlamaRelease>, String> {
+    llama_manager::get_github_releases().await
+}
+
+#[tauri::command]
+fn get_system_specs() -> Result<llama_manager::SystemSpecs, String> {
+    llama_manager::get_system_specs()
+}
+
+#[tauri::command]
+fn list_downloaded_models(custom_dir: Option<String>, app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    llama_manager::list_downloaded_models(custom_dir, &app)
 }
 
 #[tauri::command]
@@ -431,7 +471,12 @@ pub fn run() {
             start_llama_server,
             stop_llama_server,
             get_llama_server_status,
-            get_local_paths
+            get_local_paths,
+            get_llama_releases,
+            get_system_specs,
+            list_downloaded_models,
+            select_model_file,
+            select_models_dir
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

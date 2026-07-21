@@ -25,6 +25,35 @@ impl Default for ThemeColors {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct LocalServerConfig {
+    pub exe_path: Option<String>,
+    pub model_path: Option<String>,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub ctx_size: Option<u32>,
+    pub threads: Option<u32>,
+    pub gpu_layers: Option<u32>,
+    pub temp: Option<f32>,
+    pub predict: Option<i32>,
+    pub batch_size: Option<u32>,
+    pub ubatch_size: Option<u32>,
+    pub min_p: Option<f32>,
+    pub top_k: Option<u32>,
+    pub top_p: Option<f32>,
+    pub repeat_penalty: Option<f32>,
+    pub seed: Option<i32>,
+    pub presence_penalty: Option<f32>,
+    pub frequency_penalty: Option<f32>,
+    pub flash_attn: Option<bool>,
+    pub embedding: Option<bool>,
+    pub cont_batching: Option<bool>,
+    pub prompt_cache: Option<bool>,
+    pub mlock: Option<bool>,
+    pub mmap: Option<bool>,
+    pub custom_args: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct AppConfig {
     pub api_url: String,
@@ -33,6 +62,9 @@ pub struct AppConfig {
     pub workspace_dir: Option<String>,
     pub groq_api_key: Option<String>,
     pub theme_colors: Option<ThemeColors>,
+    pub models_path: Option<String>,
+    pub reasoning_enabled: Option<bool>,
+    pub local_server: Option<LocalServerConfig>,
 }
 
 impl Default for AppConfig {
@@ -98,6 +130,9 @@ def calculate(a, b):
             workspace_dir: None,
             groq_api_key: None,
             theme_colors: Some(ThemeColors::default()),
+            models_path: None,
+            reasoning_enabled: Some(true),
+            local_server: None,
         }
     }
 }
