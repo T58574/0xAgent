@@ -30,6 +30,19 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
   const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
+  const [mobileActiveTab, setMobileActiveTab] = useState<'code' | 'chat'>('chat');
+
+  // Mobile keyboard scroll offset reset on input blur (focusout)
+  useEffect(() => {
+    const handleFocusOut = () => {
+      window.scrollTo(0, 0);
+      document.body.scrollTop = 0;
+    };
+    document.addEventListener('focusout', handleFocusOut);
+    return () => {
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, []);
 
   // Apply manual hex colors configuration to document element custom properties
   useEffect(() => {
@@ -426,9 +439,33 @@ export default function App() {
   return (
     <>
       {isWorkspaceOpen ? (
-        <div className="w-screen h-screen flex bg-white text-black overflow-hidden relative select-none">
+        <div className="fixed inset-0 flex flex-col md:flex-row bg-white text-black overflow-hidden relative select-none">
+          {/* Mobile Responsive Switcher Tabs */}
+          <div className="md:hidden flex border-b border-theme-border bg-theme-bg shrink-0 z-30 w-full">
+            <button
+              onClick={() => setMobileActiveTab('chat')}
+              className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider transition-colors ${
+                mobileActiveTab === 'chat'
+                  ? 'bg-theme-active text-theme-text border-b-2 border-theme-text font-black'
+                  : 'text-neutral-500 hover:text-theme-text opacity-75'
+              }`}
+            >
+              Чат
+            </button>
+            <button
+              onClick={() => setMobileActiveTab('code')}
+              className={`flex-1 py-3 text-center text-xs font-bold uppercase tracking-wider transition-colors ${
+                mobileActiveTab === 'code'
+                  ? 'bg-theme-active text-theme-text border-b-2 border-theme-text font-black'
+                  : 'text-neutral-500 hover:text-theme-text opacity-75'
+              }`}
+            >
+              Код
+            </button>
+          </div>
+
           {/* Left Split Pane: Dark Mock IDE */}
-          <div className="w-[50%] h-full flex overflow-hidden bg-[#1e1e1e] border-r border-black relative shrink-0">
+          <div className={`w-full md:w-[50%] h-full flex overflow-hidden bg-[#1e1e1e] border-r border-black relative shrink-0 md:flex ${mobileActiveTab === 'code' ? 'flex' : 'hidden'}`}>
             {/* Sidebar Workspace tree (dark theme) */}
             <div className="w-56 h-full flex flex-col bg-[#121214] border-r border-[#2d2d2d] overflow-hidden">
               <div className="p-3 border-b border-[#2d2d2d] flex items-center justify-between shrink-0 select-none text-neutral-400 font-bold uppercase tracking-wider text-[10px]">
@@ -456,7 +493,7 @@ export default function App() {
           </div>
 
           {/* Right Split Pane: Chat Area (Styled using custom colors) */}
-          <div className="w-[50%] h-full flex flex-col items-center relative overflow-hidden px-4 md:px-6 pt-4 pb-20 bg-theme-bg text-theme-text border-l border-theme-border">
+          <div className={`w-full md:w-[50%] h-full flex flex-col items-center relative overflow-hidden px-4 md:px-6 pt-4 pb-20 bg-theme-bg text-theme-text border-l border-theme-border md:flex ${mobileActiveTab === 'chat' ? 'flex' : 'hidden'}`}>
             
             {/* TOP SESSION HEADER */}
             <Header
@@ -489,8 +526,8 @@ export default function App() {
             />
           </div>
 
-          {/* Corner Toggles absolute floating */}
-          <div className="absolute top-4 left-4 z-40">
+          {/* Corner Toggles absolute floating - visible on desktop */}
+          <div className="absolute top-4 left-4 z-40 hidden md:block">
             <button 
               onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)} 
               className="w-10 h-10 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
@@ -500,7 +537,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="absolute top-4 right-4 z-40">
+          <div className="absolute top-4 right-4 z-40 hidden md:block">
             <button 
               onClick={() => setIsSettingsOpen(true)} 
               className="w-10 h-10 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
@@ -509,9 +546,29 @@ export default function App() {
               <Settings size={16} />
             </button>
           </div>
+
+          {/* Toggles on Mobile - shifted slightly down to clear mobile switcher */}
+          <div className="absolute top-16 left-4 z-40 md:hidden">
+            <button 
+              onClick={() => setIsWorkspaceOpen(!isWorkspaceOpen)} 
+              className="w-8 h-8 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
+              title="Close Workspace Code View"
+            >
+              <Folder size={12} />
+            </button>
+          </div>
+          <div className="absolute top-16 right-4 z-40 md:hidden">
+            <button 
+              onClick={() => setIsSettingsOpen(true)} 
+              className="w-8 h-8 rounded-full border border-black bg-neutral-200 hover:bg-neutral-300 transition-all cursor-pointer shadow-sm flex items-center justify-center text-black focus:outline-none"
+              title="Developer Settings"
+            >
+              <Settings size={12} />
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="w-screen h-screen flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans relative select-none">
+        <div className="fixed inset-0 flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans relative select-none">
           
           {/* Corner Buttons */}
           <div className="absolute top-4 left-4 z-40">

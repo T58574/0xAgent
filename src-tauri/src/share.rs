@@ -958,6 +958,7 @@ pub fn start_http_server(app: AppHandle, password: Option<String>) -> Result<Str
                           let config = crate::config::load_config(&app_handle);
                           let state = app_handle.state::<AppState>();
                           let state_clone = state.pending_confirmation.clone();
+                          let cancel_tokens = state.cancel_tokens.clone();
                           let sess_id_str = session_id.to_string();
                           let app_h = app_handle.clone();
                           
@@ -970,7 +971,7 @@ pub fn start_http_server(app: AppHandle, password: Option<String>) -> Result<Str
                           }
 
                           tokio::spawn(async move {
-                            crate::agent::run_agent_loop(app_h, sess_id_str, config, state_clone).await;
+                            crate::agent::run_agent_loop(app_h, sess_id_str, config, state_clone, cancel_tokens).await;
                           });
                           
                           success = true;

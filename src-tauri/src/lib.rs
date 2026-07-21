@@ -2,6 +2,7 @@ mod config;
 mod session;
 mod agent;
 mod share;
+mod llama_manager;
 
 
 use std::sync::Arc;
@@ -25,6 +26,7 @@ pub struct FileNode {
 pub struct AppState {
     pub pending_confirmation: Arc<Mutex<Option<PendingConfirmation>>>,
     pub cancel_tokens: Arc<tokio::sync::Mutex<std::collections::HashSet<String>>>,
+    pub llama_process: Arc<tokio::sync::Mutex<Option<llama_manager::LlamaServerProcess>>>,
 }
 
 #[tauri::command]
@@ -321,6 +323,81 @@ async fn transcribe_audio(app: tauri::AppHandle, audio_base64: String) -> Result
     Ok(text.to_string())
 }
 
+#[tauri::command]
+async fn download_llama_server(
+    app: tauri::AppHandle,
+    version: String,
+    build_type: String,
+) -> Result<String, String> {
+    llama_manager::download_server_release(app, version, build_type).await
+}
+
+#[tauri::command]
+async fn download_gguf_model(
+    app: tauri::AppHandle,
+    repo: String,
+    filename: String,
+) -> Result<String, String> {
+    llama_manager::download_huggingface_model(app, repo, filename).await
+}
+
+#[tauri::command]
+async fn start_llama_server(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    config: llama_manager::LlamaServerConfig,
+) -> Result<(), String> {
+    let mut lock = state.llama_process.lock().await;
+    if let Some(mut existing) = lock.take() {
+        let _ = existing.child.kill().await;
+    }
+    let new_process = llama_manager::start_llama_server_process(app, config)?;
+    *lock = Some(new_process);
+    Ok(())
+}
+
+#[tauri::command]
+async fn stop_llama_server(
+    state: tauri::State<'_, AppState>,
+) -> Result<(), String> {
+    let mut lock = state.llama_process.lock().await;
+    if let Some(mut process) = lock.take() {
+        process.child.kill().await.map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_llama_server_status(
+    state: tauri::State<'_, AppState>,
+) -> Result<serde_json::Value, String> {
+    let mut lock = state.llama_process.lock().await;
+    if let Some(ref mut process) = *lock {
+        match process.child.try_wait() {
+            Ok(None) => {
+                Ok(serde_json::json!({ "status": "running", "port": process.port }))
+            }
+            Ok(Some(status)) => {
+                *lock = None;
+                Ok(serde_json::json!({ "status": "stopped", "code": status.code() }))
+            }
+            Err(_) => {
+                *lock = None;
+                Ok(serde_json::json!({ "status": "stopped", "error": "failed to check status" }))
+            }
+        }
+    } else {
+        Ok(serde_json::json!({ "status": "stopped" }))
+    }
+}
+
+#[tauri::command]
+fn get_local_paths(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let bin_dir = llama_manager::get_bin_dir(&app)?.to_string_lossy().to_string();
+    let models_dir = llama_manager::get_models_dir(&app)?.to_string_lossy().to_string();
+    Ok(serde_json::json!({ "bin_dir": bin_dir, "models_dir": models_dir }))
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -328,6 +405,7 @@ pub fn run() {
         .manage(AppState {
             pending_confirmation: Arc::new(Mutex::new(None)),
             cancel_tokens: Arc::new(tokio::sync::Mutex::new(std::collections::HashSet::new())),
+            llama_process: Arc::new(tokio::sync::Mutex::new(None)),
         })
         .invoke_handler(tauri::generate_handler![
             get_config,
@@ -347,7 +425,13 @@ pub fn run() {
             start_share_server,
             stop_share_server,
             get_share_status,
-            transcribe_audio
+            transcribe_audio,
+            download_llama_server,
+            download_gguf_model,
+            start_llama_server,
+            stop_llama_server,
+            get_llama_server_status,
+            get_local_paths
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
