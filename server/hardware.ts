@@ -19,12 +19,19 @@ export function detectGpuHardware(): HardwareInfo {
 
   try {
     if (process.platform === 'win32') {
-      const command = `powershell -NoProfile -Command "Get-CimInstance Win32_VideoCard | Select-Object -ExpandProperty Name"`;
-      const stdout = execSync(command, { encoding: 'utf-8' }).trim();
+      let stdout = '';
+      try {
+        const command = `powershell -NoProfile -Command "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name"`;
+        stdout = execSync(command, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      } catch {
+        try {
+          stdout = execSync('wmic path win32_videocontroller get name', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+        } catch {}
+      }
 
       if (stdout && stdout.length > 0) {
         result.isAutoDetected = true;
-        const gpus = stdout.split(/\r?\n/).map(g => g.trim()).filter(Boolean);
+        const gpus = stdout.split(/\r?\n/).map(g => g.trim()).filter(g => g && g.toLowerCase() !== 'name');
         result.gpuName = gpus.join(', ');
 
         const combinedName = stdout.toUpperCase();
@@ -50,8 +57,8 @@ export function detectGpuHardware(): HardwareInfo {
       result.recommendedBuild = 'Metal / macOS';
       result.recommendedAssetKeywords = ['macos', 'arm64'];
     }
-  } catch (err) {
-    console.error('Failed to detect GPU hardware:', err);
+  } catch {
+    // Ignore hardware detection errors gracefully
   }
 
   return result;

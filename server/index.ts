@@ -525,6 +525,33 @@ app.get('/api/llama-releases', async (req, res) => {
 
 let activeLlamaProcess: ChildProcess | null = null;
 
+// Kill any process occupying a given port (handles orphaned llama-server from tsx restarts)
+function killProcessOnPort(port: number): void {
+  try {
+    if (process.platform === 'win32') {
+      const output = execSync(
+        `netstat -ano | findstr ":${port}" | findstr "LISTENING"`,
+        { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }
+      ).trim();
+      const lines = output.split(/\r?\n/).filter(Boolean);
+      const pids = new Set<string>();
+      for (const line of lines) {
+        const parts = line.trim().split(/\s+/);
+        const pid = parts[parts.length - 1];
+        if (pid && pid !== '0') pids.add(pid);
+      }
+      for (const pid of pids) {
+        try {
+          execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
+          console.log(`[llama.cpp] Killed orphaned process PID ${pid} on port ${port}`);
+        } catch {}
+      }
+    }
+  } catch {
+    // No process found on port — safe to proceed
+  }
+}
+
 function stopLlamaServerProcess() {
   if (activeLlamaProcess) {
     try {
@@ -561,6 +588,9 @@ app.post('/api/start-local-server', (req, res) => {
     
     const host = body.host || cfg.local_server?.host || '127.0.0.1';
     const port = body.port || cfg.local_server?.port || 11434;
+
+    // Kill orphaned llama-server processes that may still hold the port
+    killProcessOnPort(port);
     let targetExe = body.exePath || cfg.local_server?.exe_path || '';
     let targetModel = body.modelPath || cfg.local_server?.model_path || '';
 
@@ -610,23 +640,52 @@ app.post('/api/start-local-server', (req, res) => {
         '--port', String(port),
       ];
 
-      if (body.ctxSize || cfg.local_server.ctx_size) args.push('-c', String(body.ctxSize || cfg.local_server.ctx_size));
-      if (body.gpuLayers !== undefined || cfg.local_server.gpu_layers !== undefined) args.push('-ngl', String(body.gpuLayers ?? cfg.local_server.gpu_layers));
-      if (body.threads || cfg.local_server.threads) args.push('-t', String(body.threads || cfg.local_server.threads));
-      if (body.batchSize || cfg.local_server.batch_size) args.push('-b', String(body.batchSize || cfg.local_server.batch_size));
-      if (body.ubatchSize || cfg.local_server.ubatch_size) args.push('-ub', String(body.ubatchSize || cfg.local_server.ubatch_size));
-      if (body.temp ?? cfg.local_server.temp) args.push('--temp', String(body.temp ?? cfg.local_server.temp));
-      if (body.repeatPenalty ?? cfg.local_server.repeat_penalty) args.push('--repeat-penalty', String(body.repeatPenalty ?? cfg.local_server.repeat_penalty));
-      if (body.minP ?? cfg.local_server.min_p) args.push('--min-p', String(body.minP ?? cfg.local_server.min_p));
+      const getVal = (bodyVal: any, cfgVal: any) => bodyVal !== undefined && bodyVal !== null ? bodyVal : cfgVal;
 
-      if (body.flashAttn ?? cfg.local_server.flash_attn) args.push('-fa');
-      if ((body.mmap ?? cfg.local_server.mmap) === false) args.push('--no-mmap');
-      if (body.mlock ?? cfg.local_server.mlock) args.push('--mlock');
-      if (body.embedding ?? cfg.local_server.embedding) args.push('--embedding');
-      if (body.contBatching ?? cfg.local_server.cont_batching) args.push('--cont-batching');
+      const ctxVal = getVal(body.ctxSize, cfg.local_server.ctx_size);
+      if (ctxVal !== undefined && ctxVal !== null) args.push('-c', String(ctxVal));
 
-      broadcast('agent-error', `Запуск сервера llama.cpp: ${path.basename(targetExe)}`);
-      
+      const nglVal = getVal(body.gpuLayers, cfg.local_server.gpu_layers);
+      if (nglVal !== undefined && nglVal !== null) args.push('-ngl', String(nglVal));
+
+      const threadsVal = getVal(body.threads, cfg.local_server.threads);
+      if (threadsVal !== undefined && threadsVal !== null) args.push('-t', String(threadsVal));
+
+      const batchVal = getVal(body.batchSize, cfg.local_server.batch_size);
+      if (batchVal !== undefined && batchVal !== null) args.push('-b', String(batchVal));
+
+      const ubatchVal = getVal(body.ubatchSize, cfg.local_server.ubatch_size);
+      if (ubatchVal !== undefined && ubatchVal !== null) args.push('-ub', String(ubatchVal));
+
+      const tempVal = getVal(body.temp, cfg.local_server.temp);
+      if (tempVal !== undefined && tempVal !== null) args.push('--temp', String(tempVal));
+
+      const rpVal = getVal(body.repeatPenalty, cfg.local_server.repeat_penalty);
+      if (rpVal !== undefined && rpVal !== null) args.push('--repeat-penalty', String(rpVal));
+
+      const minPVal = getVal(body.minP, cfg.local_server.min_p);
+      if (minPVal !== undefined && minPVal !== null) args.push('--min-p', String(minPVal));
+
+      const faVal = getVal(body.flashAttn, cfg.local_server.flash_attn);
+      if (faVal === true) args.push('-fa');
+
+      const mmapVal = getVal(body.mmap, cfg.local_server.mmap);
+      if (mmapVal === false) args.push('--no-mmap');
+
+      const mlockVal = getVal(body.mlock, cfg.local_server.mlock);
+      if (mlockVal === true) args.push('--mlock');
+
+      const embVal = getVal(body.embedding, cfg.local_server.embedding);
+      if (embVal === true) args.push('--embedding');
+
+      const cbVal = getVal(body.contBatching, cfg.local_server.cont_batching);
+      if (cbVal === true) args.push('--cont-batching');
+
+      // Log full launch command for diagnostics
+      const cmdLine = `${path.basename(targetExe)} ${args.join(' ')}`;
+      console.log(`[llama.cpp] Spawning: ${cmdLine}`);
+      broadcast('llama-server-log', `[CMD] ${cmdLine}`);
+
       activeLlamaProcess = spawn(targetExe, args, { cwd: path.dirname(targetExe) });
 
       activeLlamaProcess.stdout?.on('data', (data) => {
@@ -640,14 +699,29 @@ app.post('/api/start-local-server', (req, res) => {
       });
 
       activeLlamaProcess.on('error', (err) => {
-        broadcast('agent-error', `Ошибка llama-server: ${err.message}`);
+        console.error('[llama.cpp] Process error:', err.message);
+        broadcast('llama-server-log', `[ERROR] ${err.message}`);
+        broadcast('agent-error', `Ошибка сервера llama.cpp: ${err.message}`);
         activeLlamaProcess = null;
       });
 
-      activeLlamaProcess.on('exit', (code) => {
-        broadcast('agent-error', `Llama-server завершил работу (код ${code})`);
+      activeLlamaProcess.on('exit', (code, signal) => {
+        const exitMsg = `[llama.cpp] Процесс завершён (код: ${code}, сигнал: ${signal})`;
+        console.log(exitMsg);
+        broadcast('llama-server-log', exitMsg);
+        // Only broadcast as error if crashed (non-zero exit code)
+        if (code !== null && code !== 0) {
+          broadcast('agent-error', `Сервер llama.cpp аварийно завершился (код: ${code}). Проверьте логи сервера.`);
+        }
         activeLlamaProcess = null;
       });
+    } else {
+      const missingExe = !targetExe || !fs.existsSync(targetExe);
+      const missingModel = !targetModel || !fs.existsSync(targetModel);
+      const details: string[] = [];
+      if (missingExe) details.push(`exe_path: "${targetExe || 'не задан'}"`);
+      if (missingModel) details.push(`model_path: "${targetModel || 'не задан'}"`);
+      broadcast('llama-server-log', `[ERROR] Не удалось запустить: ${details.join(', ')}`);
     }
 
     res.json({ success: true, host, port, message: `Локальный сервер запущен на http://${host}:${port}/v1` });
