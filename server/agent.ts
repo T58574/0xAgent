@@ -9,6 +9,9 @@ import {
   executeGrepSearch,
   executeShellCommand,
 } from './tools';
+import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
+import { listSkills, readSkill } from './skills';
+import { listSessions, loadSession as getSessionById } from './session';
 
 export interface ParsedToolCall {
   id: string;
@@ -133,6 +136,96 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
     });
   }
 
+  // 7. Remember Fact
+  const reMemAdd = /<remember_fact\s+key=["']([^"']+)["']\s+value=["']([^"']+)["'](?:\s+category=["']([^"']+)["'])?\s*\/?>/gs;
+  while ((match = reMemAdd.exec(text)) !== null) {
+    toolCalls.push({
+      id: `mem_add_${uuidv4().substring(0, 8)}`,
+      name: 'remember_fact',
+      arguments: { key: match[1], value: match[2], category: match[3] || 'fact' },
+      raw_content: match[0],
+    });
+  }
+
+  // 8. Recall Memories
+  const reMemRecall = /<recall_memories\s+query=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reMemRecall.exec(text)) !== null) {
+    toolCalls.push({
+      id: `mem_recall_${uuidv4().substring(0, 8)}`,
+      name: 'recall_memories',
+      arguments: { query: match[1] },
+      raw_content: match[0],
+    });
+  }
+
+  // 9. List Skills
+  const reListSkills = /<list_skills\s*\/?>/gs;
+  while ((match = reListSkills.exec(text)) !== null) {
+    toolCalls.push({
+      id: `skills_list_${uuidv4().substring(0, 8)}`,
+      name: 'list_skills',
+      arguments: {},
+      raw_content: match[0],
+    });
+  }
+
+  // 10. Execute Skill
+  const reExecSkill = /<execute_skill\s+name=["']([^"']+)["'](?:\s+args=["']([^"']+)["'])?\s*\/?>/gs;
+  while ((match = reExecSkill.exec(text)) !== null) {
+    toolCalls.push({
+      id: `skill_exec_${uuidv4().substring(0, 8)}`,
+      name: 'execute_skill',
+      arguments: { name: match[1], args: match[2] || '' },
+      raw_content: match[0],
+    });
+  }
+
+  // 11. Search Sessions
+  const reSearchSessions = /<search_sessions\s+query=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reSearchSessions.exec(text)) !== null) {
+    toolCalls.push({
+      id: `search_sess_${uuidv4().substring(0, 8)}`,
+      name: 'search_sessions',
+      arguments: { query: match[1] },
+      raw_content: match[0],
+    });
+  }
+
+  // 12. Run Scratch Script
+  const reScratch = /<run_scratch_script\s+language=["']([^"']+)["']\s*>(.*?)<\/run_scratch_script>/gs;
+  while ((match = reScratch.exec(text)) !== null) {
+    toolCalls.push({
+      id: `scratch_${uuidv4().substring(0, 8)}`,
+      name: 'run_scratch_script',
+      arguments: { language: match[1], code: match[2] },
+      raw_content: match[0],
+    });
+  }
+
+  // 13. Ask User Clarification
+  const reAskUser = /<ask_user\s+question=["']([^"']+)["'](?:\s+options=["']([^"']+)["'])?\s*\/?>/gs;
+  while ((match = reAskUser.exec(text)) !== null) {
+    const rawOpts = match[2] || '';
+    const options = rawOpts ? rawOpts.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    toolCalls.push({
+      id: `ask_${uuidv4().substring(0, 8)}`,
+      name: 'ask_user',
+      arguments: { question: match[1], options },
+      raw_content: match[0],
+    });
+  }
+
+  // 14. Spawn Sub-Agent
+  const reSpawnAgent = /<spawn_subagent\s+role=["']([^"']+)["']\s+goal=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reSpawnAgent.exec(text)) !== null) {
+    toolCalls.push({
+      id: `subagent_${uuidv4().substring(0, 8)}`,
+      name: 'spawn_subagent',
+      arguments: { role: match[1], goal: match[2] },
+      raw_content: match[0],
+    });
+  }
+
   return toolCalls;
 }
 
@@ -155,8 +248,11 @@ export async function runAgentLoop(
       break;
     }
 
+    const memoryContext = getSystemPromptMemoryContext();
+    const fullSystemPrompt = config.system_prompt + memoryContext;
+
     const messages = [
-      { role: 'system', content: config.system_prompt },
+      { role: 'system', content: fullSystemPrompt },
       ...session.messages.map((m) => ({
         role: m.role === 'tool' ? 'user' : m.role,
         content: m.content,
@@ -343,6 +439,47 @@ export async function runAgentLoop(
             case 'execute_command':
               output = await executeShellCommand(config.workspace_dir, tc.arguments.command);
               break;
+            case 'remember_fact': {
+              const saved = addOrUpdateMemory(tc.arguments.key, tc.arguments.value, tc.arguments.category);
+              output = `Successfully stored fact in long-term memory: [${saved.category}] ${saved.key} = ${saved.value}`;
+              break;
+            }
+            case 'recall_memories': {
+              const found = queryMemories(tc.arguments.query);
+              output = found.length > 0 ? JSON.stringify(found, null, 2) : 'No matching long-term memories found.';
+              break;
+            }
+            case 'list_skills': {
+              const skills = listSkills();
+              output = JSON.stringify(skills, null, 2);
+              break;
+            }
+            case 'execute_skill': {
+              const skillContent = readSkill(tc.arguments.name);
+              output = `Loaded skill instructions [${tc.arguments.name}]:\n${skillContent}`;
+              break;
+            }
+            case 'search_sessions': {
+              const sessionSummaries = listSessions();
+              const query = (tc.arguments.query || '').toLowerCase();
+              const results: any[] = [];
+              for (const s of sessionSummaries) {
+                const full = getSessionById(s.id);
+                if (full) {
+                  const matches = full.messages.filter((m) => m.content.toLowerCase().includes(query));
+                  if (matches.length > 0) {
+                    results.push({
+                      session_id: s.id,
+                      session_title: s.title,
+                      matches_count: matches.length,
+                      snippets: matches.slice(0, 3).map((m) => m.content.substring(0, 150)),
+                    });
+                  }
+                }
+              }
+              output = results.length > 0 ? JSON.stringify(results, null, 2) : 'No matching text found across past session logs.';
+              break;
+            }
             default:
               output = `Unknown tool: ${tc.name}`;
           }

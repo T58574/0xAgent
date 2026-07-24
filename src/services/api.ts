@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, PromptFileInfo, GgufMetadata, HardwareInfo } from '../types';
+import { AppConfig, ChatSession, FileNode, PromptFileInfo, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo } from '../types';
 
 const API_BASE = '/api';
 
@@ -317,6 +317,59 @@ export async function get_server_slots(host: string, port: number): Promise<{ ok
   const res = await fetch(`${API_BASE}/server-slots?host=${encodeURIComponent(host)}&port=${port}`);
   if (!res.ok) return { ok: false, totalSlots: 0, activeSlots: 0 };
   return res.json();
+}
+
+export async function get_memories(query?: string): Promise<MemoryItem[]> {
+  const q = query ? `?query=${encodeURIComponent(query)}` : '';
+  const res = await fetch(`${API_BASE}/memories${q}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function add_memory(key: string, value: string, category?: string): Promise<MemoryItem> {
+  const res = await fetch(`${API_BASE}/memories`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, value, category }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function delete_memory(id: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/memories/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function get_skills(): Promise<SkillInfo[]> {
+  const res = await fetch(`${API_BASE}/skills`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_skill_content(name: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/skills/${encodeURIComponent(name)}`);
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.content;
+}
+
+export async function save_skill(name: string, content: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/skills/${encodeURIComponent(name)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function delete_skill(name: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/skills/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(await res.text());
 }
 
 

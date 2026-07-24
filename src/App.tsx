@@ -8,6 +8,7 @@ import { BottomPanel } from './components/BottomPanel';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { FileViewer } from './components/FileViewer';
 import { CodeEditor } from './components/CodeEditor';
+import { MemorySkillsModal } from './components/MemorySkillsModal';
 import { FolderTree, Code } from 'lucide-react';
 
 export default function App() {
@@ -16,6 +17,7 @@ export default function App() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
+  const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
   
   // Agent loop state
   const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'waiting_approval' | 'executing_tool'>('idle');
@@ -430,6 +432,7 @@ export default function App() {
             onCreateSession={() => handleCreateSession()}
             onDeleteSession={handleDeleteSession}
             onOpenSettings={() => setActiveView('settings')}
+            onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
           />
         </div>
       )}
@@ -536,6 +539,12 @@ export default function App() {
           onClose={() => setSelectedFile(null)}
         />
       )}
+
+      {/* MEMORY & SKILLS MODAL */}
+      <MemorySkillsModal
+        isOpen={isMemorySkillsOpen}
+        onClose={() => setIsMemorySkillsOpen(false)}
+      />
     </div>
   );
 }

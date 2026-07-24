@@ -36,6 +36,8 @@ import {
 } from './agent';
 import { parseGgufMetadata, GgufMetadata } from './ggufParser';
 import { detectGpuHardware } from './hardware';
+import { loadMemories, addOrUpdateMemory, deleteMemory, queryMemories } from './memory';
+import { listSkills, readSkill, writeSkill, deleteSkill } from './skills';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -124,6 +126,74 @@ app.post('/api/prompts-select', (req, res) => {
     const { filename } = req.body;
     const updatedCfg = setActivePromptFile(filename);
     res.json(updatedCfg);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Memory Endpoints (~/.0xagent/memory.json)
+app.get('/api/memories', (req, res) => {
+  try {
+    const query = req.query.query as string;
+    const list = query ? queryMemories(query) : loadMemories();
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/memories', (req, res) => {
+  try {
+    const { key, value, category } = req.body;
+    const item = addOrUpdateMemory(key, value, category);
+    res.json(item);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/memories/:id', (req, res) => {
+  try {
+    const success = deleteMemory(req.params.id);
+    res.json({ success });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Skills Endpoints (~/.0xagent/skills/)
+app.get('/api/skills', (_req, res) => {
+  try {
+    const skills = listSkills();
+    res.json(skills);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/skills/:name', (req, res) => {
+  try {
+    const content = readSkill(req.params.name);
+    res.json({ name: req.params.name, content });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+app.post('/api/skills/:name', (req, res) => {
+  try {
+    const { content } = req.body;
+    writeSkill(req.params.name, content || '');
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/skills/:name', (req, res) => {
+  try {
+    deleteSkill(req.params.name);
+    res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

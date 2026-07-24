@@ -111,6 +111,23 @@ export interface HardwareInfo {
   isAutoDetected: boolean;
 }
 
+export interface MemoryItem {
+  id: string;
+  key: string;
+  value: string;
+  category: 'user_preference' | 'project_convention' | 'architecture' | 'fact' | 'general';
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface SkillInfo {
+  name: string;
+  filename: string;
+  title: string;
+  description: string;
+  updatedAt: number;
+}
+
 export interface FileNode {
   name: string;
   path: string;

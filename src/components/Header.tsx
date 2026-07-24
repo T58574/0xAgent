@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { X, Plus, ChevronLeft, ChevronRight, Terminal } from 'lucide-react';
+import { X, Plus, ChevronLeft, ChevronRight, Terminal, Brain } from 'lucide-react';
 import { ChatSession } from '../types';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   onCreateSession: () => void;
   onDeleteSession: (id: string, e: React.MouseEvent) => void;
   onOpenSettings?: () => void;
+  onOpenMemorySkills?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -17,6 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSession,
   onCreateSession,
   onDeleteSession,
+  onOpenMemorySkills,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -50,10 +52,22 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {/* Memory & Skills Button */}
+        {onOpenMemorySkills && (
+          <button
+            onClick={onOpenMemorySkills}
+            className="flat-btn ml-2 px-2.5 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer shrink-0 flex items-center gap-1.5"
+            title="Долгосрочная память и скиллы"
+          >
+            <Brain size={13} />
+            <span className="text-xs font-medium hidden sm:inline">Память & Скиллы</span>
+          </button>
+        )}
+
         {/* Create New Session Button (Flat Glass) */}
         <button
           onClick={onCreateSession}
-          className="flat-btn ml-2 px-2.5 py-1 rounded text-xs font-medium text-slate-200 hover:text-white cursor-pointer shrink-0 flex items-center gap-1.5"
+          className="flat-btn ml-1 px-2.5 py-1 rounded text-xs font-medium text-slate-200 hover:text-white cursor-pointer shrink-0 flex items-center gap-1.5"
           title="Новая сессия"
         >
           <Plus size={13} className="text-emerald-400" />
