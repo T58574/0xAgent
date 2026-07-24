@@ -7,6 +7,11 @@ echo               0xAgent AI Platform Launcher
 echo ========================================================
 echo.
 
+echo [0/3] Clearing stale processes on port 3001 and 5173...
+powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 3001 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort 5173 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
+echo.
+
 echo [1/3] Testing TypeScript Compilation (Frontend and Backend)...
 call npx tsc --noEmit
 if %errorlevel% neq 0 (
