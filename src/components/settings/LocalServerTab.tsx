@@ -165,10 +165,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       api.parse_gguf(modelPath.trim())
         .then((meta) => {
           setModelMeta(meta);
-          // If context size is higher than max trained, cap it
-          if (meta.contextLength > 0 && ctxSize > meta.contextLength) {
-            setCtxSize(meta.contextLength);
-          }
         })
         .catch(() => setModelMeta(null));
     } else {
@@ -684,16 +680,34 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           <div className="flex justify-between items-center text-[11px]">
             <label className="font-medium text-slate-300">Context Size (-c)</label>
             {modelMeta && modelMeta.contextLength > 0 && (
-              <span className="text-[10px] text-emerald-400 font-mono">Макс: {modelMeta.contextLength}</span>
+              <span className="text-[10px] text-slate-400 font-mono" title="Обученный размер контекста GGUF модели">
+                Обучен: {modelMeta.contextLength.toLocaleString()}
+              </span>
             )}
           </div>
           <input
             type="number"
             value={ctxSize}
             onChange={(e) => setCtxSize(Number(e.target.value))}
-            max={modelMeta?.contextLength || 65536}
+            placeholder="Введит контекст (напр. 8192)..."
             className="w-full mt-1 px-2.5 py-1.5 rounded-md flat-input text-xs font-mono"
           />
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {[4096, 8192, 16384, 32768, 65536, 131072].map((val) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setCtxSize(val)}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${
+                  ctxSize === val
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                    : 'bg-slate-900/60 text-slate-400 border border-white/5 hover:text-slate-200'
+                }`}
+              >
+                {val >= 1024 ? `${val / 1024}K` : val}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>
