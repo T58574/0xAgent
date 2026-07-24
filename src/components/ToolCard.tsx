@@ -116,6 +116,43 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
             </div>
           </div>
         )}
+        {tool.name === 'ask_user' && (
+          <div className="space-y-2">
+            <div className="text-amber-300 font-semibold text-xs flex items-center gap-1.5">
+              <span>Уточняющий вопрос от Агента:</span>
+            </div>
+            <div className="text-slate-100 text-xs font-sans font-medium bg-slate-900/80 p-2.5 rounded border border-white/10">
+              {parsedArgs.question}
+            </div>
+            {Array.isArray(parsedArgs.options) && parsedArgs.options.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {parsedArgs.options.map((opt: string) => (
+                  <button
+                    key={opt}
+                    onClick={() => onRespond(tool.id, true)}
+                    className="flat-btn px-3 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer"
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {tool.name === 'run_scratch_script' && (
+          <div>
+            <div className="text-slate-400 text-[11px] mb-1">Scratch Script (<span className="text-purple-300 font-mono">{parsedArgs.language}</span>)</div>
+            <div className="text-slate-300 text-[10px] whitespace-pre-wrap max-h-28 overflow-y-auto bg-slate-950/60 p-2 border border-white/5 rounded font-mono">
+              {parsedArgs.code}
+            </div>
+          </div>
+        )}
+        {tool.name === 'spawn_subagent' && (
+          <div className="space-y-1 font-mono">
+            <div><span className="text-slate-400">Суб-агент: </span><span className="text-purple-300 font-semibold">{parsedArgs.role}</span></div>
+            <div><span className="text-slate-400">Задача: </span><span className="text-slate-200">{parsedArgs.goal}</span></div>
+          </div>
+        )}
       </div>
 
       {/* Interactive Approve / Reject buttons */}
