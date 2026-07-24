@@ -91,7 +91,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (ls.port) setPort(ls.port);
         if (ls.ctx_size) setCtxSize(ls.ctx_size);
         if (ls.threads) setThreads(ls.threads);
-        setGpuLayers(ls.gpu_layers !== undefined && ls.gpu_layers !== null ? ls.gpu_layers : 99);
+        if (ls.gpu_layers !== undefined && ls.gpu_layers !== null) setGpuLayers(ls.gpu_layers);
+        if (ls.temp !== undefined && ls.temp !== null) setTemp(ls.temp);
+        if (ls.batch_size) setBatchSize(ls.batch_size);
+        if (ls.ubatch_size) setUbatchSize(ls.ubatch_size);
+        if (ls.min_p !== undefined && ls.min_p !== null) setMinP(ls.min_p);
+        if (ls.repeat_penalty !== undefined && ls.repeat_penalty !== null) setRepeatPenalty(ls.repeat_penalty);
+        if (ls.flash_attn !== undefined && ls.flash_attn !== null) setFlashAttn(ls.flash_attn);
+        if (ls.embedding !== undefined && ls.embedding !== null) setEmbedding(ls.embedding);
+        if (ls.cont_batching !== undefined && ls.cont_batching !== null) setContBatching(ls.cont_batching);
+        if (ls.prompt_cache !== undefined && ls.prompt_cache !== null) setPromptCache(ls.prompt_cache);
+        if (ls.mlock !== undefined && ls.mlock !== null) setMlock(ls.mlock);
+        if (ls.mmap !== undefined && ls.mmap !== null) setMmap(ls.mmap);
       }
     }
   }, [config]);

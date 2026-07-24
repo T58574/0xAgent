@@ -4,6 +4,7 @@ import http from 'node:http';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import { v4 as uuidv4 } from 'uuid';
 import { execSync, spawn, ChildProcess } from 'node:child_process';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
@@ -560,20 +561,51 @@ app.post('/api/start-local-server', (req, res) => {
     
     const host = body.host || cfg.local_server?.host || '127.0.0.1';
     const port = body.port || cfg.local_server?.port || 11434;
-    const exePath = body.exePath || cfg.local_server?.exe_path;
-    const modelPath = body.modelPath || cfg.local_server?.model_path;
+    let targetExe = body.exePath || cfg.local_server?.exe_path || '';
+    let targetModel = body.modelPath || cfg.local_server?.model_path || '';
+
+    // Auto-detect installed llama.cpp binary if missing
+    if (!targetExe || !fs.existsSync(targetExe)) {
+      const llamaDir = path.join(os.homedir(), '.0xagent', 'llama');
+      if (fs.existsSync(llamaDir)) {
+        const rootExe = path.join(llamaDir, 'llama-server.exe');
+        if (fs.existsSync(rootExe)) {
+          targetExe = rootExe;
+        } else {
+          const items = fs.readdirSync(llamaDir, { withFileTypes: true });
+          for (const item of items) {
+            if (item.isDirectory()) {
+              const subExe = path.join(llamaDir, item.name, 'llama-server.exe');
+              const altExe = path.join(llamaDir, item.name, 'llama.exe');
+              if (fs.existsSync(subExe)) { targetExe = subExe; break; }
+              if (fs.existsSync(altExe)) { targetExe = altExe; break; }
+            }
+          }
+        }
+      }
+    }
+
+    // Auto-detect downloaded GGUF model if missing
+    if (!targetModel || !fs.existsSync(targetModel)) {
+      const modelsDir = path.join(os.homedir(), '.0xagent', 'models');
+      if (fs.existsSync(modelsDir)) {
+        const files = fs.readdirSync(modelsDir);
+        const gguf = files.find((f) => f.endsWith('.gguf'));
+        if (gguf) targetModel = path.join(modelsDir, gguf);
+      }
+    }
 
     cfg.api_url = `http://${host}:${port}/v1`;
     if (!cfg.local_server) cfg.local_server = {};
-    if (exePath) cfg.local_server.exe_path = exePath;
-    if (modelPath) cfg.local_server.model_path = modelPath;
+    if (targetExe) cfg.local_server.exe_path = targetExe;
+    if (targetModel) cfg.local_server.model_path = targetModel;
     cfg.local_server.host = host;
     cfg.local_server.port = port;
     saveConfig(cfg);
 
-    if (exePath && fs.existsSync(exePath) && modelPath && fs.existsSync(modelPath)) {
+    if (targetExe && fs.existsSync(targetExe) && targetModel && fs.existsSync(targetModel)) {
       const args: string[] = [
-        '-m', modelPath,
+        '-m', targetModel,
         '--host', host,
         '--port', String(port),
       ];
@@ -581,21 +613,21 @@ app.post('/api/start-local-server', (req, res) => {
       if (body.ctxSize || cfg.local_server.ctx_size) args.push('-c', String(body.ctxSize || cfg.local_server.ctx_size));
       if (body.gpuLayers !== undefined || cfg.local_server.gpu_layers !== undefined) args.push('-ngl', String(body.gpuLayers ?? cfg.local_server.gpu_layers));
       if (body.threads || cfg.local_server.threads) args.push('-t', String(body.threads || cfg.local_server.threads));
-      if (body.batchSize) args.push('-b', String(body.batchSize));
-      if (body.ubatchSize) args.push('-ub', String(body.ubatchSize));
-      if (body.temp) args.push('--temp', String(body.temp));
-      if (body.repeatPenalty) args.push('--repeat-penalty', String(body.repeatPenalty));
-      if (body.minP) args.push('--min-p', String(body.minP));
+      if (body.batchSize || cfg.local_server.batch_size) args.push('-b', String(body.batchSize || cfg.local_server.batch_size));
+      if (body.ubatchSize || cfg.local_server.ubatch_size) args.push('-ub', String(body.ubatchSize || cfg.local_server.ubatch_size));
+      if (body.temp ?? cfg.local_server.temp) args.push('--temp', String(body.temp ?? cfg.local_server.temp));
+      if (body.repeatPenalty ?? cfg.local_server.repeat_penalty) args.push('--repeat-penalty', String(body.repeatPenalty ?? cfg.local_server.repeat_penalty));
+      if (body.minP ?? cfg.local_server.min_p) args.push('--min-p', String(body.minP ?? cfg.local_server.min_p));
 
-      if (body.flashAttn) args.push('-fa');
-      if (body.mmap === false) args.push('--no-mmap');
-      if (body.mlock) args.push('--mlock');
-      if (body.embedding) args.push('--embedding');
-      if (body.contBatching) args.push('--cont-batching');
+      if (body.flashAttn ?? cfg.local_server.flash_attn) args.push('-fa');
+      if ((body.mmap ?? cfg.local_server.mmap) === false) args.push('--no-mmap');
+      if (body.mlock ?? cfg.local_server.mlock) args.push('--mlock');
+      if (body.embedding ?? cfg.local_server.embedding) args.push('--embedding');
+      if (body.contBatching ?? cfg.local_server.cont_batching) args.push('--cont-batching');
 
-      broadcast('agent-error', `Запуск llama-server: ${path.basename(exePath)}`);
+      broadcast('agent-error', `Запуск сервера llama.cpp: ${path.basename(targetExe)}`);
       
-      activeLlamaProcess = spawn(exePath, args, { cwd: path.dirname(exePath) });
+      activeLlamaProcess = spawn(targetExe, args, { cwd: path.dirname(targetExe) });
 
       activeLlamaProcess.stdout?.on('data', (data) => {
         const str = data.toString();
@@ -871,7 +903,19 @@ app.post('/api/send-message', (req, res) => {
   const config = loadConfig();
   runAgentLoop(sessionId, config, broadcast).catch((err) => {
     console.error('Agent loop error:', err);
-    broadcast('agent-error', `Agent runtime error: ${err.message}`);
+    try {
+      const session = loadSession(sessionId);
+      const errMsg = `⚠️ **Системная ошибка выполнения Агента:**\n\`\`\`\n${err.message || err}\n\`\`\``;
+      session.messages.push({
+        id: uuidv4(),
+        role: 'assistant',
+        content: errMsg,
+        timestamp: Date.now(),
+      });
+      session.updated_at = Date.now();
+      saveSession(session);
+      broadcast('agent-error', { sessionId, message: errMsg });
+    } catch {}
     broadcast('agent-status-changed', 'idle');
   });
 

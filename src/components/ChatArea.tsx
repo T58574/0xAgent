@@ -145,17 +145,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  const handleStartServerDirectly = async () => {
+  const handleStartServerDirectly = async (autoSendPrompt?: string) => {
     setIsStartingServer(true);
+    const textToSend = autoSendPrompt || inputText.trim();
     try {
       await api.start_local_server();
-      for (let i = 0; i < 8; i++) {
+      let serverReady = false;
+      for (let i = 0; i < 15; i++) {
         await new Promise((r) => setTimeout(r, 1000));
         const h = await api.get_server_health(serverHost, serverPort);
         if (h.ok) {
+          serverReady = true;
           setIsServerOffline(false);
           break;
         }
+      }
+      if (serverReady && textToSend) {
+        onSendMessage(textToSend);
+        setInputText('');
       }
     } catch (err: any) {
       alert(`Ошибка запуска сервера: ${err.message || err}`);
@@ -169,7 +176,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (!inputText.trim()) return;
 
     if (isServerOffline) {
-      handleStartServerDirectly();
+      handleStartServerDirectly(inputText.trim());
+      return;
     }
 
     onSendMessage(inputText.trim());
@@ -183,6 +191,35 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const hasMessages = messages.length > 0;
+
+  const renderWarningBanner = () => {
+    if (!isServerOffline) return null;
+    return (
+      <div className="w-full max-w-3xl mx-auto px-3 py-2.5 rounded-md bg-amber-500/10 border border-amber-500/40 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-lg animate-fadeIn mb-3 select-none">
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+          <div className="text-xs">
+            <span className="font-semibold text-amber-200">
+              ⚠️ Локальный LLM Сервер не запущен на порту {serverPort}!
+            </span>
+            <div className="text-[11px] text-slate-300">
+              Модель не сможет ответить, пока локальный сервер остановлен.
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => handleStartServerDirectly()}
+          disabled={isStartingServer}
+          className="flat-btn px-3.5 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 shrink-0 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+        >
+          {isStartingServer ? <RefreshCw size={12} className="animate-spin text-emerald-400" /> : <Play size={12} />}
+          <span>{isStartingServer ? 'Запуск сервера...' : '🚀 Запустить LLM Сервер в 1-клик'}</span>
+        </button>
+      </div>
+    );
+  };
 
   return (
     <div className="flex-grow flex flex-col relative overflow-hidden bg-scifi-grid select-text w-full text-slate-100 font-sans">
@@ -199,6 +236,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <p className="text-xs text-slate-400 mb-6 max-w-md font-normal leading-relaxed">
             Автономный разработчик. Работает локально с файлами и инструментами.
           </p>
+
+          {renderWarningBanner()}
 
           <form onSubmit={handleSubmit} className="w-full flex items-center justify-center gap-2">
             <div className="relative w-full">
@@ -330,27 +369,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
 
           {/* SERVER OFFLINE WARNING & 1-CLICK LAUNCH BANNER */}
-          {isServerOffline && (
-            <div className="px-3 py-2.5 rounded-md bg-amber-500/10 border border-amber-500/40 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-lg animate-fadeIn mx-2 mb-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={16} className="text-amber-400 shrink-0" />
-                <div className="text-xs">
-                  <span className="font-semibold text-amber-200">Локальный LLM Сервер не запущен на порту {serverPort}!</span>
-                  <div className="text-[11px] text-slate-300">Модель не сможет ответить, пока сервер остановлен.</div>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleStartServerDirectly}
-                disabled={isStartingServer}
-                className="flat-btn px-3.5 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 shrink-0 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-              >
-                {isStartingServer ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} />}
-                <span>{isStartingServer ? 'Запуск сервера...' : 'Запустить LLM Сервер'}</span>
-              </button>
-            </div>
-          )}
+          {renderWarningBanner()}
 
           {/* INPUT FORM CONTAINER */}
           <div className="p-3 border-t border-white/10 glass-panel select-none z-10 w-full">

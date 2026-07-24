@@ -279,15 +279,16 @@ export async function runAgentLoop(
         body: JSON.stringify(requestBody),
       });
     } catch (err: any) {
-      const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Запустите сервер во вкладке **Настройки -> Сервер LLM** или проверьте URL подключения.`;
+      const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Нажмите кнопку **🚀 Запустить LLM Сервер в 1-клик** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
       session.messages.push({
         id: uuidv4(),
         role: 'assistant',
         content: errMsg,
         timestamp: Date.now(),
       });
+      session.updated_at = Date.now();
       saveSession(session);
-      broadcast('agent-error', errMsg);
+      broadcast('agent-error', { sessionId, message: errMsg });
       broadcast('agent-status-changed', 'idle');
       return;
     }
@@ -301,8 +302,9 @@ export async function runAgentLoop(
         content: errMsg,
         timestamp: Date.now(),
       });
+      session.updated_at = Date.now();
       saveSession(session);
-      broadcast('agent-error', errMsg);
+      broadcast('agent-error', { sessionId, message: errMsg });
       broadcast('agent-status-changed', 'idle');
       return;
     }
@@ -315,8 +317,9 @@ export async function runAgentLoop(
         content: errMsg,
         timestamp: Date.now(),
       });
+      session.updated_at = Date.now();
       saveSession(session);
-      broadcast('agent-error', errMsg);
+      broadcast('agent-error', { sessionId, message: errMsg });
       broadcast('agent-status-changed', 'idle');
       return;
     }

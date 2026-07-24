@@ -268,6 +268,22 @@ export default function App() {
       await api.send_message(currentSession.id);
     } catch (err: any) {
       addLog(`Failed to execute completions: ${err.message || err}`);
+      const errText = `⚠️ **Системная ошибка подключения:** ${err.message || err}`;
+      const sessWithErr: ChatSession = {
+        ...updatedSession,
+        messages: [
+          ...updatedSession.messages,
+          {
+            id: crypto.randomUUID().substring(0, 8),
+            role: 'assistant',
+            content: errText,
+            timestamp: Date.now(),
+          },
+        ],
+        updated_at: Date.now(),
+      };
+      setCurrentSession(sessWithErr);
+      api.save_session(sessWithErr).catch(() => {});
     }
   };
 
@@ -353,12 +369,18 @@ export default function App() {
       });
       unlisteners.push(un3);
 
-      const unErr = await api.listen<string>('agent-error', async (event) => {
-        addLog(`Agent error: ${event.payload}`);
+      const unErr = await api.listen<any>('agent-error', async (event) => {
+        const payload = event.payload;
+        const msgText = typeof payload === 'string' ? payload : payload?.message || JSON.stringify(payload);
+        addLog(`Agent error: ${msgText}`);
+        
         if (currentSessionRef.current) {
+          const targetId = typeof payload === 'object' && payload?.sessionId ? payload.sessionId : currentSessionRef.current.id;
           try {
-            const fresh = await api.load_session(currentSessionRef.current.id);
-            setCurrentSession(fresh);
+            const fresh = await api.load_session(targetId);
+            if (currentSessionRef.current && currentSessionRef.current.id === targetId) {
+              setCurrentSession(fresh);
+            }
           } catch {}
         }
       });
@@ -422,11 +444,6 @@ export default function App() {
         }
       );
       unlisteners.push(un5);
-
-      const un6 = await api.listen<string>('agent-error', (event) => {
-        addLog(`Agent Error Alert: ${event.payload}`);
-      });
-      unlisteners.push(un6);
     }
 
     setupListeners();
