@@ -279,20 +279,44 @@ export async function runAgentLoop(
         body: JSON.stringify(requestBody),
       });
     } catch (err: any) {
-      broadcast('agent-error', `Failed to connect to LLM server: ${err.message}`);
+      const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Запустите сервер во вкладке **Настройки -> Сервер LLM** или проверьте URL подключения.`;
+      session.messages.push({
+        id: uuidv4(),
+        role: 'assistant',
+        content: errMsg,
+        timestamp: Date.now(),
+      });
+      saveSession(session);
+      broadcast('agent-error', errMsg);
       broadcast('agent-status-changed', 'idle');
       return;
     }
 
     if (!response.ok) {
       const errorText = await response.text();
-      broadcast('agent-error', `LLM server returned error ${response.status}: ${errorText}`);
+      const errMsg = `⚠️ **LLM Сервер вернул ошибку (${response.status}):**\n\`\`\`\n${errorText}\n\`\`\``;
+      session.messages.push({
+        id: uuidv4(),
+        role: 'assistant',
+        content: errMsg,
+        timestamp: Date.now(),
+      });
+      saveSession(session);
+      broadcast('agent-error', errMsg);
       broadcast('agent-status-changed', 'idle');
       return;
     }
 
     if (!response.body) {
-      broadcast('agent-error', 'Response body is empty');
+      const errMsg = '⚠️ **LLM Сервер вернул пустой ответ (body is empty)**';
+      session.messages.push({
+        id: uuidv4(),
+        role: 'assistant',
+        content: errMsg,
+        timestamp: Date.now(),
+      });
+      saveSession(session);
+      broadcast('agent-error', errMsg);
       broadcast('agent-status-changed', 'idle');
       return;
     }

@@ -463,14 +463,30 @@ app.get('/api/server-slots', async (req, res) => {
 
 // Llama.cpp GitHub Release Parser & Installer with Version Retention
 
-// 1. Fetch GitHub Releases list for ggerganov/llama.cpp
-app.get('/api/llama-releases', async (_req, res) => {
+// 1. Fetch GitHub Releases list for ggerganov/llama.cpp with 15-min TTL Cache
+let cachedLlamaReleases: any[] | null = null;
+let lastLlamaFetchTime: number = 0;
+const LLAMA_RELEASES_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+app.get('/api/llama-releases', async (req, res) => {
   try {
+    const forceRefresh = req.query.refresh === 'true';
+    const now = Date.now();
+
+    if (!forceRefresh && cachedLlamaReleases && now - lastLlamaFetchTime < LLAMA_RELEASES_TTL_MS) {
+      res.json(cachedLlamaReleases);
+      return;
+    }
+
     const response = await fetch('https://api.github.com/repos/ggerganov/llama.cpp/releases?per_page=15', {
       headers: { 'User-Agent': '0xAgent-LocalApp' }
     });
 
     if (!response.ok) {
+      if (cachedLlamaReleases) {
+        res.json(cachedLlamaReleases);
+        return;
+      }
       throw new Error(`GitHub API error (${response.status}): ${response.statusText}`);
     }
 
@@ -492,10 +508,17 @@ app.get('/api/llama-releases', async (_req, res) => {
       };
     });
 
+    cachedLlamaReleases = formatted;
+    lastLlamaFetchTime = now;
+
     res.json(formatted);
   } catch (err: any) {
     console.error('Failed to fetch llama releases:', err);
-    res.status(500).json({ error: err.message });
+    if (cachedLlamaReleases) {
+      res.json(cachedLlamaReleases);
+    } else {
+      res.status(500).json({ error: err.message });
+    }
   }
 });
 
