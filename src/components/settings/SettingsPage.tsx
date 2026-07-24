@@ -25,6 +25,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [groqApiKey, setGroqApiKey] = useState('');
   const [modelsPath, setModelsPath] = useState('');
   const [reasoningEnabled, setReasoningEnabled] = useState(true);
+  const [temperature, setTemperature] = useState(0.7);
+  const [maxTokens, setMaxTokens] = useState(8192);
+  const [apiTimeoutSec, setApiTimeoutSec] = useState(120);
+  const [autoSaveHistory, setAutoSaveHistory] = useState(true);
+  const [soundNotifications, setSoundNotifications] = useState(true);
+  const [compactChat, setCompactChat] = useState(false);
 
   // Active theme state
   const [activeTheme, setActiveTheme] = useState<'obsidian' | 'cyber' | 'graphite' | 'matrix'>('obsidian');
@@ -65,6 +71,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       setGroqApiKey(config.groq_api_key || '');
       setModelsPath(config.models_path || '');
       setReasoningEnabled(config.reasoning_enabled !== false);
+      if (config.temperature !== undefined && config.temperature !== null) setTemperature(config.temperature);
+      if (config.max_tokens) setMaxTokens(config.max_tokens);
+      if (config.api_timeout_sec) setApiTimeoutSec(config.api_timeout_sec);
+      if (config.auto_save_history !== undefined && config.auto_save_history !== null) setAutoSaveHistory(config.auto_save_history);
+      if (config.sound_notifications !== undefined && config.sound_notifications !== null) setSoundNotifications(config.sound_notifications);
+      if (config.compact_chat !== undefined && config.compact_chat !== null) setCompactChat(config.compact_chat);
 
       const theme = (config.active_theme as any) || 'obsidian';
       setActiveTheme(theme);
@@ -102,6 +114,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           groq_api_key: groqApiKey.trim() || null,
           models_path: modelsPath.trim() || null,
           reasoning_enabled: reasoningEnabled,
+          temperature,
+          max_tokens: maxTokens,
+          api_timeout_sec: apiTimeoutSec,
+          auto_save_history: autoSaveHistory,
+          sound_notifications: soundNotifications,
+          compact_chat: compactChat,
           active_theme: activeTheme,
           local_server: {
             exe_path: exePath.trim() || null,
@@ -138,6 +156,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     groqApiKey,
     modelsPath,
     reasoningEnabled,
+    temperature,
+    maxTokens,
+    apiTimeoutSec,
+    autoSaveHistory,
+    soundNotifications,
+    compactChat,
     activeTheme,
     exePath,
     modelPath,
@@ -254,6 +278,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setModelsPath={setModelsPath}
               reasoningEnabled={reasoningEnabled}
               setReasoningEnabled={setReasoningEnabled}
+              temperature={temperature}
+              setTemperature={setTemperature}
+              maxTokens={maxTokens}
+              setMaxTokens={setMaxTokens}
+              apiTimeoutSec={apiTimeoutSec}
+              setApiTimeoutSec={setApiTimeoutSec}
+              autoSaveHistory={autoSaveHistory}
+              setAutoSaveHistory={setAutoSaveHistory}
+              soundNotifications={soundNotifications}
+              setSoundNotifications={setSoundNotifications}
+              compactChat={compactChat}
+              setCompactChat={setCompactChat}
               systemPrompt={systemPrompt}
               setSystemPrompt={setSystemPrompt}
             />

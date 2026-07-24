@@ -94,20 +94,63 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   setApiUrl,
 }) => {
   const [isInstallingLlama, setIsInstallingLlama] = useState(false);
-  const [availableModels, setAvailableModels] = useState<any[]>([]);
-  const [downloadingModelId, setDownloadingModelId] = useState<string | null>(null);
+
+  // GitHub Llama Releases & Installed versions state
+  const [githubReleases, setGithubReleases] = useState<any[]>([]);
+  const [selectedTag, setSelectedTag] = useState<string>('');
+  const [selectedAssetUrl, setSelectedAssetUrl] = useState<string>('');
+  const [selectedAssetName, setSelectedAssetName] = useState<string>('');
+  const [installedVersions, setInstalledVersions] = useState<{ tag: string; exePath: string; isCurrent: boolean }[]>([]);
+  const [isLoadingReleases, setIsLoadingReleases] = useState(false);
 
   useEffect(() => {
-    async function loadModels() {
+    async function loadData() {
       try {
-        const list = await api.get_gguf_models();
-        setAvailableModels(list);
+        setIsLoadingReleases(true);
+        const [releases, installed] = await Promise.all([
+          api.get_llama_releases().catch(() => []),
+          api.get_installed_llama_versions().catch(() => []),
+        ]);
+
+        setGithubReleases(releases);
+        setInstalledVersions(installed);
+
+        if (releases.length > 0) {
+          const first = releases[0];
+          setSelectedTag(first.tag);
+          if (first.assets && first.assets.length > 0) {
+            const prefAsset = first.assets.find((a: any) => a.name.includes('bin-win-cuda') || a.name.includes('bin-win-x64')) || first.assets[0];
+            setSelectedAssetUrl(prefAsset.download_url);
+            setSelectedAssetName(prefAsset.name);
+          }
+        }
       } catch (err) {
-        console.error('Failed to load GGUF models list:', err);
+        console.error('Failed to load Llama data:', err);
+      } finally {
+        setIsLoadingReleases(false);
       }
     }
-    loadModels();
+    loadData();
   }, []);
+
+  const handleTagChange = (tag: string) => {
+    setSelectedTag(tag);
+    const rel = githubReleases.find((r) => r.tag === tag);
+    if (rel && rel.assets && rel.assets.length > 0) {
+      const prefAsset = rel.assets.find((a: any) => a.name.includes('bin-win-cuda') || a.name.includes('bin-win-x64')) || rel.assets[0];
+      setSelectedAssetUrl(prefAsset.download_url);
+      setSelectedAssetName(prefAsset.name);
+    }
+  };
+
+  const refreshInstalledVersions = async () => {
+    try {
+      const list = await api.get_installed_llama_versions();
+      setInstalledVersions(list);
+    } catch (err) {
+      console.error('Failed to refresh installed versions:', err);
+    }
+  };
 
   // Open Native Windows OpenFileDialog for Executable
   const handleSelectExe = async () => {
@@ -129,13 +172,15 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   };
 
-  // 1-Click Llama.cpp Installer from GitHub Releases
-  const handleInstallLlama = async () => {
+  // Download & Install selected llama.cpp version from GitHub (or use cached folder)
+  const handleInstallSelectedLlamaVersion = async () => {
+    if (!selectedTag) return;
     setIsInstallingLlama(true);
     try {
-      const res = await api.install_llama_cpp();
+      const res = await api.install_llama_version(selectedTag, selectedAssetUrl, selectedAssetName);
       setExePath(res.exePath);
-      alert((res as any).message || 'Llama.cpp успешно установлен!');
+      await refreshInstalledVersions();
+      alert(res.message || `Llama.cpp (${selectedTag}) успешно установлен!`);
     } catch (err: any) {
       console.error(err);
       alert(`Ошибка установки: ${err.message || err}`);
@@ -144,18 +189,15 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   };
 
-  // 1-Click GGUF Model Downloader
-  const handleDownloadModel = async (model: any) => {
-    setDownloadingModelId(model.id);
+  // Switch to an already installed version without re-downloading
+  const handleSelectInstalledVersion = async (vExePath: string) => {
     try {
-      const res = await api.download_gguf_model(model.url, model.filename);
-      setModelPath(res.modelPath);
-      alert((res as any).message || 'Модель успешно загружена!');
+      const res = await api.select_installed_llama(vExePath);
+      setExePath(res.exePath);
+      await refreshInstalledVersions();
+      alert(res.message || 'Активная версия переключена!');
     } catch (err: any) {
-      console.error(err);
-      alert(`Ошибка скачивания: ${err.message || err}`);
-    } finally {
-      setDownloadingModelId(null);
+      alert(`Ошибка переключения версии: ${err.message || err}`);
     }
   };
 
@@ -179,6 +221,11 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     { label: 'Embeddings Output', value: embedding, toggle: () => setEmbedding(!embedding) },
   ];
 
+  const currentRel = githubReleases.find((r) => r.tag === selectedTag);
+  const isSelectedVersionInstalled = installedVersions.some(
+    (v) => v.tag.toLowerCase() === selectedTag.toLowerCase()
+  );
+
   return (
     <div className="space-y-5 font-sans text-slate-100 max-w-4xl">
       <div>
@@ -188,58 +235,148 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
         </p>
       </div>
 
-      {/* Fast 1-Click Llama.cpp Installer & GGUF Model Downloader Card */}
-      <div className="p-4 rounded-md glass-card border border-white/10 space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
-          <div>
-            <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-              <Download size={14} className="text-emerald-400" />
-              <span>Авто-установщик Llama.cpp & Загрузчик GGUF Моделей</span>
+      {/* GitHub Releases Llama.cpp Installer & Installed Versions Manager Card */}
+      <div className="p-4 rounded-md glass-card border border-white/10 space-y-4">
+        
+        {/* Header & GitHub Version Selector */}
+        <div className="space-y-3 pb-3 border-b border-white/10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <div>
+              <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                <Download size={14} className="text-emerald-400" />
+                <span>Официальный установщик Llama.cpp с GitHub</span>
+              </div>
+              <div className="text-xs text-slate-400 mt-0.5">
+                Выбирайте любую версию релиза llama.cpp из GitHub и сохраняйте её локально на диске
+              </div>
             </div>
-            <div className="text-xs text-slate-400 mt-0.5">
-              Загружает официальные бинарники Llama.cpp с GitHub и GGUF модели напрямую в папки программы
+            {isLoadingReleases && (
+              <div className="flex items-center gap-1.5 text-xs text-sky-400">
+                <RefreshCw size={12} className="animate-spin" />
+                <span>Загрузка релизов...</span>
+              </div>
+            )}
+          </div>
+
+          {/* Release Tag Dropdown & Asset Selection */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-300">
+                Версия релиза llama.cpp (GitHub Tag)
+              </label>
+              <select
+                value={selectedTag}
+                onChange={(e) => handleTagChange(e.target.value)}
+                disabled={githubReleases.length === 0 || isInstallingLlama}
+                className="w-full px-3 py-1.5 rounded flat-input text-xs font-mono text-slate-100 focus:outline-none cursor-pointer"
+              >
+                {githubReleases.map((rel) => (
+                  <option key={rel.tag} value={rel.tag} className="bg-slate-900 text-slate-100">
+                    {rel.tag} ({rel.name})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-[11px] font-medium text-slate-300">
+                Сборка / Бинарник (Build Variant & CUDA/AVX)
+              </label>
+              <select
+                value={selectedAssetUrl}
+                onChange={(e) => {
+                  setSelectedAssetUrl(e.target.value);
+                  const a = currentRel?.assets.find((ast: any) => ast.download_url === e.target.value);
+                  if (a) setSelectedAssetName(a.name);
+                }}
+                disabled={!currentRel || isInstallingLlama}
+                className="w-full px-3 py-1.5 rounded flat-input text-xs font-mono text-slate-100 focus:outline-none cursor-pointer"
+              >
+                {currentRel?.assets.map((ast: any) => (
+                  <option key={ast.download_url} value={ast.download_url} className="bg-slate-900 text-slate-100">
+                    {ast.name} ({ast.size})
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleInstallLlama}
-            disabled={isInstallingLlama}
-            className="flat-btn px-3 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-50"
-          >
-            {isInstallingLlama ? <RefreshCw size={13} className="animate-spin" /> : <HardDrive size={13} />}
-            <span>{isInstallingLlama ? 'Установка...' : 'Установить Llama.cpp с GitHub (1-клик)'}</span>
-          </button>
+          {/* Action Install/Switch Button */}
+          <div className="flex justify-end pt-1">
+            <button
+              type="button"
+              onClick={handleInstallSelectedLlamaVersion}
+              disabled={isInstallingLlama || !selectedTag}
+              className="flat-btn px-4 py-2 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer flex items-center gap-2 disabled:opacity-50"
+            >
+              {isInstallingLlama ? <RefreshCw size={13} className="animate-spin" /> : <HardDrive size={13} />}
+              <span>
+                {isInstallingLlama
+                  ? 'Установка...'
+                  : isSelectedVersionInstalled
+                  ? `Переключить / Выбрать установленную ${selectedTag}`
+                  : `Скачать и установить ${selectedTag} с GitHub`}
+              </span>
+            </button>
+          </div>
         </div>
 
-        {/* Popular GGUF Models Parser Cards */}
-        <div className="space-y-2 pt-1">
-          <div className="text-[11px] font-medium text-slate-300">Доступные модели с весами (Hugging Face GGUF):</div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            {availableModels.map((m) => {
-              const isDownloading = downloadingModelId === m.id;
-              return (
-                <div key={m.id} className="p-3 rounded border border-white/10 bg-slate-900/40 space-y-2 flex flex-col justify-between">
-                  <div>
-                    <div className="text-xs font-medium text-slate-200">{m.name}</div>
-                    <div className="text-[11px] text-slate-400 mt-0.5">{m.desc}</div>
+        {/* Installed Versions Retention List */}
+        {installedVersions.length > 0 && (
+          <div className="space-y-2 pb-3 border-b border-white/10">
+            <div className="text-[11px] font-medium text-slate-300 flex items-center justify-between">
+              <span>Сохраненные локально версии llama.cpp (Без повторного скачивания):</span>
+              <button
+                type="button"
+                onClick={refreshInstalledVersions}
+                className="text-slate-400 hover:text-white cursor-pointer"
+                title="Обновить список"
+              >
+                <RefreshCw size={11} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {installedVersions.map((item) => (
+                <div
+                  key={item.exePath}
+                  className={`p-2.5 rounded border text-xs flex items-center justify-between gap-2 ${
+                    item.isCurrent
+                      ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-medium'
+                      : 'border-white/10 bg-slate-900/40 text-slate-300'
+                  }`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-xs">[{item.tag}]</span>
+                      {item.isCurrent && (
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          Активная
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-mono truncate mt-0.5" title={item.exePath}>
+                      {item.exePath}
+                    </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadModel(m)}
-                    disabled={isDownloading}
-                    className="flat-btn px-2.5 py-1 rounded text-[11px] font-medium text-slate-200 hover:text-white cursor-pointer flex items-center justify-center gap-1.5 mt-2 disabled:opacity-50"
-                  >
-                    {isDownloading ? <RefreshCw size={11} className="animate-spin text-sky-400" /> : <Download size={11} className="text-emerald-400" />}
-                    <span>{isDownloading ? 'Загрузка...' : `Скачать (${m.size})`}</span>
-                  </button>
+                  {!item.isCurrent && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectInstalledVersion(item.exePath)}
+                      className="flat-btn px-2 py-1 rounded text-[11px] font-medium text-slate-200 hover:text-white border-white/20 shrink-0 cursor-pointer"
+                    >
+                      Выбрать
+                    </button>
+                  )}
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
+
       </div>
+
 
       {/* Executable & Model Files Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

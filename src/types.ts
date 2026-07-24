@@ -44,6 +44,12 @@ export interface AppConfig {
   theme_colors?: ThemeColors | null;
   models_path?: string | null;
   reasoning_enabled?: boolean | null;
+  temperature?: number | null;
+  max_tokens?: number | null;
+  api_timeout_sec?: number | null;
+  auto_save_history?: boolean | null;
+  sound_notifications?: boolean | null;
+  compact_chat?: boolean | null;
   local_server?: LocalServerConfig | null;
 }
 

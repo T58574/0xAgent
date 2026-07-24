@@ -55,7 +55,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   }, [isRecording]);
 
   const startRecording = async () => {
+    if (!groqApiKey || !groqApiKey.trim()) {
+      alert('Для распознавания речи укажите Groq API Key в настройках!');
+      return;
+    }
+
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        alert('Запись аудио не поддерживается вашим браузером или требует HTTPS / localhost.');
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
 
@@ -72,51 +82,72 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       const recorder = new MediaRecorder(stream, options);
       
       recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
+        if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
       recorder.onstop = async () => {
         setIsTranscribing(true);
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64data = reader.result as string;
-          const base64Payload = base64data.split(',')[1];
-          if (base64Payload && groqApiKey) {
+        try {
+          if (audioChunksRef.current.length === 0) {
+            alert('Запись пустого звука. Попробуйте еще раз.');
+            return;
+          }
+
+          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+          const reader = new FileReader();
+          reader.readAsDataURL(audioBlob);
+          reader.onloadend = async () => {
             try {
-              const text = await api.transcribe_audio(base64Payload, groqApiKey);
-              if (text && text.trim()) {
-                setInputText((prev) => {
-                  const spacer = prev.trim() ? ' ' : '';
-                  return prev + spacer + text.trim();
-                });
+              const base64data = reader.result as string;
+              if (!base64data || !base64data.includes(',')) {
+                throw new Error('Ошибка кодирования аудиофайла.');
+              }
+              const base64Payload = base64data.split(',')[1];
+              if (base64Payload) {
+                const text = await api.transcribe_audio(base64Payload, groqApiKey.trim());
+                if (text && text.trim()) {
+                  setInputText((prev) => {
+                    const spacer = prev.trim() ? ' ' : '';
+                    return prev + spacer + text.trim();
+                  });
+                } else {
+                  alert('Речь не распознана. Попробуйте говорить четче.');
+                }
               }
             } catch (err: any) {
               console.error("Whisper transcription error:", err);
               alert(`Ошибка расшифровки речи Groq Whisper: ${err.message || err}`);
+            } finally {
+              setIsTranscribing(false);
             }
-          } else if (!groqApiKey) {
-            alert('Для расшифровки речи укажите Groq API Key в настройках.');
-          }
+          };
+        } catch (e: any) {
+          alert(`Ошибка обработки записи: ${e.message || e}`);
           setIsTranscribing(false);
-        };
-        stream.getTracks().forEach((track) => track.stop());
+        } finally {
+          stream.getTracks().forEach((track) => track.stop());
+        }
       };
 
       mediaRecorderRef.current = recorder;
-      recorder.start();
+      recorder.start(100); // 100ms timeslice ensures dataavailable is emitted periodically
       setIsRecording(true);
     } catch (err: any) {
       console.error("Failed to start recording:", err);
+      alert(`Ошибка доступа к микрофону: ${err.message || 'Разрешите доступ к микрофону в браузере.'}`);
+      setIsRecording(false);
     }
   };
 
   const stopRecording = () => {
     if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (e) {
+        console.error('Error stopping recorder:', e);
+      }
       setIsRecording(false);
     }
   };

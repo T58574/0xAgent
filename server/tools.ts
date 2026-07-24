@@ -239,7 +239,9 @@ export function selectWorkspaceNative(): string | null {
             Write-Output $dialog.SelectedPath
         }
       `;
-      const stdout = execSync(`powershell -NoProfile -Command "${psScript.replace(/\n/g, ' ')}"`, { encoding: 'utf-8' });
+      const buf = Buffer.from(psScript, 'utf-16le');
+      const base64 = buf.toString('base64');
+      const stdout = execSync(`powershell -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' });
       const folder = stdout.trim();
       return folder.length > 0 ? folder : null;
     } catch (err) {
@@ -264,7 +266,9 @@ export function selectFileNative(filter?: string): string | null {
             Write-Output $dialog.FileName
         }
       `;
-      const stdout = execSync(`powershell -NoProfile -Command "${psScript.replace(/\n/g, ' ')}"`, { encoding: 'utf-8' });
+      const buf = Buffer.from(psScript, 'utf-16le');
+      const base64 = buf.toString('base64');
+      const stdout = execSync(`powershell -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' });
       const filePath = stdout.trim();
       return filePath.length > 0 ? filePath : null;
     } catch (err) {
@@ -274,3 +278,4 @@ export function selectFileNative(filter?: string): string | null {
   }
   return null;
 }
+

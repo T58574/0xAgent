@@ -213,8 +213,9 @@ app.post('/api/transcribe-audio', async (req, res) => {
 
     const audioBuffer = Buffer.from(audioBase64, 'base64');
     const formData = new FormData();
-    const blob = new Blob([audioBuffer], { type: 'audio/webm' });
-    formData.append('file', blob, 'speech.webm');
+    // Using File object guarantees filename="speech.webm" in multipart/form-data header
+    const file = new File([audioBuffer], 'speech.webm', { type: 'audio/webm' });
+    formData.append('file', file);
     formData.append('model', 'whisper-large-v3');
 
     const groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
@@ -227,7 +228,7 @@ app.post('/api/transcribe-audio', async (req, res) => {
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();
-      throw new Error(`Groq API error: ${errText}`);
+      throw new Error(`Groq API error (${groqRes.status}): ${errText}`);
     }
 
     const data: any = await groqRes.json();
@@ -238,49 +239,159 @@ app.post('/api/transcribe-audio', async (req, res) => {
   }
 });
 
-// Llama.cpp Installer & Model Downloader
-app.post('/api/install-llama', async (_req, res) => {
+// Llama.cpp GitHub Release Parser & Installer with Version Retention
+
+// 1. Fetch GitHub Releases list for ggerganov/llama.cpp
+app.get('/api/llama-releases', async (_req, res) => {
+  try {
+    const response = await fetch('https://api.github.com/repos/ggerganov/llama.cpp/releases?per_page=15', {
+      headers: { 'User-Agent': '0xAgent-LocalApp' }
+    });
+
+    if (!response.ok) {
+      throw new Error(`GitHub API error (${response.status}): ${response.statusText}`);
+    }
+
+    const releases: any[] = await response.json();
+    const formatted = releases.map((rel) => {
+      const zipAssets = (rel.assets || [])
+        .filter((a: any) => a.name.endsWith('.zip') || a.name.endsWith('.tar.gz') || a.name.endsWith('.exe'))
+        .map((a: any) => ({
+          name: a.name,
+          download_url: a.browser_download_url,
+          size: `${(a.size / (1024 * 1024)).toFixed(1)} MB`,
+        }));
+
+      return {
+        tag: rel.tag_name,
+        name: rel.name || rel.tag_name,
+        published_at: rel.published_at,
+        assets: zipAssets,
+      };
+    });
+
+    res.json(formatted);
+  } catch (err: any) {
+    console.error('Failed to fetch llama releases:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 2. Scan locally saved/installed llama.cpp versions
+app.get('/api/installed-llama-versions', (_req, res) => {
   try {
     const appDir = path.join(os.homedir(), '.0xagent');
     const llamaDir = path.join(appDir, 'llama');
-    if (!fs.existsSync(llamaDir)) {
-      fs.mkdirSync(llamaDir, { recursive: true });
+    const cfg = loadConfig();
+    const activeExe = cfg.local_server?.exe_path || '';
+
+    const installed: { tag: string; exePath: string; isCurrent: boolean }[] = [];
+
+    if (fs.existsSync(llamaDir)) {
+      const items = fs.readdirSync(llamaDir, { withFileTypes: true });
+
+      // Check root llamaDir executable
+      const rootExe = path.join(llamaDir, 'llama-server.exe');
+      if (fs.existsSync(rootExe)) {
+        installed.push({
+          tag: 'default',
+          exePath: rootExe,
+          isCurrent: activeExe.toLowerCase() === rootExe.toLowerCase(),
+        });
+      }
+
+      // Check version subdirectories
+      for (const item of items) {
+        if (item.isDirectory()) {
+          const subDir = path.join(llamaDir, item.name);
+          const exePath = path.join(subDir, 'llama-server.exe');
+          const altExePath = path.join(subDir, 'llama.exe');
+          
+          let targetExe = '';
+          if (fs.existsSync(exePath)) targetExe = exePath;
+          else if (fs.existsSync(altExePath)) targetExe = altExePath;
+
+          if (targetExe) {
+            installed.push({
+              tag: item.name,
+              exePath: targetExe,
+              isCurrent: activeExe.toLowerCase() === targetExe.toLowerCase(),
+            });
+          }
+        }
+      }
     }
 
-    const exePath = path.join(llamaDir, 'llama-server.exe');
+    res.json(installed);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Install selected llama.cpp version from GitHub or switch to existing version
+app.post('/api/install-llama-version', async (req, res) => {
+  try {
+    const { tag, downloadUrl, assetName } = req.body;
+    if (!tag) {
+      res.status(400).json({ error: 'tag is required' });
+      return;
+    }
+
+    const appDir = path.join(os.homedir(), '.0xagent');
+    const llamaDir = path.join(appDir, 'llama');
+    const versionDir = path.join(llamaDir, tag);
+
+    if (!fs.existsSync(versionDir)) {
+      fs.mkdirSync(versionDir, { recursive: true });
+    }
+
+    let exePath = path.join(versionDir, 'llama-server.exe');
+    if (!fs.existsSync(exePath)) {
+      const altExe = path.join(versionDir, 'llama.exe');
+      if (fs.existsSync(altExe)) exePath = altExe;
+    }
+
+    // Check if already installed locally
     if (fs.existsSync(exePath)) {
       const cfg = loadConfig();
       if (!cfg.local_server) cfg.local_server = {};
       cfg.local_server.exe_path = exePath;
       saveConfig(cfg);
-      res.json({ exePath, message: 'llama-server.exe уже установлен!' });
+      res.json({ exePath, message: `Версия llama.cpp ${tag} уже установлена!` });
       return;
     }
 
-    const releasesRes = await fetch('https://api.github.com/repos/ggerganov/llama.cpp/releases/latest', {
-      headers: { 'User-Agent': '0xAgent' }
-    });
-    
-    if (!releasesRes.ok) {
-      throw new Error('Failed to fetch llama.cpp latest github release');
+    if (!downloadUrl) {
+      res.status(400).json({ error: 'downloadUrl обязателен для новой установки' });
+      return;
     }
 
-    const releaseData: any = await releasesRes.json();
-    const asset = releaseData.assets?.find((a: any) => a.name.includes('bin-win-cuda') || a.name.includes('bin-win-x64'));
-    
-    if (!asset) {
-      throw new Error('No Windows binary asset found in latest llama.cpp release');
+    broadcast('agent-error', `Скачивание llama.cpp (${tag})...`);
+    const zipName = assetName || `llama-${tag}.zip`;
+    const zipPath = path.join(versionDir, zipName);
+
+    const downloadRes = await fetch(downloadUrl);
+    if (!downloadRes.ok) {
+      throw new Error(`Download failed: ${downloadRes.statusText}`);
     }
 
-    const zipPath = path.join(llamaDir, asset.name);
-    const downloadRes = await fetch(asset.browser_download_url);
     const arrayBuf = await downloadRes.arrayBuffer();
     fs.writeFileSync(zipPath, Buffer.from(arrayBuf));
 
-    execSync(`powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${llamaDir}' -Force"`);
+    broadcast('agent-error', `Распаковка файла llama.cpp...`);
+    execSync(`powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${versionDir}' -Force"`);
 
     if (fs.existsSync(zipPath)) {
       fs.unlinkSync(zipPath);
+    }
+
+    // Look for extracted executable
+    if (!fs.existsSync(exePath)) {
+      const files = fs.readdirSync(versionDir);
+      const foundExe = files.find(f => f.toLowerCase() === 'llama-server.exe' || f.toLowerCase() === 'llama.exe');
+      if (foundExe) {
+        exePath = path.join(versionDir, foundExe);
+      }
     }
 
     const cfg = loadConfig();
@@ -288,9 +399,30 @@ app.post('/api/install-llama', async (_req, res) => {
     cfg.local_server.exe_path = exePath;
     saveConfig(cfg);
 
-    res.json({ exePath, message: 'llama.cpp успешно установлен!' });
+    broadcast('agent-error', `Версия llama.cpp ${tag} успешно установлена!`);
+    res.json({ exePath, message: `Llama.cpp (${tag}) успешно установлен!` });
   } catch (err: any) {
-    console.error('Llama install error:', err);
+    console.error('Llama install version error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 4. Select installed llama.cpp version without re-downloading
+app.post('/api/select-installed-llama', (req, res) => {
+  try {
+    const { exePath } = req.body;
+    if (!exePath || !fs.existsSync(exePath)) {
+      res.status(404).json({ error: 'Исполняемый файл не найден' });
+      return;
+    }
+
+    const cfg = loadConfig();
+    if (!cfg.local_server) cfg.local_server = {};
+    cfg.local_server.exe_path = exePath;
+    saveConfig(cfg);
+
+    res.json({ exePath, message: 'Активная версия llama.cpp обновлена!' });
+  } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
@@ -404,7 +536,8 @@ app.post('/api/respond-to-tool', (req, res) => {
   res.json({ success: ok });
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 0xAgent Local Server running at http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket server listening on ws://localhost:${PORT}/ws`);
+server.listen(Number(PORT), '0.0.0.0', () => {
+  console.log(`🚀 0xAgent Local Server running at http://0.0.0.0:${PORT}`);
+  console.log(`🔌 WebSocket server listening on ws://0.0.0.0:${PORT}/ws`);
 });
+

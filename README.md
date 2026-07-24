@@ -1,7 +1,15 @@
-# Tauri + React + Typescript
+# 0xAgent Local Autonomous Workspace
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Автономная платформа для разработки и работы с нейросетями локально.
 
-## Recommended IDE Setup
+## Особенности
+- **Локальный движок Llama.cpp**: Автоматическая установка любой версии Llama.cpp с GitHub, управление локальными версиями без повторного скачивания, загрузка GGUF моделей.
+- **Голосовой ввод (Groq Whisper)**: Распознавание речи через микрофон с отправкой в Groq Whisper API (`whisper-large-v3`).
+- **Сетевая раздача (LAN)**: Подключение к агенту и веб-интерфейсу с любых устройств в локальной сеть Wi-Fi (`192.168.x.x` / `172.x.x.x`).
+- **Автономное выполнение задач**: Выполнение команд, чтение/запись файлов в рабочей директории проекта.
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## Запуск
+```bash
+npm run dev
+```
+

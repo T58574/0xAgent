@@ -198,8 +198,34 @@ export async function get_local_ips(): Promise<string[]> {
   return data.urls;
 }
 
-export async function install_llama_cpp(): Promise<{ exePath: string }> {
-  const res = await fetch(`${API_BASE}/install-llama`, { method: 'POST' });
+export async function get_llama_releases(): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/llama-releases`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_installed_llama_versions(): Promise<{ tag: string; exePath: string; isCurrent: boolean }[]> {
+  const res = await fetch(`${API_BASE}/installed-llama-versions`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function install_llama_version(tag: string, downloadUrl?: string, assetName?: string): Promise<{ exePath: string; message: string }> {
+  const res = await fetch(`${API_BASE}/install-llama-version`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag, downloadUrl, assetName }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function select_installed_llama(exePath: string): Promise<{ exePath: string; message: string }> {
+  const res = await fetch(`${API_BASE}/select-installed-llama`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ exePath }),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
@@ -219,3 +245,4 @@ export async function download_gguf_model(downloadUrl: string, fileName: string)
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+

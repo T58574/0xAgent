@@ -43,6 +43,12 @@ new code
     },
     models_path: null,
     reasoning_enabled: true,
+    temperature: 0.7,
+    max_tokens: 8192,
+    api_timeout_sec: 120,
+    auto_save_history: true,
+    sound_notifications: true,
+    compact_chat: false,
     local_server: null,
   };
 }
