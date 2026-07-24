@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square } from 'lucide-react';
+import { Mic, Square, Send, Brain, Terminal, Sparkles } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
@@ -64,10 +64,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           mimeType = 'audio/webm';
         } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
           mimeType = 'audio/mp4';
-        } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
-          mimeType = 'audio/ogg';
-        } else if (MediaRecorder.isTypeSupported('audio/wav')) {
-          mimeType = 'audio/wav';
         }
       }
 
@@ -98,13 +94,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               }
             } catch (err: any) {
               console.error("Transcription failed:", err);
-              alert("Ошибка транскрибации голоса через Groq:\n" + err.toString());
             } finally {
               setIsTranscribing(false);
             }
           }
         };
-        // Stop audio tracks to release microphone lock
         stream.getTracks().forEach((track) => track.stop());
       };
 
@@ -113,7 +107,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       setIsRecording(true);
     } catch (err: any) {
       console.error("Failed to start recording:", err);
-      alert("Не удалось включить микрофон:\n" + err.toString() + "\n\nПожалуйста, проверьте:\n1. Подключен ли микрофон к компьютеру.\n2. Разрешен ли доступ к микрофону в настройках конфиденциальности Windows.\n3. Добавлен ли Groq API Key в настройках приложения для распознавания.");
     }
   };
 
@@ -137,14 +130,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (!inputText.trim()) return;
     onSendMessage(inputText.trim());
     setInputText('');
-    
-    // Auto-focus input after sending message for quick follow-up
-    setTimeout(() => {
-      const input = document.activeElement as HTMLInputElement | null;
-      if (input && input.type === 'text') {
-        input.focus();
-      }
-    }, 100);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -156,32 +141,42 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const hasMessages = messages.length > 0;
 
   return (
-    <div className="flex-grow flex flex-col relative overflow-hidden bg-theme-bg select-text w-full text-theme-text">
+    <div className="flex-grow flex flex-col relative overflow-hidden bg-scifi-grid select-text w-full text-slate-100 font-sans">
       
-      {/* 1. INITIAL CENTERED VIEW */}
+      {/* 1. INITIAL CENTERED SCI-FI HERO VIEW */}
       {!hasMessages && (
-        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center select-none z-10 w-full">
-          <form onSubmit={handleSubmit} className="w-full max-w-2xl flex items-center justify-center gap-4">
-            <div className="relative w-full max-w-lg">
+        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center select-none z-10 w-full max-w-3xl mx-auto">
+          <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 mb-6 shadow-[0_0_30px_rgba(99,102,241,0.25)]">
+            <Sparkles size={32} />
+          </div>
+          <h1 className="text-2xl font-hud uppercase tracking-wider font-bold text-white mb-2">
+            0xAgent LOCAL WORKSPACE
+          </h1>
+          <p className="text-xs font-mono text-slate-400 mb-8 max-w-md">
+            Быстрый автономный разработчик. Работает локально с файлами и PowerShell.
+          </p>
+
+          <form onSubmit={handleSubmit} className="w-full flex items-center justify-center gap-3">
+            <div className="relative w-full">
               <input
                 type="text"
                 value={inputText}
                 disabled={isTranscribing}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isTranscribing ? "Транскрибируем голос..." : "Напиши ченибудь..."}
-                className="w-full border border-theme-border rounded-full pl-6 pr-12 py-3 text-sm text-theme-text placeholder-neutral-450 bg-theme-bg focus:outline-none focus:border-theme-text transition-colors"
+                placeholder={isTranscribing ? "Транскрибируем голос..." : "Что нужно сделать с проектом?"}
+                className="w-full skeuo-input rounded-2xl pl-5 pr-12 py-3.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-all"
               />
               <button
                 type="button"
                 onClick={handleMicClick}
                 disabled={isTranscribing}
-                className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center z-10 hover:scale-110 active:scale-95 duration-150 ${
+                className={`absolute right-3.5 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-all cursor-pointer flex items-center justify-center z-10 ${
                   isRecording
-                    ? 'bg-red-500 text-white animate-pulse'
-                    : 'text-neutral-500 hover:text-theme-text'
+                    ? 'bg-rose-500 text-white animate-pulse'
+                    : 'text-slate-400 hover:text-white hover:bg-white/10'
                 }`}
-                title={isRecording ? `Запись: ${recordingSeconds} сек. Кликни чтобы остановить.` : "Голосовой ввод"}
+                title={isRecording ? `Запись: ${recordingSeconds} сек.` : "Голосовой ввод"}
               >
                 <Mic size={16} />
               </button>
@@ -189,9 +184,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               type="submit"
               disabled={!inputText.trim() || isTranscribing}
-              className="rounded-full border border-theme-border bg-theme-send-btn px-8 py-3 text-sm font-bold text-black hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 transition-colors focus:outline-none"
+              className="skeuo-btn px-6 py-3.5 rounded-2xl text-xs font-hud font-bold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-2 cursor-pointer border-emerald-500/30"
             >
-              Отправить
+              <span>Отправить</span>
+              <Send size={14} />
             </button>
           </form>
         </div>
@@ -206,7 +202,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             ref={mainHistoryRef}
             className="flex-grow overflow-y-auto px-4 md:px-8 py-6 space-y-6 scrollbar-none"
           >
-            <div className="max-w-2xl mx-auto space-y-6 flex flex-col">
+            <div className="max-w-3xl mx-auto space-y-6 flex flex-col">
               {messages.map((msg) => {
                 const textOutput = cleanContent(msg.content);
                 const hasTools = msg.tool_calls && msg.tool_calls.length > 0;
@@ -217,21 +213,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                 return (
                   <div key={msg.id} className="flex flex-col message-enter">
-                    {/* User Prompt */}
+                    {/* User Prompt Bubble */}
                     {msg.role === 'user' && (
-                      <div className="self-end max-w-[80%] rounded-full border border-theme-border px-6 py-2.5 bg-theme-bg text-theme-text text-sm whitespace-pre-wrap leading-relaxed shadow-sm">
+                      <div className="self-end max-w-[85%] rounded-2xl glass-card border border-indigo-500/30 bg-slate-900/80 px-5 py-3 text-slate-100 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed shadow-lg font-sans">
                         {msg.content}
                       </div>
                     )}
 
-                    {/* Tool / System logs */}
+                    {/* Tool Log Output Bubble */}
                     {msg.role === 'tool' && (
-                      <div className="self-start max-w-[90%] w-full rounded-2xl border border-theme-border p-4 bg-neutral-50 text-neutral-600 font-mono text-xs max-h-36 overflow-y-auto whitespace-pre-wrap my-2">
+                      <div className="self-start max-w-[95%] w-full rounded-2xl glass-card border border-white/10 p-3.5 bg-slate-950/80 text-slate-300 font-mono text-[11px] max-h-40 overflow-y-auto whitespace-pre-wrap my-1.5 shadow-inner">
+                        <div className="text-[9px] font-hud text-slate-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                          <Terminal size={10} />
+                          <span>TOOL OUTPUT RESPONSE</span>
+                        </div>
                         {msg.content}
                       </div>
                     )}
 
-                    {/* Assistant message */}
+                    {/* Assistant Message Panel */}
                     {msg.role === 'assistant' && (() => {
                       let thinkText = "";
                       let bodyText = textOutput;
@@ -250,22 +250,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       }
 
                       return (
-                        <div className="self-start max-w-[90%] w-full rounded-2xl border border-theme-border p-6 bg-theme-bg text-theme-text text-sm leading-relaxed shadow-sm my-2">
+                        <div className="self-start max-w-[95%] w-full rounded-2xl glass-panel border border-white/10 p-5 text-slate-100 text-xs sm:text-sm leading-relaxed shadow-2xl my-2">
                           {reasoningEnabled && thinkText && (
-                            <details open className="mb-3 border border-theme-border rounded-xl bg-theme-active/30 overflow-hidden group">
-                              <summary className="px-4 py-2 font-mono text-xs text-theme-text/75 select-none cursor-pointer hover:bg-theme-active transition-colors flex items-center justify-between">
-                                <span className="flex items-center gap-1.5 font-bold uppercase tracking-wide">
-                                  🧠 Ход мыслей (Reasoning)
+                            <details open className="mb-4 border border-indigo-500/20 rounded-xl bg-slate-900/60 overflow-hidden group">
+                              <summary className="px-4 py-2 font-hud text-[10px] text-indigo-300 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between uppercase tracking-wider">
+                                <span className="flex items-center gap-1.5 font-bold">
+                                  <Brain size={12} className="text-indigo-400" />
+                                  <span>[ REASONING LOG ]</span>
                                 </span>
                               </summary>
-                              <div className="px-4 py-3 border-t border-theme-border bg-theme-active/10 font-sans text-xs text-theme-text/80 whitespace-pre-wrap leading-relaxed">
+                              <div className="px-4 py-3 border-t border-white/5 bg-slate-950/40 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
                                 {thinkText}
                               </div>
                             </details>
                           )}
 
                           {bodyText && (
-                            <div className="whitespace-pre-wrap font-sans prose max-w-none text-theme-text">
+                            <div className="whitespace-pre-wrap font-sans max-w-none text-slate-100 leading-relaxed">
                               {bodyText}
                             </div>
                           )}
@@ -284,12 +285,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 );
               })}
 
-              {/* Thinking/Executing tool status */}
+              {/* Sci-Fi Status Chip for Running/Thinking */}
               {(agentStatus === 'thinking' || agentStatus === 'executing_tool') && (
                 <div className="self-start flex items-center gap-2 py-2">
-                  <div className="w-4 h-4 rounded-full border-2 border-theme-text border-t-transparent animate-spin" />
-                  <span className="text-xs text-theme-text opacity-70 font-mono">
-                    {agentStatus === 'thinking' ? '[ thinking... ]' : '[ executing tool... ]'}
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-sky-400 border-t-transparent animate-spin" />
+                  <span className="scifi-chip animate-pulse">
+                    {agentStatus === 'thinking' ? '[ SYS.THINKING... ]' : '[ EXEC.TOOL_ACTION... ]'}
                   </span>
                 </div>
               )}
@@ -298,10 +299,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           </div>
 
-          {/* Locked Bottom Prompt Form */}
-          <div className="p-4 border-t border-theme-border bg-theme-bg select-none z-10 w-full">
-            <form onSubmit={handleSubmit} className="w-full max-w-2xl mx-auto flex items-center justify-center gap-4">
-              <div className="relative w-full max-w-lg">
+          {/* Locked Bottom Sci-Fi Prompt Bar */}
+          <div className="p-3 md:p-4 border-t border-white/10 glass-panel select-none z-10 w-full">
+            <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto flex items-center justify-center gap-3">
+              <div className="relative w-full">
                 <input
                   type="text"
                   value={inputText}
@@ -312,23 +313,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     isTranscribing 
                       ? "Транскрибируем голос..." 
                       : agentStatus !== 'idle' 
-                        ? "Агент занят..." 
-                        : "Создай скрипт на питоне"
+                        ? "Агент выполняет задачи..." 
+                        : "Напиши инструкцию или задачу..."
                   }
-                  className="w-full border border-theme-border rounded-full pl-6 pr-12 py-3 text-sm text-theme-text placeholder-neutral-450 bg-theme-bg focus:outline-none focus:border-theme-text transition-colors"
+                  className="w-full skeuo-input rounded-2xl pl-5 pr-12 py-3 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none transition-all"
                 />
                 <button
                   type="button"
                   onClick={handleMicClick}
                   disabled={agentStatus !== 'idle' || isTranscribing}
-                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center z-10 hover:scale-110 active:scale-95 duration-150 ${
+                  className={`absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center z-10 ${
                     isRecording
-                      ? 'bg-red-500 text-white animate-pulse'
-                      : 'text-neutral-500 hover:text-theme-text disabled:opacity-30'
+                      ? 'bg-rose-500 text-white animate-pulse'
+                      : 'text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30'
                   }`}
-                  title={isRecording ? `Запись: ${recordingSeconds} сек. Кликни чтобы остановить.` : "Голосовой ввод"}
+                  title={isRecording ? `Запись: ${recordingSeconds} сек.` : "Голосовой ввод"}
                 >
-                  <Mic size={16} />
+                  <Mic size={15} />
                 </button>
               </div>
 
@@ -336,18 +337,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <button
                   type="button"
                   onClick={onCancelAgent}
-                  className="rounded-full border border-red-500 bg-red-50 hover:bg-red-100 text-red-600 px-8 py-3 text-sm font-bold cursor-pointer shrink-0 transition-colors focus:outline-none flex items-center gap-1.5"
+                  className="skeuo-btn rounded-2xl border-rose-500/40 text-rose-400 hover:text-rose-300 px-5 py-3 text-xs font-hud uppercase tracking-wider font-bold cursor-pointer shrink-0 transition-colors flex items-center gap-1.5"
                 >
-                  <Square size={12} className="fill-red-600" />
-                  <span>Остановить</span>
+                  <Square size={13} className="fill-rose-400" />
+                  <span>Стоп</span>
                 </button>
               ) : (
                 <button
                   type="submit"
                   disabled={!inputText.trim() || isTranscribing}
-                  className="rounded-full border border-theme-border bg-theme-send-btn px-8 py-3 text-sm font-bold text-black hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0 transition-colors focus:outline-none"
+                  className="skeuo-btn rounded-2xl px-6 py-3 text-xs font-hud font-bold uppercase tracking-wider text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 transition-colors flex items-center gap-2 cursor-pointer border-emerald-500/30"
                 >
-                  Отправить
+                  <Send size={14} />
                 </button>
               )}
             </form>

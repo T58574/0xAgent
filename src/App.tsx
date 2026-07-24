@@ -55,11 +55,11 @@ export default function App() {
       root.style.setProperty('--theme-send-btn', config.theme_colors.send_btn_color);
     } else {
       const root = document.documentElement;
-      root.style.setProperty('--theme-bg', '#ffffff');
-      root.style.setProperty('--theme-text', '#000000');
-      root.style.setProperty('--theme-border', '#000000');
-      root.style.setProperty('--theme-active', '#f5f5f5');
-      root.style.setProperty('--theme-send-btn', '#86efac');
+      root.style.setProperty('--theme-bg', '#090d16');
+      root.style.setProperty('--theme-text', '#f8fafc');
+      root.style.setProperty('--theme-border', 'rgba(255, 255, 255, 0.1)');
+      root.style.setProperty('--theme-active', 'rgba(30, 41, 59, 0.7)');
+      root.style.setProperty('--theme-send-btn', '#3b82f6');
     }
   }, [config]);
 

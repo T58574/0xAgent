@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, X, AlertCircle, Globe, Lock } from 'lucide-react';
+import { Copy, Check, X, AlertCircle, Globe, Lock, Terminal, GitBranch, MessageSquare, FolderGit2, Settings } from 'lucide-react';
 
 interface BottomPanelProps {
   logs: string[];
@@ -23,7 +23,7 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
   // Network Share Server State
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [password, setPassword] = useState('');
-  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareError] = useState<string | null>(null);
   const [copiedLinkIndex, setCopiedLinkIndex] = useState<number | null>(null);
 
   const toggleTab = (tab: 'logs' | 'share') => {
@@ -35,7 +35,6 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
   };
 
   const handleToggleShare = () => {
-    setShareError(null);
     if (shareUrl) {
       setShareUrl(null);
     } else {
@@ -55,18 +54,19 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
   };
 
   return (
-    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center w-full max-w-4xl px-4">
+    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center w-full max-w-4xl px-4 font-sans">
       
       {/* EXPANDABLE FLOATING CONTENT CARD ABOVE PILL */}
       {activeTab && (
-        <div className="w-full mb-3 rounded-2xl border border-theme-border bg-theme-bg p-4 shadow-lg overflow-y-auto max-h-[220px] flex flex-col justify-between text-theme-text">
+        <div className="w-full mb-3 rounded-2xl glass-panel p-4 shadow-2xl overflow-y-auto max-h-[240px] flex flex-col justify-between text-slate-100 border border-white/10">
           
           {/* Content Header */}
-          <div className="flex items-center justify-between pb-2 border-b border-theme-border mb-2 font-sans text-theme-text font-bold select-none text-[11px] tracking-wide uppercase">
-            <span className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between pb-2 border-b border-white/10 mb-2 select-none text-[11px] font-hud tracking-wider uppercase">
+            <span className="flex items-center gap-2 text-indigo-300">
+              <Terminal size={14} />
               <span>
-                {activeTab === 'logs' && 'Running Logs'}
-                {activeTab === 'share' && 'Local Network Share'}
+                {activeTab === 'logs' && 'СИСТЕМНЫЕ ЛОГИ АГЕНТА'}
+                {activeTab === 'share' && 'ЛОКАЛЬНЫЙ СЕТЕВОЙ ДОСТУП'}
               </span>
             </span>
 
@@ -74,102 +74,102 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
               {activeTab === 'logs' && (
                 <button
                   onClick={onClearLogs}
-                  className="px-3 py-0.5 rounded-full border border-theme-border hover:bg-theme-active text-theme-text text-[9px] cursor-pointer focus:outline-none"
+                  className="skeuo-btn px-3 py-1 rounded-lg text-slate-300 hover:text-white text-[10px] font-hud uppercase cursor-pointer"
                 >
-                  Clear Logs
+                  Очистить логи
                 </button>
               )}
               <button
                 onClick={() => setActiveTab(null)}
-                className="p-0.5 rounded-full border border-theme-border hover:bg-theme-active text-theme-text cursor-pointer transition-colors focus:outline-none"
+                className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white cursor-pointer transition-colors"
               >
-                <X size={10} />
+                <X size={14} />
               </button>
             </div>
           </div>
 
           {/* Inner Content Sections */}
-          <div className="flex-grow overflow-y-auto text-xs">
+          <div className="flex-grow overflow-y-auto text-xs scrollbar-none">
             {activeTab === 'logs' && (
-              <div className="space-y-1 font-mono text-[10px] text-theme-text opacity-85 leading-relaxed">
+              <div className="space-y-1 font-mono text-[10px] text-slate-300 leading-relaxed">
                 {logs.length > 0 ? (
                   logs.map((log, index) => (
-                    <div key={index} className="flex gap-2">
-                      <span className="text-theme-text font-bold shrink-0">[LOG]</span>
+                    <div key={index} className="flex gap-2 items-start py-0.5 border-b border-white/5 last:border-0">
+                      <span className="text-emerald-400 font-bold shrink-0 font-hud">[LOG]</span>
                       <span className="break-all">{log}</span>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-4 text-theme-text opacity-50 italic">No logs.</div>
+                  <div className="text-center py-6 text-slate-500 font-mono text-[11px]">Логи отсутствуют.</div>
                 )}
               </div>
             )}
 
             {/* Local Network Share Config View */}
             {activeTab === 'share' && (
-              <div className="space-y-2 py-1 font-sans text-theme-text">
-                <div className="text-[10px] text-theme-text opacity-70 leading-normal">
-                  Host the chat interface on your local Wi-Fi/Ethernet network. Other devices on the same network will be able to access the chat.
+              <div className="space-y-3 py-1 font-sans text-slate-200">
+                <div className="text-[11px] text-slate-400 leading-relaxed font-mono">
+                  Локальный доступ к интерфейсу в вашей Wi-Fi / Ethernet сети. Устройства в той же сети смогут подключаться к агенту.
                 </div>
 
-                <div className="flex gap-4 items-center">
+                <div className="flex gap-3 items-center">
                   <div className="flex-1 space-y-1">
-                    <label className="text-[9px] uppercase font-bold text-theme-text opacity-60 tracking-wider flex items-center gap-1 select-none">
-                      <Lock size={8} />
-                      <span>Access Password (Optional)</span>
+                    <label className="text-[9px] uppercase font-hud font-bold text-slate-400 tracking-wider flex items-center gap-1 select-none">
+                      <Lock size={10} />
+                      <span>Пароль доступа (Опционально)</span>
                     </label>
                     <input
                       type="password"
                       value={password}
                       disabled={!!shareUrl}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="No password set"
-                      className="w-full px-3 py-1 bg-theme-bg border border-theme-border rounded-full text-xs text-theme-text focus:outline-none focus:bg-theme-active"
+                      placeholder="Без пароля"
+                      className="w-full skeuo-input px-3.5 py-1.5 rounded-xl text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
                     />
                   </div>
 
                   <button
                     onClick={handleToggleShare}
-                    className={`px-4 py-1 text-xs font-bold rounded-full border border-theme-border cursor-pointer transition-all ${
+                    className={`skeuo-btn px-4 py-2 text-xs font-hud uppercase tracking-wider font-bold rounded-xl cursor-pointer transition-all ${
                       shareUrl
-                        ? 'bg-red-50 hover:bg-red-100 text-red-600'
-                        : 'bg-theme-bg hover:bg-theme-active text-theme-text'
+                        ? 'border-rose-500/40 text-rose-400 hover:text-rose-300'
+                        : 'border-emerald-500/40 text-emerald-400 hover:text-emerald-300'
                     }`}
                   >
-                    {shareUrl ? 'Stop Sharing' : 'Start Sharing'}
+                    {shareUrl ? 'Остановить' : 'Включить раздачу'}
                   </button>
                 </div>
 
                 {shareError && (
-                  <div className="text-xs text-red-500 flex items-center gap-1">
+                  <div className="text-xs text-rose-400 flex items-center gap-1">
                     <AlertCircle size={12} />
                     <span>{shareError}</span>
                   </div>
                 )}
 
                 {shareUrl && (
-                  <div className="p-2 border border-theme-border rounded-xl bg-theme-active space-y-1">
-                    <div className="text-[9px] font-bold text-theme-text uppercase tracking-wider flex items-center gap-1 select-none">
-                      <Globe size={10} />
-                      <span>Active Connection URLs (Try these on your phone)</span>
+                  <div className="p-3 border border-white/10 rounded-xl bg-slate-950/80 space-y-2">
+                    <div className="text-[10px] font-hud font-bold text-sky-400 uppercase tracking-wider flex items-center gap-1.5 select-none">
+                      <Globe size={12} />
+                      <span>АКТИВНЫЙ АДРЕС ПОДКЛЮЧЕНИЯ:</span>
                     </div>
-                    <div className="space-y-1 max-h-24 overflow-y-auto">
+                    <div className="space-y-1.5">
                       {shareUrl.split(',').map((url, index) => (
-                        <div key={index} className="flex items-center justify-between gap-3 border-b border-theme-border opacity-85 pb-1 last:border-0 last:pb-0">
+                        <div key={index} className="flex items-center justify-between gap-3 border-b border-white/5 pb-1.5 last:border-0 last:pb-0">
                           <a
                             href={url}
                             target="_blank"
                             rel="noreferrer"
-                            className="font-mono text-[10px] text-theme-text underline break-all hover:opacity-80"
+                            className="font-mono text-xs text-emerald-400 underline break-all hover:text-emerald-300"
                           >
                             {url}
                           </a>
                           <button
                             onClick={() => handleCopySpecificLink(url, index)}
-                            className="p-1 rounded bg-theme-bg border border-theme-border text-theme-text hover:bg-theme-active transition-colors cursor-pointer shrink-0 focus:outline-none"
-                            title="Copy link to clipboard"
+                            className="skeuo-btn p-1.5 rounded-lg text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
+                            title="Копировать ссылку"
                           >
-                            {copiedLinkIndex === index ? <Check size={10} className="text-green-600" /> : <Copy size={10} />}
+                            {copiedLinkIndex === index ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
                           </button>
                         </div>
                       ))}
@@ -182,74 +182,85 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
         </div>
       )}
 
-      {/* CENTERED FLOATING PILL BAR */}
-      <div className="w-full flex items-center border border-theme-border rounded-full px-4 py-1.5 bg-theme-bg text-theme-text justify-between shadow-sm select-none">
-        <div className="flex items-center gap-3">
+      {/* CENTERED FLOATING GLASS PILL BAR */}
+      <div className="w-full flex items-center glass-panel rounded-2xl px-4 py-2 text-slate-100 justify-between shadow-2xl border border-white/10 select-none">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => onChangeView('chat')}
-            className={`rounded-full border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
               activeView === 'chat' 
-                ? 'bg-theme-active font-black border-theme-text' 
-                : 'border-theme-border'
+                ? 'bg-slate-800 text-white font-bold border border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.25)]' 
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            чат
+            <MessageSquare size={13} className={activeView === 'chat' ? 'text-indigo-400' : 'text-slate-500'} />
+            <span>ЧАТ</span>
           </button>
 
           <button
             onClick={() => onChangeView('workspace')}
-            className={`rounded-full border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
               activeView === 'workspace' 
-                ? 'bg-theme-active font-black border-theme-text' 
-                : 'border-theme-border'
+                ? 'bg-slate-800 text-white font-bold border border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.25)]' 
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            воркспейс
+            <FolderGit2 size={13} className={activeView === 'workspace' ? 'text-amber-400' : 'text-slate-500'} />
+            <span>ВОРКСПЕЙС</span>
           </button>
 
           <button
             onClick={() => onChangeView('settings')}
-            className={`rounded-full border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-hud font-semibold flex items-center gap-1.5 cursor-pointer transition-all ${
               activeView === 'settings' 
-                ? 'bg-theme-active font-black border-theme-text' 
-                : 'border-theme-border'
+                ? 'bg-slate-800 text-white font-bold border border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.25)]' 
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
             }`}
           >
-            настройки
+            <Settings size={13} className={activeView === 'settings' ? 'text-emerald-400' : 'text-slate-500'} />
+            <span>НАСТРОЙКИ</span>
           </button>
 
-          <span className="w-[1px] h-4 bg-theme-border opacity-35" />
+          <span className="w-[1px] h-4 bg-white/10 hidden sm:inline-block" />
 
           <button
             onClick={() => toggleTab('logs')}
-            className={`rounded-full border border-theme-border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
-              activeTab === 'logs' ? 'bg-theme-active font-bold border-theme-text' : ''
+            className={`px-3 py-1.5 rounded-xl text-xs font-hud font-semibold cursor-pointer transition-all border ${
+              activeTab === 'logs' 
+                ? 'bg-slate-800 text-white font-bold border-indigo-500/50' 
+                : 'text-slate-400 border-white/5 hover:bg-white/5 hover:text-white'
             }`}
           >
-            логи
+            ЛОГИ
           </button>
           
           <button
             onClick={() => toggleTab('share')}
-            className={`rounded-full border border-theme-border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none ${
-              activeTab === 'share' ? 'bg-theme-active font-bold border-theme-text' : ''
+            className={`px-3 py-1.5 rounded-xl text-xs font-hud font-semibold cursor-pointer transition-all border ${
+              activeTab === 'share' 
+                ? 'bg-slate-800 text-white font-bold border-indigo-500/50' 
+                : 'text-slate-400 border-white/5 hover:bg-white/5 hover:text-white'
             }`}
           >
-            раздача
+            РАЗДАЧА
           </button>
           
           <button
             onClick={handleGithubClick}
-            className="rounded-full border border-theme-border px-4 py-0.5 text-xs text-theme-text font-semibold bg-theme-bg hover:bg-theme-active transition-colors cursor-pointer focus:outline-none"
+            className="px-3 py-1.5 rounded-xl text-xs font-hud font-semibold text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition-all cursor-pointer flex items-center gap-1"
           >
-            гитхаб
+            <GitBranch size={13} />
+            <span className="hidden md:inline">GITHUB</span>
           </button>
         </div>
 
-        {/* Model status indicator or similar */}
-        <span className="text-[10px] text-theme-text opacity-50 font-mono select-none mr-2">
-          {modelName}
-        </span>
+        {/* Model status indicator badge */}
+        <div className="hidden lg:flex items-center gap-2 border-l border-white/10 pl-3">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[10px] text-slate-400 font-mono select-none truncate max-w-[140px]">
+            {modelName}
+          </span>
+        </div>
       </div>
 
     </div>

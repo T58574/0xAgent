@@ -366,16 +366,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     <div className="w-full h-full bg-theme-bg text-theme-text flex flex-col overflow-hidden p-6 select-text">
       
       {/* Settings Header bar inside content area */}
-      <div className="flex items-center justify-between pb-4 border-b border-theme-border shrink-0 select-none">
+      <div className="flex items-center justify-between pb-4 border-b border-white/10 shrink-0 select-none">
         <div className="flex items-center gap-6">
-          <h2 className="text-sm font-black uppercase tracking-wider">Настройки системы</h2>
+          <h2 className="text-xs font-hud font-bold uppercase tracking-wider text-slate-200">НАСТРОЙКИ СИСТЕМЫ</h2>
           {/* Subtabs selector */}
-          <div className="flex border border-theme-border rounded-full p-0.5 bg-theme-bg select-none">
+          <div className="flex glass-panel rounded-xl p-1 gap-1 select-none border border-white/10">
             <button
               type="button"
               onClick={() => setActiveTab('general')}
-              className={`px-4 py-1 text-[10px] font-black uppercase rounded-full cursor-pointer transition-colors focus:outline-none ${
-                activeTab === 'general' ? 'bg-theme-text text-theme-bg font-black' : 'text-theme-text/60 hover:text-theme-text'
+              className={`px-4 py-1 text-[10px] font-hud font-bold uppercase rounded-lg cursor-pointer transition-colors focus:outline-none ${
+                activeTab === 'general' ? 'bg-slate-800 text-white font-bold border border-indigo-500/40' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Основное
@@ -383,8 +383,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('colors')}
-              className={`px-4 py-1 text-[10px] font-black uppercase rounded-full cursor-pointer transition-colors focus:outline-none ${
-                activeTab === 'colors' ? 'bg-theme-text text-theme-bg font-black' : 'text-theme-text/60 hover:text-theme-text'
+              className={`px-4 py-1 text-[10px] font-hud font-bold uppercase rounded-lg cursor-pointer transition-colors focus:outline-none ${
+                activeTab === 'colors' ? 'bg-slate-800 text-white font-bold border border-indigo-500/40' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Цвета
@@ -392,8 +392,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('local_server')}
-              className={`px-4 py-1 text-[10px] font-black uppercase rounded-full cursor-pointer transition-colors focus:outline-none ${
-                activeTab === 'local_server' ? 'bg-theme-text text-theme-bg font-black' : 'text-theme-text/60 hover:text-theme-text'
+              className={`px-4 py-1 text-[10px] font-hud font-bold uppercase rounded-lg cursor-pointer transition-colors focus:outline-none ${
+                activeTab === 'local_server' ? 'bg-slate-800 text-white font-bold border border-indigo-500/40' : 'text-slate-400 hover:text-slate-200'
               }`}
             >
               Локальный Сервер (Llama.cpp)
@@ -404,21 +404,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-1 border border-theme-border rounded-full hover:bg-theme-active text-xs font-bold transition-all cursor-pointer focus:outline-none"
+          className="skeuo-btn px-4 py-1.5 rounded-xl text-xs font-hud uppercase tracking-wider text-slate-300 hover:text-white cursor-pointer focus:outline-none"
         >
           Вернуться в чат
         </button>
       </div>
 
       {/* Main Settings Form Scrollable area */}
-      <form onSubmit={handleSave} className="flex-1 overflow-y-auto py-6 space-y-6">
+      <form onSubmit={handleSave} className="flex-1 overflow-y-auto py-6 space-y-6 scrollbar-none">
         
         {/* TAB 1: GENERAL */}
         {activeTab === 'general' && (
           <div className="max-w-3xl space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase text-theme-text opacity-70">
+                <label className="text-[10px] font-hud font-bold uppercase text-slate-400">
                   Ссылка подключения к API (Local LLM Server API URL)
                 </label>
                 <input
@@ -427,12 +427,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   onChange={(e) => setApiUrl(e.target.value)}
                   placeholder="e.g. http://127.0.0.1:11434/v1"
                   required
-                  className="w-full px-4 py-2 rounded-full bg-theme-bg border border-theme-border text-xs font-mono text-theme-text focus:outline-none focus:bg-theme-active transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl skeuo-input text-xs font-mono text-slate-100 focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase text-theme-text opacity-70">
+                <label className="text-[10px] font-hud font-bold uppercase text-slate-400">
                   Название модели (Model Name identifier)
                 </label>
                 <input
@@ -441,12 +441,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   onChange={(e) => setModelName(e.target.value)}
                   placeholder="e.g. qwen2.5-coder:7b"
                   required
-                  className="w-full px-4 py-2 rounded-full bg-theme-bg border border-theme-border text-xs font-mono text-theme-text focus:outline-none focus:bg-theme-active transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl skeuo-input text-xs font-mono text-slate-100 focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase text-theme-text opacity-70">
+                <label className="text-[10px] font-hud font-bold uppercase text-slate-400">
                   Токен API Groq (Для голосового ввода)
                 </label>
                 <input
@@ -454,12 +454,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   value={groqApiKey}
                   onChange={(e) => setGroqApiKey(e.target.value)}
                   placeholder="gsk_..."
-                  className="w-full px-4 py-2 rounded-full bg-theme-bg border border-theme-border text-xs font-mono text-theme-text focus:outline-none focus:bg-theme-active transition-colors"
+                  className="w-full px-4 py-2.5 rounded-xl skeuo-input text-xs font-mono text-slate-100 focus:outline-none"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold uppercase text-theme-text opacity-70">
+                <label className="text-[10px] font-hud font-bold uppercase text-slate-400">
                   Папка с моделями GGUF (Models Path)
                 </label>
                 <div className="flex gap-2">
@@ -468,7 +468,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                     value={modelsPath}
                     onChange={(e) => setModelsPath(e.target.value)}
                     placeholder="e.g. C:\users\user\Documents\localLLMS"
-                    className="flex-1 px-4 py-2 rounded-full bg-theme-bg border border-theme-border text-xs font-mono text-theme-text focus:outline-none focus:bg-theme-active transition-colors"
+                    className="flex-1 px-4 py-2.5 rounded-xl skeuo-input text-xs font-mono text-slate-100 focus:outline-none"
                   />
                   <button
                     type="button"
@@ -476,7 +476,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       const res = await api.select_workspace();
                       if (res) setModelsPath(res);
                     }}
-                    className="px-4 py-1 text-xs font-bold border border-theme-border rounded-full bg-theme-bg hover:bg-theme-active text-theme-text cursor-pointer focus:outline-none shrink-0"
+                    className="skeuo-btn px-4 py-1 text-xs font-hud font-bold uppercase tracking-wider rounded-xl text-slate-200 hover:text-white cursor-pointer focus:outline-none shrink-0"
                   >
                     Обзор...
                   </button>
@@ -484,21 +484,21 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 py-1 select-none cursor-pointer">
+            <div className="flex items-center gap-2.5 py-1 select-none cursor-pointer">
               <input
                 type="checkbox"
                 id="reasoning_chk"
                 checked={reasoningEnabled}
                 onChange={(e) => setReasoningEnabled(e.target.checked)}
-                className="rounded border-theme-border text-theme-text"
+                className="rounded border-white/20 bg-slate-900 text-indigo-500 focus:ring-0 cursor-pointer"
               />
-              <label htmlFor="reasoning_chk" className="text-xs font-bold text-theme-text uppercase select-none cursor-pointer">
+              <label htmlFor="reasoning_chk" className="text-xs font-hud font-bold text-slate-300 uppercase select-none cursor-pointer">
                 Reasoning (Отображать ход мыслей модели &lt;think&gt;)
               </label>
             </div>
 
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-theme-text opacity-70">
+              <label className="text-[10px] font-hud font-bold uppercase text-slate-400">
                 Системные инструкции (System Instructions Prompt)
               </label>
               <textarea
@@ -506,7 +506,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
                 required
-                className="w-full px-4 py-3.5 rounded-2xl bg-theme-bg border border-theme-border text-xs font-mono text-theme-text focus:outline-none focus:bg-theme-active transition-colors resize-none"
+                className="w-full px-4 py-3.5 rounded-2xl skeuo-input text-xs font-mono text-slate-100 focus:outline-none resize-none leading-relaxed"
               />
             </div>
           </div>
@@ -1089,20 +1089,20 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         )}
 
           {/* Action triggers */}
-          <div className="flex items-center justify-between pt-4 border-t border-theme-border mt-6 shrink-0 select-none">
+          <div className="flex items-center justify-between pt-4 border-t border-white/10 mt-6 shrink-0 select-none">
             <button
               type="button"
               onClick={handleResetToDefault}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-full border border-theme-border bg-theme-bg hover:bg-theme-active text-theme-text text-xs font-bold cursor-pointer transition-colors focus:outline-none"
+              className="skeuo-btn flex items-center gap-1.5 px-4 py-2 rounded-xl text-slate-300 hover:text-white text-xs font-hud uppercase tracking-wider cursor-pointer focus:outline-none"
             >
-              <Undo size={12} />
-              <span>Defaults</span>
+              <Undo size={13} />
+              <span>По умолчанию</span>
             </button>
 
             <button
               type="submit"
               disabled={isSaving}
-              className="flex items-center gap-1.5 px-6 py-1.5 rounded-full border border-theme-border bg-theme-send-btn hover:opacity-90 text-black text-xs font-black cursor-pointer transition-colors focus:outline-none"
+              className="skeuo-btn flex items-center gap-1.5 px-6 py-2 rounded-xl text-emerald-400 hover:text-emerald-300 border-emerald-500/30 text-xs font-hud font-bold uppercase tracking-wider cursor-pointer focus:outline-none disabled:opacity-40"
             >
               <span>{isSaving ? 'Сохранение...' : 'Сохранить настройки'}</span>
             </button>
