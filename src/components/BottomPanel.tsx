@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, X, AlertCircle, Globe, Lock, Terminal, MessageSquare, FolderGit2, Settings } from 'lucide-react';
+import { Copy, Check, X, AlertCircle, Globe, Lock, Terminal, MessageSquare, FolderGit2, Settings, Activity } from 'lucide-react';
 import * as api from '../services/api';
 
 interface BottomPanelProps {
@@ -8,8 +8,8 @@ interface BottomPanelProps {
   modelName: string;
   onClearLogs: () => void;
   onSelectWorkspace: () => void;
-  activeView: 'chat' | 'workspace' | 'settings';
-  onChangeView: (view: 'chat' | 'workspace' | 'settings') => void;
+  activeView: 'chat' | 'workspace' | 'settings' | 'analytics';
+  onChangeView: (view: 'chat' | 'workspace' | 'settings' | 'analytics') => void;
 }
 
 export const BottomPanel: React.FC<BottomPanelProps> = ({
@@ -198,6 +198,18 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
           >
             <Settings size={13} className={activeView === 'settings' ? 'text-emerald-400' : 'text-slate-500'} />
             <span>Настройки</span>
+          </button>
+
+          <button
+            onClick={() => onChangeView('analytics')}
+            className={`px-3 py-1 rounded text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-all ${
+              activeView === 'analytics' 
+                ? 'bg-slate-800 text-white font-semibold border border-emerald-500/40' 
+                : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent'
+            }`}
+          >
+            <Activity size={13} className={activeView === 'analytics' ? 'text-emerald-400' : 'text-slate-500'} />
+            <span>Аналитика</span>
           </button>
 
           <span className="w-[1px] h-3.5 bg-white/10 hidden sm:inline-block" />

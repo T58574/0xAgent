@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
-import { AppConfig, ChatSession, ChatMessage, FileNode, ToolCallInfo } from './types';
+import { AppConfig, ChatSession, ChatMessage, FileNode, ToolCallInfo, LiveTelemetry } from './types';
 import { Header } from './components/Header';
 import { WorkspaceTree } from './components/WorkspaceTree';
 import { ChatArea } from './components/ChatArea';
@@ -9,6 +9,7 @@ import { SettingsPage } from './components/settings/SettingsPage';
 import { FileViewer } from './components/FileViewer';
 import { CodeEditor } from './components/CodeEditor';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
+import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { FolderTree, Code } from 'lucide-react';
 
 export default function App() {
@@ -19,8 +20,9 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
   
-  // Agent loop state
+  // Agent loop & telemetry state
   const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'waiting_approval' | 'executing_tool'>('idle');
+  const [liveTelemetry, setLiveTelemetry] = useState<LiveTelemetry | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   
   // Workspace File tree state
@@ -28,7 +30,7 @@ export default function App() {
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; content: string } | null>(null);
   
   // Navigation view state
-  const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings'>('chat');
+  const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings' | 'analytics'>('chat');
   const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
 
   // Mobile Workspace view mode: 'files' tree or 'editor' code tab
@@ -348,9 +350,20 @@ export default function App() {
       }
     });
 
-    const un2 = api.listen<{ message_id: string; token: string }>('agent-token-stream', (event) => {
+    const un2 = api.listen<any>('agent-token-stream', (event) => {
       const sess = currentSessionRef.current;
       if (!sess) return;
+
+      if (event.payload.tokensPerSec || event.payload.contextUsed) {
+        setLiveTelemetry({
+          messageId: event.payload.message_id,
+          tokensPerSec: event.payload.tokensPerSec,
+          tokenCount: event.payload.tokenCount,
+          contextUsed: event.payload.contextUsed,
+          contextMax: event.payload.contextMax,
+          modelName: event.payload.modelName,
+        });
+      }
 
       const updatedMessages = sess.messages.map((m) => {
         if (m.id === event.payload.message_id) {
@@ -371,13 +384,16 @@ export default function App() {
     const un3 = api.listen<string>('agent-status-changed', async (event) => {
       setAgentStatus(event.payload as any);
       addLog(`Agent status changed: ${event.payload}`);
-      if (event.payload === 'idle' && currentSessionRef.current) {
-        try {
-          const fresh = await api.load_session(currentSessionRef.current.id);
-          if (currentSessionRef.current && currentSessionRef.current.id === fresh.id) {
-            updateSessionState(fresh);
-          }
-        } catch {}
+      if (event.payload === 'idle') {
+        setLiveTelemetry(null);
+        if (currentSessionRef.current) {
+          try {
+            const fresh = await api.load_session(currentSessionRef.current.id);
+            if (currentSessionRef.current && currentSessionRef.current.id === fresh.id) {
+              updateSessionState(fresh);
+            }
+          } catch {}
+        }
       }
     });
 
@@ -495,6 +511,7 @@ export default function App() {
               onCancelAgent={handleCancelAgent}
               reasoningEnabled={config?.reasoning_enabled !== false}
               groqApiKey={config?.groq_api_key}
+              liveTelemetry={liveTelemetry}
             />
           </div>
         )}
@@ -558,6 +575,16 @@ export default function App() {
               config={config}
               onSaveConfig={handleSaveConfig}
               onCancel={() => setActiveView('chat')}
+            />
+          </div>
+        )}
+
+        {activeView === 'analytics' && (
+          <div className="flex-grow w-full h-full overflow-hidden border-t border-theme-border bg-slate-950">
+            <AnalyticsPage
+              sessions={sessions}
+              serverLogs={logs}
+              onRefresh={() => window.location.reload()}
             />
           </div>
         )}

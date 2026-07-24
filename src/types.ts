@@ -70,12 +70,33 @@ export interface ToolCallInfo {
   output?: string | null;
 }
 
+export interface MessageMetrics {
+  tokensPerSec?: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  contextUsed?: number;
+  contextMax?: number;
+  evalDurationMs?: number;
+  modelName?: string;
+}
+
+export interface LiveTelemetry {
+  messageId?: string;
+  tokensPerSec?: number;
+  tokenCount?: number;
+  contextUsed?: number;
+  contextMax?: number;
+  modelName?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   timestamp: number;
   tool_calls?: ToolCallInfo[] | null;
+  metrics?: MessageMetrics | null;
 }
 
 export interface ChatSession {

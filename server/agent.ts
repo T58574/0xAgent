@@ -354,6 +354,30 @@ export async function runAgentLoop(
       role: 'assistant',
     });
 
+    const genStartTime = Date.now();
+    let tokenCount = 0;
+    const contextMax = config.local_server?.ctx_size || 8192;
+    const estimatedPromptTokens = Math.max(1, Math.round(JSON.stringify(messages).length / 3.8));
+    const modelName = config.model_name || 'qwen2.5-coder:7b';
+
+    const emitToken = (content: string) => {
+      assistantMessage.content += content;
+      tokenCount++;
+      const elapsedSec = (Date.now() - genStartTime) / 1000;
+      const tokensPerSec = elapsedSec > 0.1 ? Math.round((tokenCount / elapsedSec) * 10) / 10 : 0;
+      const contextUsed = estimatedPromptTokens + tokenCount;
+
+      broadcast('agent-token-stream', {
+        message_id: assistantMessageId,
+        token: content,
+        tokensPerSec,
+        tokenCount,
+        contextUsed,
+        contextMax,
+        modelName,
+      });
+    };
+
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
@@ -380,11 +404,7 @@ export async function runAgentLoop(
                 const parsed = JSON.parse(data);
                 const content = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text;
                 if (content) {
-                  assistantMessage.content += content;
-                  broadcast('agent-token-stream', {
-                    message_id: assistantMessageId,
-                    token: content,
-                  });
+                  emitToken(content);
                 }
               } catch {}
             }
@@ -410,11 +430,7 @@ export async function runAgentLoop(
             const parsed = JSON.parse(data);
             const content = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text;
             if (content) {
-              assistantMessage.content += content;
-              broadcast('agent-token-stream', {
-                message_id: assistantMessageId,
-                token: content,
-              });
+              emitToken(content);
             }
           } catch {
             // Ignore parse errors for broken chunk lines
@@ -422,6 +438,21 @@ export async function runAgentLoop(
         }
       }
     }
+
+    const totalElapsedMs = Date.now() - genStartTime;
+    const finalTokensPerSec = totalElapsedMs > 100 ? Math.round((tokenCount / (totalElapsedMs / 1000)) * 10) / 10 : 0;
+    const finalContextUsed = estimatedPromptTokens + tokenCount;
+
+    assistantMessage.metrics = {
+      tokensPerSec: finalTokensPerSec,
+      promptTokens: estimatedPromptTokens,
+      completionTokens: tokenCount,
+      totalTokens: finalContextUsed,
+      contextUsed: finalContextUsed,
+      contextMax,
+      evalDurationMs: totalElapsedMs,
+      modelName,
+    };
 
     // Save assistant message to session
     session.messages.push(assistantMessage);

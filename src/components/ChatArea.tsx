@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, AlertTriangle, Play } from 'lucide-react';
-import { ChatMessage } from '../types';
+import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, AlertTriangle, Play, Zap, Cpu } from 'lucide-react';
+import { ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
+import { NotionMarkdown } from './NotionMarkdown';
 import * as api from '../services/api';
 
 interface ChatAreaProps {
@@ -13,6 +14,7 @@ interface ChatAreaProps {
   onCancelAgent?: () => void;
   reasoningEnabled?: boolean;
   groqApiKey?: string | null;
+  liveTelemetry?: LiveTelemetry | null;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -23,6 +25,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onCancelAgent,
   reasoningEnabled = true,
   groqApiKey,
+  liveTelemetry,
 }) => {
   const [inputText, setInputText] = useState('');
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -31,10 +34,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Microphone recording state
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<any>(null);
 
   // Server health state for 1-click launch banner
   const [isServerOffline, setIsServerOffline] = useState(false);
@@ -44,7 +45,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, agentStatus]);
+  }, [messages, agentStatus, liveTelemetry]);
 
   useEffect(() => {
     const checkHealth = async () => {
@@ -71,20 +72,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       unlisten();
     };
   }, [serverHost, serverPort]);
-
-  useEffect(() => {
-    if (isRecording) {
-      timerRef.current = setInterval(() => {
-        setRecordingSeconds((prev) => prev + 1);
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-      setRecordingSeconds(0);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRecording]);
 
   const startRecording = async () => {
     try {
@@ -198,92 +185,85 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setInputText('');
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      handleSubmit(e);
-    }
-  };
-
-  const hasMessages = messages.length > 0;
+  const hasMessages = messages && messages.length > 0;
 
   const renderWarningBanner = () => {
     if (!isServerOffline) return null;
     return (
-      <div className="w-full max-w-3xl mx-auto px-3 py-2.5 rounded-md bg-amber-500/10 border border-amber-500/40 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-lg animate-fadeIn mb-3 select-none">
+      <div className="mx-4 my-2 p-3 rounded-lg border border-amber-500/40 bg-amber-950/40 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg z-20">
         <div className="flex items-center gap-2">
-          <AlertTriangle size={16} className="text-amber-400 shrink-0" />
-          <div className="text-xs">
-            <span className="font-semibold text-amber-200">
-              ⚠️ Локальный LLM Сервер не запущен на порту {serverPort}!
-            </span>
-            <div className="text-[11px] text-slate-300">
-              Модель не сможет ответить, пока локальный сервер остановлен.
-            </div>
+          <AlertTriangle size={18} className="text-amber-400 shrink-0 animate-pulse" />
+          <div>
+            <span className="font-semibold text-slate-100">Локальный сервер llama.cpp не запущен!</span>
+            <p className="text-[11px] text-slate-300 mt-0.5">
+              Для отправки сообщений запустите сервер в 1-клик или загрузите модель в Настройках.
+            </p>
           </div>
         </div>
-
         <button
-          type="button"
           onClick={() => handleStartServerDirectly()}
           disabled={isStartingServer}
-          className="flat-btn px-3.5 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 shrink-0 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+          className="flat-btn px-3.5 py-1.5 rounded-md text-xs font-semibold text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/20 flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
         >
-          {isStartingServer ? <RefreshCw size={12} className="animate-spin text-emerald-400" /> : <Play size={12} />}
-          <span>{isStartingServer ? 'Запуск сервера...' : '🚀 Запустить LLM Сервер в 1-клик'}</span>
+          {isStartingServer ? (
+            <>
+              <RefreshCw size={13} className="animate-spin" />
+              <span>Запуск...</span>
+            </>
+          ) : (
+            <>
+              <Play size={13} />
+              <span>Запустить LLM в 1-клик</span>
+            </>
+          )}
         </button>
       </div>
     );
   };
 
   return (
-    <div className="flex-grow flex flex-col relative overflow-hidden bg-scifi-grid select-text w-full text-slate-100 font-sans">
+    <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden relative">
       
-      {/* 1. INITIAL CENTERED HERO VIEW */}
+      {/* 1. EMPTY CHAT WELCOME VIEW */}
       {!hasMessages && (
-        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center select-none z-10 w-full max-w-2xl mx-auto">
-          <div className="w-12 h-12 rounded-md bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-4">
-            <Sparkles size={24} />
+        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center z-10 max-w-xl mx-auto space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shadow-xl">
+            <Sparkles size={32} className="text-emerald-400 animate-pulse" />
           </div>
-          <h1 className="text-xl font-semibold text-white mb-1.5 tracking-tight">
-            0xAgent Local Workspace
-          </h1>
-          <p className="text-xs text-slate-400 mb-6 max-w-md font-normal leading-relaxed">
-            Автономный разработчик. Работает локально с файлами и инструментами.
+          <h2 className="text-xl font-bold text-slate-100 tracking-tight">
+            0xAgent AI Pair Programmer
+          </h2>
+          <p className="text-xs text-slate-400 leading-relaxed font-sans">
+            Введите вашу задачу или выберите локальную GGUF модель в Настройках для начала автономной написания кода.
           </p>
 
           {renderWarningBanner()}
 
-          <form onSubmit={handleSubmit} className="w-full flex items-center justify-center gap-2">
-            <div className="relative w-full">
+          <form onSubmit={handleSubmit} className="w-full flex items-center gap-2 mt-4">
+            <div className="relative flex-1">
               <input
                 type="text"
                 value={inputText}
-                disabled={isTranscribing}
                 onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={isTranscribing ? "Расшифровываем голос через Groq Whisper..." : "Что нужно сделать с проектом?"}
-                className="w-full flat-input rounded-md pl-4 pr-10 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                placeholder="Что строим сегодня?.."
+                className="w-full px-4 py-3 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none pr-10"
               />
               <button
                 type="button"
                 onClick={handleMicClick}
-                disabled={isTranscribing}
-                className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded transition-all cursor-pointer flex items-center justify-center z-10 ${
-                  isRecording
-                    ? 'bg-rose-500 text-white animate-pulse'
-                    : 'text-slate-400 hover:text-white hover:bg-white/10'
+                className={`absolute right-2.5 top-2.5 p-1 rounded transition-colors ${
+                  isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
                 }`}
-                title={isRecording ? `Запись: ${recordingSeconds} сек.` : "Голосовой ввод"}
               >
-                {isTranscribing ? <RefreshCw size={15} className="animate-spin text-sky-400" /> : <Mic size={15} />}
+                {isRecording ? <Square size={16} /> : <Mic size={16} />}
               </button>
             </div>
             <button
               type="submit"
               disabled={!inputText.trim() || isTranscribing}
-              className="flat-btn rounded-md px-4 py-2.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
+              className="flat-btn rounded-lg px-5 py-3 text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
             >
-              <Send size={14} />
+              <Send size={16} />
             </button>
           </form>
         </div>
@@ -351,9 +331,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         )}
 
                         {bodyText && (
-                          <div className="whitespace-pre-wrap font-sans max-w-none text-slate-100 leading-relaxed">
-                            {bodyText}
-                          </div>
+                          <NotionMarkdown content={bodyText} />
                         )}
 
                         {msg.tool_calls && msg.tool_calls.map((tool) => (
@@ -363,6 +341,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             onRespond={onRespondToTool} 
                           />
                         ))}
+
+                        {/* COMPACT METRICS FOOTER PILL */}
+                        {msg.metrics && (
+                          <div className="mt-3 pt-2 border-t border-white/5 flex flex-wrap items-center gap-3 text-[10px] font-mono text-slate-400 select-none">
+                            {msg.metrics.tokensPerSec !== undefined && msg.metrics.tokensPerSec > 0 && (
+                              <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                                <Zap size={11} />
+                                <span>{msg.metrics.tokensPerSec} t/s</span>
+                              </span>
+                            )}
+                            {msg.metrics.contextUsed !== undefined && (
+                              <span className="flex items-center gap-1 text-blue-300">
+                                <Brain size={11} />
+                                <span>Контекст: {msg.metrics.contextUsed.toLocaleString()} / {msg.metrics.contextMax?.toLocaleString()} tok</span>
+                              </span>
+                            )}
+                            {msg.metrics.modelName && (
+                              <span className="flex items-center gap-1 text-purple-300">
+                                <Cpu size={11} />
+                                <span>{msg.metrics.modelName}</span>
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })()}
@@ -370,12 +372,40 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               );
             })}
 
+            {/* LIVE STREAMING TELEMETRY BANNER */}
             {(agentStatus === 'thinking' || agentStatus === 'executing_tool') && (
-              <div className="self-start flex items-center gap-2 py-1.5 px-3 rounded bg-slate-900/60 border border-white/10 text-xs text-slate-300 font-medium">
-                <RefreshCw size={13} className="animate-spin text-emerald-400" />
-                <span>
-                  {agentStatus === 'thinking' ? 'Агент размышляет и формирует ответ...' : 'Агент выполняет инструмент...'}
-                </span>
+              <div className="self-start w-full max-w-full my-2 p-3 rounded-lg bg-slate-900/90 border border-emerald-500/30 text-xs text-slate-200 shadow-md space-y-2 font-sans">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-medium">
+                    <RefreshCw size={13} className="animate-spin text-emerald-400" />
+                    <span>
+                      {agentStatus === 'thinking' ? 'Агент генерирует ответ...' : 'Агент выполняет инструмент...'}
+                    </span>
+                  </div>
+                  {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/30 animate-pulse flex items-center gap-1">
+                      <Zap size={11} />
+                      <span>{liveTelemetry.tokensPerSec} t/s</span>
+                    </span>
+                  )}
+                </div>
+
+                {liveTelemetry?.contextUsed !== undefined && (
+                  <div className="space-y-1 pt-1 font-mono text-[11px] text-slate-400 border-t border-white/5">
+                    <div className="flex justify-between items-center">
+                      <span>Заполнение контекста: <strong className="text-slate-200">{liveTelemetry.contextUsed.toLocaleString()}</strong> / {liveTelemetry.contextMax?.toLocaleString()} tok</span>
+                      <span className="text-blue-300 font-semibold">
+                        {((liveTelemetry.contextUsed / (liveTelemetry.contextMax || 8192)) * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5">
+                      <div
+                        className="bg-emerald-400 h-full transition-all duration-300"
+                        style={{ width: `${Math.min(100, (liveTelemetry.contextUsed / (liveTelemetry.contextMax || 8192)) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -388,44 +418,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* INPUT FORM CONTAINER */}
           <div className="p-3 border-t border-white/10 glass-panel select-none z-10 w-full">
             <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2">
-              <div className="relative w-full">
+              <div className="relative flex-1">
                 <input
                   type="text"
                   value={inputText}
-                  disabled={agentStatus !== 'idle' || isTranscribing}
                   onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={
-                    isTranscribing 
-                      ? "Расшифровываем голос через Groq Whisper..." 
-                      : agentStatus !== 'idle' 
-                        ? "Агент выполняет задачу..." 
-                        : "Напиши задачу..."
-                  }
-                  className="w-full flat-input rounded-md pl-4 pr-10 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                  placeholder="Задайте вопрос или опишите задачу..."
+                  className="w-full px-4 py-2.5 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none pr-10"
                 />
                 <button
                   type="button"
                   onClick={handleMicClick}
-                  disabled={agentStatus !== 'idle' || isTranscribing}
-                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 rounded transition-all cursor-pointer flex items-center justify-center z-10 ${
-                    isRecording
-                      ? 'bg-rose-500 text-white animate-pulse'
-                      : 'text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-30'
+                  className={`absolute right-2.5 top-2.5 p-1 rounded transition-colors ${
+                    isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
                   }`}
-                  title={isRecording ? `Запись: ${recordingSeconds} сек.` : "Голосовой ввод"}
                 >
-                  {isTranscribing ? <RefreshCw size={15} className="animate-spin text-sky-400" /> : <Mic size={15} />}
+                  {isRecording ? <Square size={16} /> : <Mic size={16} />}
                 </button>
               </div>
 
-              {agentStatus !== 'idle' ? (
+              {agentStatus !== 'idle' && onCancelAgent ? (
                 <button
                   type="button"
                   onClick={onCancelAgent}
-                  className="flat-btn rounded-md border-rose-500/40 text-rose-400 hover:text-rose-300 px-4 py-2.5 text-xs font-medium cursor-pointer shrink-0 flex items-center gap-1.5"
+                  className="flat-btn rounded-md px-3.5 py-2.5 text-xs font-semibold text-rose-400 border-rose-500/30 hover:bg-rose-500/10 cursor-pointer flex items-center gap-1.5 shrink-0"
                 >
-                  <Square size={12} className="fill-rose-400" />
+                  <Square size={13} />
                   <span>Стоп</span>
                 </button>
               ) : (
@@ -434,12 +452,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   disabled={!inputText.trim() || isTranscribing}
                   className="flat-btn rounded-md px-4 py-2.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
                 >
-                  <Send size={13} />
+                  <Send size={14} />
                 </button>
               )}
             </form>
           </div>
-
         </div>
       )}
 
