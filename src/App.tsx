@@ -288,7 +288,7 @@ export default function App() {
   };
 
   // Approve or Reject write-based tool actions
-  const handleRespondToTool = async (toolId: string, approve: boolean) => {
+  const handleRespondToTool = async (toolId: string, approve: boolean | string) => {
     if (!currentSessionId) return;
     try {
       addLog(`Tool response submitted: [${toolId}] approved=${approve}`);

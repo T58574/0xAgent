@@ -9,7 +9,7 @@ interface ChatAreaProps {
   messages: ChatMessage[];
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
   onSendMessage: (text: string) => void;
-  onRespondToTool: (toolId: string, approve: boolean) => void;
+  onRespondToTool: (toolId: string, approve: boolean | string) => void;
   onCancelAgent?: () => void;
   reasoningEnabled?: boolean;
   groqApiKey?: string | null;

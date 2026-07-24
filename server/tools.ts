@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { exec, execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import { FileNode } from '../src/types';
 
 export function resolvePath(workspaceDir: string | null | undefined, pathStr: string): string {
@@ -167,10 +167,21 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
   return new Promise((resolve) => {
     const isWindows = process.platform === 'win32';
     const shell = isWindows ? 'powershell.exe' : 'sh';
-    const args = isWindows ? ['-NoProfile', '-Command', commandStr] : ['-c', commandStr];
+    const args = isWindows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', commandStr] : ['-c', commandStr];
     const cwd = workspaceDir && fs.existsSync(workspaceDir) ? workspaceDir : process.cwd();
 
-    exec(`${shell} ${args.map(a => `"${a.replace(/"/g, '\\"')}"`).join(' ')}`, { cwd }, (error, stdout, stderr) => {
+    const child = spawn(shell, args, { cwd });
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout?.on('data', (data) => { stdout += data.toString(); });
+    child.stderr?.on('data', (data) => { stderr += data.toString(); });
+
+    child.on('error', (err) => {
+      resolve(`Error launching process: ${err.message}`);
+    });
+
+    child.on('close', (code) => {
       let result = '';
       if (stdout && stdout.trim().length > 0) {
         result += stdout;
@@ -180,7 +191,7 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
         result += stderr;
       }
       if (result.length === 0) {
-        result = error ? `Error: ${error.message}` : 'Command executed successfully with no output.';
+        result = code === 0 ? 'Command executed successfully with no output.' : `Command exited with code ${code}.`;
       }
       resolve(result);
     });

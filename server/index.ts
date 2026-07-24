@@ -4,6 +4,8 @@ import http from 'node:http';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { execSync, spawn, ChildProcess } from 'node:child_process';
 import { WebSocketServer, WebSocket } from 'ws';
@@ -382,7 +384,7 @@ app.post('/api/parse-gguf', (req, res) => {
 });
 
 // Recursively scan directory for GGUF model files & extract metadata
-app.get('/api/scan-models-dir', (req, res) => {
+app.get('/api/scan-models-dir', async (req, res) => {
   try {
     const targetDir = (req.query.dirPath as string) || path.join(os.homedir(), '.0xagent', 'models');
     if (!fs.existsSync(targetDir)) {
@@ -392,16 +394,16 @@ app.get('/api/scan-models-dir', (req, res) => {
 
     const models: GgufMetadata[] = [];
 
-    function scanDir(dir: string, depth: number) {
+    async function scanDir(dir: string, depth: number) {
       if (depth > 3 || models.length > 100) return;
       try {
-        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        const entries = await fs.promises.readdir(dir, { withFileTypes: true });
         for (const entry of entries) {
           if (models.length > 100) break;
           const fullPath = path.join(dir, entry.name);
           if (entry.isDirectory()) {
-            if (!['.git', 'node_modules', 'dist', 'build'].includes(entry.name)) {
-              scanDir(fullPath, depth + 1);
+            if (!['.git', 'node_modules', 'dist', 'build', '.idea', '.vscode'].includes(entry.name)) {
+              await scanDir(fullPath, depth + 1);
             }
           } else if (entry.isFile() && entry.name.endsWith('.gguf')) {
             models.push(parseGgufMetadata(fullPath));
@@ -410,7 +412,7 @@ app.get('/api/scan-models-dir', (req, res) => {
       } catch {}
     }
 
-    scanDir(targetDir, 0);
+    await scanDir(targetDir, 0);
     res.json({ dirPath: targetDir, models });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -921,14 +923,19 @@ app.get('/api/gguf-models', (_req, res) => {
 
 app.post('/api/download-model', async (req, res) => {
   try {
-    const { downloadUrl, fileName } = req.body;
+    const { downloadUrl, fileName } = req.body || {};
+    if (!downloadUrl || !fileName) {
+      res.status(400).json({ error: 'downloadUrl and fileName are required' });
+      return;
+    }
+
     const appDir = path.join(os.homedir(), '.0xagent');
     const modelsDir = path.join(appDir, 'models');
     if (!fs.existsSync(modelsDir)) {
       fs.mkdirSync(modelsDir, { recursive: true });
     }
 
-    const modelPath = path.join(modelsDir, fileName);
+    const modelPath = path.join(modelsDir, path.basename(fileName));
     if (fs.existsSync(modelPath)) {
       const cfg = loadConfig();
       if (!cfg.local_server) cfg.local_server = {};
@@ -940,18 +947,23 @@ app.post('/api/download-model', async (req, res) => {
 
     broadcast('agent-error', `Начало загрузки GGUF: ${fileName}`);
     const downloadRes = await fetch(downloadUrl);
-    if (!downloadRes.ok) throw new Error(`Download failed: ${downloadRes.statusText}`);
+    if (!downloadRes.ok) throw new Error(`Download failed (${downloadRes.status}): ${downloadRes.statusText}`);
 
     const fileStream = fs.createWriteStream(modelPath);
-    // @ts-ignore
-    const body = downloadRes.body;
-    if (body) {
+    try {
       // @ts-ignore
-      for await (const chunk of body) {
-        fileStream.write(chunk);
+      const body = downloadRes.body;
+      if (body) {
+        // @ts-ignore
+        const nodeStream = Readable.fromWeb ? Readable.fromWeb(body as any) : body;
+        // @ts-ignore
+        await pipeline(nodeStream, fileStream);
       }
+    } catch (streamErr) {
+      fileStream.close();
+      if (fs.existsSync(modelPath)) fs.unlinkSync(modelPath);
+      throw streamErr;
     }
-    fileStream.end();
 
     const cfg = loadConfig();
     if (!cfg.local_server) cfg.local_server = {};

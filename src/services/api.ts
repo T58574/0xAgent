@@ -171,7 +171,7 @@ export async function cancel_agent(sessionId: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
-export async function respond_to_tool(sessionId: string, toolCallId: string, approve: boolean): Promise<void> {
+export async function respond_to_tool(sessionId: string, toolCallId: string, approve: boolean | string): Promise<void> {
   const res = await fetch(`${API_BASE}/respond-to-tool`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -239,6 +239,7 @@ export async function get_gguf_models(): Promise<any[]> {
 export async function download_gguf_model(downloadUrl: string, fileName: string): Promise<{ modelPath: string }> {
   const res = await fetch(`${API_BASE}/download-model`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ downloadUrl, fileName }),
   });
   if (!res.ok) throw new Error(await res.text());

@@ -49,6 +49,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [ubatchSize, setUbatchSize] = useState(512);
   const [minP, setMinP] = useState(0.08);
   const [repeatPenalty, setRepeatPenalty] = useState(1.1);
+  const [predict, setPredict] = useState<number | null>(null);
+  const [topK, setTopK] = useState<number | null>(null);
+  const [topP, setTopP] = useState<number | null>(null);
+  const [seed, setSeed] = useState<number | null>(null);
+  const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
+  const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
+  const [customArgs, setCustomArgs] = useState<string>('');
   const [flashAttn, setFlashAttn] = useState(false);
   const [embedding, setEmbedding] = useState(false);
   const [contBatching, setContBatching] = useState(false);
@@ -97,6 +104,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (ls.ubatch_size) setUbatchSize(ls.ubatch_size);
         if (ls.min_p !== undefined && ls.min_p !== null) setMinP(ls.min_p);
         if (ls.repeat_penalty !== undefined && ls.repeat_penalty !== null) setRepeatPenalty(ls.repeat_penalty);
+        if (ls.predict !== undefined && ls.predict !== null) setPredict(ls.predict);
+        if (ls.top_k !== undefined && ls.top_k !== null) setTopK(ls.top_k);
+        if (ls.top_p !== undefined && ls.top_p !== null) setTopP(ls.top_p);
+        if (ls.seed !== undefined && ls.seed !== null) setSeed(ls.seed);
+        if (ls.presence_penalty !== undefined && ls.presence_penalty !== null) setPresencePenalty(ls.presence_penalty);
+        if (ls.frequency_penalty !== undefined && ls.frequency_penalty !== null) setFrequencyPenalty(ls.frequency_penalty);
+        if (ls.custom_args) setCustomArgs(ls.custom_args);
         if (ls.flash_attn !== undefined && ls.flash_attn !== null) setFlashAttn(ls.flash_attn);
         if (ls.embedding !== undefined && ls.embedding !== null) setEmbedding(ls.embedding);
         if (ls.cont_batching !== undefined && ls.cont_batching !== null) setContBatching(ls.cont_batching);
@@ -142,16 +156,23 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             threads,
             gpu_layers: gpuLayers,
             temp,
+            predict,
             batch_size: batchSize,
             ubatch_size: ubatchSize,
             min_p: minP,
+            top_k: topK,
+            top_p: topP,
             repeat_penalty: repeatPenalty,
+            seed,
+            presence_penalty: presencePenalty,
+            frequency_penalty: frequencyPenalty,
             flash_attn: flashAttn,
             embedding,
             cont_batching: contBatching,
             prompt_cache: promptCache,
             mlock,
             mmap,
+            custom_args: customArgs.trim() || null,
           },
         });
         setSaveStatus('saved');
@@ -183,10 +204,17 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     threads,
     gpuLayers,
     temp,
+    predict,
     batchSize,
     ubatchSize,
     minP,
+    topK,
+    topP,
     repeatPenalty,
+    seed,
+    presencePenalty,
+    frequencyPenalty,
+    customArgs,
     flashAttn,
     embedding,
     contBatching,

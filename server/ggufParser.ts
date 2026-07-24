@@ -198,15 +198,60 @@ function parseGgufValue(buffer: Buffer, offset: number, type: GgufValueType): { 
       const arrayLen = Number(buffer.readBigUInt64LE(offset + 4));
       let currentOffset = offset + 12;
       const arr = [];
-      for (let i = 0; i < Math.min(arrayLen, 20); i++) {
+      const previewLimit = Math.min(arrayLen, 20);
+
+      // Read first previewLimit items into array
+      for (let i = 0; i < previewLimit && currentOffset < buffer.length - 4; i++) {
         const item = parseGgufValue(buffer, currentOffset, elemType);
         arr.push(item.value);
         currentOffset = item.newOffset;
       }
-      return { value: arr, newOffset: currentOffset };
+
+      // Skip remaining elements if any
+      const remaining = arrayLen - previewLimit;
+      if (remaining > 0 && currentOffset < buffer.length) {
+        const fixedSize = getGgufTypeSize(elemType);
+        if (fixedSize > 0) {
+          currentOffset += remaining * fixedSize;
+        } else if (elemType === GgufValueType.STRING) {
+          for (let i = 0; i < remaining && currentOffset + 8 <= buffer.length; i++) {
+            const strLen = Number(buffer.readBigUInt64LE(currentOffset));
+            currentOffset += 8 + strLen;
+          }
+        } else {
+          for (let i = 0; i < remaining && currentOffset < buffer.length - 4; i++) {
+            const item = parseGgufValue(buffer, currentOffset, elemType);
+            currentOffset = item.newOffset;
+          }
+        }
+      }
+
+      return { value: arr, newOffset: Math.min(currentOffset, buffer.length) };
     }
     default:
       return { value: null, newOffset: offset + 4 };
+  }
+}
+
+function getGgufTypeSize(type: GgufValueType): number {
+  switch (type) {
+    case GgufValueType.UINT8:
+    case GgufValueType.INT8:
+    case GgufValueType.BOOL:
+      return 1;
+    case GgufValueType.UINT16:
+    case GgufValueType.INT16:
+      return 2;
+    case GgufValueType.UINT32:
+    case GgufValueType.INT32:
+    case GgufValueType.FLOAT32:
+      return 4;
+    case GgufValueType.UINT64:
+    case GgufValueType.INT64:
+    case GgufValueType.FLOAT64:
+      return 8;
+    default:
+      return 0;
   }
 }
 

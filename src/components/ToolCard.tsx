@@ -4,11 +4,12 @@ import { ToolCallInfo } from '../types';
 
 interface ToolCardProps {
   tool: ToolCallInfo;
-  onRespond: (toolId: string, approve: boolean) => void;
+  onRespond: (toolId: string, approve: boolean | string) => void;
 }
 
 export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
   const [showDetails, setShowDetails] = useState(false);
+  const [customAnswer, setCustomAnswer] = useState('');
 
   let parsedArgs: Record<string, any> = {};
   try {
@@ -124,17 +125,46 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
             <div className="text-slate-100 text-xs font-sans font-medium bg-slate-900/80 p-2.5 rounded border border-white/10">
               {parsedArgs.question}
             </div>
-            {Array.isArray(parsedArgs.options) && parsedArgs.options.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                {parsedArgs.options.map((opt: string) => (
+            {tool.status === 'pending' && (
+              <div className="space-y-2 pt-1">
+                {Array.isArray(parsedArgs.options) && parsedArgs.options.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {parsedArgs.options.map((opt: string) => (
+                      <button
+                        key={opt}
+                        onClick={() => onRespond(tool.id, opt)}
+                        className="flat-btn px-3 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer"
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (customAnswer.trim()) {
+                      onRespond(tool.id, customAnswer.trim());
+                      setCustomAnswer('');
+                    }
+                  }}
+                  className="flex gap-2"
+                >
+                  <input
+                    type="text"
+                    value={customAnswer}
+                    onChange={(e) => setCustomAnswer(e.target.value)}
+                    placeholder="Введите ваш ответ..."
+                    className="flex-1 px-3 py-1.5 rounded flat-input text-xs text-slate-100 focus:outline-none"
+                  />
                   <button
-                    key={opt}
-                    onClick={() => onRespond(tool.id, true)}
-                    className="flat-btn px-3 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer"
+                    type="submit"
+                    disabled={!customAnswer.trim()}
+                    className="flat-btn px-3 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40"
                   >
-                    {opt}
+                    Отправить
                   </button>
-                ))}
+                </form>
               </div>
             )}
           </div>
