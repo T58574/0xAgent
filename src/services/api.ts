@@ -146,6 +146,13 @@ export async function get_workspace_tree(workspaceDir?: string | null): Promise<
   return res.json();
 }
 
+export async function get_workspace_context(workspaceDir?: string | null): Promise<{ loaded: boolean; filePath: string | null; filename: string | null; content: string | null }> {
+  const query = workspaceDir ? `?workspaceDir=${encodeURIComponent(workspaceDir)}` : '';
+  const res = await fetch(`${API_BASE}/workspace-context${query}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function read_file_raw(path: string): Promise<string> {
   const res = await fetch(`${API_BASE}/read-file-raw?path=${encodeURIComponent(path)}`);
   if (!res.ok) throw new Error(await res.text());

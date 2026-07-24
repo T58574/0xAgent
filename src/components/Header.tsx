@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { X, Plus, ChevronLeft, ChevronRight, Terminal, Brain, ClipboardList } from 'lucide-react';
+import { X, Plus, ChevronLeft, ChevronRight, Terminal, FileText } from 'lucide-react';
 import { ChatSession } from '../types';
 
 interface HeaderProps {
@@ -9,9 +9,7 @@ interface HeaderProps {
   onCreateSession: () => void;
   onDeleteSession: (id: string, e: React.MouseEvent) => void;
   onOpenSettings?: () => void;
-  onOpenMemorySkills?: () => void;
-  planningMode?: boolean;
-  onTogglePlanningMode?: () => void;
+  has0xAgentMd?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -20,9 +18,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSession,
   onCreateSession,
   onDeleteSession,
-  onOpenMemorySkills,
-  planningMode = true,
-  onTogglePlanningMode,
+  has0xAgentMd = false,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -52,44 +48,23 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-xs font-semibold tracking-wide text-white flex items-center gap-1.5">
               0xAgent
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {has0xAgentMd && (
+                <span
+                  className="px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-[10px] text-sky-300 font-mono flex items-center gap-1"
+                  title="Автоматический контекст 0xagent.md загружен в память"
+                >
+                  <FileText size={10} className="text-sky-400" />
+                  0xagent.md
+                </span>
+              )}
             </span>
           </div>
         </div>
 
-        {/* Planning Mode Toggle Button */}
-        {onTogglePlanningMode && (
-          <button
-            onClick={onTogglePlanningMode}
-            className={`flat-btn ml-2 px-2.5 py-1 rounded text-xs font-medium cursor-pointer shrink-0 flex items-center gap-1.5 transition-colors ${
-              planningMode
-                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm font-semibold'
-                : 'text-slate-400 border-white/10 hover:text-slate-200'
-            }`}
-            title={planningMode ? 'Режим Планирования активен' : 'Включить Режим Планирования'}
-          >
-            <ClipboardList size={13} className={planningMode ? 'text-purple-400' : 'text-slate-400'} />
-            <span className="text-xs font-medium hidden sm:inline">
-              {planningMode ? 'План: ВКЛ' : 'План: ВЫКЛ'}
-            </span>
-          </button>
-        )}
-
-        {/* Memory & Skills Button */}
-        {onOpenMemorySkills && (
-          <button
-            onClick={onOpenMemorySkills}
-            className="flat-btn ml-1 px-2.5 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer shrink-0 flex items-center gap-1.5"
-            title="Долгосрочная память и скиллы"
-          >
-            <Brain size={13} />
-            <span className="text-xs font-medium hidden sm:inline">Память & Скиллы</span>
-          </button>
-        )}
-
         {/* Create New Session Button (Flat Glass) */}
         <button
           onClick={onCreateSession}
-          className="flat-btn ml-1 px-2.5 py-1 rounded text-xs font-medium text-slate-200 hover:text-white cursor-pointer shrink-0 flex items-center gap-1.5"
+          className="flat-btn ml-2 px-2.5 py-1 rounded text-xs font-medium text-slate-200 hover:text-white cursor-pointer shrink-0 flex items-center gap-1.5"
           title="Новая сессия"
         >
           <Plus size={13} className="text-emerald-400" />

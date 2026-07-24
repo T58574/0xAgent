@@ -31,6 +31,7 @@ import {
   executeWriteFile,
   selectWorkspaceNative,
   selectFileNative,
+  find0xAgentContext,
 } from './tools';
 import {
   runAgentLoop,
@@ -308,6 +309,21 @@ app.get('/api/workspace-tree', (req, res) => {
     const workspaceDir = req.query.workspaceDir as string | undefined;
     const tree = getWorkspaceTree(workspaceDir);
     res.json(tree);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/workspace-context', (req, res) => {
+  try {
+    const cfg = loadConfig();
+    const targetDir = (req.query.workspaceDir as string) || cfg.workspace_dir || process.cwd();
+    const found = find0xAgentContext(targetDir);
+    if (found) {
+      res.json({ loaded: true, filePath: found.filePath, filename: path.basename(found.filePath), content: found.content });
+    } else {
+      res.json({ loaded: false, filePath: null, filename: null, content: null });
+    }
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

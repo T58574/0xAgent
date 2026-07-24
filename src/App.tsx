@@ -28,6 +28,7 @@ export default function App() {
   // Workspace File tree state
   const [workspaceTree, setWorkspaceTree] = useState<FileNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; content: string } | null>(null);
+  const [has0xAgentMd, setHas0xAgentMd] = useState<boolean>(false);
   
   // Navigation view state
   const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings' | 'analytics'>('chat');
@@ -124,6 +125,11 @@ export default function App() {
     try {
       const tree = await api.get_workspace_tree(dirPath);
       setWorkspaceTree(tree);
+      const ctx = await api.get_workspace_context(dirPath);
+      setHas0xAgentMd(ctx.loaded);
+      if (ctx.loaded) {
+        addLog(`Auto-loaded workspace context from ${ctx.filename}`);
+      }
     } catch (err: any) {
       addLog(`Failed to load file tree: ${err.message || err}`);
     }
@@ -506,9 +512,7 @@ export default function App() {
             onCreateSession={() => handleCreateSession()}
             onDeleteSession={handleDeleteSession}
             onOpenSettings={() => setActiveView('settings')}
-            onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
-            planningMode={config?.planning_mode !== false}
-            onTogglePlanningMode={handleTogglePlanningMode}
+            has0xAgentMd={has0xAgentMd}
           />
         </div>
       )}
@@ -527,6 +531,9 @@ export default function App() {
               reasoningEnabled={config?.reasoning_enabled !== false}
               groqApiKey={config?.groq_api_key}
               liveTelemetry={liveTelemetry}
+              planningMode={config?.planning_mode !== false}
+              onTogglePlanningMode={handleTogglePlanningMode}
+              onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
             />
           </div>
         )}

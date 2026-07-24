@@ -98,6 +98,41 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
   return `Successfully applied ${appliedCount} patch block(s) to ${targetPath}`;
 }
 
+export interface ContextLoadResult {
+  filePath: string;
+  content: string;
+}
+
+export function find0xAgentContext(dirPath: string): ContextLoadResult | null {
+  if (!dirPath || !fs.existsSync(dirPath)) return null;
+  const candidates = ['0xagent.md', '.0xagent.md', '0XAGENT.MD', '0xAgent.md', '0xAGENT.md'];
+  for (const candidate of candidates) {
+    const fullPath = path.join(dirPath, candidate);
+    if (fs.existsSync(fullPath) && fs.statSync(fullPath).isFile()) {
+      try {
+        const content = fs.readFileSync(fullPath, 'utf-8');
+        return { filePath: fullPath, content };
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+export function getWorkspace0xAgentMdContext(workspaceDir?: string | null): string {
+  const rootDir = workspaceDir && fs.existsSync(workspaceDir) ? workspaceDir : process.cwd();
+  const found = find0xAgentContext(rootDir);
+  if (!found) return '';
+
+  return `\n\n# 📄 WORKSPACE AUTOMATIC CONTEXT INSTRUCTIONS (Loaded from ${path.basename(found.filePath)})
+[Loaded automatically from: ${found.filePath}]
+
+--- BEGIN 0xagent.md DIRECTIVES ---
+${found.content}
+--- END 0xagent.md DIRECTIVES ---`;
+}
+
 export function executeListDir(workspaceDir: string | null | undefined, pathStr: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
   if (!fs.existsSync(targetPath)) {
@@ -116,7 +151,15 @@ export function executeListDir(workspaceDir: string | null | undefined, pathStr:
     list.push(`- [${type}] ${entry.name}`);
   }
 
-  return list.join('\n');
+  let result = list.join('\n');
+
+  // Automatic Context Loading: If target directory contains 0xagent.md, load it into context immediately
+  const localContext = find0xAgentContext(targetPath);
+  if (localContext) {
+    result += `\n\n📌 [AUTOMATIC CONTEXT LOADED FROM ${path.basename(localContext.filePath)} IN ${targetPath}]:\n${localContext.content}`;
+  }
+
+  return result;
 }
 
 export function executeGrepSearch(workspaceDir: string | null | undefined, patternStr: string, pathStr: string): string {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, AlertTriangle, Play, Zap, Cpu } from 'lucide-react';
+import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, AlertTriangle, Play, Zap, Cpu, ClipboardList } from 'lucide-react';
 import { ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
@@ -15,6 +15,9 @@ interface ChatAreaProps {
   reasoningEnabled?: boolean;
   groqApiKey?: string | null;
   liveTelemetry?: LiveTelemetry | null;
+  planningMode?: boolean;
+  onTogglePlanningMode?: () => void;
+  onOpenMemorySkills?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -26,6 +29,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   reasoningEnabled = true,
   groqApiKey,
   liveTelemetry,
+  planningMode = true,
+  onTogglePlanningMode,
+  onOpenMemorySkills,
 }) => {
   const [inputText, setInputText] = useState('');
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -221,6 +227,80 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     );
   };
 
+  const renderQuickControls = () => {
+    if (!onTogglePlanningMode && !onOpenMemorySkills) return null;
+    return (
+      <div className="flex items-center gap-2 mb-2">
+        {onTogglePlanningMode && (
+          <button
+            type="button"
+            onClick={onTogglePlanningMode}
+            className={`flat-btn px-2.5 py-1 rounded text-xs font-medium cursor-pointer flex items-center gap-1.5 transition-colors ${
+              planningMode
+                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm font-semibold'
+                : 'text-slate-400 border-white/10 hover:text-slate-200'
+            }`}
+            title={planningMode ? 'Режим Планирования активен' : 'Включить Режим Планирования'}
+          >
+            <ClipboardList size={13} className={planningMode ? 'text-purple-400' : 'text-slate-400'} />
+            <span>{planningMode ? '📋 План: ВКЛ' : '📋 План: ВЫКЛ'}</span>
+          </button>
+        )}
+
+        {onOpenMemorySkills && (
+          <button
+            type="button"
+            onClick={onOpenMemorySkills}
+            className="flat-btn px-2.5 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer flex items-center gap-1.5"
+            title="Долгосрочная память и скиллы"
+          >
+            <Brain size={13} />
+            <span>🧠 Память & Скиллы</span>
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const renderStreamingBanner = () => {
+    if (agentStatus !== 'thinking' && agentStatus !== 'executing_tool') return null;
+    return (
+      <div className="self-start w-full max-w-full my-2 p-3 rounded-lg bg-slate-900/90 border border-emerald-500/30 text-xs text-slate-200 shadow-md space-y-2 font-sans">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 font-medium">
+            <RefreshCw size={13} className="animate-spin text-emerald-400" />
+            <span>
+              {agentStatus === 'thinking' ? 'Агент генерирует ответ...' : 'Агент выполняет инструмент...'}
+            </span>
+          </div>
+          {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
+            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/30 animate-pulse flex items-center gap-1">
+              <Zap size={11} />
+              <span>{liveTelemetry.tokensPerSec} t/s</span>
+            </span>
+          )}
+        </div>
+
+        {liveTelemetry?.contextUsed !== undefined && (
+          <div className="space-y-1 pt-1 font-mono text-[11px] text-slate-400 border-t border-white/5">
+            <div className="flex justify-between items-center">
+              <span>Заполнение контекста: <strong className="text-slate-200">{liveTelemetry.contextUsed.toLocaleString()}</strong> / {liveTelemetry.contextMax?.toLocaleString()} tok</span>
+              <span className="text-blue-300 font-semibold">
+                {((liveTelemetry.contextUsed / (liveTelemetry.contextMax || 8192)) * 100).toFixed(1)}%
+              </span>
+            </div>
+            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5">
+              <div
+                className="bg-emerald-400 h-full transition-all duration-300"
+                style={{ width: `${Math.min(100, (liveTelemetry.contextUsed / (liveTelemetry.contextMax || 8192)) * 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-hidden relative select-text">
       
@@ -239,33 +319,36 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {renderWarningBanner()}
 
-          <form onSubmit={handleSubmit} className="w-full flex items-center gap-2 mt-4">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Что строим сегодня?.."
-                className="w-full px-4 py-3 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none pr-10"
-              />
+          <div className="w-full mt-4">
+            {renderQuickControls()}
+            <form onSubmit={handleSubmit} className="w-full flex items-center gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  placeholder="Что строим сегодня?.."
+                  className="w-full px-4 py-3 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={handleMicClick}
+                  className={`absolute right-2.5 top-2.5 p-1 rounded transition-colors ${
+                    isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {isRecording ? <Square size={16} /> : <Mic size={16} />}
+                </button>
+              </div>
               <button
-                type="button"
-                onClick={handleMicClick}
-                className={`absolute right-2.5 top-2.5 p-1 rounded transition-colors ${
-                  isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
-                }`}
+                type="submit"
+                disabled={!inputText.trim() || isTranscribing}
+                className="flat-btn rounded-lg px-5 py-3 text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
               >
-                {isRecording ? <Square size={16} /> : <Mic size={16} />}
+                <Send size={16} />
               </button>
-            </div>
-            <button
-              type="submit"
-              disabled={!inputText.trim() || isTranscribing}
-              className="flat-btn rounded-lg px-5 py-3 text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
-            >
-              <Send size={16} />
-            </button>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 
@@ -319,20 +402,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         {reasoningEnabled && thinkText && (
                           <details open className="mb-3 border border-white/10 rounded bg-slate-950/40 overflow-hidden group">
                             <summary className="px-3 py-1.5 text-[11px] font-medium text-slate-300 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
-                              <span className="flex items-center gap-1.5">
-                                <Brain size={12} className="text-emerald-400" />
-                                <span>Ход мыслей (Reasoning)</span>
+                              <span className="flex items-center gap-1.5 text-purple-300 font-semibold">
+                                <Sparkles size={12} className="text-purple-400" />
+                                Ход мыслей локальной модели
                               </span>
+                              <span className="text-[10px] text-slate-500 group-open:rotate-180 transition-transform">▼</span>
                             </summary>
-                            <div className="px-3 py-2.5 border-t border-white/5 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                            <div className="p-3 border-t border-white/5 font-mono text-xs text-purple-200/90 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto bg-slate-950/60">
                               {thinkText}
                             </div>
                           </details>
                         )}
-
-                        {bodyText && (
                           <NotionMarkdown content={bodyText} />
-                        )}
 
                         {msg.tool_calls && msg.tool_calls.map((tool) => (
                           <ToolCard 
@@ -411,6 +492,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
             <div ref={historyEndRef} />
           </div>
+
+          {/* STREAMING TELEMETRY BADGE */}
+          {renderStreamingBanner()}
 
           {/* SERVER OFFLINE WARNING & 1-CLICK LAUNCH BANNER */}
           {renderWarningBanner()}

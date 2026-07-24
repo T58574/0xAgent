@@ -12,6 +12,7 @@ import {
   executeListDir,
   executeGrepSearch,
   executeShellCommand,
+  getWorkspace0xAgentMdContext,
 } from './tools';
 import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
 import { listSkills, readSkill } from './skills';
@@ -289,7 +290,8 @@ Before executing modifying tool calls (<write_file>, <patch_file>, <execute_comm
 3. Explain your technical rationale concisely.`
       : '';
 
-    const fullSystemPrompt = config.system_prompt + envContext + planningContext + memoryContext;
+    const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
+    const fullSystemPrompt = config.system_prompt + envContext + planningContext + memoryContext + workspaceMdContext;
 
     const messages = [
       { role: 'system', content: fullSystemPrompt },
