@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Copy, Check, X, AlertCircle, Globe, Lock, Terminal, GitBranch, MessageSquare, FolderGit2, Settings } from 'lucide-react';
+import { Copy, Check, X, AlertCircle, Globe, Lock, Terminal, MessageSquare, FolderGit2, Settings } from 'lucide-react';
+import * as api from '../services/api';
 
 interface BottomPanelProps {
   logs: string[];
@@ -13,7 +14,6 @@ interface BottomPanelProps {
 
 export const BottomPanel: React.FC<BottomPanelProps> = ({
   logs,
-  modelName,
   onClearLogs,
   activeView,
   onChangeView,
@@ -21,25 +21,24 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
   const [activeTab, setActiveTab] = useState<'logs' | 'share' | null>(null);
 
   // Network Share Server State
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareUrls, setShareUrls] = useState<string[]>([]);
   const [password, setPassword] = useState('');
   const [shareError] = useState<string | null>(null);
   const [copiedLinkIndex, setCopiedLinkIndex] = useState<number | null>(null);
 
-  const toggleTab = (tab: 'logs' | 'share') => {
+  const toggleTab = async (tab: 'logs' | 'share') => {
     if (activeTab === tab) {
       setActiveTab(null);
     } else {
       setActiveTab(tab);
-    }
-  };
-
-  const handleToggleShare = () => {
-    if (shareUrl) {
-      setShareUrl(null);
-    } else {
-      const port = window.location.port || '3000';
-      setShareUrl(`http://${window.location.hostname}:${port}`);
+      if (tab === 'share') {
+        try {
+          const urls = await api.get_local_ips();
+          setShareUrls(urls);
+        } catch (err) {
+          console.error('Failed to get local IPs:', err);
+        }
+      }
     }
   };
 
@@ -47,10 +46,6 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
     navigator.clipboard.writeText(url);
     setCopiedLinkIndex(index);
     setTimeout(() => setCopiedLinkIndex(null), 2000);
-  };
-
-  const handleGithubClick = () => {
-    window.open('https://github.com/', '_blank');
   };
 
   return (
@@ -109,35 +104,21 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
             {activeTab === 'share' && (
               <div className="space-y-2.5 py-1 font-sans text-slate-200">
                 <div className="text-xs text-slate-400 leading-relaxed">
-                  Доступ к интерфейсу в локальной Wi-Fi / Ethernet сети. Устройства в той же сети смогут открывать приложение.
+                  Откройте любой из этих адресов на вашем телефоне или планшете в той же Wi-Fi сети:
                 </div>
 
-                <div className="flex gap-3 items-center">
-                  <div className="flex-1 space-y-1">
-                    <label className="text-[11px] font-medium text-slate-300 flex items-center gap-1 select-none">
-                      <Lock size={10} />
-                      <span>Пароль доступа (Опционально)</span>
-                    </label>
-                    <input
-                      type="password"
-                      value={password}
-                      disabled={!!shareUrl}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="Без пароля"
-                      className="w-full flat-input px-3 py-1.5 rounded text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
-                    />
-                  </div>
-
-                  <button
-                    onClick={handleToggleShare}
-                    className={`flat-btn px-4 py-1.5 text-xs font-medium rounded cursor-pointer transition-all ${
-                      shareUrl
-                        ? 'border-rose-500/40 text-rose-400 hover:text-rose-300'
-                        : 'border-emerald-500/40 text-emerald-400 hover:text-emerald-300'
-                    }`}
-                  >
-                    {shareUrl ? 'Остановить' : 'Включить раздачу'}
-                  </button>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-medium text-slate-300 flex items-center gap-1 select-none">
+                    <Lock size={10} />
+                    <span>Пароль доступа (Опционально)</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Без пароля"
+                    className="w-full flat-input px-3 py-1.5 rounded text-xs text-slate-100 placeholder-slate-500 focus:outline-none"
+                  />
                 </div>
 
                 {shareError && (
@@ -147,42 +128,40 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
                   </div>
                 )}
 
-                {shareUrl && (
-                  <div className="p-2.5 border border-white/10 rounded bg-slate-950/80 space-y-1.5">
-                    <div className="text-[11px] font-medium text-emerald-400 flex items-center gap-1.5 select-none">
-                      <Globe size={12} />
-                      <span>Адрес для подключения:</span>
-                    </div>
-                    <div className="space-y-1">
-                      {shareUrl.split(',').map((url, index) => (
-                        <div key={index} className="flex items-center justify-between gap-3 border-b border-white/5 pb-1 last:border-0 last:pb-0">
-                          <a
-                            href={url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="font-mono text-xs text-emerald-400 underline break-all hover:text-emerald-300"
-                          >
-                            {url}
-                          </a>
-                          <button
-                            onClick={() => handleCopySpecificLink(url, index)}
-                            className="flat-btn p-1 rounded text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
-                            title="Копировать ссылку"
-                          >
-                            {copiedLinkIndex === index ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
+                <div className="p-2.5 border border-white/10 rounded bg-slate-950/80 space-y-1.5">
+                  <div className="text-[11px] font-medium text-emerald-400 flex items-center gap-1.5 select-none">
+                    <Globe size={12} />
+                    <span>Адреса для подключения в локальной сети (IP):</span>
                   </div>
-                )}
+                  <div className="space-y-1">
+                    {shareUrls.map((url, index) => (
+                      <div key={index} className="flex items-center justify-between gap-3 border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="font-mono text-xs text-emerald-400 underline break-all hover:text-emerald-300"
+                        >
+                          {url}
+                        </a>
+                        <button
+                          onClick={() => handleCopySpecificLink(url, index)}
+                          className="flat-btn p-1 rounded text-slate-300 hover:text-white transition-colors cursor-pointer shrink-0"
+                          title="Копировать ссылку"
+                        >
+                          {copiedLinkIndex === index ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* CENTERED FLOATING GLASS PILL BAR (Minimal Rounding: rounded-md) */}
+      {/* CENTERED FLOATING GLASS PILL BAR */}
       <div className="w-full flex items-center glass-panel rounded-md px-3 py-1.5 text-slate-100 justify-between shadow-2xl border border-white/10 select-none">
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
@@ -244,22 +223,6 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
           >
             Раздача
           </button>
-          
-          <button
-            onClick={handleGithubClick}
-            className="px-2.5 py-1 rounded text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 border border-white/5 transition-all cursor-pointer flex items-center gap-1"
-          >
-            <GitBranch size={12} />
-            <span className="hidden md:inline">GitHub</span>
-          </button>
-        </div>
-
-        {/* Active model status badge */}
-        <div className="hidden lg:flex items-center gap-2 border-l border-white/10 pl-3">
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[11px] text-slate-400 font-mono select-none truncate max-w-[140px]">
-            {modelName}
-          </span>
         </div>
       </div>
 

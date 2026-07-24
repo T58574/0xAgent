@@ -446,6 +446,7 @@ export default function App() {
               onRespondToTool={handleRespondToTool}
               onCancelAgent={handleCancelAgent}
               reasoningEnabled={config?.reasoning_enabled !== false}
+              groqApiKey={config?.groq_api_key}
             />
           </div>
         )}

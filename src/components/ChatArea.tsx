@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Send, Brain, Terminal, Sparkles } from 'lucide-react';
+import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
+import * as api from '../services/api';
 
 interface ChatAreaProps {
   messages: ChatMessage[];
@@ -11,6 +12,7 @@ interface ChatAreaProps {
   onRespondToTool: (toolId: string, approve: boolean) => void;
   onCancelAgent?: () => void;
   reasoningEnabled?: boolean;
+  groqApiKey?: string | null;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -20,6 +22,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onRespondToTool,
   onCancelAgent,
   reasoningEnabled = true,
+  groqApiKey,
 }) => {
   const [inputText, setInputText] = useState('');
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -33,12 +36,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
 
-  // Auto-scroll to bottom of history on new messages
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, agentStatus]);
 
-  // Recording timer
   useEffect(() => {
     if (isRecording) {
       timerRef.current = setInterval(() => {
@@ -77,10 +78,29 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       };
 
       recorder.onstop = async () => {
+        setIsTranscribing(true);
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         const reader = new FileReader();
         reader.readAsDataURL(audioBlob);
         reader.onloadend = async () => {
+          const base64data = reader.result as string;
+          const base64Payload = base64data.split(',')[1];
+          if (base64Payload && groqApiKey) {
+            try {
+              const text = await api.transcribe_audio(base64Payload, groqApiKey);
+              if (text && text.trim()) {
+                setInputText((prev) => {
+                  const spacer = prev.trim() ? ' ' : '';
+                  return prev + spacer + text.trim();
+                });
+              }
+            } catch (err: any) {
+              console.error("Whisper transcription error:", err);
+              alert(`Ошибка расшифровки речи Groq Whisper: ${err.message || err}`);
+            }
+          } else if (!groqApiKey) {
+            alert('Для расшифровки речи укажите Groq API Key в настройках.');
+          }
           setIsTranscribing(false);
         };
         stream.getTracks().forEach((track) => track.stop());
@@ -148,7 +168,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 disabled={isTranscribing}
                 onChange={(e) => setInputText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isTranscribing ? "Транскрибируем голос..." : "Что нужно сделать с проектом?"}
+                placeholder={isTranscribing ? "Расшифровываем голос через Groq Whisper..." : "Что нужно сделать с проектом?"}
                 className="w-full flat-input rounded-md pl-4 pr-10 py-2.5 text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
               />
               <button
@@ -162,7 +182,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 }`}
                 title={isRecording ? `Запись: ${recordingSeconds} сек.` : "Голосовой ввод"}
               >
-                <Mic size={15} />
+                {isTranscribing ? <RefreshCw size={15} className="animate-spin text-sky-400" /> : <Mic size={15} />}
               </button>
             </div>
             <button
@@ -181,7 +201,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       {hasMessages && (
         <div className="flex-grow flex flex-col min-h-0 z-10 w-full">
           
-          {/* Main Message History List */}
           <div 
             ref={mainHistoryRef}
             className="flex-grow overflow-y-auto px-4 md:px-8 py-4 space-y-4 scrollbar-none"
@@ -197,14 +216,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                 return (
                   <div key={msg.id} className="flex flex-col message-enter">
-                    {/* User Prompt Bubble */}
                     {msg.role === 'user' && (
                       <div className="self-end max-w-[85%] rounded-md glass-card border border-emerald-500/30 bg-slate-900/80 px-4 py-2.5 text-slate-100 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans">
                         {msg.content}
                       </div>
                     )}
 
-                    {/* Tool Log Output Bubble */}
                     {msg.role === 'tool' && (
                       <div className="self-start max-w-[95%] w-full rounded-md glass-card border border-white/10 p-3 bg-slate-950/80 text-slate-300 font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1">
                         <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
@@ -215,7 +232,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       </div>
                     )}
 
-                    {/* Assistant Message Panel */}
                     {msg.role === 'assistant' && (() => {
                       let thinkText = "";
                       let bodyText = textOutput;
@@ -269,7 +285,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 );
               })}
 
-              {/* Status Chip */}
               {(agentStatus === 'thinking' || agentStatus === 'executing_tool') && (
                 <div className="self-start flex items-center gap-2 py-1.5 px-3 rounded bg-slate-900/60 border border-white/10 text-xs text-slate-300 font-medium">
                   <div className="w-3 h-3 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
@@ -283,7 +298,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           </div>
 
-          {/* Locked Bottom Prompt Bar */}
           <div className="p-3 border-t border-white/10 glass-panel select-none z-10 w-full">
             <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2">
               <div className="relative w-full">
@@ -295,7 +309,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   onKeyDown={handleKeyDown}
                   placeholder={
                     isTranscribing 
-                      ? "Транскрибируем голос..." 
+                      ? "Расшифровываем голос через Groq Whisper..." 
                       : agentStatus !== 'idle' 
                         ? "Агент выполняет задачу..." 
                         : "Напиши задачу..."
@@ -313,7 +327,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   }`}
                   title={isRecording ? `Запись: ${recordingSeconds} сек.` : "Голосовой ввод"}
                 >
-                  <Mic size={15} />
+                  {isTranscribing ? <RefreshCw size={15} className="animate-spin text-sky-400" /> : <Mic size={15} />}
                 </button>
               </div>
 

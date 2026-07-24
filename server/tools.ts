@@ -249,3 +249,28 @@ export function selectWorkspaceNative(): string | null {
   }
   return null;
 }
+
+export function selectFileNative(filter?: string): string | null {
+  if (process.platform === 'win32') {
+    try {
+      const filterStr = filter || "All Files (*.*)|*.*|Executables (*.exe)|*.exe|GGUF Models (*.gguf)|*.gguf";
+      const psScript = `
+        Add-Type -AssemblyName System.Windows.Forms
+        $dialog = New-Object System.Windows.Forms.OpenFileDialog
+        $dialog.Title = "Select File"
+        $dialog.Filter = "${filterStr}"
+        $result = $dialog.ShowDialog()
+        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+            Write-Output $dialog.FileName
+        }
+      `;
+      const stdout = execSync(`powershell -NoProfile -Command "${psScript.replace(/\n/g, ' ')}"`, { encoding: 'utf-8' });
+      const filePath = stdout.trim();
+      return filePath.length > 0 ? filePath : null;
+    } catch (err) {
+      console.error('Failed to open native Windows file dialog:', err);
+      return null;
+    }
+  }
+  return null;
+}

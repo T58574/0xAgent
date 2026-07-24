@@ -2,7 +2,6 @@ import { AppConfig, ChatSession, FileNode } from '../types';
 
 const API_BASE = '/api';
 
-// WebSocket connection for real-time events
 type EventCallback = (eventData: { payload: any }) => void;
 const eventListeners = new Map<string, Set<EventCallback>>();
 let ws: WebSocket | null = null;
@@ -11,7 +10,7 @@ let reconnectTimer: any = null;
 function getWsUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.hostname;
-  const port = '3001'; // Default local server port
+  const port = '3001';
   return `${protocol}//${host}:${port}/ws`;
 }
 
@@ -53,7 +52,6 @@ function initWebSocket() {
   }
 }
 
-// Start WebSocket connection
 initWebSocket();
 
 export async function listen<T>(event: string, callback: (eventData: { payload: T }) => void): Promise<() => void> {
@@ -68,7 +66,6 @@ export async function listen<T>(event: string, callback: (eventData: { payload: 
   };
 }
 
-// API functions
 export async function get_config(): Promise<AppConfig> {
   const res = await fetch(`${API_BASE}/config`);
   if (!res.ok) throw new Error(await res.text());
@@ -131,6 +128,17 @@ export async function select_workspace(): Promise<string | null> {
   return data.folder;
 }
 
+export async function select_file_native(filter?: string): Promise<string | null> {
+  const res = await fetch(`${API_BASE}/select-file`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filter }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.filePath;
+}
+
 export async function get_workspace_tree(workspaceDir?: string | null): Promise<FileNode[]> {
   const query = workspaceDir ? `?workspaceDir=${encodeURIComponent(workspaceDir)}` : '';
   const res = await fetch(`${API_BASE}/workspace-tree${query}`);
@@ -170,4 +178,44 @@ export async function respond_to_tool(sessionId: string, toolCallId: string, app
     body: JSON.stringify({ sessionId, toolCallId, approve }),
   });
   if (!res.ok) throw new Error(await res.text());
+}
+
+export async function transcribe_audio(audioBase64: string, apiKey: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/transcribe-audio`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ audioBase64, apiKey }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.text;
+}
+
+export async function get_local_ips(): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/get-local-ips`);
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.urls;
+}
+
+export async function install_llama_cpp(): Promise<{ exePath: string }> {
+  const res = await fetch(`${API_BASE}/install-llama`, { method: 'POST' });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_gguf_models(): Promise<any[]> {
+  const res = await fetch(`${API_BASE}/gguf-models`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function download_gguf_model(downloadUrl: string, fileName: string): Promise<{ modelPath: string }> {
+  const res = await fetch(`${API_BASE}/download-model`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ downloadUrl, fileName }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
 }

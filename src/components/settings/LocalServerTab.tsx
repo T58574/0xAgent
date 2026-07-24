@@ -1,5 +1,5 @@
-import React from 'react';
-import { Cpu, Play, Square, Folder } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Cpu, Play, Square, Folder, Download, HardDrive, RefreshCw } from 'lucide-react';
 import * as api from '../../services/api';
 
 interface LocalServerTabProps {
@@ -93,21 +93,69 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   setServerLogsAutoScroll,
   setApiUrl,
 }) => {
+  const [isInstallingLlama, setIsInstallingLlama] = useState(false);
+  const [availableModels, setAvailableModels] = useState<any[]>([]);
+  const [downloadingModelId, setDownloadingModelId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadModels() {
+      try {
+        const list = await api.get_gguf_models();
+        setAvailableModels(list);
+      } catch (err) {
+        console.error('Failed to load GGUF models list:', err);
+      }
+    }
+    loadModels();
+  }, []);
+
+  // Open Native Windows OpenFileDialog for Executable
   const handleSelectExe = async () => {
     try {
-      const file = await api.select_workspace();
+      const file = await api.select_file_native("Executable Files (*.exe)|*.exe|All Files (*.*)|*.*");
       if (file) setExePath(file);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to select file:', err);
     }
   };
 
+  // Open Native Windows OpenFileDialog for GGUF Model
   const handleSelectModel = async () => {
     try {
-      const file = await api.select_workspace();
+      const file = await api.select_file_native("GGUF Model Files (*.gguf)|*.gguf|All Files (*.*)|*.*");
       if (file) setModelPath(file);
     } catch (err) {
+      console.error('Failed to select GGUF model:', err);
+    }
+  };
+
+  // 1-Click Llama.cpp Installer from GitHub Releases
+  const handleInstallLlama = async () => {
+    setIsInstallingLlama(true);
+    try {
+      const res = await api.install_llama_cpp();
+      setExePath(res.exePath);
+      alert((res as any).message || 'Llama.cpp успешно установлен!');
+    } catch (err: any) {
       console.error(err);
+      alert(`Ошибка установки: ${err.message || err}`);
+    } finally {
+      setIsInstallingLlama(false);
+    }
+  };
+
+  // 1-Click GGUF Model Downloader
+  const handleDownloadModel = async (model: any) => {
+    setDownloadingModelId(model.id);
+    try {
+      const res = await api.download_gguf_model(model.url, model.filename);
+      setModelPath(res.modelPath);
+      alert((res as any).message || 'Модель успешно загружена!');
+    } catch (err: any) {
+      console.error(err);
+      alert(`Ошибка скачивания: ${err.message || err}`);
+    } finally {
+      setDownloadingModelId(null);
     }
   };
 
@@ -140,6 +188,59 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
         </p>
       </div>
 
+      {/* Fast 1-Click Llama.cpp Installer & GGUF Model Downloader Card */}
+      <div className="p-4 rounded-md glass-card border border-white/10 space-y-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+          <div>
+            <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+              <Download size={14} className="text-emerald-400" />
+              <span>Авто-установщик Llama.cpp & Загрузчик GGUF Моделей</span>
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              Загружает официальные бинарники Llama.cpp с GitHub и GGUF модели напрямую в папки программы
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleInstallLlama}
+            disabled={isInstallingLlama}
+            className="flat-btn px-3 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer flex items-center gap-1.5 shrink-0 disabled:opacity-50"
+          >
+            {isInstallingLlama ? <RefreshCw size={13} className="animate-spin" /> : <HardDrive size={13} />}
+            <span>{isInstallingLlama ? 'Установка...' : 'Установить Llama.cpp с GitHub (1-клик)'}</span>
+          </button>
+        </div>
+
+        {/* Popular GGUF Models Parser Cards */}
+        <div className="space-y-2 pt-1">
+          <div className="text-[11px] font-medium text-slate-300">Доступные модели с весами (Hugging Face GGUF):</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {availableModels.map((m) => {
+              const isDownloading = downloadingModelId === m.id;
+              return (
+                <div key={m.id} className="p-3 rounded border border-white/10 bg-slate-900/40 space-y-2 flex flex-col justify-between">
+                  <div>
+                    <div className="text-xs font-medium text-slate-200">{m.name}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">{m.desc}</div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadModel(m)}
+                    disabled={isDownloading}
+                    className="flat-btn px-2.5 py-1 rounded text-[11px] font-medium text-slate-200 hover:text-white cursor-pointer flex items-center justify-center gap-1.5 mt-2 disabled:opacity-50"
+                  >
+                    {isDownloading ? <RefreshCw size={11} className="animate-spin text-sky-400" /> : <Download size={11} className="text-emerald-400" />}
+                    <span>{isDownloading ? 'Загрузка...' : `Скачать (${m.size})`}</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Executable & Model Files Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="space-y-1.5">
@@ -158,6 +259,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
               type="button"
               onClick={handleSelectExe}
               className="flat-btn px-2.5 py-2 text-xs font-medium rounded-md text-slate-200 hover:text-white cursor-pointer shrink-0"
+              title="Выбрать файл llama-server.exe"
             >
               <Folder size={13} />
             </button>
@@ -180,6 +282,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
               type="button"
               onClick={handleSelectModel}
               className="flat-btn px-2.5 py-2 text-xs font-medium rounded-md text-slate-200 hover:text-white cursor-pointer shrink-0"
+              title="Выбрать файл .gguf"
             >
               <Folder size={13} />
             </button>
@@ -288,7 +391,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
         </div>
       </div>
 
-      {/* Pro Custom Toggle Switches Grid (No default checkboxes) */}
+      {/* Pro Custom Toggle Switches Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 select-none">
         {toggleItems.map((item, idx) => (
           <div

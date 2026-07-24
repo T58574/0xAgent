@@ -9,7 +9,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
-    host: "127.0.0.1",
+    host: "0.0.0.0", // Bind to all interfaces for local Wi-Fi network sharing
     proxy: {
       "/api": {
         target: "http://127.0.0.1:3001",
