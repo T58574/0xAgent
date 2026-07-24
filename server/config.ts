@@ -88,6 +88,7 @@ export function getDefaultConfig(): AppConfig {
     },
     models_path: null,
     reasoning_enabled: true,
+    planning_mode: true,
     temperature: 0.7,
     max_tokens: 8192,
     api_timeout_sec: 120,

@@ -222,7 +222,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-hidden relative">
+    <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-hidden relative select-text">
       
       {/* 1. EMPTY CHAT WELCOME VIEW */}
       {!hasMessages && (
@@ -271,24 +271,24 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* 2. MAIN CHAT HISTORY LIST */}
       {hasMessages && (
-        <div className="flex-grow flex flex-col justify-between overflow-hidden relative w-full max-w-4xl mx-auto">
+        <div className="flex-grow flex flex-col justify-between overflow-hidden relative w-full max-w-4xl mx-auto select-text">
           
           <div
             ref={mainHistoryRef}
-            className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-none flex flex-col min-h-0"
+            className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-none flex flex-col min-h-0 select-text"
           >
             {messages.map((msg) => {
               const textOutput = cleanContent(msg.content);
               return (
-                <div key={msg.id} className="flex flex-col space-y-1 w-full">
+                <div key={msg.id} className="flex flex-col space-y-1 w-full select-text">
                   {msg.role === 'user' && (
-                    <div className="self-end max-w-[85%] rounded-md glass-card border border-emerald-500/30 bg-slate-900/80 px-4 py-2.5 text-slate-100 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans">
+                    <div className="self-end max-w-[85%] rounded-md glass-card border border-emerald-500/30 bg-slate-900/80 px-4 py-2.5 text-slate-100 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans select-text">
                       {msg.content}
                     </div>
                   )}
 
                   {msg.role === 'tool' && (
-                    <div className="self-start max-w-[95%] w-full rounded-md glass-card border border-white/10 p-3 bg-slate-950/80 text-slate-300 font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1">
+                    <div className="self-start max-w-[95%] w-full rounded-md glass-card border border-white/10 p-3 bg-slate-950/80 text-slate-300 font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1 select-text">
                       <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
                         <Terminal size={10} />
                         <span>Результат выполнения инструмента</span>
@@ -315,7 +315,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     }
 
                     return (
-                      <div className="self-start max-w-[95%] w-full rounded-md glass-panel border border-white/10 p-4 text-slate-100 text-xs sm:text-sm leading-relaxed my-1.5">
+                      <div className="self-start max-w-[95%] w-full rounded-md glass-panel border border-white/10 p-4 text-slate-100 text-xs sm:text-sm leading-relaxed my-1.5 select-text">
                         {reasoningEnabled && thinkText && (
                           <details open className="mb-3 border border-white/10 rounded bg-slate-950/40 overflow-hidden group">
                             <summary className="px-3 py-1.5 text-[11px] font-medium text-slate-300 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">

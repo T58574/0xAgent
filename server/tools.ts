@@ -72,7 +72,21 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
     const currentContentClean = currentContent.replace(/\r\n/g, '\n');
 
     if (!currentContentClean.includes(searchBlockClean)) {
-      throw new Error(`Could not find the SEARCH block in file: \n\`\`\`\n${searchBlock}\n\`\`\``);
+      // Fallback: try normalized line matching (trimming trailing whitespace)
+      const normSearch = searchBlockClean.split('\n').map((l) => l.trimEnd()).join('\n');
+      const normCurrent = currentContentClean.split('\n').map((l) => l.trimEnd()).join('\n');
+
+      if (normCurrent.includes(normSearch)) {
+        currentContent = normCurrent.replace(normSearch, replaceBlock);
+        remaining = afterDiv.substring(endIdx + replaceMarker.length);
+        appliedCount++;
+        continue;
+      }
+
+      throw new Error(
+        `Could not find the SEARCH block in file: \n\`\`\`\n${searchBlock}\n\`\`\`\n\n` +
+        `[SYSTEM HINT]: The exact SEARCH block was not found. Use <read_file path="${pathStr}" /> to inspect the file's current lines and whitespace before retrying <patch_file> or <write_file>.`
+      );
     }
 
     currentContent = currentContentClean.replace(searchBlockClean, replaceBlock);

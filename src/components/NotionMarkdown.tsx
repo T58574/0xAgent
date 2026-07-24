@@ -33,7 +33,7 @@ export const NotionMarkdown: React.FC<NotionMarkdownProps> = ({ content }) => {
   const textParts = renderMathBlocks(content);
 
   return (
-    <div className="notion-markdown text-slate-100 font-sans leading-relaxed space-y-3">
+    <div className="notion-markdown text-slate-100 font-sans leading-relaxed space-y-3 select-text">
       {textParts.map((part, idx) => {
         if (part.type === 'block-math') {
           return (

@@ -26,6 +26,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [groqApiKey, setGroqApiKey] = useState('');
   const [modelsPath, setModelsPath] = useState('');
   const [reasoningEnabled, setReasoningEnabled] = useState(true);
+  const [planningEnabled, setPlanningEnabled] = useState(true);
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(8192);
   const [apiTimeoutSec, setApiTimeoutSec] = useState(120);
@@ -79,6 +80,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       setGroqApiKey(config.groq_api_key || '');
       setModelsPath(config.models_path || '');
       setReasoningEnabled(config.reasoning_enabled !== false);
+      setPlanningEnabled(config.planning_mode !== false);
       if (config.temperature !== undefined && config.temperature !== null) setTemperature(config.temperature);
       if (config.max_tokens) setMaxTokens(config.max_tokens);
       if (config.api_timeout_sec) setApiTimeoutSec(config.api_timeout_sec);
@@ -140,6 +142,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           groq_api_key: groqApiKey.trim() || null,
           models_path: modelsPath.trim() || null,
           reasoning_enabled: reasoningEnabled,
+          planning_mode: planningEnabled,
           temperature,
           max_tokens: maxTokens,
           api_timeout_sec: apiTimeoutSec,

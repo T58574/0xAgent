@@ -480,8 +480,21 @@ export default function App() {
     };
   }, []);
 
+  const handleTogglePlanningMode = async () => {
+    if (!config) return;
+    const newPlanning = config.planning_mode === false ? true : false;
+    const updated = { ...config, planning_mode: newPlanning };
+    setConfig(updated);
+    try {
+      await api.save_config(updated);
+      addLog(`Planning mode switched to: ${newPlanning ? 'ENABLED' : 'DISABLED'}`);
+    } catch (err: any) {
+      console.error('Failed to save planning mode:', err);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans select-none">
+    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans">
       
       {/* TOP SESSION HEADER */}
       {activeView !== 'settings' && (
@@ -494,6 +507,8 @@ export default function App() {
             onDeleteSession={handleDeleteSession}
             onOpenSettings={() => setActiveView('settings')}
             onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
+            planningMode={config?.planning_mode !== false}
+            onTogglePlanningMode={handleTogglePlanningMode}
           />
         </div>
       )}

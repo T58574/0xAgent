@@ -276,7 +276,20 @@ CRITICAL RULES FOR <execute_command>:
 2. Do NOT wrap commands in "powershell -Command ...", "powershell -Command cd ...", or explicit "cd <path>". The command is ALREADY executed inside PowerShell in the workspace root directory! Write direct commands like: \`npm run build\`, \`npx tsc --noEmit\`, \`Get-ChildItem\`, \`git status\`.
 3. NEVER execute long-running blocking background dev-servers (e.g., 'npm run dev', 'vite', 'npm start') inside <execute_command> as they will run indefinitely and time out. Execute one-off build or test commands instead.`;
 
-    const fullSystemPrompt = config.system_prompt + envContext + memoryContext;
+    const isPlanningMode = config.planning_mode !== false;
+    const planningContext = isPlanningMode
+      ? `\n\n# 📋 PLANNING MODE IS ACTIVE
+You are operating in Planning Mode.
+Before executing modifying tool calls (<write_file>, <patch_file>, <execute_command>), follow this mandatory workflow:
+1. RESEARCH & DIAGNOSE: Use read-only tools (<read_file>, <list_dir>, <grep_search>) to inspect existing codebase, imports, types, and find the exact root cause.
+2. FORMULATE IMPLEMENTATION PLAN: Clearly present your analysis and proposed solution in your response before or alongside executing actions:
+   - Root Cause Analysis
+   - Proposed Changes (files to create/modify)
+   - Verification Plan
+3. Explain your technical rationale concisely.`
+      : '';
+
+    const fullSystemPrompt = config.system_prompt + envContext + planningContext + memoryContext;
 
     const messages = [
       { role: 'system', content: fullSystemPrompt },
@@ -692,7 +705,7 @@ CRITICAL RULES FOR <execute_command>:
             output,
           });
         } catch (err: any) {
-          output = `Error: ${err.message}`;
+          output = `Error: ${err.message}\n\n[SYSTEM HINT TO AGENT]: The tool call returned an error. Analyze the error message above, use <read_file> if needed to inspect exact file lines, and try a corrected approach.`;
           broadcast('agent-tool-status-changed', {
             message_id: assistantMessageId,
             tool_id: tc.id,

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { X, Plus, ChevronLeft, ChevronRight, Terminal, Brain } from 'lucide-react';
+import { X, Plus, ChevronLeft, ChevronRight, Terminal, Brain, ClipboardList } from 'lucide-react';
 import { ChatSession } from '../types';
 
 interface HeaderProps {
@@ -10,6 +10,8 @@ interface HeaderProps {
   onDeleteSession: (id: string, e: React.MouseEvent) => void;
   onOpenSettings?: () => void;
   onOpenMemorySkills?: () => void;
+  planningMode?: boolean;
+  onTogglePlanningMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,6 +21,8 @@ export const Header: React.FC<HeaderProps> = ({
   onCreateSession,
   onDeleteSession,
   onOpenMemorySkills,
+  planningMode = true,
+  onTogglePlanningMode,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -52,11 +56,29 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
+        {/* Planning Mode Toggle Button */}
+        {onTogglePlanningMode && (
+          <button
+            onClick={onTogglePlanningMode}
+            className={`flat-btn ml-2 px-2.5 py-1 rounded text-xs font-medium cursor-pointer shrink-0 flex items-center gap-1.5 transition-colors ${
+              planningMode
+                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm font-semibold'
+                : 'text-slate-400 border-white/10 hover:text-slate-200'
+            }`}
+            title={planningMode ? 'Режим Планирования активен' : 'Включить Режим Планирования'}
+          >
+            <ClipboardList size={13} className={planningMode ? 'text-purple-400' : 'text-slate-400'} />
+            <span className="text-xs font-medium hidden sm:inline">
+              {planningMode ? 'План: ВКЛ' : 'План: ВЫКЛ'}
+            </span>
+          </button>
+        )}
+
         {/* Memory & Skills Button */}
         {onOpenMemorySkills && (
           <button
             onClick={onOpenMemorySkills}
-            className="flat-btn ml-2 px-2.5 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer shrink-0 flex items-center gap-1.5"
+            className="flat-btn ml-1 px-2.5 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer shrink-0 flex items-center gap-1.5"
             title="Долгосрочная память и скиллы"
           >
             <Brain size={13} />

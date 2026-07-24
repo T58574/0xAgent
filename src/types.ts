@@ -52,6 +52,7 @@ export interface AppConfig {
   theme_colors?: ThemeColors | null;
   models_path?: string | null;
   reasoning_enabled?: boolean | null;
+  planning_mode?: boolean | null;
   temperature?: number | null;
   max_tokens?: number | null;
   api_timeout_sec?: number | null;
