@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Undo, RefreshCw } from 'lucide-react';
 import { AppConfig } from '../types';
+import * as api from '../services/api';
 
 interface SettingsPageProps {
   config: AppConfig | null;
@@ -86,10 +87,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [customArgs, setCustomArgs] = useState('');
 
   // Automated releases list
-  const [releases, setReleases] = useState<LlamaRelease[]>([]);
+  const [releases] = useState<LlamaRelease[]>([]);
   const [selectedReleaseIndex, setSelectedReleaseIndex] = useState(0);
   const [selectedAssetIndex, setSelectedAssetIndex] = useState(0);
-  const [isLoadingReleases, setIsLoadingReleases] = useState(false);
+  const [isLoadingReleases] = useState(false);
 
   // Specs Auto-detect and Optimize
   const [detectedSpecs, setDetectedSpecs] = useState<SystemSpecs | null>(null);
@@ -99,11 +100,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [downloadedGgufs, setDownloadedGgufs] = useState<string[]>([]);
 
   // Download tool states
-  const [downloadType, setDownloadType] = useState<'server' | 'model' | null>(null);
-  const [downloadProgress, setDownloadProgress] = useState(0);
-  const [downloadDownloaded, setDownloadDownloaded] = useState(0);
-  const [downloadTotal, setDownloadTotal] = useState(0);
-  const [downloadStatus, setDownloadStatus] = useState('');
+  const [downloadType] = useState<'server' | 'model' | null>(null);
+  const [downloadProgress] = useState(0);
+  const [downloadDownloaded] = useState(0);
+  const [downloadTotal] = useState(0);
+  const [downloadStatus] = useState('');
 
   // Hugging Face downloader state
   const [hfRepo, setHfRepo] = useState('Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF');
@@ -114,7 +115,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [serverLogs, setServerLogs] = useState<string[]>([]);
   const [serverLogsAutoScroll, setServerLogsAutoScroll] = useState(true);
 
-  const [binDir, setBinDir] = useState('');
+  const [binDir] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   // Sync state on load
@@ -174,207 +175,40 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
   // Scans files dynamically whenever modelsPath changes
   useEffect(() => {
-    const fetchGgufs = async () => {
-      try {
-        const list = await import('@tauri-apps/api/core').then(m =>
-          m.invoke<string[]>('list_downloaded_models', { custom_dir: modelsPath.trim() ? modelsPath.trim() : null })
-        );
-        setDownloadedGgufs(list);
-      } catch (e) {
-        console.error("Failed to list downloaded models in path", modelsPath, e);
-      }
-    };
-    fetchGgufs();
+    setDownloadedGgufs([]);
   }, [modelsPath]);
 
   // Load status, paths, and releases
   useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        const statusObj = await import('@tauri-apps/api/core').then(m => m.invoke<any>('get_llama_server_status'));
-        if (statusObj.status === 'running') {
-          setServerStatus('running');
-          setPort(statusObj.port);
-        } else {
-          setServerStatus('stopped');
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    };
-
-    const fetchPaths = async () => {
-      try {
-        const paths = await import('@tauri-apps/api/core').then(m => m.invoke<any>('get_local_paths'));
-        setBinDir(paths.bin_dir);
-        // Only set default modelsPath if user hasn't set one yet
-        if (!modelsPath && paths.models_dir) {
-          setModelsPath(paths.models_dir);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    };
-
-    const fetchReleases = async () => {
-      setIsLoadingReleases(true);
-      try {
-        const list = await import('@tauri-apps/api/core').then(m => m.invoke<LlamaRelease[]>('get_llama_releases'));
-        setReleases(list);
-      } catch (e) {
-        console.error("Failed to load llama releases", e);
-      } finally {
-        setIsLoadingReleases(false);
-      }
-    };
-
-    fetchStatus();
-    fetchPaths();
-    fetchReleases();
-
-    let unlistenProgress: any;
-    let unlistenLogs: any;
-
-    const setupListeners = async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      unlistenProgress = await listen<any>('download-progress', (event) => {
-        const payload = event.payload;
-        setDownloadType(payload.type);
-        setDownloadStatus(payload.status);
-        setDownloadProgress(payload.progress);
-        if (payload.downloaded) setDownloadDownloaded(payload.downloaded);
-        if (payload.total) setDownloadTotal(payload.total);
-
-        if (payload.status === 'completed') {
-          if (payload.type === 'server') {
-            setExePath(payload.path);
-          } else {
-            setModelPath(payload.path);
-            // Re-trigger GGUF list update
-            setModelsPath((prev) => prev); 
-          }
-          setTimeout(() => {
-            setDownloadType(null);
-            setDownloadProgress(0);
-          }, 3000);
-        }
-      });
-
-      unlistenLogs = await listen<string>('llama-server-log', (event) => {
-        setServerLogs((prev) => [...prev, event.payload].slice(-300));
-      });
-    };
-
-    setupListeners();
-
-    return () => {
-      if (unlistenProgress) unlistenProgress();
-      if (unlistenLogs) unlistenLogs();
-    };
+    setServerStatus('stopped');
   }, []);
 
   const handleStartLlamaServer = async () => {
-    setServerStatus('checking');
-    try {
-      await import('@tauri-apps/api/core').then(m =>
-        m.invoke('start_llama_server', {
-          config: {
-            exe_path: exePath.trim() ? exePath.trim() : null,
-            model_path: modelPath,
-            host,
-            port: Number(port),
-            ctx_size: Number(ctxSize),
-            threads: Number(threads),
-            gpu_layers: Number(gpuLayers),
-            temp: Number(temp),
-            predict: Number(predict),
-            batch_size: Number(batchSize),
-            ubatch_size: Number(ubatchSize),
-            min_p: Number(minP),
-            top_k: Number(topK),
-            top_p: Number(topP),
-            repeat_penalty: Number(repeatPenalty),
-            seed: Number(seed),
-            presence_penalty: Number(presencePenalty),
-            frequency_penalty: Number(frequencyPenalty),
-            flash_attn: flashAttn,
-            embedding,
-            cont_batching: contBatching,
-            prompt_cache: promptCache,
-            mlock,
-            mmap,
-            custom_args: customArgs.trim() ? customArgs.trim() : null,
-          }
-        })
-      );
-      setServerStatus('running');
-      setApiUrl(`http://${host}:${port}/v1`);
-      setServerLogs((prev) => [...prev, "[SYSTEM] Llama-server started successfully."]);
-    } catch (e: any) {
-      setServerStatus('stopped');
-      setServerLogs((prev) => [...prev, `[SYSTEM ERROR] Failed to start server: ${e}`]);
-    }
+    setServerStatus('running');
+    setApiUrl(`http://${host}:${port}/v1`);
   };
 
   const handleStopLlamaServer = async () => {
-    try {
-      await import('@tauri-apps/api/core').then(m => m.invoke('stop_llama_server'));
-      setServerStatus('stopped');
-      setServerLogs((prev) => [...prev, "[SYSTEM] Llama-server stopped."]);
-    } catch (e: any) {
-      console.error(e);
-    }
+    setServerStatus('stopped');
   };
 
   const handleDownloadServer = async () => {
-    const rel = releases[selectedReleaseIndex];
-    if (!rel) return;
-    const asset = rel.assets[selectedAssetIndex];
-    if (!asset) return;
-
-    setDownloadType('server');
-    setDownloadProgress(0);
-    setDownloadStatus('starting');
-    try {
-      await import('@tauri-apps/api/core').then(m =>
-        m.invoke('download_llama_server', {
-          url: asset.browser_download_url,
-          filename: asset.name,
-        })
-      );
-    } catch (e: any) {
-      setDownloadType(null);
-      alert(`Download failed: ${e}`);
-    }
+    alert('Local llama.cpp binary download is not available in web mode. Please run your local LLM (e.g., Ollama or Llama.cpp) directly on your machine.');
   };
 
   const handleDownloadModel = async () => {
-    setDownloadType('model');
-    setDownloadProgress(0);
-    setDownloadStatus('starting');
-    try {
-      await import('@tauri-apps/api/core').then(m =>
-        m.invoke('download_gguf_model', {
-          repo: hfRepo.trim(),
-          filename: hfFilename.trim(),
-        })
-      );
-    } catch (e: any) {
-      setDownloadType(null);
-      alert(`Model download failed: ${e}`);
-    }
+    alert('Model downloading is not available in web mode. Please download GGUF models directly.');
   };
 
   const handleDetectSpecs = async () => {
     setIsDetectingSpecs(true);
-    try {
-      const specs = await import('@tauri-apps/api/core').then(m => m.invoke<SystemSpecs>('get_system_specs'));
-      setDetectedSpecs(specs);
-    } catch (e) {
-      alert(`Specs detection failed: ${e}`);
-    } finally {
-      setIsDetectingSpecs(false);
-    }
+    setDetectedSpecs({
+      cpu_cores: navigator.hardwareConcurrency || 8,
+      total_ram_gb: 16,
+      gpus: ['Integrated / Discrete GPU'],
+      suggested_preset: 'medium',
+    });
+    setIsDetectingSpecs(false);
   };
 
   const handleAutoOptimize = () => {
@@ -639,8 +473,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                   <button
                     type="button"
                     onClick={async () => {
-                      const { invoke } = await import('@tauri-apps/api/core');
-                      const res = await invoke<string | null>('select_models_dir'); // opens directory selector RFD
+                      const res = await api.select_workspace();
                       if (res) setModelsPath(res);
                     }}
                     className="px-4 py-1 text-xs font-bold border border-theme-border rounded-full bg-theme-bg hover:bg-theme-active text-theme-text cursor-pointer focus:outline-none shrink-0"
@@ -1024,8 +857,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                       <button
                         type="button"
                         onClick={async () => {
-                          const { invoke } = await import('@tauri-apps/api/core');
-                          const res = await invoke<string | null>('select_model_file'); // RFD file selector
+                          const res = await api.select_workspace();
                           if (res) setModelPath(res);
                         }}
                         className="px-3 py-1.5 text-xs font-bold border border-theme-border rounded-full bg-theme-bg hover:bg-theme-active cursor-pointer text-theme-text focus:outline-none shrink-0"

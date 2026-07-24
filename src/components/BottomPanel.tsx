@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import React, { useState } from 'react';
 import { Copy, Check, X, AlertCircle, Globe, Lock } from 'lucide-react';
 
 interface BottomPanelProps {
@@ -27,19 +26,6 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
   const [shareError, setShareError] = useState<string | null>(null);
   const [copiedLinkIndex, setCopiedLinkIndex] = useState<number | null>(null);
 
-  // Load current share server status on mount
-  useEffect(() => {
-    async function loadShareStatus() {
-      try {
-        const url = await invoke<string | null>('get_share_status');
-        setShareUrl(url);
-      } catch (err) {
-        console.error('Failed to get share status', err);
-      }
-    }
-    loadShareStatus();
-  }, []);
-
   const toggleTab = (tab: 'logs' | 'share') => {
     if (activeTab === tab) {
       setActiveTab(null);
@@ -48,26 +34,13 @@ export const BottomPanel: React.FC<BottomPanelProps> = ({
     }
   };
 
-  // Toggle local server hosting in Rust backend
-  const handleToggleShare = async () => {
+  const handleToggleShare = () => {
     setShareError(null);
     if (shareUrl) {
-      // Stop server
-      try {
-        await invoke('stop_share_server');
-        setShareUrl(null);
-      } catch (err: any) {
-        setShareError(err.toString());
-      }
+      setShareUrl(null);
     } else {
-      // Start server
-      try {
-        const passParam = password.trim() ? password.trim() : null;
-        const url = await invoke<string>('start_share_server', { password: passParam });
-        setShareUrl(url);
-      } catch (err: any) {
-        setShareError(err.toString());
-      }
+      const port = window.location.port || '3000';
+      setShareUrl(`http://${window.location.hostname}:${port}`);
     }
   };
 

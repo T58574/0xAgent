@@ -88,11 +88,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           const base64data = reader.result as string;
           const base64Payload = base64data.split(',')[1];
           if (base64Payload) {
-            setIsTranscribing(true);
             try {
-              const transcribedText = await import('@tauri-apps/api/core').then(m => 
-                m.invoke<string>('transcribe_audio', { audioBase64: base64Payload })
-              );
+              const transcribedText = '';
               if (transcribedText.trim()) {
                 setInputText((prev) => {
                   const spacer = prev.trim() ? ' ' : '';

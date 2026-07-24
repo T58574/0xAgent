@@ -29,7 +29,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="opacity-50 font-sans italic" title="$1">$1</span>');
 
     // Strings - escape quotes in content to prevent breaking HTML attributes
-    html = html.replace(/(["'`])(.*?)\1/g, (match, quote, content) => {
+    html = html.replace(/(["'`])(.*?)\1/g, (_match, quote, content) => {
       const safeContent = content.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       return `<span class="text-emerald-500 font-bold" title="${quote}${safeContent}${quote}">${quote}${content}${quote}</span>`;
     });

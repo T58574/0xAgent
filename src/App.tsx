@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
+import * as api from './services/api';
 import { AppConfig, ChatSession, ChatMessage, FileNode, ToolCallInfo } from './types';
 import { Header } from './components/Header';
 import { WorkspaceTree } from './components/WorkspaceTree';
@@ -29,12 +28,11 @@ export default function App() {
   const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings'>('chat');
   const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
 
-  // Mobile keyboard scroll offset reset on input blur (focusout) - FIXED: only on chat view inputs
+  // Mobile keyboard scroll offset reset on input blur (focusout)
   useEffect(() => {
     const handleFocusOut = (e: FocusEvent) => {
       if (activeView !== 'chat') return;
       const target = e.target as HTMLElement;
-      // Only scroll when focus leaves input fields in chat area
       if (!target.closest('input, textarea')) {
         window.scrollTo(0, 0);
         document.body.scrollTop = 0;
@@ -94,7 +92,7 @@ export default function App() {
     async function init() {
       try {
         addLog('Initializing system configurations...');
-        const cfg = await invoke<AppConfig>('get_config');
+        const cfg = await api.get_config();
         setConfig(cfg);
         addLog(`Loaded settings. Model: ${cfg.model_name}`);
 
@@ -102,21 +100,20 @@ export default function App() {
           loadWorkspaceTree(cfg.workspace_dir);
         }
 
-        const sessionList = await invoke<ChatSession[]>('list_sessions');
+        const sessionList = await api.list_sessions();
         setSessions(sessionList);
 
         if (sessionList.length > 0) {
           const firstSession = sessionList[0];
           setCurrentSessionId(firstSession.id);
-          const fullSession = await invoke<ChatSession>('load_session', { id: firstSession.id });
+          const fullSession = await api.load_session(firstSession.id);
           setCurrentSession(fullSession);
           addLog(`Restored session: "${fullSession.title}"`);
         } else {
-          // Create initial session if list is empty
           await handleCreateSession('Default Session');
         }
-      } catch (err) {
-        addLog(`Error during startup: ${err}`);
+      } catch (err: any) {
+        addLog(`Error during startup: ${err.message || err}`);
       }
     }
     init();
@@ -125,10 +122,10 @@ export default function App() {
   // 2. Fetch workspace file tree recursive
   const loadWorkspaceTree = async (dirPath: string) => {
     try {
-      const tree = await invoke<FileNode[]>('get_workspace_tree', { workspaceDir: dirPath });
+      const tree = await api.get_workspace_tree(dirPath);
       setWorkspaceTree(tree);
-    } catch (err) {
-      addLog(`Failed to load file tree: ${err}`);
+    } catch (err: any) {
+      addLog(`Failed to load file tree: ${err.message || err}`);
     }
   };
 
@@ -144,31 +141,31 @@ export default function App() {
   const handleSelectSession = async (id: string) => {
     try {
       setCurrentSessionId(id);
-      const full = await invoke<ChatSession>('load_session', { id });
+      const full = await api.load_session(id);
       setCurrentSession(full);
       addLog(`Switched session to "${full.title}"`);
-    } catch (err) {
-      addLog(`Failed to load session ${id}: ${err}`);
+    } catch (err: any) {
+      addLog(`Failed to load session ${id}: ${err.message || err}`);
     }
   };
 
   const handleCreateSession = async (title?: string) => {
     try {
       const name = title || `Session ${sessions.length + 1}`;
-      const newSess = await invoke<ChatSession>('create_session', { title: name });
+      const newSess = await api.create_session(name);
       setSessions((prev) => [newSess, ...prev]);
       setCurrentSessionId(newSess.id);
       setCurrentSession(newSess);
       addLog(`Created new session: "${name}"`);
-    } catch (err) {
-      addLog(`Failed to create session: ${err}`);
+    } catch (err: any) {
+      addLog(`Failed to create session: ${err.message || err}`);
     }
   };
 
   const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      await invoke('delete_session', { id });
+      await api.delete_session(id);
       const updatedList = sessions.filter((s) => s.id !== id);
       setSessions(updatedList);
       addLog(`Deleted session: ${id}`);
@@ -180,30 +177,30 @@ export default function App() {
           handleCreateSession('Default Session');
         }
       }
-    } catch (err) {
-      addLog(`Failed to delete session: ${err}`);
+    } catch (err: any) {
+      addLog(`Failed to delete session: ${err.message || err}`);
     }
   };
 
-  // 4. Select workspace directory via native picker RFD
+  // 4. Select workspace directory
   const handleSelectWorkspace = async () => {
     try {
-      const folder = await invoke<string | null>('select_workspace');
+      const folder = await api.select_workspace();
       if (folder) {
         addLog(`Selected workspace: ${folder}`);
-        const updatedConfig = await invoke<AppConfig>('get_config');
+        const updatedConfig = await api.get_config();
         setConfig(updatedConfig);
         loadWorkspaceTree(folder);
       }
-    } catch (err) {
-      addLog(`Failed to select directory: ${err}`);
+    } catch (err: any) {
+      addLog(`Failed to select directory: ${err.message || err}`);
     }
   };
 
   // 5. Save settings config updates
   const handleSaveConfig = async (updated: AppConfig) => {
     try {
-      await invoke('save_config', { config: updated });
+      await api.save_config(updated);
       setConfig(updated);
       addLog(`Settings updated. Active Model: ${updated.model_name}`);
       if (updated.workspace_dir) {
@@ -211,8 +208,8 @@ export default function App() {
       } else {
         setWorkspaceTree([]);
       }
-    } catch (err) {
-      addLog(`Failed to save configuration: ${err}`);
+    } catch (err: any) {
+      addLog(`Failed to save configuration: ${err.message || err}`);
       throw err;
     }
   };
@@ -220,7 +217,7 @@ export default function App() {
   // 6. View raw text file onClick
   const handleFileClick = async (filePath: string, fileName: string) => {
     try {
-      const content = await invoke<string>('read_file_raw', { path: filePath });
+      const content = await api.read_file_raw(filePath);
       const newFile = {
         path: filePath,
         name: fileName,
@@ -238,8 +235,8 @@ export default function App() {
       setSelectedFile(newFile);
       setActiveView('workspace');
       addLog(`Opened raw file: ${fileName}`);
-    } catch (err) {
-      addLog(`Failed to read file contents: ${err}`);
+    } catch (err: any) {
+      addLog(`Failed to read file contents: ${err.message || err}`);
     }
   };
 
@@ -267,14 +264,12 @@ export default function App() {
     );
 
     try {
-      // Save session representation on disk
-      await invoke('save_session', { session: updatedSession });
+      await api.save_session(updatedSession);
       addLog(`Prompt submitted: "${text.substring(0, 30)}..."`);
       
-      // Start background agent runner
-      await invoke('send_message', { sessionId: currentSession.id });
-    } catch (err) {
-      addLog(`Failed to execute completions: ${err}`);
+      await api.send_message(currentSession.id);
+    } catch (err: any) {
+      addLog(`Failed to execute completions: ${err.message || err}`);
     }
   };
 
@@ -283,13 +278,9 @@ export default function App() {
     if (!currentSessionId) return;
     try {
       addLog(`Tool response submitted: [${toolId}] approved=${approve}`);
-      await invoke('respond_to_tool', {
-        sessionId: currentSessionId,
-        toolCallId: toolId,
-        approve,
-      });
-    } catch (err) {
-      addLog(`Failed to submit tool confirmation: ${err}`);
+      await api.respond_to_tool(currentSessionId, toolId, approve);
+    } catch (err: any) {
+      addLog(`Failed to submit tool confirmation: ${err.message || err}`);
     }
   };
 
@@ -298,23 +289,22 @@ export default function App() {
     if (!currentSessionId) return;
     try {
       addLog(`Cancellation request submitted for session ${currentSessionId}`);
-      await invoke('cancel_agent', { sessionId: currentSessionId });
-    } catch (err) {
-      addLog(`Failed to cancel agent: ${err}`);
+      await api.cancel_agent(currentSessionId);
+    } catch (err: any) {
+      addLog(`Failed to cancel agent: ${err.message || err}`);
     }
   };
 
-  // 8. Listen to SSE completions events streamed from Rust Backend
+  // 8. Listen to SSE completions events streamed from Node.js Backend
   useEffect(() => {
     let unlisteners: (() => void)[] = [];
 
     async function setupListeners() {
       // Message start
-      const un1 = await listen<{ id: string; role: string }>('agent-message-start', (event) => {
+      const un1 = await api.listen<{ id: string; role: string }>('agent-message-start', (event) => {
         const sess = currentSessionRef.current;
         if (!sess) return;
         
-        // Append empty assistant container if not present
         const hasMsg = sess.messages.some((m) => m.id === event.payload.id);
         if (!hasMsg) {
           const newAssistantMsg: ChatMessage = {
@@ -334,7 +324,7 @@ export default function App() {
       unlisteners.push(un1);
 
       // Token streaming
-      const un2 = await listen<{ message_id: string; token: string }>('agent-token-stream', (event) => {
+      const un2 = await api.listen<{ message_id: string; token: string }>('agent-token-stream', (event) => {
         const sess = currentSessionRef.current;
         if (!sess) return;
 
@@ -356,14 +346,14 @@ export default function App() {
       unlisteners.push(un2);
 
       // Status change
-      const un3 = await listen<string>('agent-status-changed', (event) => {
+      const un3 = await api.listen<string>('agent-status-changed', (event) => {
         setAgentStatus(event.payload as any);
         addLog(`Agent status changed: ${event.payload}`);
       });
       unlisteners.push(un3);
 
       // Tools layout updated
-      const un4 = await listen<{ message_id: string; tools: ToolCallInfo[] }>('agent-tools-updated', (event) => {
+      const un4 = await api.listen<{ message_id: string; tools: ToolCallInfo[] }>('agent-tools-updated', (event) => {
         const sess = currentSessionRef.current;
         if (!sess) return;
 
@@ -385,7 +375,7 @@ export default function App() {
       unlisteners.push(un4);
 
       // Single tool execution details updated
-      const un5 = await listen<{ message_id: string; tool_id: string; status: string; output?: string }>(
+      const un5 = await api.listen<{ message_id: string; tool_id: string; status: string; output?: string }>(
         'agent-tool-status-changed',
         (event) => {
           const sess = currentSessionRef.current;
@@ -416,7 +406,6 @@ export default function App() {
             messages: updatedMessages,
           });
 
-          // Refresh workspace file tree on completed writes/patches
           if (event.payload.status === 'completed' && config?.workspace_dir) {
             loadWorkspaceTree(config.workspace_dir);
           }
@@ -425,7 +414,7 @@ export default function App() {
       unlisteners.push(un5);
 
       // System agent errors
-      const un6 = await listen<string>('agent-error', (event) => {
+      const un6 = await api.listen<string>('agent-error', (event) => {
         addLog(`Agent Error Alert: ${event.payload}`);
       });
       unlisteners.push(un6);
@@ -441,7 +430,7 @@ export default function App() {
   return (
     <div className="fixed inset-0 flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans select-none">
       
-      {/* TOP SESSION HEADER (Hidden on Settings page to keep it clean) */}
+      {/* TOP SESSION HEADER */}
       {activeView !== 'settings' && (
         <div className="px-4 pt-4 shrink-0 select-none">
           <Header
@@ -473,7 +462,7 @@ export default function App() {
 
         {activeView === 'workspace' && (
           <div className="flex-grow w-full h-full flex overflow-hidden border-t border-theme-border">
-            {/* Sidebar Workspace tree (main theme) */}
+            {/* Sidebar Workspace tree */}
             <div className="w-64 h-full flex flex-col bg-theme-bg border-r border-theme-border overflow-hidden">
               <div className="flex-grow overflow-hidden">
                 <WorkspaceTree
@@ -520,7 +509,7 @@ export default function App() {
         onChangeView={setActiveView}
       />
 
-      {/* raw text file viewer OVERLAY (fallback) */}
+      {/* RAW TEXT FILE VIEWER OVERLAY */}
       {activeView !== 'workspace' && selectedFile && (
         <FileViewer
           fileName={selectedFile.name}
