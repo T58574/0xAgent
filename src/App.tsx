@@ -5,9 +5,10 @@ import { Header } from './components/Header';
 import { WorkspaceTree } from './components/WorkspaceTree';
 import { ChatArea } from './components/ChatArea';
 import { BottomPanel } from './components/BottomPanel';
-import { SettingsPage } from './components/SettingsModal';
+import { SettingsPage } from './components/settings/SettingsPage';
 import { FileViewer } from './components/FileViewer';
 import { CodeEditor } from './components/CodeEditor';
+import { FolderTree, Code } from 'lucide-react';
 
 export default function App() {
   // App Config and Sessions state
@@ -27,6 +28,9 @@ export default function App() {
   // Navigation view state
   const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings'>('chat');
   const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
+
+  // Mobile Workspace view mode: 'files' tree or 'editor' code tab
+  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'files' | 'editor'>('files');
 
   // Mobile keyboard scroll offset reset on input blur (focusout)
   useEffect(() => {
@@ -65,7 +69,10 @@ export default function App() {
 
   const handleSelectTab = (path: string) => {
     const tab = openTabs.find(t => t.path === path);
-    if (tab) setSelectedFile(tab);
+    if (tab) {
+      setSelectedFile(tab);
+      setMobileWorkspaceTab('editor');
+    }
   };
 
   const handleCloseTab = (path: string, e: React.MouseEvent) => {
@@ -81,7 +88,6 @@ export default function App() {
     }
   };
 
-  // Latest status ref to avoid event listener closures issues
   const currentSessionRef = useRef<ChatSession | null>(null);
   useEffect(() => {
     currentSessionRef.current = currentSession;
@@ -233,6 +239,7 @@ export default function App() {
       });
 
       setSelectedFile(newFile);
+      setMobileWorkspaceTab('editor'); // Auto-switch to code editor on mobile
       setActiveView('workspace');
       addLog(`Opened raw file: ${fileName}`);
     } catch (err: any) {
@@ -244,7 +251,6 @@ export default function App() {
   const handleSendMessage = async (text: string) => {
     if (!currentSession) return;
 
-    // Create User message
     const userMsg: ChatMessage = {
       id: crypto.randomUUID().substring(0, 8),
       role: 'user',
@@ -300,7 +306,6 @@ export default function App() {
     let unlisteners: (() => void)[] = [];
 
     async function setupListeners() {
-      // Message start
       const un1 = await api.listen<{ id: string; role: string }>('agent-message-start', (event) => {
         const sess = currentSessionRef.current;
         if (!sess) return;
@@ -323,7 +328,6 @@ export default function App() {
       });
       unlisteners.push(un1);
 
-      // Token streaming
       const un2 = await api.listen<{ message_id: string; token: string }>('agent-token-stream', (event) => {
         const sess = currentSessionRef.current;
         if (!sess) return;
@@ -345,14 +349,12 @@ export default function App() {
       });
       unlisteners.push(un2);
 
-      // Status change
       const un3 = await api.listen<string>('agent-status-changed', (event) => {
         setAgentStatus(event.payload as any);
         addLog(`Agent status changed: ${event.payload}`);
       });
       unlisteners.push(un3);
 
-      // Tools layout updated
       const un4 = await api.listen<{ message_id: string; tools: ToolCallInfo[] }>('agent-tools-updated', (event) => {
         const sess = currentSessionRef.current;
         if (!sess) return;
@@ -374,7 +376,6 @@ export default function App() {
       });
       unlisteners.push(un4);
 
-      // Single tool execution details updated
       const un5 = await api.listen<{ message_id: string; tool_id: string; status: string; output?: string }>(
         'agent-tool-status-changed',
         (event) => {
@@ -413,7 +414,6 @@ export default function App() {
       );
       unlisteners.push(un5);
 
-      // System agent errors
       const un6 = await api.listen<string>('agent-error', (event) => {
         addLog(`Agent Error Alert: ${event.payload}`);
       });
@@ -428,11 +428,11 @@ export default function App() {
   }, [config]);
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans select-none">
+    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans select-none">
       
       {/* TOP SESSION HEADER */}
       {activeView !== 'settings' && (
-        <div className="px-4 pt-4 shrink-0 select-none">
+        <div className="px-3 pt-3 shrink-0 select-none">
           <Header
             sessions={sessions}
             currentSessionId={currentSessionId}
@@ -445,10 +445,10 @@ export default function App() {
       )}
 
       {/* MAIN VIEWPORT SWITCHER */}
-      <div className="flex-1 w-full min-h-0 relative flex flex-col mt-4 pb-20">
+      <div className="flex-1 w-full min-h-0 relative flex flex-col mt-2 pb-20">
         
         {activeView === 'chat' && (
-          <div className="flex-grow w-full h-full flex flex-col relative px-4 md:px-12 overflow-hidden">
+          <div className="flex-grow w-full h-full flex flex-col relative px-2 sm:px-6 md:px-12 overflow-hidden">
             <ChatArea
               messages={currentSession ? currentSession.messages : []}
               agentStatus={agentStatus}
@@ -461,9 +461,34 @@ export default function App() {
         )}
 
         {activeView === 'workspace' && (
-          <div className="flex-grow w-full h-full flex overflow-hidden border-t border-theme-border">
-            {/* Sidebar Workspace tree */}
-            <div className="w-64 h-full flex flex-col bg-theme-bg border-r border-theme-border overflow-hidden">
+          <div className="flex-grow w-full h-full flex flex-col md:flex-row overflow-hidden border-t border-theme-border">
+            
+            {/* Mobile Workspace Toggle (Visible on md:hidden) */}
+            <div className="flex md:hidden glass-panel p-1 border-b border-white/10 shrink-0 select-none">
+              <button
+                onClick={() => setMobileWorkspaceTab('files')}
+                className={`flex-1 py-1.5 text-xs font-hud font-bold uppercase flex items-center justify-center gap-1.5 rounded-lg transition-colors ${
+                  mobileWorkspaceTab === 'files' ? 'bg-slate-800 text-white border border-indigo-500/40' : 'text-slate-400'
+                }`}
+              >
+                <FolderTree size={14} />
+                <span>Дерево файлов</span>
+              </button>
+              <button
+                onClick={() => setMobileWorkspaceTab('editor')}
+                className={`flex-1 py-1.5 text-xs font-hud font-bold uppercase flex items-center justify-center gap-1.5 rounded-lg transition-colors ${
+                  mobileWorkspaceTab === 'editor' ? 'bg-slate-800 text-white border border-indigo-500/40' : 'text-slate-400'
+                }`}
+              >
+                <Code size={14} />
+                <span>Редактор ({openTabs.length})</span>
+              </button>
+            </div>
+
+            {/* Sidebar Workspace tree (Full width on mobile when 'files', 64 width on desktop) */}
+            <div className={`w-full md:w-64 h-full flex-col bg-theme-bg border-r border-theme-border overflow-hidden ${
+              mobileWorkspaceTab === 'files' ? 'flex' : 'hidden md:flex'
+            }`}>
               <div className="flex-grow overflow-hidden">
                 <WorkspaceTree
                   workspaceDir={config?.workspace_dir}
@@ -474,8 +499,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* Main code editor area */}
-            <div className="flex-grow h-full overflow-hidden">
+            {/* Main code editor area (Full width on mobile when 'editor', flex-1 on desktop) */}
+            <div className={`w-full md:flex-1 h-full overflow-hidden ${
+              mobileWorkspaceTab === 'editor' ? 'flex flex-col' : 'hidden md:flex'
+            }`}>
               <CodeEditor
                 selectedFile={selectedFile}
                 openTabs={openTabs}
