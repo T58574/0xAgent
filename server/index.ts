@@ -4,7 +4,7 @@ import http from 'node:http';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, spawn, ChildProcess } from 'node:child_process';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   loadConfig,
@@ -522,7 +522,118 @@ app.get('/api/llama-releases', async (req, res) => {
   }
 });
 
-// 2. Scan locally saved/installed llama.cpp versions
+let activeLlamaProcess: ChildProcess | null = null;
+
+function stopLlamaServerProcess() {
+  if (activeLlamaProcess) {
+    try {
+      if (process.platform === 'win32' && activeLlamaProcess.pid) {
+        execSync(`taskkill /F /T /PID ${activeLlamaProcess.pid}`, { stdio: 'ignore' });
+      } else {
+        activeLlamaProcess.kill('SIGKILL');
+      }
+    } catch {}
+    activeLlamaProcess = null;
+  }
+}
+
+// Graceful process exit handlers for 0xAgent backend node process
+const cleanupOnExit = () => {
+  stopLlamaServerProcess();
+};
+process.on('SIGINT', () => { cleanupOnExit(); process.exit(0); });
+process.on('SIGTERM', () => { cleanupOnExit(); process.exit(0); });
+process.on('exit', () => { cleanupOnExit(); });
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  cleanupOnExit();
+  process.exit(1);
+});
+
+// 2. Start Local Llama.cpp Server Endpoint
+app.post('/api/start-local-server', (req, res) => {
+  try {
+    stopLlamaServerProcess();
+
+    const cfg = loadConfig();
+    const body = req.body || {};
+    
+    const host = body.host || cfg.local_server?.host || '127.0.0.1';
+    const port = body.port || cfg.local_server?.port || 11434;
+    const exePath = body.exePath || cfg.local_server?.exe_path;
+    const modelPath = body.modelPath || cfg.local_server?.model_path;
+
+    cfg.api_url = `http://${host}:${port}/v1`;
+    if (!cfg.local_server) cfg.local_server = {};
+    if (exePath) cfg.local_server.exe_path = exePath;
+    if (modelPath) cfg.local_server.model_path = modelPath;
+    cfg.local_server.host = host;
+    cfg.local_server.port = port;
+    saveConfig(cfg);
+
+    if (exePath && fs.existsSync(exePath) && modelPath && fs.existsSync(modelPath)) {
+      const args: string[] = [
+        '-m', modelPath,
+        '--host', host,
+        '--port', String(port),
+      ];
+
+      if (body.ctxSize || cfg.local_server.ctx_size) args.push('-c', String(body.ctxSize || cfg.local_server.ctx_size));
+      if (body.gpuLayers !== undefined || cfg.local_server.gpu_layers !== undefined) args.push('-ngl', String(body.gpuLayers ?? cfg.local_server.gpu_layers));
+      if (body.threads || cfg.local_server.threads) args.push('-t', String(body.threads || cfg.local_server.threads));
+      if (body.batchSize) args.push('-b', String(body.batchSize));
+      if (body.ubatchSize) args.push('-ub', String(body.ubatchSize));
+      if (body.temp) args.push('--temp', String(body.temp));
+      if (body.repeatPenalty) args.push('--repeat-penalty', String(body.repeatPenalty));
+      if (body.minP) args.push('--min-p', String(body.minP));
+
+      if (body.flashAttn) args.push('-fa');
+      if (body.mmap === false) args.push('--no-mmap');
+      if (body.mlock) args.push('--mlock');
+      if (body.embedding) args.push('--embedding');
+      if (body.contBatching) args.push('--cont-batching');
+
+      broadcast('agent-error', `Запуск llama-server: ${path.basename(exePath)}`);
+      
+      activeLlamaProcess = spawn(exePath, args, { cwd: path.dirname(exePath) });
+
+      activeLlamaProcess.stdout?.on('data', (data) => {
+        const str = data.toString();
+        broadcast('llama-server-log', str);
+      });
+
+      activeLlamaProcess.stderr?.on('data', (data) => {
+        const str = data.toString();
+        broadcast('llama-server-log', str);
+      });
+
+      activeLlamaProcess.on('error', (err) => {
+        broadcast('agent-error', `Ошибка llama-server: ${err.message}`);
+        activeLlamaProcess = null;
+      });
+
+      activeLlamaProcess.on('exit', (code) => {
+        broadcast('agent-error', `Llama-server завершил работу (код ${code})`);
+        activeLlamaProcess = null;
+      });
+    }
+
+    res.json({ success: true, host, port, message: `Локальный сервер запущен на http://${host}:${port}/v1` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/stop-local-server', (_req, res) => {
+  try {
+    stopLlamaServerProcess();
+    res.json({ success: true, message: 'Локальный сервер остановлен' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 3. Scan locally saved/installed llama.cpp versions
 app.get('/api/installed-llama-versions', (_req, res) => {
   try {
     const appDir = path.join(os.homedir(), '.0xagent');

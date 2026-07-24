@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw } from 'lucide-react';
+import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, AlertTriangle, Play } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
@@ -36,9 +36,29 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<any>(null);
 
+  // Server health state for 1-click launch banner
+  const [isServerOffline, setIsServerOffline] = useState(false);
+  const [isStartingServer, setIsStartingServer] = useState(false);
+  const [serverHost] = useState('127.0.0.1');
+  const [serverPort] = useState(11434);
+
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, agentStatus]);
+
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const h = await api.get_server_health(serverHost, serverPort);
+        setIsServerOffline(!h.ok);
+      } catch {
+        setIsServerOffline(true);
+      }
+    };
+    checkHealth();
+    const interval = setInterval(checkHealth, 3000);
+    return () => clearInterval(interval);
+  }, [serverHost, serverPort]);
 
   useEffect(() => {
     if (isRecording) {
@@ -55,89 +75,54 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   }, [isRecording]);
 
   const startRecording = async () => {
-    if (!groqApiKey || !groqApiKey.trim()) {
-      alert('Для распознавания речи укажите Groq API Key в настройках!');
-      return;
-    }
-
     try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        alert('Запись аудио не поддерживается вашим браузером или требует HTTPS / localhost.');
-        return;
-      }
-
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
 
-      let mimeType = 'audio/webm';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm')) {
-          mimeType = 'audio/webm';
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          mimeType = 'audio/mp4';
-        }
-      }
-
-      const options = { mimeType };
-      const recorder = new MediaRecorder(stream, options);
-      
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
 
-      recorder.onstop = async () => {
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+
+        if (!groqApiKey) {
+          alert('Для использования распознавания речи введите API токен Groq в Настройках!');
+          return;
+        }
+
         setIsTranscribing(true);
         try {
-          if (audioChunksRef.current.length === 0) {
-            alert('Запись пустого звука. Попробуйте еще раз.');
-            return;
-          }
-
-          const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           reader.onloadend = async () => {
+            const base64Audio = (reader.result as string).split(',')[1];
             try {
-              const base64data = reader.result as string;
-              if (!base64data || !base64data.includes(',')) {
-                throw new Error('Ошибка кодирования аудиофайла.');
-              }
-              const base64Payload = base64data.split(',')[1];
-              if (base64Payload) {
-                const text = await api.transcribe_audio(base64Payload, groqApiKey.trim());
-                if (text && text.trim()) {
-                  setInputText((prev) => {
-                    const spacer = prev.trim() ? ' ' : '';
-                    return prev + spacer + text.trim();
-                  });
-                } else {
-                  alert('Речь не распознана. Попробуйте говорить четче.');
-                }
+              const text = await api.transcribe_audio(base64Audio, groqApiKey);
+              if (text) {
+                setInputText((prev) => (prev ? `${prev} ${text}` : text));
               }
             } catch (err: any) {
-              console.error("Whisper transcription error:", err);
-              alert(`Ошибка расшифровки речи Groq Whisper: ${err.message || err}`);
+              alert(`Ошибка распознавания: ${err.message || err}`);
             } finally {
               setIsTranscribing(false);
             }
           };
-        } catch (e: any) {
-          alert(`Ошибка обработки записи: ${e.message || e}`);
+        } catch (err: any) {
           setIsTranscribing(false);
-        } finally {
-          stream.getTracks().forEach((track) => track.stop());
+          alert(`Ошибка записи: ${err.message || err}`);
         }
       };
 
-      mediaRecorderRef.current = recorder;
-      recorder.start(100); // 100ms timeslice ensures dataavailable is emitted periodically
+      mediaRecorder.start();
       setIsRecording(true);
-    } catch (err: any) {
-      console.error("Failed to start recording:", err);
-      alert(`Ошибка доступа к микрофону: ${err.message || 'Разрешите доступ к микрофону в браузере.'}`);
-      setIsRecording(false);
+    } catch (err) {
+      alert('Не удалось получить доступ к микрофону.');
     }
   };
 
@@ -145,8 +130,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (mediaRecorderRef.current && isRecording) {
       try {
         mediaRecorderRef.current.stop();
-      } catch (e) {
-        console.error('Error stopping recorder:', e);
+      } catch (err) {
+        console.error('Stop recording error:', err);
       }
       setIsRecording(false);
     }
@@ -160,9 +145,33 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
+  const handleStartServerDirectly = async () => {
+    setIsStartingServer(true);
+    try {
+      await api.start_local_server();
+      for (let i = 0; i < 8; i++) {
+        await new Promise((r) => setTimeout(r, 1000));
+        const h = await api.get_server_health(serverHost, serverPort);
+        if (h.ok) {
+          setIsServerOffline(false);
+          break;
+        }
+      }
+    } catch (err: any) {
+      alert(`Ошибка запуска сервера: ${err.message || err}`);
+    } finally {
+      setIsStartingServer(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+
+    if (isServerOffline) {
+      handleStartServerDirectly();
+    }
+
     onSendMessage(inputText.trim());
     setInputText('');
   };
@@ -219,116 +228,131 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <button
               type="submit"
               disabled={!inputText.trim() || isTranscribing}
-              className="flat-btn px-5 py-2.5 rounded-md text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
+              className="flat-btn rounded-md px-4 py-2.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
             >
-              <span>Отправить</span>
-              <Send size={13} />
+              <Send size={14} />
             </button>
           </form>
         </div>
       )}
 
-      {/* 2. ACTIVE CHAT TIMELINE VIEW */}
+      {/* 2. MAIN CHAT HISTORY LIST */}
       {hasMessages && (
-        <div className="flex-grow flex flex-col min-h-0 z-10 w-full">
+        <div className="flex-grow flex flex-col justify-between overflow-hidden relative w-full max-w-4xl mx-auto">
           
-          <div 
+          <div
             ref={mainHistoryRef}
-            className="flex-grow overflow-y-auto px-4 md:px-8 py-4 space-y-4 scrollbar-none"
+            className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-none flex flex-col min-h-0"
           >
-            <div className="max-w-3xl mx-auto space-y-4 flex flex-col">
-              {messages.map((msg) => {
-                const textOutput = cleanContent(msg.content);
-                const hasTools = msg.tool_calls && msg.tool_calls.length > 0;
-                
-                if (msg.role === 'assistant' && !textOutput && !hasTools) {
-                  return null;
-                }
+            {messages.map((msg) => {
+              const textOutput = cleanContent(msg.content);
+              return (
+                <div key={msg.id} className="flex flex-col space-y-1 w-full">
+                  {msg.role === 'user' && (
+                    <div className="self-end max-w-[85%] rounded-md glass-card border border-emerald-500/30 bg-slate-900/80 px-4 py-2.5 text-slate-100 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans">
+                      {msg.content}
+                    </div>
+                  )}
 
-                return (
-                  <div key={msg.id} className="flex flex-col message-enter">
-                    {msg.role === 'user' && (
-                      <div className="self-end max-w-[85%] rounded-md glass-card border border-emerald-500/30 bg-slate-900/80 px-4 py-2.5 text-slate-100 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans">
-                        {msg.content}
+                  {msg.role === 'tool' && (
+                    <div className="self-start max-w-[95%] w-full rounded-md glass-card border border-white/10 p-3 bg-slate-950/80 text-slate-300 font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1">
+                      <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
+                        <Terminal size={10} />
+                        <span>Результат выполнения инструмента</span>
                       </div>
-                    )}
+                      {msg.content}
+                    </div>
+                  )}
 
-                    {msg.role === 'tool' && (
-                      <div className="self-start max-w-[95%] w-full rounded-md glass-card border border-white/10 p-3 bg-slate-950/80 text-slate-300 font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1">
-                        <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
-                          <Terminal size={10} />
-                          <span>Результат выполнения инструмента</span>
-                        </div>
-                        {msg.content}
-                      </div>
-                    )}
+                  {msg.role === 'assistant' && (() => {
+                    let thinkText = "";
+                    let bodyText = textOutput;
 
-                    {msg.role === 'assistant' && (() => {
-                      let thinkText = "";
-                      let bodyText = textOutput;
-
-                      if (textOutput) {
-                        const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
-                        const match = textOutput.match(thinkRegex);
-                        if (match) {
-                          thinkText = match[1].trim();
-                          bodyText = textOutput.replace(thinkRegex, "").trim();
-                        } else if (textOutput.includes("<think>")) {
-                          const startIdx = textOutput.indexOf("<think>");
-                          thinkText = textOutput.substring(startIdx + 7).trim();
-                          bodyText = textOutput.substring(0, startIdx).trim();
-                        }
+                    if (textOutput) {
+                      const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+                      const match = textOutput.match(thinkRegex);
+                      if (match) {
+                        thinkText = match[1].trim();
+                        bodyText = textOutput.replace(thinkRegex, "").trim();
+                      } else if (textOutput.includes("<think>")) {
+                        const startIdx = textOutput.indexOf("<think>");
+                        thinkText = textOutput.substring(startIdx + 7).trim();
+                        bodyText = textOutput.substring(0, startIdx).trim();
                       }
+                    }
 
-                      return (
-                        <div className="self-start max-w-[95%] w-full rounded-md glass-panel border border-white/10 p-4 text-slate-100 text-xs sm:text-sm leading-relaxed my-1.5">
-                          {reasoningEnabled && thinkText && (
-                            <details open className="mb-3 border border-white/10 rounded bg-slate-950/40 overflow-hidden group">
-                              <summary className="px-3 py-1.5 text-[11px] font-medium text-slate-300 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
-                                <span className="flex items-center gap-1.5">
-                                  <Brain size={12} className="text-emerald-400" />
-                                  <span>Ход мыслей (Reasoning)</span>
-                                </span>
-                              </summary>
-                              <div className="px-3 py-2.5 border-t border-white/5 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
-                                {thinkText}
-                              </div>
-                            </details>
-                          )}
-
-                          {bodyText && (
-                            <div className="whitespace-pre-wrap font-sans max-w-none text-slate-100 leading-relaxed">
-                              {bodyText}
+                    return (
+                      <div className="self-start max-w-[95%] w-full rounded-md glass-panel border border-white/10 p-4 text-slate-100 text-xs sm:text-sm leading-relaxed my-1.5">
+                        {reasoningEnabled && thinkText && (
+                          <details open className="mb-3 border border-white/10 rounded bg-slate-950/40 overflow-hidden group">
+                            <summary className="px-3 py-1.5 text-[11px] font-medium text-slate-300 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
+                              <span className="flex items-center gap-1.5">
+                                <Brain size={12} className="text-emerald-400" />
+                                <span>Ход мыслей (Reasoning)</span>
+                              </span>
+                            </summary>
+                            <div className="px-3 py-2.5 border-t border-white/5 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed">
+                              {thinkText}
                             </div>
-                          )}
+                          </details>
+                        )}
 
-                          {msg.tool_calls && msg.tool_calls.map((tool) => (
-                            <ToolCard 
-                              key={tool.id} 
-                              tool={tool} 
-                              onRespond={onRespondToTool} 
-                            />
-                          ))}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })}
+                        {bodyText && (
+                          <div className="whitespace-pre-wrap font-sans max-w-none text-slate-100 leading-relaxed">
+                            {bodyText}
+                          </div>
+                        )}
 
-              {(agentStatus === 'thinking' || agentStatus === 'executing_tool') && (
-                <div className="self-start flex items-center gap-2 py-1.5 px-3 rounded bg-slate-900/60 border border-white/10 text-xs text-slate-300 font-medium">
-                  <div className="w-3 h-3 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
-                  <span>
-                    {agentStatus === 'thinking' ? 'Агент размышляет...' : 'Выполнение инструмента...'}
-                  </span>
+                        {msg.tool_calls && msg.tool_calls.map((tool) => (
+                          <ToolCard 
+                            key={tool.id} 
+                            tool={tool} 
+                            onRespond={onRespondToTool} 
+                          />
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
-              )}
+              );
+            })}
 
-              <div ref={historyEndRef} />
-            </div>
+            {(agentStatus === 'thinking' || agentStatus === 'executing_tool') && (
+              <div className="self-start flex items-center gap-2 py-1.5 px-3 rounded bg-slate-900/60 border border-white/10 text-xs text-slate-300 font-medium">
+                <RefreshCw size={13} className="animate-spin text-emerald-400" />
+                <span>
+                  {agentStatus === 'thinking' ? 'Агент размышляет и формирует ответ...' : 'Агент выполняет инструмент...'}
+                </span>
+              </div>
+            )}
+
+            <div ref={historyEndRef} />
           </div>
 
+          {/* SERVER OFFLINE WARNING & 1-CLICK LAUNCH BANNER */}
+          {isServerOffline && (
+            <div className="px-3 py-2.5 rounded-md bg-amber-500/10 border border-amber-500/40 text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 shadow-lg animate-fadeIn mx-2 mb-2">
+              <div className="flex items-center gap-2">
+                <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+                <div className="text-xs">
+                  <span className="font-semibold text-amber-200">Локальный LLM Сервер не запущен на порту {serverPort}!</span>
+                  <div className="text-[11px] text-slate-300">Модель не сможет ответить, пока сервер остановлен.</div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleStartServerDirectly}
+                disabled={isStartingServer}
+                className="flat-btn px-3.5 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 shrink-0 cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {isStartingServer ? <RefreshCw size={12} className="animate-spin" /> : <Play size={12} />}
+                <span>{isStartingServer ? 'Запуск сервера...' : 'Запустить LLM Сервер'}</span>
+              </button>
+            </div>
+          )}
+
+          {/* INPUT FORM CONTAINER */}
           <div className="p-3 border-t border-white/10 glass-panel select-none z-10 w-full">
             <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2">
               <div className="relative w-full">

@@ -8,7 +8,8 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

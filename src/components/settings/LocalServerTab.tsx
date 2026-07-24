@@ -44,7 +44,7 @@ interface LocalServerTabProps {
   serverStatus: 'stopped' | 'running' | 'checking';
   setServerStatus: (val: 'stopped' | 'running' | 'checking') => void;
   serverLogs: string[];
-  setServerLogs: (val: string[]) => void;
+  setServerLogs: React.Dispatch<React.SetStateAction<string[]>>;
   serverLogsAutoScroll: boolean;
   setServerLogsAutoScroll: (val: boolean) => void;
   setApiUrl: (val: string) => void;
@@ -276,17 +276,59 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   };
 
-  const handleStartServer = () => {
+  // Listen to live WebSocket log stream from llama-server process
+  useEffect(() => {
+    let unlisten: (() => void) | null = null;
+    api.listen<string>('llama-server-log', (data) => {
+      setServerLogs((prev) => [...prev, data.payload]);
+    }).then((un) => {
+      unlisten = un;
+    });
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, []);
+
+  const handleStartServer = async () => {
     setServerStatus('running');
     setHealthStatus('loading');
     setApiUrl(`http://${host}:${port}/v1`);
-    setServerLogs([...serverLogs, `[SYSTEM] Starting llama.cpp server at http://${host}:${port}/v1...`]);
+    setServerLogs((prev) => [...prev, `[SYSTEM] Launching llama.cpp server at http://${host}:${port}/v1...`]);
+
+    try {
+      await api.start_local_server({
+        exePath,
+        modelPath,
+        host,
+        port,
+        ctxSize,
+        gpuLayers,
+        threads,
+        batchSize,
+        ubatchSize,
+        temp,
+        repeatPenalty,
+        minP,
+        flashAttn,
+        mmap,
+        mlock,
+        embedding,
+        contBatching,
+      });
+    } catch (err: any) {
+      setServerStatus('stopped');
+      setHealthStatus('stopped');
+      setServerLogs((prev) => [...prev, `[SYSTEM ERROR] Failed to start server: ${err.message}`]);
+    }
   };
 
-  const handleStopServer = () => {
+  const handleStopServer = async () => {
+    try {
+      await api.stop_local_server();
+    } catch {}
     setServerStatus('stopped');
     setHealthStatus('stopped');
-    setServerLogs([...serverLogs, '[SYSTEM] Server stopped.']);
+    setServerLogs((prev) => [...prev, '[SYSTEM] Server stopped.']);
   };
 
   const toggleItems = [

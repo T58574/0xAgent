@@ -341,11 +341,28 @@ export default function App() {
       });
       unlisteners.push(un2);
 
-      const un3 = await api.listen<string>('agent-status-changed', (event) => {
+      const un3 = await api.listen<string>('agent-status-changed', async (event) => {
         setAgentStatus(event.payload as any);
         addLog(`Agent status changed: ${event.payload}`);
+        if (event.payload === 'idle' && currentSessionRef.current) {
+          try {
+            const fresh = await api.load_session(currentSessionRef.current.id);
+            setCurrentSession(fresh);
+          } catch {}
+        }
       });
       unlisteners.push(un3);
+
+      const unErr = await api.listen<string>('agent-error', async (event) => {
+        addLog(`Agent error: ${event.payload}`);
+        if (currentSessionRef.current) {
+          try {
+            const fresh = await api.load_session(currentSessionRef.current.id);
+            setCurrentSession(fresh);
+          } catch {}
+        }
+      });
+      unlisteners.push(unErr);
 
       const un4 = await api.listen<{ message_id: string; tools: ToolCallInfo[] }>('agent-tools-updated', (event) => {
         const sess = currentSessionRef.current;

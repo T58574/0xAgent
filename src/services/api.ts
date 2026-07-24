@@ -372,4 +372,23 @@ export async function delete_skill(name: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+export async function start_local_server(params?: any): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/start-local-server`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params || {}),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function stop_local_server(): Promise<{ success: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/stop-local-server`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 
