@@ -58,18 +58,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     checkHealth();
     const interval = setInterval(checkHealth, 3000);
 
-    let unlisten: (() => void) | null = null;
-    api.listen<{ status: string }>('llama-server-status', (event) => {
+    const unlisten = api.listen<{ status: string }>('llama-server-status', (event) => {
       if (event.payload.status === 'running') {
         setIsServerOffline(false);
       } else if (event.payload.status === 'stopped') {
         setIsServerOffline(true);
       }
-    }).then((un) => { unlisten = un; });
+    });
 
     return () => {
       clearInterval(interval);
-      if (unlisten) unlisten();
+      unlisten();
     };
   }, [serverHost, serverPort]);
 

@@ -271,31 +271,47 @@ export async function runAgentLoop(
       temperature: 0.2,
     };
 
-    let response: Response;
-    try {
-      response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody),
-      });
-    } catch (err: any) {
-      const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Нажмите кнопку **🚀 Запустить LLM Сервер в 1-клик** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
-      session.messages.push({
-        id: uuidv4(),
-        role: 'assistant',
-        content: errMsg,
-        timestamp: Date.now(),
-      });
-      session.updated_at = Date.now();
-      saveSession(session);
-      broadcast('agent-error', { sessionId, message: errMsg });
-      broadcast('agent-status-changed', 'idle');
-      return;
+    let response: Response | null = null;
+    let attempts = 0;
+    const maxAttempts = 6; // Initial attempt + up to 5 retries (10 seconds total)
+
+    while (attempts < maxAttempts) {
+      attempts++;
+      try {
+        response = await fetch(apiEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody),
+        });
+        if (response.status === 503 && attempts < maxAttempts) {
+          console.log(`[agent] LLM server returning 503 (loading model). Retrying in 2s (${attempts}/${maxAttempts})...`);
+          await new Promise((r) => setTimeout(r, 2000));
+          continue;
+        }
+        break;
+      } catch (err: any) {
+        if (attempts < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1500));
+          continue;
+        }
+        const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Нажмите кнопку **🚀 Запустить LLM Сервер в 1-клик** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
+        session.messages.push({
+          id: uuidv4(),
+          role: 'assistant',
+          content: errMsg,
+          timestamp: Date.now(),
+        });
+        session.updated_at = Date.now();
+        saveSession(session);
+        broadcast('agent-error', { sessionId, message: errMsg });
+        broadcast('agent-status-changed', 'idle');
+        return;
+      }
     }
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      const errMsg = `⚠️ **LLM Сервер вернул ошибку (${response.status}):**\n\`\`\`\n${errorText}\n\`\`\``;
+    if (!response || !response.ok) {
+      const errorText = response ? await response.text() : 'No response from server';
+      const errMsg = `⚠️ **LLM Сервер вернул ошибку (${response?.status || 500}):**\n\`\`\`\n${errorText}\n\`\`\``;
       session.messages.push({
         id: uuidv4(),
         role: 'assistant',
@@ -341,15 +357,41 @@ export async function runAgentLoop(
     const reader = response.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
+    let isStreamDone = false;
 
-    while (true) {
+    while (!isStreamDone) {
       if (activeCancelTokens.has(sessionId)) {
         broadcast('agent-status-changed', 'idle');
         return;
       }
 
       const { value, done } = await reader.read();
-      if (done) break;
+      if (done) {
+        isStreamDone = true;
+        if (buffer.trim()) {
+          const lines = buffer.split('\n');
+          buffer = '';
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+              if (data === '[DONE]') break;
+              try {
+                const parsed = JSON.parse(data);
+                const content = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text;
+                if (content) {
+                  assistantMessage.content += content;
+                  broadcast('agent-token-stream', {
+                    message_id: assistantMessageId,
+                    token: content,
+                  });
+                }
+              } catch {}
+            }
+          }
+        }
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
@@ -359,11 +401,14 @@ export async function runAgentLoop(
         const line = rawLine.trim();
         if (line.startsWith('data:')) {
           const data = line.slice(5).trim();
-          if (data === '[DONE]') break;
+          if (data === '[DONE]') {
+            isStreamDone = true;
+            break;
+          }
 
           try {
             const parsed = JSON.parse(data);
-            const content = parsed.choices?.[0]?.delta?.content;
+            const content = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text;
             if (content) {
               assistantMessage.content += content;
               broadcast('agent-token-stream', {

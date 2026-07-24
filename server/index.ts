@@ -739,15 +739,23 @@ app.post('/api/start-local-server', (req, res) => {
       modelPath: targetModel,
     });
 
-    activeLlamaProcess.stdout?.on('data', (data) => {
-      const cleanStr = stripAnsiCodes(data.toString());
-      if (cleanStr.trim()) broadcast('llama-server-log', cleanStr);
-    });
+    let lastLogText = '';
+    let lastLogTime = 0;
 
-    activeLlamaProcess.stderr?.on('data', (data) => {
-      const cleanStr = stripAnsiCodes(data.toString());
-      if (cleanStr.trim()) broadcast('llama-server-log', cleanStr);
-    });
+    const handleLogData = (data: Buffer) => {
+      const cleanStr = stripAnsiCodes(data.toString()).trim();
+      if (!cleanStr) return;
+      const now = Date.now();
+      if (cleanStr === lastLogText && now - lastLogTime < 150) {
+        return; // Suppress duplicate line emitted simultaneously on stdout & stderr
+      }
+      lastLogText = cleanStr;
+      lastLogTime = now;
+      broadcast('llama-server-log', cleanStr);
+    };
+
+    activeLlamaProcess.stdout?.on('data', handleLogData);
+    activeLlamaProcess.stderr?.on('data', handleLogData);
 
     activeLlamaProcess.on('error', (err) => {
       console.error('[llama.cpp] Process error:', err.message);

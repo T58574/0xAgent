@@ -54,7 +54,7 @@ function initWebSocket() {
 
 initWebSocket();
 
-export async function listen<T>(event: string, callback: (eventData: { payload: T }) => void): Promise<() => void> {
+export function listen<T>(event: string, callback: (eventData: { payload: T }) => void): () => void {
   if (!eventListeners.has(event)) {
     eventListeners.set(event, new Set());
   }

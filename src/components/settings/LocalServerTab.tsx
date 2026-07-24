@@ -285,25 +285,22 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
   // Listen to live WebSocket log stream and server status from llama-server process
   useEffect(() => {
-    let un1: (() => void) | null = null;
-    let un2: (() => void) | null = null;
-
-    api.listen<string>('llama-server-log', (data) => {
+    const un1 = api.listen<string>('llama-server-log', (data) => {
       setServerLogs((prev) => [...prev, data.payload]);
-    }).then((un) => { un1 = un; });
+    });
 
-    api.listen<{ status: string; error?: string }>('llama-server-status', (data) => {
+    const un2 = api.listen<{ status: string; error?: string }>('llama-server-status', (data) => {
       if (data.payload.status === 'running') {
         setServerStatus('running');
       } else if (data.payload.status === 'stopped') {
         setServerStatus('stopped');
         setHealthStatus('stopped');
       }
-    }).then((un) => { un2 = un; });
+    });
 
     return () => {
-      if (un1) un1();
-      if (un2) un2();
+      un1();
+      un2();
     };
   }, []);
 

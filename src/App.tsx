@@ -257,6 +257,7 @@ export default function App() {
     };
 
     setCurrentSession(updatedSession);
+    currentSessionRef.current = updatedSession;
     setSessions((prev) =>
       prev.map((s) => (s.id === currentSession.id ? { ...s, updated_at: updatedSession.updated_at } : s))
     );
@@ -310,148 +311,150 @@ export default function App() {
   };
 
   // 8. Listen to SSE completions events streamed from Node.js Backend
+  // Helper to update currentSession both in React state and ref synchronously
+  const updateSessionState = (newSession: ChatSession) => {
+    currentSessionRef.current = newSession;
+    setCurrentSession(newSession);
+  };
+
+  // 8. Listen to SSE completions events streamed from Node.js Backend
   useEffect(() => {
-    let unlisteners: (() => void)[] = [];
+    const un1 = api.listen<{ id: string; role: string }>('agent-message-start', (event) => {
+      const sess = currentSessionRef.current;
+      if (!sess) return;
+      
+      const hasMsg = sess.messages.some((m) => m.id === event.payload.id);
+      if (!hasMsg) {
+        const newAssistantMsg: ChatMessage = {
+          id: event.payload.id,
+          role: 'assistant',
+          content: '',
+          timestamp: Date.now(),
+          tool_calls: [],
+        };
+        const updated = {
+          ...sess,
+          messages: [...sess.messages, newAssistantMsg],
+        };
+        updateSessionState(updated);
+      }
+    });
 
-    async function setupListeners() {
-      const un1 = await api.listen<{ id: string; role: string }>('agent-message-start', (event) => {
-        const sess = currentSessionRef.current;
-        if (!sess) return;
-        
-        const hasMsg = sess.messages.some((m) => m.id === event.payload.id);
-        if (!hasMsg) {
-          const newAssistantMsg: ChatMessage = {
-            id: event.payload.id,
-            role: 'assistant',
-            content: '',
-            timestamp: Date.now(),
-            tool_calls: [],
+    const un2 = api.listen<{ message_id: string; token: string }>('agent-token-stream', (event) => {
+      const sess = currentSessionRef.current;
+      if (!sess) return;
+
+      const updatedMessages = sess.messages.map((m) => {
+        if (m.id === event.payload.message_id) {
+          return {
+            ...m,
+            content: m.content + event.payload.token,
           };
-          const updated = {
-            ...sess,
-            messages: [...sess.messages, newAssistantMsg],
-          };
-          setCurrentSession(updated);
         }
+        return m;
       });
-      unlisteners.push(un1);
 
-      const un2 = await api.listen<{ message_id: string; token: string }>('agent-token-stream', (event) => {
+      updateSessionState({
+        ...sess,
+        messages: updatedMessages,
+      });
+    });
+
+    const un3 = api.listen<string>('agent-status-changed', async (event) => {
+      setAgentStatus(event.payload as any);
+      addLog(`Agent status changed: ${event.payload}`);
+      if (event.payload === 'idle' && currentSessionRef.current) {
+        try {
+          const fresh = await api.load_session(currentSessionRef.current.id);
+          if (currentSessionRef.current && currentSessionRef.current.id === fresh.id) {
+            updateSessionState(fresh);
+          }
+        } catch {}
+      }
+    });
+
+    const unErr = api.listen<any>('agent-error', async (event) => {
+      const payload = event.payload;
+      const msgText = typeof payload === 'string' ? payload : payload?.message || JSON.stringify(payload);
+      addLog(`Agent error: ${msgText}`);
+      
+      if (currentSessionRef.current) {
+        const targetId = typeof payload === 'object' && payload?.sessionId ? payload.sessionId : currentSessionRef.current.id;
+        try {
+          const fresh = await api.load_session(targetId);
+          if (currentSessionRef.current && currentSessionRef.current.id === targetId) {
+            updateSessionState(fresh);
+          }
+        } catch {}
+      }
+    });
+
+    const un4 = api.listen<{ message_id: string; tools: ToolCallInfo[] }>('agent-tools-updated', (event) => {
+      const sess = currentSessionRef.current;
+      if (!sess) return;
+
+      const updatedMessages = sess.messages.map((m) => {
+        if (m.id === event.payload.message_id) {
+          return {
+            ...m,
+            tool_calls: event.payload.tools,
+          };
+        }
+        return m;
+      });
+
+      updateSessionState({
+        ...sess,
+        messages: updatedMessages,
+      });
+    });
+
+    const un5 = api.listen<{ message_id: string; tool_id: string; status: string; output?: string }>(
+      'agent-tool-status-changed',
+      (event) => {
         const sess = currentSessionRef.current;
         if (!sess) return;
 
         const updatedMessages = sess.messages.map((m) => {
-          if (m.id === event.payload.message_id) {
+          if (m.id === event.payload.message_id && m.tool_calls) {
+            const updatedTools = m.tool_calls.map((t) => {
+              if (t.id === event.payload.tool_id) {
+                return {
+                  ...t,
+                  status: event.payload.status as any,
+                  output: event.payload.output !== undefined ? event.payload.output : t.output,
+                };
+              }
+              return t;
+            });
             return {
               ...m,
-              content: m.content + event.payload.token,
+              tool_calls: updatedTools,
             };
           }
           return m;
         });
 
-        setCurrentSession({
+        updateSessionState({
           ...sess,
           messages: updatedMessages,
         });
-      });
-      unlisteners.push(un2);
 
-      const un3 = await api.listen<string>('agent-status-changed', async (event) => {
-        setAgentStatus(event.payload as any);
-        addLog(`Agent status changed: ${event.payload}`);
-        if (event.payload === 'idle' && currentSessionRef.current) {
-          try {
-            const fresh = await api.load_session(currentSessionRef.current.id);
-            setCurrentSession(fresh);
-          } catch {}
+        if (event.payload.status === 'completed' && config?.workspace_dir) {
+          loadWorkspaceTree(config.workspace_dir);
         }
-      });
-      unlisteners.push(un3);
-
-      const unErr = await api.listen<any>('agent-error', async (event) => {
-        const payload = event.payload;
-        const msgText = typeof payload === 'string' ? payload : payload?.message || JSON.stringify(payload);
-        addLog(`Agent error: ${msgText}`);
-        
-        if (currentSessionRef.current) {
-          const targetId = typeof payload === 'object' && payload?.sessionId ? payload.sessionId : currentSessionRef.current.id;
-          try {
-            const fresh = await api.load_session(targetId);
-            if (currentSessionRef.current && currentSessionRef.current.id === targetId) {
-              setCurrentSession(fresh);
-            }
-          } catch {}
-        }
-      });
-      unlisteners.push(unErr);
-
-      const un4 = await api.listen<{ message_id: string; tools: ToolCallInfo[] }>('agent-tools-updated', (event) => {
-        const sess = currentSessionRef.current;
-        if (!sess) return;
-
-        const updatedMessages = sess.messages.map((m) => {
-          if (m.id === event.payload.message_id) {
-            return {
-              ...m,
-              tool_calls: event.payload.tools,
-            };
-          }
-          return m;
-        });
-
-        setCurrentSession({
-          ...sess,
-          messages: updatedMessages,
-        });
-      });
-      unlisteners.push(un4);
-
-      const un5 = await api.listen<{ message_id: string; tool_id: string; status: string; output?: string }>(
-        'agent-tool-status-changed',
-        (event) => {
-          const sess = currentSessionRef.current;
-          if (!sess) return;
-
-          const updatedMessages = sess.messages.map((m) => {
-            if (m.id === event.payload.message_id && m.tool_calls) {
-              const updatedTools = m.tool_calls.map((t) => {
-                if (t.id === event.payload.tool_id) {
-                  return {
-                    ...t,
-                    status: event.payload.status as any,
-                    output: event.payload.output !== undefined ? event.payload.output : t.output,
-                  };
-                }
-                return t;
-              });
-              return {
-                ...m,
-                tool_calls: updatedTools,
-              };
-            }
-            return m;
-          });
-
-          setCurrentSession({
-            ...sess,
-            messages: updatedMessages,
-          });
-
-          if (event.payload.status === 'completed' && config?.workspace_dir) {
-            loadWorkspaceTree(config.workspace_dir);
-          }
-        }
-      );
-      unlisteners.push(un5);
-    }
-
-    setupListeners();
+      }
+    );
 
     return () => {
-      unlisteners.forEach((u) => u());
+      un1();
+      un2();
+      un3();
+      unErr();
+      un4();
+      un5();
     };
-  }, [config]);
+  }, []);
 
   return (
     <div className="fixed inset-0 h-[100dvh] flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans select-none">
