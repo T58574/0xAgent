@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, Play, Square, Folder, Download, HardDrive, RefreshCw } from 'lucide-react';
+import { Cpu, Play, Square, Folder, Download, HardDrive, RefreshCw, AlertTriangle, Zap, Layers, Activity, Eye, Search } from 'lucide-react';
+import { GgufMetadata, HardwareInfo } from '../../types';
+import { ModelPickerModal } from '../ModelPickerModal';
 import * as api from '../../services/api';
 
 interface LocalServerTabProps {
@@ -94,8 +96,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   setApiUrl,
 }) => {
   const [isInstallingLlama, setIsInstallingLlama] = useState(false);
-
-  // GitHub Llama Releases & Installed versions state
   const [githubReleases, setGithubReleases] = useState<any[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>('');
   const [selectedAssetUrl, setSelectedAssetUrl] = useState<string>('');
@@ -103,23 +103,42 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   const [installedVersions, setInstalledVersions] = useState<{ tag: string; exePath: string; isCurrent: boolean }[]>([]);
   const [isLoadingReleases, setIsLoadingReleases] = useState(false);
 
+  // New Phase 1 States: Metadata, Hardware, Slots, Modal, Adviser
+  const [modelMeta, setModelMeta] = useState<GgufMetadata | null>(null);
+  const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | null>(null);
+  const [isPickerModalOpen, setIsPickerModalOpen] = useState(false);
+  const [healthStatus, setHealthStatus] = useState<'ok' | 'loading' | 'stopped'>('stopped');
+  const [slotMetrics, setSlotMetrics] = useState<{ totalSlots: number; activeSlots: number }>({ totalSlots: 0, activeSlots: 0 });
+  const [crashAdvice, setCrashAdvice] = useState<string | null>(null);
+
+  // 1. Initial Load: Hardware & Releases
   useEffect(() => {
     async function loadData() {
       try {
         setIsLoadingReleases(true);
-        const [releases, installed] = await Promise.all([
+        const [releases, installed, hw] = await Promise.all([
           api.get_llama_releases().catch(() => []),
           api.get_installed_llama_versions().catch(() => []),
+          api.detect_hardware().catch(() => null),
         ]);
 
         setGithubReleases(releases);
         setInstalledVersions(installed);
+        setHardwareInfo(hw);
 
         if (releases.length > 0) {
           const first = releases[0];
           setSelectedTag(first.tag);
           if (first.assets && first.assets.length > 0) {
-            const prefAsset = first.assets.find((a: any) => a.name.includes('bin-win-cuda') || a.name.includes('bin-win-x64')) || first.assets[0];
+            // Auto-select asset based on GPU detection
+            let prefAsset = null;
+            if (hw?.recommendedAssetKeywords) {
+              for (const kw of hw.recommendedAssetKeywords) {
+                prefAsset = first.assets.find((a: any) => a.name.includes(kw));
+                if (prefAsset) break;
+              }
+            }
+            if (!prefAsset) prefAsset = first.assets[0];
             setSelectedAssetUrl(prefAsset.download_url);
             setSelectedAssetName(prefAsset.name);
           }
@@ -133,11 +152,72 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     loadData();
   }, []);
 
+  // 2. Parse GGUF Metadata whenever modelPath changes
+  useEffect(() => {
+    if (modelPath && modelPath.trim().length > 0) {
+      api.parse_gguf(modelPath.trim())
+        .then((meta) => {
+          setModelMeta(meta);
+          // If context size is higher than max trained, cap it
+          if (meta.contextLength > 0 && ctxSize > meta.contextLength) {
+            setCtxSize(meta.contextLength);
+          }
+        })
+        .catch(() => setModelMeta(null));
+    } else {
+      setModelMeta(null);
+    }
+  }, [modelPath]);
+
+  // 3. Health & Slots Polling Timer
+  useEffect(() => {
+    let timer: any = null;
+    if (serverStatus === 'running') {
+      timer = setInterval(async () => {
+        try {
+          const h = await api.get_server_health(host, port);
+          setHealthStatus(h.status as any);
+          if (h.ok) {
+            const s = await api.get_server_slots(host, port);
+            setSlotMetrics({ totalSlots: s.totalSlots, activeSlots: s.activeSlots });
+          }
+        } catch {}
+      }, 2000);
+    } else {
+      setHealthStatus('stopped');
+      setSlotMetrics({ totalSlots: 0, activeSlots: 0 });
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [serverStatus, host, port]);
+
+  // 4. Log Inspection Crash Adviser
+  useEffect(() => {
+    const logsStr = serverLogs.join('\n');
+    if (logsStr.includes('pinned memory') || logsStr.includes('CUDA error') || logsStr.includes('out of memory')) {
+      if (!mmap) {
+        setCrashAdvice('Советчик по ошибкам: Падение сервера вызваны включенной опцией --no-mmap (отключение Mmap). Включите Mmap обратно или уменьшите число GPU слоев.');
+      } else {
+        setCrashAdvice('Советчик по ошибкам: Падение вызвано нехваткой VRAM на видеокарте. Уменьшите количество GPU слоев (-ngl) или размер контекста (-c).');
+      }
+    } else {
+      setCrashAdvice(null);
+    }
+  }, [serverLogs, mmap]);
+
   const handleTagChange = (tag: string) => {
     setSelectedTag(tag);
     const rel = githubReleases.find((r) => r.tag === tag);
     if (rel && rel.assets && rel.assets.length > 0) {
-      const prefAsset = rel.assets.find((a: any) => a.name.includes('bin-win-cuda') || a.name.includes('bin-win-x64')) || rel.assets[0];
+      let prefAsset = null;
+      if (hardwareInfo?.recommendedAssetKeywords) {
+        for (const kw of hardwareInfo.recommendedAssetKeywords) {
+          prefAsset = rel.assets.find((a: any) => a.name.includes(kw));
+          if (prefAsset) break;
+        }
+      }
+      if (!prefAsset) prefAsset = rel.assets[0];
       setSelectedAssetUrl(prefAsset.download_url);
       setSelectedAssetName(prefAsset.name);
     }
@@ -152,7 +232,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   };
 
-  // Open Native Windows OpenFileDialog for Executable
   const handleSelectExe = async () => {
     try {
       const file = await api.select_file_native("Executable Files (*.exe)|*.exe|All Files (*.*)|*.*");
@@ -162,7 +241,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   };
 
-  // Open Native Windows OpenFileDialog for GGUF Model
   const handleSelectModel = async () => {
     try {
       const file = await api.select_file_native("GGUF Model Files (*.gguf)|*.gguf|All Files (*.*)|*.*");
@@ -172,7 +250,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   };
 
-  // Download & Install selected llama.cpp version from GitHub (or use cached folder)
   const handleInstallSelectedLlamaVersion = async () => {
     if (!selectedTag) return;
     setIsInstallingLlama(true);
@@ -182,14 +259,12 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       await refreshInstalledVersions();
       alert(res.message || `Llama.cpp (${selectedTag}) успешно установлен!`);
     } catch (err: any) {
-      console.error(err);
       alert(`Ошибка установки: ${err.message || err}`);
     } finally {
       setIsInstallingLlama(false);
     }
   };
 
-  // Switch to an already installed version without re-downloading
   const handleSelectInstalledVersion = async (vExePath: string) => {
     try {
       const res = await api.select_installed_llama(vExePath);
@@ -203,12 +278,14 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
   const handleStartServer = () => {
     setServerStatus('running');
+    setHealthStatus('loading');
     setApiUrl(`http://${host}:${port}/v1`);
-    setServerLogs([...serverLogs, `[SYSTEM] Local llama server bound to http://${host}:${port}/v1`]);
+    setServerLogs([...serverLogs, `[SYSTEM] Starting llama.cpp server at http://${host}:${port}/v1...`]);
   };
 
   const handleStopServer = () => {
     setServerStatus('stopped');
+    setHealthStatus('stopped');
     setServerLogs([...serverLogs, '[SYSTEM] Server stopped.']);
   };
 
@@ -228,17 +305,55 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
   return (
     <div className="space-y-5 font-sans text-slate-100 max-w-4xl">
-      <div>
-        <h3 className="text-sm font-semibold text-slate-200">Параметры сервера Llama.cpp</h3>
-        <p className="text-xs text-slate-400 mt-0.5">
-          Конфигурация локального движка выполнения GGUF моделей с GPU Offload (99 слоев)
-        </p>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-200">Параметры сервера Llama.cpp</h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Конфигурация локального движка выполнения GGUF моделей с GPU Offload
+          </p>
+        </div>
+
+        {/* Live Slot & Health Metrics Badge */}
+        {serverStatus === 'running' && (
+          <div className="flex items-center gap-2 text-xs font-mono bg-slate-900/80 px-3 py-1.5 rounded border border-white/10 select-none">
+            <Activity size={13} className={healthStatus === 'ok' ? 'text-emerald-400 animate-pulse' : 'text-amber-400 animate-spin'} />
+            <span>
+              {healthStatus === 'loading'
+                ? 'Загрузка модели в память...'
+                : healthStatus === 'ok'
+                ? `Готов | Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 4}`
+                : 'Ожидание...'}
+            </span>
+          </div>
+        )}
       </div>
+
+      {/* Crash Advisory Alert Box */}
+      {crashAdvice && (
+        <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs flex items-start gap-2 animate-fadeIn">
+          <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+          <span>{crashAdvice}</span>
+        </div>
+      )}
+
+      {/* Hardware Auto-Detector Banner */}
+      {hardwareInfo && hardwareInfo.isAutoDetected && (
+        <div className="p-2.5 rounded-md bg-slate-900/60 border border-emerald-500/30 flex items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            <Zap size={14} className="text-emerald-400 shrink-0" />
+            <span>
+              <span className="font-semibold text-slate-200">Автоопределение GPU:</span>{' '}
+              <span className="text-emerald-300 font-mono">{hardwareInfo.gpuName}</span>
+            </span>
+          </div>
+          <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium shrink-0">
+            Рекомендовано: {hardwareInfo.recommendedBuild}
+          </span>
+        </div>
+      )}
 
       {/* GitHub Releases Llama.cpp Installer & Installed Versions Manager Card */}
       <div className="p-4 rounded-md glass-card border border-white/10 space-y-4">
-        
-        {/* Header & GitHub Version Selector */}
         <div className="space-y-3 pb-3 border-b border-white/10">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <div>
@@ -280,7 +395,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
             <div className="space-y-1">
               <label className="text-[11px] font-medium text-slate-300">
-                Сборка / Бинарник (Build Variant & CUDA/AVX)
+                Сборка / Бинарник (Build Variant)
               </label>
               <select
                 value={selectedAssetUrl}
@@ -301,7 +416,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             </div>
           </div>
 
-          {/* Action Install/Switch Button */}
           <div className="flex justify-end pt-1">
             <button
               type="button"
@@ -323,7 +437,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
         {/* Installed Versions Retention List */}
         {installedVersions.length > 0 && (
-          <div className="space-y-2 pb-3 border-b border-white/10">
+          <div className="space-y-2">
             <div className="text-[11px] font-medium text-slate-300 flex items-center justify-between">
               <span>Сохраненные локально версии llama.cpp (Без повторного скачивания):</span>
               <button
@@ -374,9 +488,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             </div>
           </div>
         )}
-
       </div>
-
 
       {/* Executable & Model Files Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -403,9 +515,17 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-300">
-            Файл GGUF Модели (.gguf)
+        <div className="md:col-span-2 space-y-1.5">
+          <label className="text-xs font-medium text-slate-300 flex items-center justify-between">
+            <span>Файл GGUF Модели (.gguf)</span>
+            <button
+              type="button"
+              onClick={() => setIsPickerModalOpen(true)}
+              className="text-[11px] text-emerald-400 hover:underline cursor-pointer flex items-center gap-1 font-sans"
+            >
+              <Search size={11} />
+              <span>Сканировать папку моделей...</span>
+            </button>
           </label>
           <div className="flex gap-2">
             <input
@@ -425,41 +545,96 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             </button>
           </div>
         </div>
+      </div>
 
-        <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-300">
-            Хост и Порт
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              placeholder="127.0.0.1"
-              className="w-1/2 px-3 py-2 rounded-md flat-input text-xs font-mono text-slate-100 focus:outline-none"
-            />
-            <input
-              type="number"
-              value={port}
-              onChange={(e) => setPort(Number(e.target.value))}
-              placeholder="11434"
-              className="w-1/2 px-3 py-2 rounded-md flat-input text-xs font-mono text-slate-100 focus:outline-none"
-            />
+      {/* GGUF Parsed Metadata Card */}
+      {modelMeta && (
+        <div className={`p-3.5 rounded-md border text-xs space-y-2 animate-fadeIn ${
+          modelMeta.isMmproj ? 'border-amber-500/40 bg-amber-500/10 text-amber-200' : 'border-emerald-500/40 bg-emerald-500/10 text-slate-200'
+        }`}>
+          {modelMeta.isMmproj ? (
+            <div className="flex items-center gap-2 text-amber-300 font-semibold text-xs">
+              <Eye size={15} />
+              <span>⚠️ Выбранный файл является Vision-проектором (mmproj), а не основной моделью LLM!</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div className="font-semibold text-emerald-300 flex items-center gap-1.5">
+                <Cpu size={14} />
+                <span>Метаданные модели: {modelMeta.modelName}</span>
+              </div>
+              <span className="font-mono text-[11px] text-slate-300">{modelMeta.fileSizeFormatted}</span>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-2 pt-1 font-mono text-[11px]">
+            <span className="px-2 py-0.5 rounded bg-slate-900 border border-white/10 text-sky-300 font-bold uppercase">
+              Архитектура: {modelMeta.architecture}
+            </span>
+            <span className="px-2 py-0.5 rounded bg-slate-900 border border-white/10 text-emerald-300 font-bold">
+              Квант: {modelMeta.quantization}
+            </span>
+            {modelMeta.blockCount > 0 && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-white/10 text-slate-200 flex items-center gap-1">
+                <Layers size={11} className="text-emerald-400" />
+                <span>{modelMeta.blockCount} слоев</span>
+              </span>
+            )}
+            {modelMeta.contextLength > 0 && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-white/10 text-slate-200">
+                Макс. контекст: {modelMeta.contextLength.toLocaleString()} токенов
+              </span>
+            )}
+            {modelMeta.expertCount > 0 && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 border border-white/10 text-purple-300 font-bold">
+                MoE: {modelMeta.expertCount} экспертов
+              </span>
+            )}
           </div>
+        </div>
+      )}
+
+      {/* Host & Port */}
+      <div className="space-y-1.5">
+        <label className="text-xs font-medium text-slate-300">
+          Хост и Порт локального сервера
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={host}
+            onChange={(e) => setHost(e.target.value)}
+            placeholder="127.0.0.1"
+            className="w-1/2 px-3 py-2 rounded-md flat-input text-xs font-mono text-slate-100 focus:outline-none"
+          />
+          <input
+            type="number"
+            value={port}
+            onChange={(e) => setPort(Number(e.target.value))}
+            placeholder="11434"
+            className="w-1/2 px-3 py-2 rounded-md flat-input text-xs font-mono text-slate-100 focus:outline-none"
+          />
         </div>
       </div>
 
       {/* Numerical Parameters Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3.5 rounded-md glass-card">
         <div>
-          <label className="text-[11px] font-medium text-slate-300">Context Size (-c)</label>
+          <div className="flex justify-between items-center text-[11px]">
+            <label className="font-medium text-slate-300">Context Size (-c)</label>
+            {modelMeta && modelMeta.contextLength > 0 && (
+              <span className="text-[10px] text-emerald-400 font-mono">Макс: {modelMeta.contextLength}</span>
+            )}
+          </div>
           <input
             type="number"
             value={ctxSize}
             onChange={(e) => setCtxSize(Number(e.target.value))}
+            max={modelMeta?.contextLength || 65536}
             className="w-full mt-1 px-2.5 py-1.5 rounded-md flat-input text-xs font-mono"
           />
         </div>
+
         <div>
           <label className="text-[11px] font-medium text-slate-300">CPU Threads (-t)</label>
           <input
@@ -469,15 +644,28 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             className="w-full mt-1 px-2.5 py-1.5 rounded-md flat-input text-xs font-mono"
           />
         </div>
+
         <div>
-          <label className="text-[11px] font-medium text-slate-300">GPU Offload (-ngl)</label>
+          <div className="flex justify-between items-center text-[11px]">
+            <label className="font-medium text-slate-300">GPU Offload (-ngl)</label>
+            {modelMeta && modelMeta.blockCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setGpuLayers(modelMeta.blockCount)}
+                className="text-[10px] text-emerald-400 hover:underline cursor-pointer font-mono"
+              >
+                Все {modelMeta.blockCount} слоев
+              </button>
+            )}
+          </div>
           <input
             type="number"
-            value={gpuLayers || 99}
+            value={gpuLayers}
             onChange={(e) => setGpuLayers(Number(e.target.value))}
             className="w-full mt-1 px-2.5 py-1.5 rounded-md flat-input text-xs font-mono"
           />
         </div>
+
         <div>
           <label className="text-[11px] font-medium text-slate-300">Batch Size (-b)</label>
           <input
@@ -487,6 +675,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             className="w-full mt-1 px-2.5 py-1.5 rounded-md flat-input text-xs font-mono"
           />
         </div>
+
         <div>
           <label className="text-[11px] font-medium text-slate-300">Micro-Batch (-ub)</label>
           <input
@@ -496,6 +685,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             className="w-full mt-1 px-2.5 py-1.5 rounded-md flat-input text-xs font-mono"
           />
         </div>
+
         <div>
           <label className="text-[11px] font-medium text-slate-300">Temperature</label>
           <input
@@ -506,6 +696,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             className="w-full mt-1 px-2.5 py-1.5 rounded-md flat-input text-xs font-mono"
           />
         </div>
+
         <div>
           <label className="text-[11px] font-medium text-slate-300">Min P</label>
           <input
@@ -516,6 +707,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             className="w-full mt-1 px-2.5 py-1.5 rounded-md flat-input text-xs font-mono"
           />
         </div>
+
         <div>
           <label className="text-[11px] font-medium text-slate-300">Repeat Penalty</label>
           <input
@@ -606,6 +798,13 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           )}
         </div>
       </div>
+
+      {/* Model Picker Modal */}
+      <ModelPickerModal
+        isOpen={isPickerModalOpen}
+        onClose={() => setIsPickerModalOpen(false)}
+        onSelectModel={(selectedPath) => setModelPath(selectedPath)}
+      />
     </div>
   );
 };

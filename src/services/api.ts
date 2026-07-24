@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode } from '../types';
+import { AppConfig, ChatSession, FileNode, PromptFileInfo, GgufMetadata, HardwareInfo } from '../types';
 
 const API_BASE = '/api';
 
@@ -239,10 +239,84 @@ export async function get_gguf_models(): Promise<any[]> {
 export async function download_gguf_model(downloadUrl: string, fileName: string): Promise<{ modelPath: string }> {
   const res = await fetch(`${API_BASE}/download-model`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ downloadUrl, fileName }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function get_prompts(): Promise<PromptFileInfo[]> {
+  const res = await fetch(`${API_BASE}/prompts`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_prompt_content(filename: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/prompts/${encodeURIComponent(filename)}`);
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.content;
+}
+
+export async function save_prompt_file(filename: string, content: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/prompts/${encodeURIComponent(filename)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function delete_prompt_file(filename: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/prompts/${encodeURIComponent(filename)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function select_prompt_file(filename: string): Promise<AppConfig> {
+  const res = await fetch(`${API_BASE}/prompts-select`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function parse_gguf(filePath: string): Promise<GgufMetadata> {
+  const res = await fetch(`${API_BASE}/parse-gguf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filePath }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function scan_models_dir(dirPath?: string): Promise<{ dirPath: string; models: GgufMetadata[] }> {
+  const query = dirPath ? `?dirPath=${encodeURIComponent(dirPath)}` : '';
+  const res = await fetch(`${API_BASE}/scan-models-dir${query}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function detect_hardware(): Promise<HardwareInfo> {
+  const res = await fetch(`${API_BASE}/detect-hardware`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_server_health(host: string, port: number): Promise<{ ok: boolean; status: string }> {
+  const res = await fetch(`${API_BASE}/server-health?host=${encodeURIComponent(host)}&port=${port}`);
+  if (!res.ok) return { ok: false, status: 'stopped' };
+  return res.json();
+}
+
+export async function get_server_slots(host: string, port: number): Promise<{ ok: boolean; totalSlots: number; activeSlots: number }> {
+  const res = await fetch(`${API_BASE}/server-slots?host=${encodeURIComponent(host)}&port=${port}`);
+  if (!res.ok) return { ok: false, totalSlots: 0, activeSlots: 0 };
+  return res.json();
+}
+
 

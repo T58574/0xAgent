@@ -34,10 +34,18 @@ export interface LocalServerConfig {
   custom_args?: string | null;
 }
 
+export interface PromptFileInfo {
+  filename: string;
+  title: string;
+  is_active: boolean;
+  updated_at: number;
+}
+
 export interface AppConfig {
   api_url: string;
   model_name: string;
   system_prompt: string;
+  active_prompt_file?: string | null;
   workspace_dir?: string | null;
   groq_api_key?: string | null;
   active_theme?: 'obsidian' | 'cyber' | 'graphite' | 'matrix' | string | null;
@@ -76,6 +84,31 @@ export interface ChatSession {
   messages: ChatMessage[];
   created_at: number;
   updated_at: number;
+}
+
+export interface GgufMetadata {
+  filePath: string;
+  fileName: string;
+  fileSizeFormatted: string;
+  fileSizeBytes: number;
+  magicValid: boolean;
+  version: number;
+  architecture: string;
+  modelName: string;
+  quantization: string;
+  blockCount: number;
+  contextLength: number;
+  expertCount: number;
+  isMmproj: boolean;
+  rawKv?: Record<string, any>;
+}
+
+export interface HardwareInfo {
+  vendor: 'NVIDIA' | 'AMD' | 'Intel' | 'Apple' | 'CPU';
+  gpuName: string;
+  recommendedBuild: string;
+  recommendedAssetKeywords: string[];
+  isAutoDetected: boolean;
 }
 
 export interface FileNode {

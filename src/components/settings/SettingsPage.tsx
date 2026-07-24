@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft } from 'lucide-react';
+import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, FileText } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { GeneralTab } from './GeneralTab';
+import { PromptsTab } from './PromptsTab';
 import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
 
@@ -16,7 +17,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onSaveConfig,
   onCancel,
 }) => {
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'themes' | 'local_server'>('general');
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'prompts' | 'themes' | 'local_server'>('general');
 
   // General state
   const [apiUrl, setApiUrl] = useState('');
@@ -239,6 +240,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveSubtab('prompts')}
+            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
+              activeSubtab === 'prompts'
+                ? 'bg-slate-800 text-white font-semibold border border-white/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+            }`}
+          >
+            <FileText size={14} className={activeSubtab === 'prompts' ? 'text-amber-400' : 'text-slate-500'} />
+            <span>Инструкции Агента</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveSubtab('themes')}
             className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
               activeSubtab === 'themes'
@@ -270,28 +284,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <GeneralTab
               apiUrl={apiUrl}
               setApiUrl={setApiUrl}
-              modelName={modelName}
-              setModelName={setModelName}
               groqApiKey={groqApiKey}
               setGroqApiKey={setGroqApiKey}
-              modelsPath={modelsPath}
-              setModelsPath={setModelsPath}
               reasoningEnabled={reasoningEnabled}
               setReasoningEnabled={setReasoningEnabled}
-              temperature={temperature}
-              setTemperature={setTemperature}
-              maxTokens={maxTokens}
-              setMaxTokens={setMaxTokens}
-              apiTimeoutSec={apiTimeoutSec}
-              setApiTimeoutSec={setApiTimeoutSec}
               autoSaveHistory={autoSaveHistory}
               setAutoSaveHistory={setAutoSaveHistory}
               soundNotifications={soundNotifications}
               setSoundNotifications={setSoundNotifications}
               compactChat={compactChat}
               setCompactChat={setCompactChat}
-              systemPrompt={systemPrompt}
-              setSystemPrompt={setSystemPrompt}
+            />
+          )}
+
+          {activeSubtab === 'prompts' && (
+            <PromptsTab
+              onConfigUpdated={(updatedCfg) => onSaveConfig(updatedCfg)}
             />
           )}
 

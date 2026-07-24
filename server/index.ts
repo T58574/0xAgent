@@ -6,7 +6,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { WebSocketServer, WebSocket } from 'ws';
-import { loadConfig, saveConfig } from './config';
+import {
+  loadConfig,
+  saveConfig,
+  listPromptFiles,
+  readPromptFile,
+  writePromptFile,
+  deletePromptFile,
+  setActivePromptFile,
+} from './config';
 import {
   listSessions,
   loadSession,
@@ -26,6 +34,8 @@ import {
   cancelAgentSession,
   respondToToolConfirmation,
 } from './agent';
+import { parseGgufMetadata, GgufMetadata } from './ggufParser';
+import { detectGpuHardware } from './hardware';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -66,6 +76,54 @@ app.post('/api/config', (req, res) => {
   try {
     saveConfig(req.body);
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// System Prompts Files endpoints (~/.0xagent/prompts/)
+app.get('/api/prompts', (_req, res) => {
+  try {
+    const files = listPromptFiles();
+    res.json(files);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/prompts/:filename', (req, res) => {
+  try {
+    const content = readPromptFile(req.params.filename);
+    res.json({ filename: req.params.filename, content });
+  } catch (err: any) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
+app.post('/api/prompts/:filename', (req, res) => {
+  try {
+    const { content } = req.body;
+    writePromptFile(req.params.filename, content || '');
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/prompts/:filename', (req, res) => {
+  try {
+    deletePromptFile(req.params.filename);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/prompts-select', (req, res) => {
+  try {
+    const { filename } = req.body;
+    const updatedCfg = setActivePromptFile(filename);
+    res.json(updatedCfg);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -236,6 +294,100 @@ app.post('/api/transcribe-audio', async (req, res) => {
   } catch (err: any) {
     console.error('Transcription error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+app.post('/api/parse-gguf', (req, res) => {
+  try {
+    const { filePath } = req.body;
+    if (!filePath || !fs.existsSync(filePath)) {
+      res.status(400).json({ error: 'Valid filePath is required' });
+      return;
+    }
+    const meta = parseGgufMetadata(filePath);
+    res.json(meta);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Recursively scan directory for GGUF model files & extract metadata
+app.get('/api/scan-models-dir', (req, res) => {
+  try {
+    const targetDir = (req.query.dirPath as string) || path.join(os.homedir(), '.0xagent', 'models');
+    if (!fs.existsSync(targetDir)) {
+      res.json({ dirPath: targetDir, models: [] });
+      return;
+    }
+
+    const models: GgufMetadata[] = [];
+
+    function scanDir(dir: string, depth: number) {
+      if (depth > 3 || models.length > 100) return;
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (models.length > 100) break;
+          const fullPath = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            if (!['.git', 'node_modules', 'dist', 'build'].includes(entry.name)) {
+              scanDir(fullPath, depth + 1);
+            }
+          } else if (entry.isFile() && entry.name.endsWith('.gguf')) {
+            models.push(parseGgufMetadata(fullPath));
+          }
+        }
+      } catch {}
+    }
+
+    scanDir(targetDir, 0);
+    res.json({ dirPath: targetDir, models });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GPU Hardware Auto-Detector
+app.get('/api/detect-hardware', (_req, res) => {
+  try {
+    const hw = detectGpuHardware();
+    res.json(hw);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Server Health Checker (/health polling)
+app.get('/api/server-health', async (req, res) => {
+  try {
+    const host = (req.query.host as string) || '127.0.0.1';
+    const port = (req.query.port as string) || '11434';
+    const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(1500) });
+    if (response.ok) {
+      const data = await response.json();
+      res.json({ ok: true, status: data.status || 'ok' });
+    } else {
+      res.json({ ok: false, status: 'loading' });
+    }
+  } catch {
+    res.json({ ok: false, status: 'stopped' });
+  }
+});
+
+// Server Live Slot Metrics (/slots polling)
+app.get('/api/server-slots', async (req, res) => {
+  try {
+    const host = (req.query.host as string) || '127.0.0.1';
+    const port = (req.query.port as string) || '11434';
+    const response = await fetch(`http://${host}:${port}/slots`, { signal: AbortSignal.timeout(1500) });
+    if (response.ok) {
+      const slotsData: any[] = await response.json();
+      const activeSlots = slotsData.filter((s) => s.state !== 0 && s.is_processing).length;
+      res.json({ ok: true, totalSlots: slotsData.length, activeSlots });
+    } else {
+      res.json({ ok: false, totalSlots: 0, activeSlots: 0 });
+    }
+  } catch {
+    res.json({ ok: false, totalSlots: 0, activeSlots: 0 });
   }
 });
 
