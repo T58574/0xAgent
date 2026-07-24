@@ -42,6 +42,15 @@ import { parseGgufMetadata, GgufMetadata } from './ggufParser';
 import { detectGpuHardware } from './hardware';
 import { loadMemories, addOrUpdateMemory, deleteMemory, queryMemories } from './memory';
 import { listSkills, readSkill, writeSkill, deleteSkill } from './skills';
+import {
+  isPasswordSet,
+  setupMasterPassword,
+  loginMasterPassword,
+  changeMasterPassword,
+  verifySessionToken,
+  revokeSessionToken,
+  checkBruteForceLockout,
+} from './auth';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -49,12 +58,47 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// Auth verification middleware for API requests
+app.use((req, res, next) => {
+  const publicAuthPaths = [
+    '/api/auth/status',
+    '/api/auth/setup',
+    '/api/auth/login',
+  ];
+
+  if (!req.path.startsWith('/api/') || publicAuthPaths.includes(req.path)) {
+    return next();
+  }
+
+  if (isPasswordSet()) {
+    const authHeader = req.headers.authorization;
+    const queryToken = req.query.token as string | undefined;
+    const token = authHeader || queryToken;
+
+    if (!verifySessionToken(token)) {
+      res.status(401).json({ error: 'Unauthorized: Требуется авторизация мастер-паролем' });
+      return;
+    }
+  }
+
+  next();
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
 const clients = new Set<WebSocket>();
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
+  const urlParams = new URLSearchParams((req.url || '').split('?')[1] || '');
+  const token = urlParams.get('token') || (req.headers['sec-websocket-protocol'] as string);
+
+  if (isPasswordSet() && !verifySessionToken(token)) {
+    console.warn('[WEBSOCKET SECURITY] Rejected unauthenticated WebSocket connection request');
+    ws.close(4001, 'Unauthorized');
+    return;
+  }
+
   clients.add(ws);
   ws.on('close', () => clients.delete(ws));
 });
@@ -67,6 +111,61 @@ function broadcast(event: string, payload: any): void {
     }
   }
 }
+
+// Authentication Endpoints
+app.get('/api/auth/status', (req, res) => {
+  const token = req.headers.authorization || (req.query.token as string);
+  const passwordSet = isPasswordSet();
+  const authenticated = !passwordSet || verifySessionToken(token);
+  const lockout = checkBruteForceLockout();
+  res.json({
+    isPasswordSet: passwordSet,
+    isAuthenticated: authenticated,
+    locked: lockout.locked,
+    remainingSec: lockout.remainingSec,
+  });
+});
+
+app.post('/api/auth/setup', (req, res) => {
+  const { password } = req.body || {};
+  const result = setupMasterPassword(password);
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(400).json(result);
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { password } = req.body || {};
+  const result = loginMasterPassword(password);
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(401).json(result);
+  }
+});
+
+app.post('/api/auth/change-password', (req, res) => {
+  const token = req.headers.authorization || (req.query.token as string);
+  if (!verifySessionToken(token)) {
+    res.status(401).json({ success: false, error: 'Unauthorized' });
+    return;
+  }
+  const { currentPassword, newPassword } = req.body || {};
+  const result = changeMasterPassword(currentPassword, newPassword);
+  if (result.success) {
+    res.json(result);
+  } else {
+    res.status(400).json(result);
+  }
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  const token = req.headers.authorization || (req.query.token as string);
+  revokeSessionToken(token);
+  res.json({ success: true });
+});
 
 // Config endpoints
 app.get('/api/config', (_req, res) => {

@@ -10,9 +10,14 @@ import { FileViewer } from './components/FileViewer';
 import { CodeEditor } from './components/CodeEditor';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
+import { LockScreen } from './components/LockScreen';
 import { FolderTree, Code } from 'lucide-react';
 
 export default function App() {
+  // Authentication & Security state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
+  const [isPasswordSet, setIsPasswordSet] = useState<boolean>(false);
+
   // App Config and Sessions state
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -88,33 +93,52 @@ export default function App() {
     currentSessionRef.current = currentSession;
   }, [currentSession]);
 
+  const checkAuth = async (): Promise<boolean> => {
+    try {
+      const status = await api.get_auth_status();
+      setIsPasswordSet(status.isPasswordSet);
+      setIsAuthenticated(status.isAuthenticated);
+      return status.isAuthenticated;
+    } catch (err) {
+      console.error('Failed to query auth status:', err);
+      return true;
+    }
+  };
+
+  const loadInitialData = async () => {
+    try {
+      addLog('Initializing system configurations...');
+      const cfg = await api.get_config();
+      setConfig(cfg);
+      addLog(`Loaded settings. Model: ${cfg.model_name}`);
+
+      if (cfg.workspace_dir) {
+        loadWorkspaceTree(cfg.workspace_dir);
+      }
+
+      const sessionList = await api.list_sessions();
+      setSessions(sessionList);
+
+      if (sessionList.length > 0) {
+        const firstSession = sessionList[0];
+        setCurrentSessionId(firstSession.id);
+        const fullSession = await api.load_session(firstSession.id);
+        setCurrentSession(fullSession);
+        addLog(`Restored session: "${fullSession.title}"`);
+      } else {
+        await handleCreateSession('Default Session');
+      }
+    } catch (err: any) {
+      addLog(`Error during startup: ${err.message || err}`);
+    }
+  };
+
   // 1. Initial Load Config and Sessions
   useEffect(() => {
     async function init() {
-      try {
-        addLog('Initializing system configurations...');
-        const cfg = await api.get_config();
-        setConfig(cfg);
-        addLog(`Loaded settings. Model: ${cfg.model_name}`);
-
-        if (cfg.workspace_dir) {
-          loadWorkspaceTree(cfg.workspace_dir);
-        }
-
-        const sessionList = await api.list_sessions();
-        setSessions(sessionList);
-
-        if (sessionList.length > 0) {
-          const firstSession = sessionList[0];
-          setCurrentSessionId(firstSession.id);
-          const fullSession = await api.load_session(firstSession.id);
-          setCurrentSession(fullSession);
-          addLog(`Restored session: "${fullSession.title}"`);
-        } else {
-          await handleCreateSession('Default Session');
-        }
-      } catch (err: any) {
-        addLog(`Error during startup: ${err.message || err}`);
+      const isAuth = await checkAuth();
+      if (isAuth) {
+        await loadInitialData();
       }
     }
     init();
@@ -639,6 +663,18 @@ export default function App() {
         isOpen={isMemorySkillsOpen}
         onClose={() => setIsMemorySkillsOpen(false)}
       />
+
+      {/* MASTER PASSWORD LOCK SCREEN OVERLAY */}
+      {(!isAuthenticated || !isPasswordSet) && (
+        <LockScreen
+          isPasswordSet={isPasswordSet}
+          onAuthenticated={async () => {
+            setIsAuthenticated(true);
+            setIsPasswordSet(true);
+            await loadInitialData();
+          }}
+        />
+      )}
     </div>
   );
 }

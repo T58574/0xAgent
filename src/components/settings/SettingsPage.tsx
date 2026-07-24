@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, FileText } from 'lucide-react';
+import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, FileText, Shield } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { GeneralTab } from './GeneralTab';
 import { PromptsTab } from './PromptsTab';
 import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
+import { SecurityTab } from './SecurityTab';
 
 interface SettingsPageProps {
   config: AppConfig | null;
@@ -17,7 +18,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onSaveConfig,
   onCancel,
 }) => {
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'prompts' | 'themes' | 'local_server'>('general');
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'prompts' | 'themes' | 'local_server' | 'security'>('general');
 
   // General state
   const [apiUrl, setApiUrl] = useState('');
@@ -318,6 +319,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             <Cpu size={14} className={activeSubtab === 'local_server' ? 'text-emerald-400' : 'text-slate-500'} />
             <span>Сервер LLM</span>
           </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSubtab('security')}
+            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
+              activeSubtab === 'security'
+                ? 'bg-slate-800 text-white font-semibold border border-white/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+            }`}
+          >
+            <Shield size={14} className={activeSubtab === 'security' ? 'text-emerald-400' : 'text-slate-500'} />
+            <span>Безопасность</span>
+          </button>
         </div>
 
         {/* Right Scrollable Content Panel (pb-28 prevents overlapping with bottom navigation bar) */}
@@ -398,6 +412,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setServerLogsAutoScroll={setServerLogsAutoScroll}
               setApiUrl={setApiUrl}
             />
+          )}
+
+          {activeSubtab === 'security' && (
+            <SecurityTab />
           )}
         </div>
       </div>
