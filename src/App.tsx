@@ -48,22 +48,12 @@ export default function App() {
     };
   }, [activeView]);
 
-  // Apply manual hex colors configuration to document element custom properties
+  // Apply glassmorphism preset theme to document element
   useEffect(() => {
-    if (config && config.theme_colors) {
-      const root = document.documentElement;
-      root.style.setProperty('--theme-bg', config.theme_colors.bg_color);
-      root.style.setProperty('--theme-text', config.theme_colors.text_color);
-      root.style.setProperty('--theme-border', config.theme_colors.border_color);
-      root.style.setProperty('--theme-active', config.theme_colors.active_color);
-      root.style.setProperty('--theme-send-btn', config.theme_colors.send_btn_color);
+    if (config && config.active_theme) {
+      document.documentElement.setAttribute('data-theme', config.active_theme);
     } else {
-      const root = document.documentElement;
-      root.style.setProperty('--theme-bg', '#090d16');
-      root.style.setProperty('--theme-text', '#f8fafc');
-      root.style.setProperty('--theme-border', 'rgba(255, 255, 255, 0.1)');
-      root.style.setProperty('--theme-active', 'rgba(30, 41, 59, 0.7)');
-      root.style.setProperty('--theme-send-btn', '#3b82f6');
+      document.documentElement.setAttribute('data-theme', 'obsidian');
     }
   }, [config]);
 

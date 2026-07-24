@@ -20,15 +20,15 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
   const getStatusInfo = () => {
     switch (tool.status) {
       case 'completed':
-        return { label: 'SUCCESS', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10', icon: <CheckCircle2 size={12} className="text-emerald-400" /> };
+        return { label: 'УСПЕШНО', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10', icon: <CheckCircle2 size={12} className="text-emerald-400" /> };
       case 'error':
-        return { label: 'ERROR', color: 'text-rose-400 border-rose-500/30 bg-rose-500/10', icon: <AlertTriangle size={12} className="text-rose-400" /> };
+        return { label: 'ОШИБКА', color: 'text-rose-400 border-rose-500/30 bg-rose-500/10', icon: <AlertTriangle size={12} className="text-rose-400" /> };
       case 'running':
-        return { label: 'EXECUTING', color: 'text-sky-400 border-sky-500/30 bg-sky-500/10 animate-pulse', icon: <Play size={12} className="text-sky-400 animate-spin" /> };
+        return { label: 'ВЫПОЛНЕНИЕ', color: 'text-sky-400 border-sky-500/30 bg-sky-500/10 animate-pulse', icon: <Play size={12} className="text-sky-400 animate-spin" /> };
       case 'rejected':
-        return { label: 'REJECTED', color: 'text-slate-400 border-slate-500/30 bg-slate-500/10', icon: <X size={12} className="text-slate-400" /> };
+        return { label: 'ОТКЛОНЕНО', color: 'text-slate-400 border-slate-500/30 bg-slate-500/10', icon: <X size={12} className="text-slate-400" /> };
       case 'pending':
-        return { label: 'AWAITING APPROVAL', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10', icon: <AlertTriangle size={12} className="text-amber-400" /> };
+        return { label: 'ОЖИДАЕТ ПОДТВЕРЖДЕНИЯ', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10', icon: <AlertTriangle size={12} className="text-amber-400" /> };
       default:
         return { label: tool.status.toUpperCase(), color: 'text-slate-300 border-slate-500/30 bg-slate-500/10', icon: null };
     }
@@ -38,10 +38,10 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
     switch (tool.name) {
       case 'execute_command': return <Terminal size={14} className="text-sky-400" />;
       case 'write_file': return <FileText size={14} className="text-emerald-400" />;
-      case 'patch_file': return <Layers size={14} className="text-indigo-400" />;
+      case 'patch_file': return <Layers size={14} className="text-cyan-400" />;
       case 'read_file': return <FileText size={14} className="text-slate-300" />;
       case 'grep_search': return <Search size={14} className="text-amber-400" />;
-      case 'list_dir': return <Folder size={14} className="text-cyan-400" />;
+      case 'list_dir': return <Folder size={14} className="text-emerald-400" />;
       default: return <Terminal size={14} className="text-slate-300" />;
     }
   };
@@ -49,33 +49,33 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
   const statusInfo = getStatusInfo();
 
   return (
-    <div className="glass-card rounded-2xl p-4 my-3 border border-white/10 text-slate-100 shadow-xl transition-all">
+    <div className="glass-card rounded-md p-3.5 my-2.5 border border-white/10 text-slate-100 font-sans">
       {/* Card Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-slate-900/80 border border-white/10 flex items-center justify-center shadow-inner">
+          <div className="w-7 h-7 rounded bg-slate-900/80 border border-white/10 flex items-center justify-center">
             {getToolIcon()}
           </div>
           <div>
-            <div className="text-[9px] font-hud uppercase tracking-widest text-slate-400">
-              TOOL ACTION REQUEST
+            <div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">
+              Запрос инструмента
             </div>
-            <div className="text-xs font-mono font-bold text-white flex items-center gap-1.5">
+            <div className="text-xs font-mono font-medium text-white flex items-center gap-1.5">
               <span>{tool.name}</span>
               <span className="text-[10px] text-slate-500 font-normal">[{tool.id}]</span>
             </div>
           </div>
         </div>
 
-        {/* HUD Status Badge */}
-        <div className={`px-2.5 py-1 rounded-lg border font-hud text-[10px] tracking-wider flex items-center gap-1.5 uppercase ${statusInfo.color}`}>
+        {/* Status Badge */}
+        <div className={`px-2 py-0.5 rounded text-[10px] border font-medium flex items-center gap-1.5 ${statusInfo.color}`}>
           {statusInfo.icon}
-          <span>[ {statusInfo.label} ]</span>
+          <span>{statusInfo.label}</span>
         </div>
       </div>
 
-      {/* Main Command / File Target Parameters */}
-      <div className="mt-3 skeuo-input rounded-xl p-3 text-xs font-mono text-slate-200 max-h-40 overflow-y-auto">
+      {/* Main Parameters */}
+      <div className="mt-2.5 flat-input rounded-md p-2.5 text-xs font-mono text-slate-200 max-h-40 overflow-y-auto">
         {tool.name === 'execute_command' && (
           <div className="flex items-start gap-1.5">
             <span className="text-emerald-400 font-bold select-none">PS &gt;</span>
@@ -84,73 +84,73 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
         )}
         {tool.name === 'write_file' && (
           <div>
-            <div className="text-slate-400 text-[11px] mb-1">Path: <span className="text-emerald-300 font-bold">{parsedArgs.path}</span></div>
-            <div className="mt-1 text-slate-300 text-[10px] whitespace-pre-wrap max-h-28 overflow-y-auto bg-slate-950/60 p-2.5 border border-white/5 rounded-lg">
+            <div className="text-slate-400 text-[11px] mb-1">Файл: <span className="text-emerald-300 font-medium">{parsedArgs.path}</span></div>
+            <div className="mt-1 text-slate-300 text-[10px] whitespace-pre-wrap max-h-28 overflow-y-auto bg-slate-950/60 p-2 border border-white/5 rounded">
               {parsedArgs.content}
             </div>
           </div>
         )}
         {tool.name === 'patch_file' && (
           <div>
-            <div className="text-slate-400 text-[11px] mb-1">Path: <span className="text-indigo-300 font-bold">{parsedArgs.path}</span></div>
-            <div className="mt-1 text-slate-300 text-[10px] whitespace-pre-wrap max-h-28 overflow-y-auto bg-slate-950/60 p-2.5 border border-white/5 rounded-lg font-mono">
+            <div className="text-slate-400 text-[11px] mb-1">Файл: <span className="text-cyan-300 font-medium">{parsedArgs.path}</span></div>
+            <div className="mt-1 text-slate-300 text-[10px] whitespace-pre-wrap max-h-28 overflow-y-auto bg-slate-950/60 p-2 border border-white/5 rounded font-mono">
               {parsedArgs.content}
             </div>
           </div>
         )}
         {(tool.name === 'read_file' || tool.name === 'list_dir') && (
           <div>
-            <span className="text-slate-400">Path: </span>
+            <span className="text-slate-400">Путь: </span>
             <span className="text-slate-100">{parsedArgs.path}</span>
           </div>
         )}
         {tool.name === 'grep_search' && (
           <div className="space-y-1">
             <div>
-              <span className="text-slate-400">Pattern: </span>
-              <span className="text-amber-300 font-semibold">"{parsedArgs.pattern}"</span>
+              <span className="text-slate-400">Шаблон: </span>
+              <span className="text-amber-300 font-medium">"{parsedArgs.pattern}"</span>
             </div>
             <div>
-              <span className="text-slate-400">Path: </span>
+              <span className="text-slate-400">Путь: </span>
               <span className="text-slate-100">{parsedArgs.path}</span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Interactive Approve / Reject buttons for pending actions */}
+      {/* Interactive Approve / Reject buttons */}
       {tool.status === 'pending' && (
-        <div className="mt-3.5 flex items-center justify-end gap-2.5 border-t border-white/5 pt-3">
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/5 pt-2.5">
           <button
             onClick={() => onRespond(tool.id, false)}
-            className="skeuo-btn px-4 py-1.5 rounded-xl text-rose-400 hover:text-rose-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            className="flat-btn px-3.5 py-1 rounded text-rose-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer"
           >
-            <X size={13} />
-            <span className="font-hud uppercase tracking-wider text-[11px]">Отклонить</span>
+            <X size={12} />
+            <span>Отклонить</span>
           </button>
           <button
             onClick={() => onRespond(tool.id, true)}
-            className="skeuo-btn px-5 py-1.5 rounded-xl text-emerald-400 hover:text-emerald-300 text-xs font-semibold flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
+            className="flat-btn px-4 py-1 rounded text-emerald-400 hover:text-emerald-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
           >
-            <Check size={13} />
-            <span className="font-hud uppercase tracking-wider text-[11px]">Подтвердить</span>
+            <Check size={12} />
+            <span>Подтвердить</span>
           </button>
         </div>
       )}
 
-      {/* Output Log Toggle Drawer */}
+      {/* Output Log Drawer */}
       {tool.output && (
-        <div className="mt-2.5">
+        <div className="mt-2">
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-1 text-[10px] font-hud text-slate-400 hover:text-white uppercase tracking-wider cursor-pointer transition-colors"
+            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white cursor-pointer transition-colors"
           >
-            <span>{showDetails ? 'Скрыть Лог Выполнения' : 'Показать Лог Выполнения'}</span>
-            {showDetails ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+            <span>{showDetails ? 'Скрыть лог выполнения' : 'Показать лог выполнения'}</span>
+            {showDetails ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
 
           {showDetails && (
-            <div className="mt-2 bg-slate-950/80 rounded-xl p-3 border border-white/10 text-[10px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed shadow-inner">
+            <div className="mt-1.5 bg-slate-950/80 rounded-md p-2.5 border border-white/10 text-[10px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
               {tool.output}
             </div>
           )}

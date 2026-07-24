@@ -40,6 +40,7 @@ export interface AppConfig {
   system_prompt: string;
   workspace_dir?: string | null;
   groq_api_key?: string | null;
+  active_theme?: 'obsidian' | 'cyber' | 'graphite' | 'matrix' | string | null;
   theme_colors?: ThemeColors | null;
   models_path?: string | null;
   reasoning_enabled?: boolean | null;

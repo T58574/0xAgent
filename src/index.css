@@ -1,20 +1,56 @@
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-  --font-hud: 'Share Tech Mono', 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
   
   --color-theme-bg: var(--theme-bg, #090d16);
   --color-theme-text: var(--theme-text, #f8fafc);
-  --color-theme-border: var(--theme-border, rgba(255, 255, 255, 0.1));
-  --color-theme-active: var(--theme-active, rgba(30, 41, 59, 0.7));
-  --color-theme-send-btn: var(--theme-send-btn, #3b82f6);
+  --color-theme-border: var(--theme-border, rgba(255, 255, 255, 0.08));
+  --color-theme-panel: var(--theme-panel, rgba(15, 23, 42, 0.75));
+  --color-theme-accent: var(--theme-accent, #10b981);
 }
 
-/* Custom Matte Glass Scrollbar */
+/* 4 GLASSMORPHISM PRESET THEMES (No purple, no manual HEX pickers, minimal rounding) */
+:root, [data-theme="obsidian"] {
+  --theme-bg: #090d16;
+  --theme-text: #f8fafc;
+  --theme-border: rgba(255, 255, 255, 0.08);
+  --theme-panel: rgba(15, 23, 42, 0.8);
+  --theme-accent: #10b981;
+  --theme-accent-hover: #059669;
+}
+
+[data-theme="cyber"] {
+  --theme-bg: #080e1a;
+  --theme-text: #f1f5f9;
+  --theme-border: rgba(56, 189, 248, 0.12);
+  --theme-panel: rgba(15, 23, 42, 0.85);
+  --theme-accent: #06b6d4;
+  --theme-accent-hover: #0891b2;
+}
+
+[data-theme="graphite"] {
+  --theme-bg: #09090b;
+  --theme-text: #fafafa;
+  --theme-border: rgba(255, 255, 255, 0.1);
+  --theme-panel: rgba(24, 24, 27, 0.85);
+  --theme-accent: #e4e4e7;
+  --theme-accent-hover: #ffffff;
+}
+
+[data-theme="matrix"] {
+  --theme-bg: #06120e;
+  --theme-text: #ecfdf5;
+  --theme-border: rgba(52, 211, 153, 0.12);
+  --theme-panel: rgba(6, 32, 22, 0.85);
+  --theme-accent: #34d399;
+  --theme-accent-hover: #059669;
+}
+
+/* Custom Sleek Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -26,7 +62,7 @@
 
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.12);
-  border-radius: 4px;
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -37,8 +73,8 @@ html, body {
   font-family: var(--font-sans);
   font-size: 13.5px;
   line-height: 1.5;
-  background-color: var(--theme-bg, #090d16);
-  color: var(--theme-text, #f8fafc);
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
   overflow: hidden;
   margin: 0;
   padding: 0;
@@ -47,85 +83,80 @@ html, body {
   position: fixed;
 }
 
-/* Sci-Fi Grid Background Pattern */
+/* Subtle Grid Background Pattern */
 .bg-scifi-grid {
-  background-size: 28px 28px;
+  background-size: 32px 32px;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
 }
 
-/* Glassmorphism Frosted Panels */
+/* Minimal Glassmorphism Panels (Minimal Rounding: rounded-md) */
 .glass-panel {
-  background: rgba(13, 18, 30, 0.75);
+  background: var(--theme-panel);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
 }
 
 .glass-card {
-  background: rgba(17, 24, 39, 0.65);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
 }
 
-/* Tactile Skeuomorphic Button Feel */
+/* Flat Glass Buttons (No Skeuomorphism, Crisp & Clean) */
+.flat-btn {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  color: var(--theme-text);
+  transition: all 0.12s ease-in-out;
+}
+
+.flat-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.flat-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.flat-input {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  color: var(--theme-text);
+  transition: border-color 0.12s ease-in-out;
+}
+
+.flat-input:focus {
+  border-color: var(--theme-accent);
+  outline: none;
+}
+
+/* Legacy alias fallback */
 .skeuo-btn {
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  transition: all 0.12s ease-in-out;
 }
-
 .skeuo-btn:hover {
-  background: linear-gradient(180deg, rgba(51, 65, 85, 0.85) 0%, rgba(30, 41, 59, 0.95) 100%);
-  border-color: rgba(255, 255, 255, 0.22);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
 }
-
-.skeuo-btn:active {
-  transform: translateY(1px);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6);
-}
-
 .skeuo-input {
-  background: rgba(11, 15, 25, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5), 0 1px 0 rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(8px);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--theme-border);
+  border-radius: 6px;
+  color: var(--theme-text);
 }
-
 .skeuo-input:focus {
-  border-color: rgba(99, 102, 241, 0.5);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5), 0 0 12px rgba(99, 102, 241, 0.25);
-}
-
-/* Sci-Fi Brutalist HUD Chips */
-.scifi-chip {
-  font-family: var(--font-hud);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(56, 189, 248, 0.25);
-  color: #38bdf8;
-}
-
-/* Animated Entrance */
-.message-enter {
-  opacity: 0;
-  transform: translateY(8px);
-  animation: swipeUp 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes swipeUp {
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  border-color: var(--theme-accent);
+  outline: none;
 }
