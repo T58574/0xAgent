@@ -239,12 +239,20 @@ export default function App() {
     }
   };
 
+  // Safe ID generator that works in non-secure HTTP / LAN contexts
+  const generateShortId = (): string => {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID().substring(0, 8);
+    }
+    return Math.random().toString(36).substring(2, 10);
+  };
+
   // 7. Chat Send message logic
   const handleSendMessage = async (text: string) => {
     if (!currentSession) return;
 
     const userMsg: ChatMessage = {
-      id: crypto.randomUUID().substring(0, 8),
+      id: generateShortId(),
       role: 'user',
       content: text,
       timestamp: Date.now(),
@@ -275,7 +283,7 @@ export default function App() {
         messages: [
           ...updatedSession.messages,
           {
-            id: crypto.randomUUID().substring(0, 8),
+            id: generateShortId(),
             role: 'assistant',
             content: errText,
             timestamp: Date.now(),
