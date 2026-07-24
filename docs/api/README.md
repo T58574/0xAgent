@@ -260,6 +260,21 @@ Terminates the active llama-server process tree.
 
 **Response:** `{ success: true, message: string }`
 
+### `GET /api/server-status`
+Returns live state of the local llama-server child process.
+
+**Response:**
+```json
+{
+  "running": true,
+  "pid": 12345,
+  "exePath": "C:\\...\\llama-server.exe",
+  "modelPath": "C:\\...\\model.gguf",
+  "host": "127.0.0.1",
+  "port": 11434
+}
+```
+
 ### `GET /api/server-health`
 Proxies a health check to the local llama.cpp server.
 
@@ -388,7 +403,8 @@ All messages are JSON: `{ event: string, payload: any }`
 | `agent-tools-updated` | `{ sessionId, messageId, tools: ToolCallInfo[] }` | Tool calls parsed from response |
 | `agent-tool-status-changed` | `{ sessionId, toolCallId, status, output? }` | Tool execution status update |
 | `agent-error` | `string \| { sessionId, message }` | System error or status notification |
-| `llama-server-log` | `string` | Live stdout/stderr output from llama-server process |
+| `llama-server-log` | `string` | Live stdout/stderr output from llama-server process (ANSI stripped) |
+| `llama-server-status` | `{ status: "running" \| "stopped", pid?, host?, port?, error? }` | Real-time llama-server process status update |
 
 ---
 

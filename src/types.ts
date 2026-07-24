@@ -111,6 +111,15 @@ export interface HardwareInfo {
   isAutoDetected: boolean;
 }
 
+export interface ServerStatusInfo {
+  running: boolean;
+  pid?: number | null;
+  exePath?: string | null;
+  modelPath?: string | null;
+  host: string;
+  port: number;
+}
+
 export interface MemoryItem {
   id: string;
   key: string;

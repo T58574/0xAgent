@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, PromptFileInfo, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo } from '../types';
+import { AppConfig, ChatSession, FileNode, PromptFileInfo, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo } from '../types';
 
 const API_BASE = '/api';
 
@@ -388,6 +388,12 @@ export async function stop_local_server(): Promise<{ success: boolean; message: 
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_server_status(): Promise<ServerStatusInfo> {
+  const res = await fetch(`${API_BASE}/server-status`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

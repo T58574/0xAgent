@@ -111,20 +111,27 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   const [slotMetrics, setSlotMetrics] = useState<{ totalSlots: number; activeSlots: number }>({ totalSlots: 0, activeSlots: 0 });
   const [crashAdvice, setCrashAdvice] = useState<string | null>(null);
 
-  // 1. Initial Load: Hardware & Releases
+  // 1. Initial Load: Hardware, Releases & Initial Server Status
   useEffect(() => {
     async function loadData() {
       try {
         setIsLoadingReleases(true);
-        const [releases, installed, hw] = await Promise.all([
+        const [releases, installed, hw, statusInfo] = await Promise.all([
           api.get_llama_releases().catch(() => []),
           api.get_installed_llama_versions().catch(() => []),
           api.detect_hardware().catch(() => null),
+          api.get_server_status().catch(() => null),
         ]);
 
         setGithubReleases(releases);
         setInstalledVersions(installed);
         setHardwareInfo(hw);
+
+        if (statusInfo && statusInfo.running) {
+          setServerStatus('running');
+        } else {
+          setServerStatus('stopped');
+        }
 
         if (releases.length > 0) {
           const first = releases[0];
@@ -276,27 +283,37 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   };
 
-  // Listen to live WebSocket log stream from llama-server process
+  // Listen to live WebSocket log stream and server status from llama-server process
   useEffect(() => {
-    let unlisten: (() => void) | null = null;
+    let un1: (() => void) | null = null;
+    let un2: (() => void) | null = null;
+
     api.listen<string>('llama-server-log', (data) => {
       setServerLogs((prev) => [...prev, data.payload]);
-    }).then((un) => {
-      unlisten = un;
-    });
+    }).then((un) => { un1 = un; });
+
+    api.listen<{ status: string; error?: string }>('llama-server-status', (data) => {
+      if (data.payload.status === 'running') {
+        setServerStatus('running');
+      } else if (data.payload.status === 'stopped') {
+        setServerStatus('stopped');
+        setHealthStatus('stopped');
+      }
+    }).then((un) => { un2 = un; });
+
     return () => {
-      if (unlisten) unlisten();
+      if (un1) un1();
+      if (un2) un2();
     };
   }, []);
 
   const handleStartServer = async () => {
-    setServerStatus('running');
     setHealthStatus('loading');
     setApiUrl(`http://${host}:${port}/v1`);
     setServerLogs((prev) => [...prev, `[SYSTEM] Launching llama.cpp server at http://${host}:${port}/v1...`]);
 
     try {
-      await api.start_local_server({
+      const res = await api.start_local_server({
         exePath,
         modelPath,
         host,
@@ -315,10 +332,15 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
         embedding,
         contBatching,
       });
+      if (res && res.success) {
+        setServerStatus('running');
+      }
     } catch (err: any) {
       setServerStatus('stopped');
       setHealthStatus('stopped');
-      setServerLogs((prev) => [...prev, `[SYSTEM ERROR] Failed to start server: ${err.message}`]);
+      const errMsg = err.message || err;
+      setServerLogs((prev) => [...prev, `[SYSTEM ERROR] Failed to start server:\n${errMsg}`]);
+      alert(`Ошибка запуска сервера llama.cpp:\n${errMsg}`);
     }
   };
 

@@ -57,7 +57,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     };
     checkHealth();
     const interval = setInterval(checkHealth, 3000);
-    return () => clearInterval(interval);
+
+    let unlisten: (() => void) | null = null;
+    api.listen<{ status: string }>('llama-server-status', (event) => {
+      if (event.payload.status === 'running') {
+        setIsServerOffline(false);
+      } else if (event.payload.status === 'stopped') {
+        setIsServerOffline(true);
+      }
+    }).then((un) => { unlisten = un; });
+
+    return () => {
+      clearInterval(interval);
+      if (unlisten) unlisten();
+    };
   }, [serverHost, serverPort]);
 
   useEffect(() => {
@@ -149,23 +162,25 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setIsStartingServer(true);
     const textToSend = autoSendPrompt || inputText.trim();
     try {
-      await api.start_local_server();
-      let serverReady = false;
-      for (let i = 0; i < 15; i++) {
-        await new Promise((r) => setTimeout(r, 1000));
-        const h = await api.get_server_health(serverHost, serverPort);
-        if (h.ok) {
-          serverReady = true;
-          setIsServerOffline(false);
-          break;
+      const res = await api.start_local_server();
+      if (res && res.success) {
+        let serverReady = false;
+        for (let i = 0; i < 20; i++) {
+          await new Promise((r) => setTimeout(r, 1000));
+          const h = await api.get_server_health(serverHost, serverPort);
+          if (h.ok) {
+            serverReady = true;
+            setIsServerOffline(false);
+            break;
+          }
+        }
+        if (serverReady && textToSend) {
+          onSendMessage(textToSend);
+          setInputText('');
         }
       }
-      if (serverReady && textToSend) {
-        onSendMessage(textToSend);
-        setInputText('');
-      }
     } catch (err: any) {
-      alert(`Ошибка запуска сервера: ${err.message || err}`);
+      alert(`Ошибка запуска сервера llama.cpp:\n${err.message || err}`);
     } finally {
       setIsStartingServer(false);
     }
