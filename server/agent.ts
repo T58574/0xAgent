@@ -36,10 +36,23 @@ const activeCancelTokens = new Set<string>();
 
 export function respondToToolConfirmation(sessionId: string, toolCallId: string, approve: boolean | string): boolean {
   const key = `${sessionId}:${toolCallId}`;
-  const pending = activeConfirmations.get(key);
+  let pending = activeConfirmations.get(key);
+
+  if (!pending) {
+    // Fallback: search by toolCallId alone in case sessionId desynchronized
+    for (const [k, p] of activeConfirmations.entries()) {
+      if (p.toolCallId === toolCallId || k.endsWith(`:${toolCallId}`)) {
+        pending = p;
+        activeConfirmations.delete(k);
+        break;
+      }
+    }
+  } else {
+    activeConfirmations.delete(key);
+  }
+
   if (pending) {
     pending.resolve(approve);
-    activeConfirmations.delete(key);
     return true;
   }
   return false;
@@ -516,7 +529,7 @@ export async function runAgentLoop(
         });
       }
 
-      const approved = userResponseOrApproved !== false;
+      const approved = userResponseOrApproved !== false && userResponseOrApproved !== 'false';
       const status = approved ? 'running' : 'rejected';
       broadcast('agent-status-changed', approved ? 'executing_tool' : 'thinking');
       broadcast('agent-tool-status-changed', {

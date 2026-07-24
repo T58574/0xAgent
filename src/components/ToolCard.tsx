@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Check, X, Terminal, FileText, Layers, Search, Folder, CheckCircle2, AlertTriangle, Play, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X, Terminal, FileText, Layers, Search, Folder, CheckCircle2, AlertTriangle, Play, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
 import { ToolCallInfo } from '../types';
 
 interface ToolCardProps {
@@ -10,6 +10,12 @@ interface ToolCardProps {
 export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
   const [showDetails, setShowDetails] = useState(false);
   const [customAnswer, setCustomAnswer] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleAction = (value: boolean | string) => {
+    setIsSubmitting(true);
+    onRespond(tool.id, value);
+  };
 
   let parsedArgs: Record<string, any> = {};
   try {
@@ -132,8 +138,9 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
                     {parsedArgs.options.map((opt: string) => (
                       <button
                         key={opt}
-                        onClick={() => onRespond(tool.id, opt)}
-                        className="flat-btn px-3 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer"
+                        disabled={isSubmitting}
+                        onClick={() => handleAction(opt)}
+                        className="flat-btn px-3 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40"
                       >
                         {opt}
                       </button>
@@ -143,8 +150,8 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (customAnswer.trim()) {
-                      onRespond(tool.id, customAnswer.trim());
+                    if (customAnswer.trim() && !isSubmitting) {
+                      handleAction(customAnswer.trim());
                       setCustomAnswer('');
                     }
                   }}
@@ -153,16 +160,18 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
                   <input
                     type="text"
                     value={customAnswer}
+                    disabled={isSubmitting}
                     onChange={(e) => setCustomAnswer(e.target.value)}
                     placeholder="Введите ваш ответ..."
                     className="flex-1 px-3 py-1.5 rounded flat-input text-xs text-slate-100 focus:outline-none"
                   />
                   <button
                     type="submit"
-                    disabled={!customAnswer.trim()}
-                    className="flat-btn px-3 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40"
+                    disabled={!customAnswer.trim() || isSubmitting}
+                    className="flat-btn px-3 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40 flex items-center gap-1.5"
                   >
-                    Отправить
+                    {isSubmitting && <RefreshCw size={12} className="animate-spin text-emerald-400" />}
+                    <span>{isSubmitting ? 'Отправка...' : 'Отправить'}</span>
                   </button>
                 </form>
               </div>
@@ -189,18 +198,24 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
       {tool.status === 'pending' && (
         <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/5 pt-2.5">
           <button
-            onClick={() => onRespond(tool.id, false)}
-            className="flat-btn px-3.5 py-1 rounded text-rose-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer"
+            disabled={isSubmitting}
+            onClick={() => handleAction(false)}
+            className="flat-btn px-3.5 py-1 rounded text-rose-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
           >
             <X size={12} />
             <span>Отклонить</span>
           </button>
           <button
-            onClick={() => onRespond(tool.id, true)}
-            className="flat-btn px-4 py-1 rounded text-emerald-400 hover:text-emerald-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
+            disabled={isSubmitting}
+            onClick={() => handleAction(true)}
+            className="flat-btn px-4 py-1 rounded text-emerald-400 hover:text-emerald-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer border-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <Check size={12} />
-            <span>Подтвердить</span>
+            {isSubmitting ? (
+              <RefreshCw size={12} className="animate-spin text-emerald-400" />
+            ) : (
+              <Check size={12} />
+            )}
+            <span>{isSubmitting ? 'Выполняется...' : 'Подтвердить'}</span>
           </button>
         </div>
       )}

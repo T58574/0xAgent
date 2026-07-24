@@ -300,10 +300,10 @@ export default function App() {
 
   // Approve or Reject write-based tool actions
   const handleRespondToTool = async (toolId: string, approve: boolean | string) => {
-    if (!currentSessionId) return;
+    const targetSessionId = currentSessionId || currentSessionRef.current?.id || '';
     try {
       addLog(`Tool response submitted: [${toolId}] approved=${approve}`);
-      await api.respond_to_tool(currentSessionId, toolId, approve);
+      await api.respond_to_tool(targetSessionId, toolId, approve);
     } catch (err: any) {
       addLog(`Failed to submit tool confirmation: ${err.message || err}`);
     }
