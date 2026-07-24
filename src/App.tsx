@@ -580,7 +580,7 @@ export default function App() {
         )}
 
         {activeView === 'analytics' && (
-          <div className="flex-grow w-full h-full overflow-hidden border-t border-theme-border bg-slate-950">
+          <div className="flex-grow w-full h-full overflow-hidden border-t border-theme-border bg-theme-bg">
             <AnalyticsPage
               sessions={sessions}
               serverLogs={logs}

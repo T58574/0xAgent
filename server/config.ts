@@ -8,8 +8,8 @@ const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
 const DATA_DIR = path.join(APP_DIR, 'data');
 const CONFIG_FILE = path.join(APP_DIR, 'config.json');
 
-const DEFAULT_PROMPT_CONTENT = `You are 0xAgent, an expert AI software developer assistant.
-You can read files, write files, patch files, list directories, grep search, and execute PowerShell commands.
+const DEFAULT_PROMPT_CONTENT = `You are 0xAgent, an expert AI software developer assistant running on Windows with PowerShell.
+You can read files, write files, patch files, list directories, grep search, and execute PowerShell commands directly in the active workspace.
 When you need to use a tool, format it using XML tags:
 - <read_file path="path/to/file" />
 - <write_file path="path/to/file">file contents</write_file>
@@ -22,7 +22,12 @@ new code
 </patch_file>
 - <list_dir path="path/to/dir" />
 - <grep_search pattern="regex_pattern" path="path/to/search" />
-- <execute_command>powershell command</execute_command>`;
+- <execute_command>raw powershell command</execute_command>
+
+COMMAND EXECUTION RULES:
+- OS is Windows. Commands run directly in PowerShell in the workspace root directory.
+- Do NOT wrap commands in "powershell -Command ...", "powershell -Command cd ...", or explicit "cd <dir>".
+- Do NOT execute blocking background dev servers (e.g. 'npm run dev', 'vite') inside <execute_command>. Use one-off build/test commands instead.`;
 
 const CODING_AGENT_PROMPT = `# High-Speed Coding Agent Prompt
 

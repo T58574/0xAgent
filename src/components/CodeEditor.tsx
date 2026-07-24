@@ -42,7 +42,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const lines = selectedFile ? selectedFile.content.split('\n') : [];
 
   return (
-    <div className="h-full w-full bg-slate-950/80 text-slate-100 flex flex-col font-mono text-xs overflow-hidden select-text">
+    <div className="h-full w-full bg-theme-bg text-slate-100 flex flex-col font-mono text-xs overflow-hidden select-text">
       {/* Editor Tabs Bar */}
       <div className="flex items-center overflow-x-auto bg-slate-900/60 border-b border-white/10 select-none scrollbar-none shrink-0 font-sans">
         {openTabs.map((tab) => {
@@ -75,7 +75,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         {selectedFile ? (
           <>
             {/* Line Numbers */}
-            <div className="text-right text-slate-600 font-mono select-none pr-4 border-r border-white/10 sticky left-0 bg-slate-950/80 h-fit">
+            <div className="text-right text-slate-600 font-mono select-none pr-4 border-r border-white/10 sticky left-0 bg-theme-bg h-fit">
               {lines.map((_, i) => (
                 <div key={i} className="leading-5 h-5 min-w-[24px]">
                   {i + 1}

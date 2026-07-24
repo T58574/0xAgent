@@ -266,7 +266,17 @@ export async function runAgentLoop(
     }
 
     const memoryContext = getSystemPromptMemoryContext();
-    const fullSystemPrompt = config.system_prompt + memoryContext;
+    const envContext = `\n\n# OPERATING SYSTEM & SHELL ENVIRONMENT
+- OS: Windows (${process.platform})
+- Shell: PowerShell (powershell.exe)
+- Active Working Directory: ${config.workspace_dir || process.cwd()}
+
+CRITICAL RULES FOR <execute_command>:
+1. You are running on Windows inside PowerShell. Write standard PowerShell commands.
+2. Do NOT wrap commands in "powershell -Command ...", "powershell -Command cd ...", or explicit "cd <path>". The command is ALREADY executed inside PowerShell in the workspace root directory! Write direct commands like: \`npm run build\`, \`npx tsc --noEmit\`, \`Get-ChildItem\`, \`git status\`.
+3. NEVER execute long-running blocking background dev-servers (e.g., 'npm run dev', 'vite', 'npm start') inside <execute_command> as they will run indefinitely and time out. Execute one-off build or test commands instead.`;
+
+    const fullSystemPrompt = config.system_prompt + envContext + memoryContext;
 
     const messages = [
       { role: 'system', content: fullSystemPrompt },

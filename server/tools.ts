@@ -165,23 +165,57 @@ export function executeGrepSearch(workspaceDir: string | null | undefined, patte
 
 export function executeShellCommand(workspaceDir: string | null | undefined, commandStr: string): Promise<string> {
   return new Promise((resolve) => {
+    let cleanCmd = commandStr.trim();
+    // Strip redundant powershell -Command "cd '...'; ..." wrapper if present
+    const psWrapperRegex = /^powershell(?:\.exe)?\s+(?:-[a-zA-Z]+\s+)*-Command\s+["'](.*)["']$/is;
+    const match = psWrapperRegex.exec(cleanCmd);
+    if (match) {
+      cleanCmd = match[1];
+    }
+
     const isWindows = process.platform === 'win32';
     const shell = isWindows ? 'powershell.exe' : 'sh';
-    const args = isWindows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', commandStr] : ['-c', commandStr];
+    const args = isWindows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', cleanCmd] : ['-c', cleanCmd];
     const cwd = workspaceDir && fs.existsSync(workspaceDir) ? workspaceDir : process.cwd();
 
     const child = spawn(shell, args, { cwd });
     let stdout = '';
     let stderr = '';
+    let isTimedOut = false;
+
+    // 30-second timeout guard to prevent infinite process hangs
+    const timeoutTimer = setTimeout(() => {
+      isTimedOut = true;
+      try {
+        if (isWindows && child.pid) {
+          execSync(`taskkill /pid ${child.pid} /T /F`);
+        } else {
+          child.kill('SIGKILL');
+        }
+      } catch {}
+
+      const partialOutput = (stdout + (stderr ? `\n--- STDERR ---\n${stderr}` : '')).trim();
+      resolve(
+        `⚠️ Ошибка: Команда превысила 30-секундный лимит и была принудительно остановлена.\n` +
+        `Полученный вывод до останова:\n${partialOutput || '(Вывод отсутствует)'}\n\n` +
+        `[СИСТЕМНОЕ ПРЕДУПРЕЖДЕНИЕ ДЛЯ АГЕНТА]: Запрещено запускать фоновые бессрочные dev-серверы (например, 'npm run dev' или 'vite') через <execute_command>, так как они никогда не завершаются сами. Используйте одноразовые команды сборки или тестов (например 'npm run build' или 'npx tsc').`
+      );
+    }, 30000);
 
     child.stdout?.on('data', (data) => { stdout += data.toString(); });
     child.stderr?.on('data', (data) => { stderr += data.toString(); });
 
     child.on('error', (err) => {
-      resolve(`Error launching process: ${err.message}`);
+      clearTimeout(timeoutTimer);
+      if (!isTimedOut) {
+        resolve(`Error launching process: ${err.message}`);
+      }
     });
 
     child.on('close', (code) => {
+      clearTimeout(timeoutTimer);
+      if (isTimedOut) return;
+
       let result = '';
       if (stdout && stdout.trim().length > 0) {
         result += stdout;

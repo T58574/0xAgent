@@ -222,7 +222,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-hidden relative">
+    <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-hidden relative">
       
       {/* 1. EMPTY CHAT WELCOME VIEW */}
       {!hasMessages && (

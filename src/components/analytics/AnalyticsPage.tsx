@@ -93,7 +93,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
   }, [allAssistantMessages, searchFilter, selectedCategory]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-slate-950 overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin font-sans">
+    <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin font-sans">
       
       {/* HEADER BAR */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
