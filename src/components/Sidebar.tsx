@@ -89,16 +89,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <Plus size={16} />
           </button>
 
-          {workspaceDir && (
-            <button
-              type="button"
-              onClick={() => onCreateSession(`Чат (${getWorkspaceBaseName(workspaceDir)})`, workspaceDir)}
-              className="p-2 rounded-lg bg-white/10 text-white border border-[var(--theme-border)] hover:bg-white/20 cursor-pointer"
-              title={`Чат в Workspace: ${getWorkspaceBaseName(workspaceDir)}`}
-            >
-              <FolderPlus size={16} />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onSelectWorkspace}
+            className="p-2 rounded-lg text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 cursor-pointer"
+            title="Открыть новый Workspace"
+          >
+            <FolderPlus size={16} />
+          </button>
         </div>
 
         <div className="flex flex-col items-center gap-2">
@@ -153,17 +151,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span>{workspaceDir ? `Чат в ${getWorkspaceBaseName(workspaceDir)}` : 'Создать новый чат'}</span>
         </button>
 
-        {/* Sub-Action: Open Workspace Directory if not set */}
-        {!workspaceDir && (
-          <button
-            type="button"
-            onClick={onSelectWorkspace}
-            className="w-full flat-btn py-1.5 px-3 rounded-lg text-xs font-medium text-theme-muted hover:text-theme-text flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <Folder size={13} />
-            <span>Открыть воркспейс...</span>
-          </button>
-        )}
+        {/* Single Workspace Select/Open Action Button */}
+        <button
+          type="button"
+          onClick={onSelectWorkspace}
+          className="w-full flat-btn py-1.5 px-3 rounded-lg text-xs font-medium text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+          title="Открыть диалог выбора папки Workspace"
+        >
+          <FolderPlus size={14} className="text-emerald-400" />
+          <span>{workspaceDir ? 'Сменить воркспейс...' : 'Открыть воркспейс...'}</span>
+        </button>
       </div>
 
       {/* 2. MIDDLE SESSIONS LIST (SCROLLABLE) */}

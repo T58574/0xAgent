@@ -382,17 +382,24 @@ export async function selectWorkspaceNative(): Promise<string | null> {
       try {
         const psScript = `
           Add-Type -AssemblyName System.Windows.Forms
-          $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-          $dialog.Description = "Select Workspace Folder for 0xAgent"
-          $result = $dialog.ShowDialog()
-          if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-              Write-Output $dialog.SelectedPath
+          $app = New-Object -ComObject Shell.Application
+          $folder = $app.BrowseForFolder(0, "Выберите папку Workspace для 0xAgent", 0, 0)
+          if ($folder -ne $null) {
+              Write-Output $folder.Self.Path
+          } else {
+              $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+              $dialog.Description = "Выберите папку Workspace для 0xAgent"
+              $dialog.ShowNewFolderButton = $true
+              $result = $dialog.ShowDialog()
+              if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+                  Write-Output $dialog.SelectedPath
+              }
           }
         `;
         const buf = Buffer.from(psScript, 'utf-16le');
         const base64 = buf.toString('base64');
         const { exec } = require('node:child_process');
-        exec(`powershell -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' }, (err: any, stdout: string) => {
+        exec(`powershell -Sta -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' }, (err: any, stdout: string) => {
           if (err) {
             console.error('Failed to open native Windows folder dialog:', err);
             resolve(null);
@@ -428,7 +435,7 @@ export async function selectFileNative(filter?: string): Promise<string | null> 
         const buf = Buffer.from(psScript, 'utf-16le');
         const base64 = buf.toString('base64');
         const { exec } = require('node:child_process');
-        exec(`powershell -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' }, (err: any, stdout: string) => {
+        exec(`powershell -Sta -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' }, (err: any, stdout: string) => {
           if (err) {
             console.error('Failed to open native Windows file dialog:', err);
             resolve(null);
