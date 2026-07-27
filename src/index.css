@@ -216,3 +216,15 @@ html, body {
   color: var(--theme-accent);
 }
 
+/* LAN Share dropdown animation */
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+

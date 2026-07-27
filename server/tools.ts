@@ -381,19 +381,13 @@ export async function selectWorkspaceNative(): Promise<string | null> {
     return new Promise((resolve) => {
       try {
         const psScript = `
-          Add-Type -AssemblyName System.Windows.Forms
-          $app = New-Object -ComObject Shell.Application
-          $folder = $app.BrowseForFolder(0, "Выберите папку Workspace для 0xAgent", 0, 0)
-          if ($folder -ne $null) {
-              Write-Output $folder.Self.Path
-          } else {
-              $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-              $dialog.Description = "Выберите папку Workspace для 0xAgent"
-              $dialog.ShowNewFolderButton = $true
-              $result = $dialog.ShowDialog()
-              if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-                  Write-Output $dialog.SelectedPath
-              }
+          [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null
+          $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+          $dialog.Description = "Выберите папку Workspace для 0xAgent"
+          $dialog.ShowNewFolderButton = $true
+          $result = $dialog.ShowDialog()
+          if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+              Write-Output $dialog.SelectedPath
           }
         `;
         const buf = Buffer.from(psScript, 'utf-16le');

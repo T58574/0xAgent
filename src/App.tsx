@@ -10,6 +10,7 @@ import { SettingsPage } from './components/settings/SettingsPage';
 import { CodeEditor } from './components/CodeEditor';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
 import { ModelPickerModal } from './components/ModelPickerModal';
+import { WorkspacePickerModal } from './components/WorkspacePickerModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { LockScreen } from './components/LockScreen';
 import { FolderTree, Code, Terminal, X } from 'lucide-react';
@@ -26,6 +27,8 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
   const [isModelPickerOpen, setIsModelPickerOpen] = useState<boolean>(false);
+  const [isWorkspacePickerOpen, setIsWorkspacePickerOpen] = useState<boolean>(false);
+
 
   
   // Agent loop & telemetry state
@@ -288,20 +291,28 @@ export default function App() {
     }
   };
 
-  // 4. Select workspace directory
-  const handleSelectWorkspace = async () => {
+  // 4. Select workspace directory modal handler
+  const handleSelectWorkspace = () => {
+    setIsWorkspacePickerOpen(true);
+  };
+
+  const handleSelectWorkspaceDir = async (dirPath: string) => {
     try {
-      const folder = await api.select_workspace();
-      if (folder) {
-        addLog(`Selected workspace: ${folder}`);
-        const updatedConfig = await api.get_config();
-        setConfig(updatedConfig);
-        loadWorkspaceTree(folder);
+      let currentCfg = config;
+      if (!currentCfg) {
+        currentCfg = await api.get_config();
       }
+      const updated = { ...currentCfg, workspace_dir: dirPath };
+      await api.save_config(updated);
+      setConfig(updated);
+      loadWorkspaceTree(dirPath);
+      addLog(`Selected workspace: ${dirPath}`);
     } catch (err: any) {
-      addLog(`Failed to select directory: ${err.message || err}`);
+      addLog(`Failed to select workspace directory: ${err.message || err}`);
+      throw err;
     }
   };
+
 
   // 5. Save settings config updates
   const handleSaveConfig = async (updated: AppConfig) => {
@@ -807,8 +818,15 @@ export default function App() {
         initialDir={config?.models_path || undefined}
       />
 
+      {/* WORKSPACE DIRECTORY PICKER MODAL */}
+      <WorkspacePickerModal
+        isOpen={isWorkspacePickerOpen}
+        onClose={() => setIsWorkspacePickerOpen(false)}
+        onSelectWorkspaceDir={handleSelectWorkspaceDir}
+        currentWorkspaceDir={config?.workspace_dir}
+        recentWorkspaces={sessions.map((s) => s.workspace_dir).filter((d): d is string => Boolean(d))}
+      />
 
-      {/* MASTER PASSWORD LOCK SCREEN OVERLAY */}
       {(!isAuthenticated || !isPasswordSet) && (
         <LockScreen
           isPasswordSet={isPasswordSet}

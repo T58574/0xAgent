@@ -543,5 +543,11 @@ export async function save_summarizer_prompt(content: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+export async function get_local_ips(): Promise<{ urls: string[] }> {
+  const res = await authFetch(`${API_BASE}/get-local-ips`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 
 

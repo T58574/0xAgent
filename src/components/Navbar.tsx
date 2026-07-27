@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   PanelLeft,
   Folder,
@@ -10,6 +10,10 @@ import {
   RefreshCw,
   FileText,
   Terminal,
+  Wifi,
+  Copy,
+  Check,
+  X,
 } from 'lucide-react';
 import { AppConfig } from '../types';
 import { getWorkspaceBaseName } from '../utils/helpers';
@@ -44,6 +48,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { showToast } = useToast();
   const [internalIsServerOffline, setInternalIsServerOffline] = useState(true);
   const [isStartingServer, setIsStartingServer] = useState(false);
+
+  // LAN Sharing state
+  const [lanOpen, setLanOpen] = useState(false);
+  const [lanUrls, setLanUrls] = useState<string[]>([]);
+  const [lanLoading, setLanLoading] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
+  const lanRef = useRef<HTMLDivElement>(null);
 
   const isServerOffline = isServerOfflineProp !== undefined ? isServerOfflineProp : internalIsServerOffline;
 
@@ -134,6 +145,46 @@ export const Navbar: React.FC<NavbarProps> = ({
       setIsStartingServer(false);
     }
   };
+
+  // LAN Sharing handlers
+  const handleToggleLan = async () => {
+    if (lanOpen) {
+      setLanOpen(false);
+      return;
+    }
+    setLanOpen(true);
+    setLanLoading(true);
+    try {
+      const data = await api.get_local_ips();
+      setLanUrls(data.urls || []);
+    } catch (err) {
+      console.error('Failed to get local IPs:', err);
+      setLanUrls([]);
+    } finally {
+      setLanLoading(false);
+    }
+  };
+
+  const handleCopyUrl = (url: string) => {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedUrl(url);
+      showToast(`Скопировано: ${url}`, 'success');
+      setTimeout(() => setCopiedUrl(null), 2000);
+    });
+  };
+
+  // Close LAN dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (lanRef.current && !lanRef.current.contains(e.target as Node)) {
+        setLanOpen(false);
+      }
+    };
+    if (lanOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [lanOpen]);
 
   return (
     <header className="w-full bg-[#0b0c10] border-b border-white/10 px-3 py-1.5 flex items-center justify-between select-none z-30 shrink-0 font-sans text-xs text-slate-200 backdrop-blur-xl">
@@ -262,6 +313,85 @@ export const Navbar: React.FC<NavbarProps> = ({
             <BarChart2 size={13} />
             <span className="hidden sm:inline">Аналитика</span>
           </button>
+        </div>
+
+        {/* LAN Share Button & Dropdown */}
+        <div className="relative" ref={lanRef}>
+          <button
+            type="button"
+            onClick={handleToggleLan}
+            className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 text-[11px] font-semibold ${
+              lanOpen
+                ? 'bg-violet-500/20 border-violet-500/40 text-violet-300 shadow-[0_0_12px_rgba(139,92,246,0.25)]'
+                : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-violet-300 hover:bg-violet-500/10 hover:border-violet-500/30'
+            }`}
+            title="Раздача в локальную сеть (Wi-Fi)"
+          >
+            <Wifi size={14} />
+            <span className="hidden lg:inline">LAN</span>
+          </button>
+
+          {/* LAN Dropdown */}
+          {lanOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-white/15 bg-[#12131a]/95 backdrop-blur-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden"
+              style={{ animation: 'fadeSlideDown 0.2s ease-out' }}
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10">
+                <div className="flex items-center gap-2">
+                  <Wifi size={14} className="text-violet-400" />
+                  <span className="text-xs font-bold text-white tracking-wide">Раздача в LAN</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLanOpen(false)}
+                  className="p-1 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-4">
+                {lanLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-4">
+                    <RefreshCw size={14} className="text-violet-400 animate-spin" />
+                    <span className="text-xs text-slate-400">Определение IP-адресов...</span>
+                  </div>
+                ) : lanUrls.length === 0 ? (
+                  <div className="text-center py-4">
+                    <span className="text-xs text-slate-500">Нет доступных адресов</span>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-[10px] text-slate-500 mb-3">Откройте любой из этих адресов на другом устройстве в вашей Wi-Fi сети:</p>
+                    {lanUrls.map((url) => (
+                      <div
+                        key={url}
+                        className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-white/[0.04] border border-white/10 hover:border-violet-500/30 transition-colors group"
+                      >
+                        <span className="text-[11px] font-mono text-emerald-300 truncate">{url}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleCopyUrl(url)}
+                          className="shrink-0 p-1.5 rounded-md bg-white/[0.06] hover:bg-violet-500/20 text-slate-400 hover:text-violet-300 border border-transparent hover:border-violet-500/30 transition-all cursor-pointer"
+                          title="Скопировать"
+                        >
+                          {copiedUrl === url ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer hint */}
+              <div className="px-4 py-2.5 border-t border-white/10 bg-white/[0.02]">
+                <p className="text-[9px] text-slate-600 text-center">Устройства должны быть в одной Wi-Fi сети • Порт 5173</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Top Right "Open IDE" Action Button */}
