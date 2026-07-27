@@ -168,6 +168,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       }
     }
     if (imageFiles.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
       processImageFiles(imageFiles);
     }
   };
@@ -474,7 +476,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
-                onPaste={handlePaste}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -724,7 +725,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  onPaste={handlePaste}
                   placeholder="Задайте вопрос, вставьте картинку (Ctrl+V) или перетащите файл..."
                   className="w-full pl-4 pr-16 py-2.5 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
                 />
