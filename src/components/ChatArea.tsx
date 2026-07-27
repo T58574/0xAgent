@@ -1,7 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, Zap, Cpu, Play, AlertCircle } from 'lucide-react';
+import {
+  Mic,
+  Square,
+  Send,
+  Brain,
+  Terminal,
+  Sparkles,
+  RefreshCw,
+  Zap,
+  Cpu,
+  Play,
+  AlertCircle,
+  Plus,
+  Folder,
+  ChevronDown,
+  Eye,
+} from 'lucide-react';
 import { ChatMessage, LiveTelemetry } from '../types';
-import { cleanContent } from '../utils/helpers';
+import { cleanContent, getWorkspaceBaseName } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
 import * as api from '../services/api';
@@ -20,6 +36,10 @@ interface ChatAreaProps {
   onTogglePlanningMode?: () => void;
   isServerOffline?: boolean;
   onStartServer?: () => Promise<void>;
+  workspaceDir?: string | null;
+  onSelectWorkspace?: () => void;
+  modelName?: string;
+  onOpenModelPicker?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -35,6 +55,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onTogglePlanningMode,
   isServerOffline = false,
   onStartServer,
+  workspaceDir,
+  onSelectWorkspace,
+  modelName,
+  onOpenModelPicker,
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
@@ -169,8 +193,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!inputText.trim()) return;
     isUserScrolledUpRef.current = false;
     onSendMessage(inputText.trim());
@@ -185,18 +209,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="flex items-center justify-center pt-2 select-none">
         <label
           onClick={onTogglePlanningMode}
-          className="flex items-center gap-2 text-xs text-[var(--theme-text)] opacity-80 hover:opacity-100 cursor-pointer transition-opacity"
+          className="flex items-center gap-2 text-xs text-slate-300 opacity-80 hover:opacity-100 cursor-pointer transition-opacity"
         >
           <div
             className={`w-8 h-4 flex items-center rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
-              planningMode ? 'bg-[var(--theme-accent)] justify-end' : 'bg-slate-700 justify-start'
+              planningMode ? 'bg-emerald-500 justify-end' : 'bg-slate-700 justify-start'
             }`}
           >
             <div className="w-3 h-3 rounded-full bg-white shadow-md" />
           </div>
           <span className="font-medium text-[11px]">
             Режим планирования:{' '}
-            <strong className={planningMode ? 'text-[var(--theme-accent)]' : 'text-slate-400'}>
+            <strong className={planningMode ? 'text-emerald-400' : 'text-slate-400'}>
               {planningMode ? 'ВКЛ' : 'ВЫКЛ'}
             </strong>
           </span>
@@ -208,7 +232,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const renderStreamingBanner = () => {
     if (agentStatus !== 'thinking' && agentStatus !== 'executing_tool') return null;
     return (
-      <div className="self-start w-full max-w-full my-2 p-3 rounded-lg bg-slate-900/90 border border-emerald-500/30 text-xs text-slate-200 shadow-md space-y-2 font-sans">
+      <div className="self-start w-full max-w-full my-2 p-3 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs text-slate-200 shadow-md space-y-2 font-sans">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 font-medium">
             <RefreshCw size={13} className="animate-spin text-emerald-400" />
@@ -301,43 +325,102 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-hidden relative select-text">
+    <div className="flex-1 flex flex-col h-full bg-[#0b0c10] overflow-hidden relative select-text">
       
-      {/* 1. EMPTY CHAT WELCOME VIEW (Centered hero prompt input) */}
+      {/* 1. EMPTY CHAT WELCOME HERO VIEW */}
       {!hasMessages && (
-        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center z-10 w-full max-w-2xl mx-auto my-auto">
+        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center z-10 w-full max-w-3xl mx-auto my-auto font-sans">
+          
+          {/* Top Center Workspace Selector Dropdown */}
+          <div className="mb-8">
+            <button
+              type="button"
+              onClick={onSelectWorkspace}
+              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/20 text-slate-200 text-xs font-semibold shadow-sm transition-all cursor-pointer"
+            >
+              <Folder size={14} className="text-emerald-400" />
+              <span>{getWorkspaceBaseName(workspaceDir)}</span>
+              <ChevronDown size={13} className="text-slate-400" />
+            </button>
+          </div>
+
           {renderServerOfflineBanner()}
           {renderSummarizingBanner()}
 
-          <div className="w-full space-y-3">
-            <form onSubmit={handleSubmit} className="w-full flex items-center gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Что строим сегодня?.."
-                  className="w-full px-4 py-3.5 rounded-xl flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none pr-10 shadow-xl border border-white/10"
-                />
-                <button
-                  type="button"
-                  onClick={handleMicClick}
-                  className={`absolute right-3 top-3 p-1 rounded transition-colors ${
-                    isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {isRecording ? <Square size={16} /> : <Mic size={16} />}
-                </button>
+          {/* Floating Hero Card Prompt Box */}
+          <div className="w-full max-w-2xl bg-[#14151c]/90 border border-white/12 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSubmit(e);
+                  }
+                }}
+                rows={2}
+                placeholder="Ask anything, @ to mention, / for actions"
+                className="w-full bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-xs sm:text-sm resize-none font-sans"
+              />
+
+              {/* Bottom bar inside hero input card */}
+              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs">
+                
+                {/* Left side actions */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onSelectWorkspace}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Прикрепить файл / контекст (@)"
+                  >
+                    <Plus size={16} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onOpenModelPicker}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/[0.06] border border-white/10 hover:border-white/20 text-slate-200 text-xs font-medium cursor-pointer transition-colors"
+                  >
+                    <Cpu size={13} className="text-emerald-400" />
+                    <span className="truncate max-w-[170px] font-mono text-[11px]">
+                      {modelName || 'Local LLM Server'}
+                    </span>
+                    <Eye size={12} className="text-slate-400 ml-0.5" />
+                    <ChevronDown size={12} className="text-slate-400" />
+                  </button>
+                </div>
+
+                {/* Right side microphone recording & submit */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleMicClick}
+                    className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                      isRecording
+                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
+                        : 'text-slate-400 hover:text-white hover:bg-white/10'
+                    }`}
+                    title="Голосовой ввод"
+                  >
+                    {isRecording ? <Square size={16} /> : <Mic size={16} />}
+                  </button>
+
+                  {inputText.trim() && (
+                    <button
+                      type="submit"
+                      disabled={isTranscribing}
+                      className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all shadow-md cursor-pointer"
+                    >
+                      <Send size={15} />
+                    </button>
+                  )}
+                </div>
               </div>
-              <button
-                type="submit"
-                disabled={!inputText.trim() || isTranscribing}
-                className="flat-btn rounded-xl px-5 py-3.5 text-xs font-medium text-[var(--theme-text)] border-[var(--theme-border)] hover:bg-white/10 cursor-pointer shadow-xl"
-              >
-                <Send size={16} />
-              </button>
             </form>
           </div>
+
         </div>
       )}
 

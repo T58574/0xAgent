@@ -79,4 +79,25 @@ export function generateShortId(): string {
   return Math.random().toString(36).substring(2, 10);
 }
 
+/**
+ * Format timestamp into relative age string like '10m', '2h', '3d', '1mo'
+ */
+export function formatRelativeTime(timestamp?: number): string {
+  if (!timestamp) return '';
+  const now = Date.now();
+  const diffMs = Math.max(0, now - timestamp);
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHour = Math.floor(diffMin / 60);
+  const diffDay = Math.floor(diffHour / 24);
+  const diffMonth = Math.floor(diffDay / 30);
+
+  if (diffMin < 1) return '1m';
+  if (diffMin < 60) return `${diffMin}m`;
+  if (diffHour < 24) return `${diffHour}h`;
+  if (diffDay < 30) return `${diffDay}d`;
+  return `${diffMonth}mo`;
+}
+
+
 

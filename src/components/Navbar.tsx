@@ -135,32 +135,36 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
-
   return (
-    <header className="w-full bg-[var(--theme-panel)] border-b border-[var(--theme-border)] backdrop-blur-md px-3 py-2 flex items-center justify-between select-none z-30 shrink-0 font-sans text-xs text-[var(--theme-text)]">
-      {/* Left Section: Sidebar Trigger & Workspace Badge */}
-      <div className="flex items-center gap-2">
+    <header className="w-full bg-[#0b0c10] border-b border-white/10 px-3 py-1.5 flex items-center justify-between select-none z-30 shrink-0 font-sans text-xs text-slate-200 backdrop-blur-xl">
+      
+      {/* Left Section: App Brand & Workspace Badge */}
+      <div className="flex items-center gap-2.5">
+        {/* Sidebar Toggle Button */}
         <button
           type="button"
           onClick={onToggleSidebar}
           className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
             sidebarOpen
-              ? 'bg-white/10 border-white/20 text-[var(--theme-text)]'
-              : 'bg-white/[0.03] border-[var(--theme-border)] text-slate-400 hover:text-white hover:bg-white/10'
+              ? 'bg-white/10 border-white/20 text-white'
+              : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white hover:bg-white/10'
           }`}
-          title={sidebarOpen ? 'Скрыть боковую панель' : 'Показать боковую панель'}
+          title={sidebarOpen ? 'Скрыть панель' : 'Показать панель'}
         >
-          <PanelLeft size={16} />
+          <PanelLeft size={15} />
         </button>
 
-        {/* Active Workspace Badge */}
+        {/* 0xAgent Brand Header */}
+        <span className="font-bold text-white tracking-wide text-xs">0xAgent</span>
+
+        {/* Active Workspace Badge Button */}
         <button
           type="button"
           onClick={onSelectWorkspace}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text)] hover:border-white/20 transition-colors cursor-pointer"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 text-[11px] text-slate-200 hover:border-white/20 transition-colors cursor-pointer"
           title={config?.workspace_dir || 'Выбрать папку Workspace'}
         >
-          <Folder size={12} className="text-[var(--theme-accent)]" />
+          <Folder size={12} className="text-emerald-400" />
           <span className="truncate max-w-[150px] font-mono text-[11px] font-medium">
             {getWorkspaceBaseName(config?.workspace_dir)}
           </span>
@@ -168,7 +172,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {has0xAgentMd && (
           <span
-            className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-[10px] text-sky-300 font-mono"
+            className="hidden lg:flex items-center gap-1 px-2 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-[10px] text-sky-300 font-mono"
             title="Автоматический контекст 0xagent.md загружен"
           >
             <FileText size={10} className="text-sky-400" />
@@ -177,15 +181,15 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
       </div>
 
-      {/* Center/Right Section: Navigation View Switcher Tabs & Server Indicator */}
+      {/* Right Section: LLM Server Status, View Switcher Tabs, Open IDE button */}
       <div className="flex items-center gap-2">
         {/* Compact Llama Server Status Indicator */}
-        <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[11px]">
+        <div className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-black/40 border border-white/10 text-[11px]">
           {isServerOffline ? (
             <>
               <div className="flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
-                <span className="text-slate-400 font-medium hidden sm:inline">Сервер не запущен</span>
+                <span className="text-slate-400 font-medium hidden sm:inline">Offline</span>
               </div>
               <button
                 type="button"
@@ -200,13 +204,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           ) : (
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-              <span className="text-emerald-300 font-medium font-mono text-[10px]">LLM запущен</span>
+              <span className="text-emerald-300 font-medium font-mono text-[10px]">LLM Ready</span>
             </div>
           )}
         </div>
 
         {/* View Switcher Tabs */}
-        <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-[var(--theme-border)]">
+        <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-white/10">
           <button
             type="button"
             onClick={() => onChangeView('chat')}
@@ -260,12 +264,23 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
 
-        {/* Logs Drawer Trigger */}
+        {/* Top Right "Open IDE" Action Button */}
+        <button
+          type="button"
+          onClick={() => onChangeView('workspace')}
+          className="flat-btn px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 border border-sky-500/30 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm"
+          title="Открыть окно Редактора IDE"
+        >
+          <Code size={13} className="text-sky-400" />
+          <span className="hidden sm:inline">Open IDE</span>
+        </button>
+
+        {/* Console Logs Trigger */}
         {onToggleLogs && (
           <button
             type="button"
             onClick={onToggleLogs}
-            className="p-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-slate-400 hover:text-white transition-colors cursor-pointer hidden md:flex"
+            className="p-1.5 rounded-lg bg-black/40 border border-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer hidden md:flex"
             title="Логи консоли"
           >
             <Terminal size={14} />

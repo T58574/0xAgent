@@ -9,6 +9,7 @@ import { ChatArea } from './components/ChatArea';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { CodeEditor } from './components/CodeEditor';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
+import { ModelPickerModal } from './components/ModelPickerModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { LockScreen } from './components/LockScreen';
 import { FolderTree, Code, Terminal, X } from 'lucide-react';
@@ -24,6 +25,8 @@ export default function App() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
+  const [isModelPickerOpen, setIsModelPickerOpen] = useState<boolean>(false);
+
   
   // Agent loop & telemetry state
   const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'waiting_approval' | 'executing_tool'>('idle');
@@ -621,6 +624,7 @@ export default function App() {
           workspaceTreeNodes={workspaceTree}
           onFileClick={handleFileClick}
           onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
+          onOpenSettings={() => setActiveView('settings')}
         />
 
         {/* CONTENT VIEWPORT */}
@@ -716,6 +720,10 @@ export default function App() {
                   onTogglePlanningMode={handleTogglePlanningMode}
                   isServerOffline={isServerOffline}
                   onStartServer={handleStartServer}
+                  workspaceDir={config?.workspace_dir}
+                  onSelectWorkspace={handleSelectWorkspace}
+                  modelName={config?.model_name}
+                  onOpenModelPicker={() => setIsModelPickerOpen(true)}
                 />
               </div>
             </div>
@@ -737,6 +745,10 @@ export default function App() {
                 onTogglePlanningMode={handleTogglePlanningMode}
                 isServerOffline={isServerOffline}
                 onStartServer={handleStartServer}
+                workspaceDir={config?.workspace_dir}
+                onSelectWorkspace={handleSelectWorkspace}
+                modelName={config?.model_name}
+                onOpenModelPicker={() => setIsModelPickerOpen(true)}
               />
             </div>
           )}
@@ -775,6 +787,26 @@ export default function App() {
         isOpen={isMemorySkillsOpen}
         onClose={() => setIsMemorySkillsOpen(false)}
       />
+
+      {/* GGUF MODEL PICKER MODAL */}
+      <ModelPickerModal
+        isOpen={isModelPickerOpen}
+        onClose={() => setIsModelPickerOpen(false)}
+        onSelectModel={async (filePath, metadata) => {
+          const mName = metadata?.modelName || filePath.split(/[/\\]/).pop() || filePath;
+          const updated = {
+            ...config!,
+            model_name: mName,
+            local_server: {
+              ...config?.local_server,
+              model_path: filePath,
+            },
+          };
+          await handleSaveConfig(updated);
+        }}
+        initialDir={config?.models_path || undefined}
+      />
+
 
       {/* MASTER PASSWORD LOCK SCREEN OVERLAY */}
       {(!isAuthenticated || !isPasswordSet) && (
