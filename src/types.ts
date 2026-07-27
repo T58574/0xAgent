@@ -18,6 +18,7 @@ export interface PromptFileInfo {
 export interface LocalServerConfig {
   exe_path?: string | null;
   model_path?: string | null;
+  mmproj_path?: string | null;
   host?: string | null;
   port?: number | null;
   ctx_size?: number | null;

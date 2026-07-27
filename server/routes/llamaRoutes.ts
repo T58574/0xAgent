@@ -317,10 +317,26 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         return;
       }
 
+      let targetMmproj = body.mmprojPath || cfg.local_server?.mmproj_path || '';
+      if (!targetMmproj || !fs.existsSync(targetMmproj)) {
+        if (targetModel && fs.existsSync(targetModel)) {
+          const modelDir = path.dirname(targetModel);
+          if (fs.existsSync(modelDir)) {
+            const files = fs.readdirSync(modelDir);
+            const foundMmproj = files.find((f) => f.toLowerCase().includes('mmproj') && f.endsWith('.gguf'));
+            if (foundMmproj) {
+              targetMmproj = path.join(modelDir, foundMmproj);
+              console.log(`[llama.cpp] Auto-detected Vision mmproj file: "${targetMmproj}"`);
+            }
+          }
+        }
+      }
+
       cfg.api_url = `http://${host}:${port}/v1`;
       if (!cfg.local_server) cfg.local_server = {};
       cfg.local_server.exe_path = targetExe;
       cfg.local_server.model_path = targetModel;
+      cfg.local_server.mmproj_path = targetMmproj || null;
       cfg.local_server.host = host;
       cfg.local_server.port = port;
       saveConfig(cfg);
@@ -330,6 +346,11 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         '--host', host,
         '--port', String(port),
       ];
+
+      if (targetMmproj && fs.existsSync(targetMmproj)) {
+        args.push('--mmproj', targetMmproj);
+        appendServerLog(`[INFO] Vision mmproj projector activated: ${path.basename(targetMmproj)}`);
+      }
 
       const getVal = (bodyVal: any, cfgVal: any) => bodyVal !== undefined && bodyVal !== null ? bodyVal : cfgVal;
 
