@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, Zap, Cpu } from 'lucide-react';
+import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, Zap, Cpu, Play, AlertCircle } from 'lucide-react';
 import { ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
@@ -18,6 +18,8 @@ interface ChatAreaProps {
   liveTelemetry?: LiveTelemetry | null;
   planningMode?: boolean;
   onTogglePlanningMode?: () => void;
+  isServerOffline?: boolean;
+  onStartServer?: () => Promise<void>;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -31,6 +33,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   liveTelemetry,
   planningMode = true,
   onTogglePlanningMode,
+  isServerOffline = false,
+  onStartServer,
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
@@ -262,12 +266,35 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     );
   };
 
+  const renderServerOfflineBanner = () => {
+    if (!isServerOffline) return null;
+    return (
+      <div className="mx-auto my-3 w-full max-w-xl p-3.5 rounded-xl bg-rose-950/80 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3 shadow-xl font-sans backdrop-blur-md">
+        <div className="flex items-center gap-2.5">
+          <AlertCircle size={16} className="text-rose-400 shrink-0 animate-pulse" />
+          <span className="font-semibold text-slate-100">Локальный ИИ-сервер llama.cpp не запущен</span>
+        </div>
+        {onStartServer && (
+          <button
+            type="button"
+            onClick={onStartServer}
+            className="flat-btn px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/50 font-semibold cursor-pointer flex items-center gap-1.5 text-xs transition-all shrink-0 shadow-md"
+          >
+            <Play size={13} />
+            <span>Запустить сервер</span>
+          </button>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-hidden relative select-text">
       
       {/* 1. EMPTY CHAT WELCOME VIEW (Centered hero prompt input) */}
       {!hasMessages && (
         <div className="flex-grow flex flex-col items-center justify-center p-6 text-center z-10 w-full max-w-2xl mx-auto my-auto">
+          {renderServerOfflineBanner()}
           {renderSummarizingBanner()}
 
           <div className="w-full space-y-3">

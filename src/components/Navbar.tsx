@@ -14,6 +14,7 @@ import {
 import { AppConfig } from '../types';
 import { getWorkspaceBaseName } from '../utils/helpers';
 import * as api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface NavbarProps {
   sidebarOpen: boolean;
@@ -24,6 +25,8 @@ interface NavbarProps {
   onSelectWorkspace: () => void;
   has0xAgentMd?: boolean;
   onToggleLogs?: () => void;
+  isServerOffline?: boolean;
+  onStartServer?: () => Promise<void>;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -35,9 +38,14 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectWorkspace,
   has0xAgentMd = false,
   onToggleLogs,
+  isServerOffline: isServerOfflineProp,
+  onStartServer: onStartServerProp,
 }) => {
-  const [isServerOffline, setIsServerOffline] = useState(true);
+  const { showToast } = useToast();
+  const [internalIsServerOffline, setInternalIsServerOffline] = useState(true);
   const [isStartingServer, setIsStartingServer] = useState(false);
+
+  const isServerOffline = isServerOfflineProp !== undefined ? isServerOfflineProp : internalIsServerOffline;
 
   useEffect(() => {
     const checkServer = async () => {
@@ -45,9 +53,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         const host = config?.local_server?.host || '127.0.0.1';
         const port = config?.local_server?.port || 11434;
         const h = await api.get_server_health(host, port);
-        setIsServerOffline(!h.ok);
+        setInternalIsServerOffline(!h.ok);
       } catch {
-        setIsServerOffline(true);
+        setInternalIsServerOffline(true);
       }
     };
 
@@ -56,9 +64,9 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     const un = api.listen<{ status: string }>('llama-server-status', (event) => {
       if (event.payload.status === 'running') {
-        setIsServerOffline(false);
+        setInternalIsServerOffline(false);
       } else if (event.payload.status === 'stopped') {
-        setIsServerOffline(true);
+        setInternalIsServerOffline(true);
       }
     });
 
@@ -69,34 +77,59 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, [config]);
 
   const handleStartServer = async () => {
+    if (onStartServerProp) {
+      setIsStartingServer(true);
+      try {
+        await onStartServerProp();
+      } finally {
+        setIsStartingServer(false);
+      }
+      return;
+    }
+
     setIsStartingServer(true);
     try {
-      const serverConfig = config?.local_server ? {
-        exePath: config.local_server.exe_path || undefined,
-        modelPath: config.local_server.model_path || undefined,
-        host: config.local_server.host || '127.0.0.1',
-        port: config.local_server.port || 11434,
-        ctxSize: config.local_server.ctx_size,
-        gpuLayers: config.local_server.gpu_layers,
-        threads: config.local_server.threads,
-        batchSize: config.local_server.batch_size,
-        ubatchSize: config.local_server.ubatch_size,
-        temp: config.local_server.temp,
-        repeatPenalty: config.local_server.repeat_penalty,
-        minP: config.local_server.min_p,
-        flashAttn: config.local_server.flash_attn,
-        mmap: config.local_server.mmap,
-        mlock: config.local_server.mlock,
-        embedding: config.local_server.embedding,
-        contBatching: config.local_server.cont_batching,
-      } : undefined;
+      let currentCfg = config;
+      if (!currentCfg) {
+        try {
+          currentCfg = await api.get_config();
+        } catch {}
+      }
+
+      const ls = currentCfg?.local_server;
+      const serverConfig = ls ? {
+        exePath: ls.exe_path || undefined,
+        modelPath: ls.model_path || undefined,
+        host: ls.host || '127.0.0.1',
+        port: ls.port || 11434,
+        ctxSize: ls.ctx_size,
+        gpuLayers: ls.gpu_layers,
+        threads: ls.threads,
+        batchSize: ls.batch_size,
+        ubatchSize: ls.ubatch_size,
+        temp: ls.temp,
+        repeatPenalty: ls.repeat_penalty,
+        minP: ls.min_p,
+        flashAttn: ls.flash_attn,
+        mmap: ls.mmap,
+        mlock: ls.mlock,
+        embedding: ls.embedding,
+        contBatching: ls.cont_batching,
+      } : {};
 
       const res = await api.start_local_server(serverConfig);
       if (res && res.success) {
-        setIsServerOffline(false);
+        setInternalIsServerOffline(false);
+        showToast('Сервер llama.cpp успешно запущен!', 'success');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to start server from Navbar:', err);
+      const errMsg = err.message || String(err);
+      showToast(errMsg, 'error');
+
+      if (errMsg.includes('не найден') || errMsg.includes('не задан') || errMsg.includes('GGUF')) {
+        onChangeView('settings');
+      }
     } finally {
       setIsStartingServer(false);
     }

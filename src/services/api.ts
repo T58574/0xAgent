@@ -446,7 +446,16 @@ export async function start_local_server(params?: any): Promise<{ success: boole
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params || {}),
   });
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const errText = await res.text();
+    try {
+      const parsed = JSON.parse(errText);
+      if (parsed.error) throw new Error(parsed.error);
+    } catch (e: any) {
+      if (e.message && e.message !== errText && !e.message.startsWith('Unexpected token')) throw e;
+    }
+    throw new Error(errText);
+  }
   return res.json();
 }
 
