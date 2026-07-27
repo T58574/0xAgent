@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { ChatSession, FileNode } from '../types';
 import { WorkspaceTree } from './WorkspaceTree';
+import { getWorkspaceBaseName } from '../utils/helpers';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -47,11 +48,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showFileExplorer, setShowFileExplorer] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
-  const getWorkspaceBaseName = (dirPath?: string | null) => {
-    if (!dirPath) return 'Без папки';
-    const parts = dirPath.split(/[/\\]/).filter(Boolean);
-    return parts[parts.length - 1] || dirPath;
-  };
 
   const toggleGroup = (key: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));

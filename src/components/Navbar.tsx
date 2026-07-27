@@ -12,6 +12,7 @@ import {
   Terminal,
 } from 'lucide-react';
 import { AppConfig } from '../types';
+import { getWorkspaceBaseName } from '../utils/helpers';
 import * as api from '../services/api';
 
 interface NavbarProps {
@@ -81,11 +82,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   };
 
-  const getWorkspaceBaseName = (dirPath?: string | null) => {
-    if (!dirPath) return 'Без папки';
-    const parts = dirPath.split(/[/\\]/).filter(Boolean);
-    return parts[parts.length - 1] || dirPath;
-  };
 
   return (
     <header className="w-full bg-[var(--theme-panel)] border-b border-[var(--theme-border)] backdrop-blur-md px-3 py-2 flex items-center justify-between select-none z-30 shrink-0 font-sans text-xs text-[var(--theme-text)]">

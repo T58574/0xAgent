@@ -406,47 +406,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             })}
 
             {/* LIVE STREAMING TELEMETRY BANNER */}
-            {(agentStatus === 'thinking' || agentStatus === 'executing_tool') && (
-              <div className="self-start w-full max-w-full my-2 p-3 rounded-lg bg-slate-900/90 border border-emerald-500/30 text-xs text-slate-200 shadow-md space-y-2 font-sans">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 font-medium">
-                    <RefreshCw size={13} className="animate-spin text-emerald-400" />
-                    <span>
-                      {agentStatus === 'thinking' ? 'Агент генерирует ответ...' : 'Агент выполняет инструмент...'}
-                    </span>
-                  </div>
-                  {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/30 animate-pulse flex items-center gap-1">
-                      <Zap size={11} />
-                      <span>{liveTelemetry.tokensPerSec} t/s</span>
-                    </span>
-                  )}
-                </div>
-
-                {liveTelemetry?.contextUsed !== undefined && (
-                  <div className="space-y-1 pt-1 font-mono text-[11px] text-slate-400 border-t border-white/5">
-                    <div className="flex justify-between items-center">
-                      <span>Заполнение контекста: <strong className="text-slate-200">{liveTelemetry.contextUsed.toLocaleString()}</strong> / {liveTelemetry.contextMax?.toLocaleString()} tok</span>
-                      <span className="text-blue-300 font-semibold">
-                        {((liveTelemetry.contextUsed / (liveTelemetry.contextMax || 8192)) * 100).toFixed(1)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5">
-                      <div
-                        className="bg-emerald-400 h-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, (liveTelemetry.contextUsed / (liveTelemetry.contextMax || 8192)) * 100)}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
+            {renderStreamingBanner()}
 
             <div ref={historyEndRef} />
           </div>
-
-          {/* STREAMING TELEMETRY BADGE */}
-          {renderStreamingBanner()}
 
           {/* SUMMARIZING SCI-FI BANNER */}
           {renderSummarizingBanner()}

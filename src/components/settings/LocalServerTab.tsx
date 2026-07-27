@@ -239,8 +239,10 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     try {
       const list = await api.get_installed_llama_versions();
       setInstalledVersions(list);
+      return list;
     } catch (err) {
       console.error('Failed to refresh installed versions:', err);
+      return [];
     }
   };
 
@@ -297,9 +299,8 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     setDeletingTag(tag);
     try {
       const res = await api.delete_installed_llama(tag, vExePath);
-      await refreshInstalledVersions();
+      const updated = await refreshInstalledVersions();
       if (exePath.toLowerCase() === vExePath.toLowerCase()) {
-        const updated = await api.get_installed_llama_versions();
         if (updated.length > 0) {
           setExePath(updated[0].exePath);
         } else {

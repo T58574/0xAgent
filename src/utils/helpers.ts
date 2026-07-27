@@ -59,3 +59,13 @@ export function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+/**
+ * Extracts the last folder name from a given workspace directory path
+ */
+export function getWorkspaceBaseName(dirPath?: string | null): string {
+  if (!dirPath) return 'Без папки';
+  const parts = dirPath.split(/[/\\]/).filter(Boolean);
+  return parts[parts.length - 1] || dirPath;
+}
+
