@@ -578,4 +578,10 @@ export async function save_summarizer_prompt(content: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+export async function autotune_hardware(): Promise<{ hardware: any; optimal: any }> {
+  const res = await authFetch(`${API_BASE}/autotune-hardware`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 

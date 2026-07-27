@@ -75,6 +75,14 @@ export async function summarizeContext(
     percent: 55,
   });
 
+  const maxCharLen = 16000;
+  const trimmedExcerpt =
+    conversationExcerpt.length > maxCharLen
+      ? conversationExcerpt.substring(0, 4000) +
+        '\n\n[... Промежуточная часть диалога сжата ...]\n\n' +
+        conversationExcerpt.substring(conversationExcerpt.length - 12000)
+      : conversationExcerpt;
+
   try {
     const res = await fetch(apiEndpoint, {
       method: 'POST',
@@ -85,7 +93,7 @@ export async function summarizeContext(
           { role: 'system', content: summarizerPrompt },
           {
             role: 'user',
-            content: `Пожалуйста, составьте сжатое резюме по следующей истории диалога:\n\n${conversationExcerpt.substring(0, 16000)}`,
+            content: `Пожалуйста, составьте сжатое резюме по следующей истории диалога:\n\n${trimmedExcerpt}`,
           },
         ],
         temperature: 0.2,

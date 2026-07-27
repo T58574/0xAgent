@@ -31,6 +31,7 @@ export interface LocalServerConfig {
   prompt_cache?: boolean | null;
   mlock?: boolean | null;
   mmap?: boolean | null;
+  parallel_slots?: number | null;
   custom_args?: string | null;
 }
 
@@ -150,6 +151,9 @@ export interface HardwareInfo {
   recommendedBuild: string;
   recommendedAssetKeywords: string[];
   isAutoDetected: boolean;
+  vramMB?: number;
+  ramGB?: number;
+  cpuCores?: number;
 }
 
 export interface ServerStatusInfo {

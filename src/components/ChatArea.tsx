@@ -68,16 +68,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       setSummarizePercent(e.payload.percent);
     });
 
+    let sumTimer: any = null;
     const u3 = api.listen<{ oldTokens: number; newTokens: number; summary: string }>('agent-summarizing-end', (e) => {
       setSummarizePercent(100);
       setSummarizePhase('✨ Контекст успешно сжат!');
       setSummarizeMetrics({ oldTokens: e.payload.oldTokens, newTokens: e.payload.newTokens });
-      setTimeout(() => {
+      sumTimer = setTimeout(() => {
         setIsSummarizing(false);
       }, 3500);
     });
 
     return () => {
+      if (sumTimer) clearTimeout(sumTimer);
       u1();
       u2();
       u3();

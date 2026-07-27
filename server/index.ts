@@ -39,7 +39,7 @@ import {
   respondToToolConfirmation,
 } from './agent';
 import { parseGgufMetadata, GgufMetadata } from './ggufParser';
-import { detectGpuHardware } from './hardware';
+import { detectGpuHardware, calculateOptimalLlamaConfig } from './hardware';
 import { loadMemories, addOrUpdateMemory, deleteMemory, queryMemories } from './memory';
 import { listSkills, readSkill, writeSkill, deleteSkill } from './skills';
 import {
@@ -778,7 +778,11 @@ function stripAnsiCodes(str: string): string {
   return str.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r/g, '');
 }
 
+let isIntentionalStop = false;
+let lastLaunchParams: any = null;
+
 function stopLlamaServerProcess() {
+  isIntentionalStop = true;
   if (activeLlamaProcess) {
     try {
       if (process.platform === 'win32' && activeLlamaProcess.pid) {
@@ -814,12 +818,20 @@ app.get('/api/server-status', (_req, res) => {
     const isRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
     res.json({
       running: isRunning,
-      pid: activeLlamaProcess?.pid || null,
-      exePath: cfg.local_server?.exe_path || null,
-      modelPath: cfg.local_server?.model_path || null,
       host,
       port,
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Hardware Auto-Tuner Endpoint
+app.get('/api/autotune-hardware', (_req, res) => {
+  try {
+    const hw = detectGpuHardware();
+    const optimal = calculateOptimalLlamaConfig(hw);
+    res.json({ hardware: hw, optimal });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -906,16 +918,17 @@ app.post('/api/start-local-server', (req, res) => {
     const ctxVal = getVal(body.ctxSize, cfg.local_server?.ctx_size ?? 16384);
     if (typeof ctxVal === 'number' && ctxVal > 0) args.push('-c', String(ctxVal));
 
-    const nglVal = getVal(body.gpuLayers, cfg.local_server?.gpu_layers);
+    // Full GPU Offload rule: Always offload ALL model layers to GPU VRAM by default (-ngl 999)
+    const nglVal = getVal(body.gpuLayers, cfg.local_server?.gpu_layers ?? 999);
     if (typeof nglVal === 'number' && nglVal >= 0) args.push('-ngl', String(nglVal));
 
-    const threadsVal = getVal(body.threads, cfg.local_server?.threads);
+    const threadsVal = getVal(body.threads, cfg.local_server?.threads ?? 8);
     if (typeof threadsVal === 'number' && threadsVal > 0) args.push('-t', String(threadsVal));
 
-    const batchVal = getVal(body.batchSize, cfg.local_server?.batch_size);
+    const batchVal = getVal(body.batchSize, cfg.local_server?.batch_size ?? 2048);
     if (typeof batchVal === 'number' && batchVal > 0) args.push('-b', String(batchVal));
 
-    const ubatchVal = getVal(body.ubatchSize, cfg.local_server?.ubatch_size);
+    const ubatchVal = getVal(body.ubatchSize, cfg.local_server?.ubatch_size ?? 512);
     if (typeof ubatchVal === 'number' && ubatchVal > 0) args.push('-ub', String(ubatchVal));
 
     const tempVal = getVal(body.temp, cfg.local_server?.temp);
@@ -927,20 +940,40 @@ app.post('/api/start-local-server', (req, res) => {
     const minPVal = getVal(body.minP, cfg.local_server?.min_p);
     if (typeof minPVal === 'number') args.push('--min-p', String(minPVal));
 
-    const faVal = getVal(body.flashAttn, cfg.local_server.flash_attn);
-    if (faVal === true) args.push('-fa');
+    // Flash Attention enabled by default for max GPU speed
+    const faVal = getVal(body.flashAttn, cfg.local_server?.flash_attn ?? true);
+    if (faVal !== false) args.push('-fa');
 
-    const mmapVal = getVal(body.mmap, cfg.local_server.mmap);
+    const mmapVal = getVal(body.mmap, cfg.local_server?.mmap ?? true);
     if (mmapVal === false) args.push('--no-mmap');
 
-    const mlockVal = getVal(body.mlock, cfg.local_server.mlock);
+    const mlockVal = getVal(body.mlock, cfg.local_server?.mlock);
     if (mlockVal === true) args.push('--mlock');
 
-    const embVal = getVal(body.embedding, cfg.local_server.embedding);
+    const embVal = getVal(body.embedding, cfg.local_server?.embedding);
     if (embVal === true) args.push('--embedding');
 
-    const cbVal = getVal(body.contBatching, cfg.local_server.cont_batching);
-    if (cbVal === true) args.push('--cont-batching');
+    const cbVal = getVal(body.contBatching, cfg.local_server?.cont_batching ?? true);
+    if (cbVal !== false) args.push('--cont-batching');
+
+    // Context shift to prevent hard prompt context crashes
+    args.push('--ctx-shift');
+
+    // Multi-slot parallel processing (2 parallel execution slots)
+    const npVal = getVal(body.parallelSlots, cfg.local_server?.parallel_slots ?? 2);
+    if (typeof npVal === 'number' && npVal > 0) args.push('--parallel', String(npVal));
+
+    // Prefix Caching & Instant TTFT
+    args.push('--cache-reuse', '256');
+    const slotsDir = path.join(os.homedir(), '.0xagent', 'slots');
+    if (!fs.existsSync(slotsDir)) {
+      fs.mkdirSync(slotsDir, { recursive: true });
+    }
+    args.push('--slot-save-path', slotsDir);
+
+    // Save launch parameters for Watchdog Auto-Recovery
+    isIntentionalStop = false;
+    lastLaunchParams = { targetExe, args, host, port };
 
     // Log full launch command for diagnostics
     const cmdLine = `${path.basename(targetExe)} ${args.join(' ')}`;
@@ -988,11 +1021,32 @@ app.post('/api/start-local-server', (req, res) => {
       const exitMsg = `[llama.cpp] Процесс завершён (код: ${code}, сигнал: ${signal})`;
       console.log(exitMsg);
       broadcast('llama-server-log', exitMsg);
-      broadcast('llama-server-status', { status: 'stopped', code, signal });
-      if (code !== null && code !== 0) {
-        broadcast('agent-error', `Сервер llama.cpp аварийно завершился (код: ${code}). Проверьте логи сервера.`);
+
+      if (!isIntentionalStop && lastLaunchParams) {
+        console.warn(`[Watchdog 🛡️] ALERT: llama-server process died unexpectedly! Auto-recovering in 1.5s...`);
+        broadcast('llama-server-log', `[WATCHDOG 🛡️] WARNING: Process crashed (code ${code}). Auto-recovering in 1.5s...`);
+        broadcast('llama-server-status', { status: 'recovering' });
+        activeLlamaProcess = null;
+
+        setTimeout(() => {
+          if (!activeLlamaProcess && !isIntentionalStop && lastLaunchParams) {
+            console.log(`[Watchdog 🛡️] Auto-respawning llama-server...`);
+            const p = lastLaunchParams;
+            activeLlamaProcess = spawn(p.targetExe, p.args, { cwd: path.dirname(p.targetExe) });
+            activeLlamaProcess.stdout?.on('data', handleLogData);
+            activeLlamaProcess.stderr?.on('data', handleLogData);
+            broadcast('llama-server-status', {
+              status: 'running',
+              pid: activeLlamaProcess.pid,
+              host: p.host,
+              port: p.port,
+            });
+          }
+        }, 1500);
+      } else {
+        broadcast('llama-server-status', { status: 'stopped', code, signal });
+        activeLlamaProcess = null;
       }
-      activeLlamaProcess = null;
     });
 
     res.json({ success: true, host, port, pid: activeLlamaProcess.pid, message: `Локальный сервер запущен на http://${host}:${port}/v1` });

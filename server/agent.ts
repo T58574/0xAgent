@@ -36,6 +36,7 @@ export interface PendingConfirmation {
 // Global active confirmations map and cancellation tokens
 const activeConfirmations = new Map<string, PendingConfirmation>();
 const activeCancelTokens = new Set<string>();
+const activeRunningLoops = new Set<string>();
 
 export function respondToToolConfirmation(sessionId: string, toolCallId: string, approve: boolean | string): boolean {
   const key = `${sessionId}:${toolCallId}`;
@@ -309,8 +310,8 @@ export function detectRepetitionLoop(history: ChatMessage[], newContent: string)
   for (const trigger of loopTriggers) {
     if (trimmedNew.includes(trigger)) {
       const assistantMsgs = history.filter((m) => m.role === 'assistant');
-      const prevAssistant = assistantMsgs[assistantMsgs.length - 1];
-      if (prevAssistant && prevAssistant.content.toLowerCase().includes(trigger)) {
+      const recentAssistants = assistantMsgs.slice(-3);
+      if (recentAssistants.some((m) => m.content.toLowerCase().includes(trigger))) {
         return true;
       }
     }
@@ -341,11 +342,18 @@ export async function runAgentLoop(
   config: AppConfig,
   broadcast: EventBroadcaster
 ): Promise<void> {
-  let session = loadSession(sessionId);
-  activeCancelTokens.delete(sessionId);
+  if (activeRunningLoops.has(sessionId)) {
+    console.warn(`[agent] Loop already running for session ${sessionId}. Ignoring duplicate invocation.`);
+    return;
+  }
+  activeRunningLoops.add(sessionId);
 
-  broadcast('agent-status-changed', 'thinking');
-  let loopRetryCount = 0;
+  try {
+    let session = loadSession(sessionId);
+    activeCancelTokens.delete(sessionId);
+
+    broadcast('agent-status-changed', 'thinking');
+    let loopRetryCount = 0;
 
   while (true) {
     if (activeCancelTokens.has(sessionId)) {
@@ -414,7 +422,7 @@ ${activePersona.user}`;
         session.messages = [
           {
             id: uuidv4(),
-            role: 'system' as any,
+            role: 'user',
             content: `[🧠 АВТОМАТИЧЕСКИ СЖАТЫЙ КОНТЕКСТ СЕССИИ]:\n${summaryText}`,
             timestamp: Date.now(),
           },
@@ -912,5 +920,8 @@ ${activePersona.user}`;
     }
 
     broadcast('agent-status-changed', 'thinking');
+  }
+  } finally {
+    activeRunningLoops.delete(sessionId);
   }
 }

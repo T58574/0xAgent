@@ -393,19 +393,23 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
         </div>
       )}
 
-      {/* Hardware Auto-Detector Banner */}
+      {/* Hardware GPU Status Banner (No extra buttons, 100% Full GPU Offload default) */}
       {hardwareInfo && hardwareInfo.isAutoDetected && (
-        <div className="p-2.5 rounded-md bg-slate-900/60 border border-emerald-500/30 flex items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2">
-            <Zap size={14} className="text-emerald-400 shrink-0" />
-            <span>
-              <span className="font-semibold text-slate-200">Автоопределение GPU:</span>{' '}
-              <span className="text-emerald-300 font-mono">{hardwareInfo.gpuName}</span>
-            </span>
+        <div className="p-3 rounded-xl bg-slate-900/80 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+              <Zap size={15} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 font-semibold text-slate-200">
+                <span>Видеокарта:</span>
+                <span className="text-emerald-300 font-mono">{hardwareInfo.gpuName}</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[10px]">
+                  100% Full GPU Offload (-ngl 999)
+                </span>
+              </div>
+            </div>
           </div>
-          <span className="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-medium shrink-0">
-            Рекомендовано: {hardwareInfo.recommendedBuild}
-          </span>
         </div>
       )}
 

@@ -1,6 +1,7 @@
-import React, { useRef } from 'react';
-import { X, Plus, ChevronLeft, ChevronRight, Terminal, FileText } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Plus, ChevronLeft, ChevronRight, Terminal, FileText, User } from 'lucide-react';
 import { ChatSession } from '../types';
+import * as api from '../services/api';
 
 interface HeaderProps {
   sessions: ChatSession[];
@@ -18,9 +19,24 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSession,
   onCreateSession,
   onDeleteSession,
+  onOpenSettings,
   has0xAgentMd = false,
 }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [activePersonaName, setActivePersonaName] = useState<string>('');
+
+  useEffect(() => {
+    const fetchActivePersona = async () => {
+      try {
+        const list = await api.get_personas();
+        const active = list.find((p) => p.is_active);
+        if (active) {
+          setActivePersonaName(active.name);
+        }
+      } catch {}
+    };
+    fetchActivePersona();
+  }, [sessions, currentSessionId]);
 
   const handleScrollLeft = () => {
     if (scrollRef.current) {
@@ -48,6 +64,16 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="text-xs font-semibold tracking-wide text-white flex items-center gap-1.5">
               0xAgent
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {activePersonaName && (
+                <span
+                  className="px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-[10px] text-emerald-300 font-medium flex items-center gap-1 cursor-pointer hover:bg-emerald-500/25 transition-colors"
+                  onClick={onOpenSettings}
+                  title={`Активная личность: ${activePersonaName} (Нажмите для настройки)`}
+                >
+                  <User size={10} className="text-emerald-400" />
+                  <span>{activePersonaName}</span>
+                </span>
+              )}
               {has0xAgentMd && (
                 <span
                   className="px-1.5 py-0.5 rounded bg-sky-500/15 border border-sky-500/30 text-[10px] text-sky-300 font-mono flex items-center gap-1"
