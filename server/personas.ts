@@ -30,6 +30,67 @@ function getPersonasDir(): string {
   return PERSONAS_DIR;
 }
 
+export const UNIFIED_SYSTEM_TOOLS_MD = `# 🧰 UNIFIED SYSTEM TOOL REGISTRY & XML SPECIFICATION
+You have access to 16 native execution tools. Always emit valid XML tool calls inside your response:
+
+1. <read_file path="..." />
+   - Reads exact contents of a file.
+
+2. <write_file path="...">content</write_file>
+   - Creates a new file or overwrites an existing file completely.
+
+3. <patch_file path="...">
+<<<<<<< SEARCH
+exact lines to replace
+=======
+new lines to insert
+>>>>>>> REPLACE
+</patch_file>
+   - Applies targeted line replacements to an existing file.
+
+4. <create_directory path="..." />
+   - Creates directory structure recursively.
+
+5. <get_file_info path="..." />
+   - Returns size, line count, and modification date of a file or directory without loading full content.
+
+6. <list_dir path="..." />
+   - Lists directory contents.
+
+7. <grep_search pattern="..." path="..." />
+   - Performs regex search across files in path.
+
+8. <execute_command>cmd</execute_command>
+   - Executes one-off PowerShell command in workspace root (do not run long-running dev servers).
+
+9. <remember_fact key="..." value="..." category="..." />
+   - Persists key-value fact to long-term memory & active persona profile.
+
+10. <recall_memories query="..." />
+    - Queries stored long-term memory facts.
+
+11. <list_skills />
+    - Lists user custom skills.
+
+12. <execute_skill name="..." args="..." />
+    - Loads skill instructions.
+
+13. <search_sessions query="..." />
+    - Searches past session chat logs.
+
+14. <run_scratch_script language="...">code</run_scratch_script>
+    - Executes temp script (js/node, python, powershell).
+
+15. <ask_user question="..." options="opt1,opt2" />
+    - Asks user for clarification or option selection.
+
+16. <spawn_subagent role="..." goal="..." />
+    - Delegates a sub-task to a specialized sub-agent.`;
+
+export function getUnifiedToolsContext(): string {
+  return `\n\n${UNIFIED_SYSTEM_TOOLS_MD}`;
+}
+
 // Populate default personas if dir is empty
 export function initPersonas(): void {
   const dir = getPersonasDir();
@@ -52,12 +113,7 @@ export function initPersonas(): void {
 ## Core Directives
 - Write clean, type-safe, maintainable code.
 - Solve user requests with maximum execution precision.`,
-      tools: `# TOOLS.md — Tool Usage Instructions
-
-## Tool Preferences
-- Prefer <read_file> before attempting any code edits.
-- Use <patch_file> for targeted edits and <write_file> for creating new files.
-- Validate terminal commands with <execute_command> without blocking processes.`,
+      tools: UNIFIED_SYSTEM_TOOLS_MD,
       user: `# USER.md — User Profile & Observed Preferences
 User Unique ID: usr_core_01
 

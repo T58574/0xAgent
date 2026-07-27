@@ -19,7 +19,7 @@ import {
 import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
 import { listSkills, readSkill } from './skills';
 import { listSessions, loadSession as getSessionById } from './session';
-import { getActivePersona, appendSilentUserTrait } from './personas';
+import { getActivePersona, appendSilentUserTrait, getUnifiedToolsContext } from './personas';
 import { summarizeContext } from './summarizer';
 
 export interface ParsedToolCall {
@@ -437,8 +437,9 @@ ${activePersona.tools}
 ## USER.md — USER PROFILE & OBSERVED TRAITS (${activePersona.metadata.user_id})
 ${activePersona.user}`;
 
+    const unifiedToolsContext = getUnifiedToolsContext();
     const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
-    const fullSystemPrompt = personaContext + envContext + planningContext + memoryContext + workspaceMdContext;
+    const fullSystemPrompt = personaContext + unifiedToolsContext + envContext + planningContext + memoryContext + workspaceMdContext;
 
     const rawMessages = [
       { role: 'system', content: fullSystemPrompt },
