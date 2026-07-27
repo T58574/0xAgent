@@ -16,6 +16,8 @@ import {
   ChevronDown,
   Eye,
   Layers,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent, getWorkspaceBaseName } from '../utils/helpers';
@@ -27,7 +29,7 @@ import { useToast } from '../context/ToastContext';
 interface ChatAreaProps {
   messages: ChatMessage[];
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
-  onSendMessage: (text: string) => void;
+  onSendMessage: (text: string, images?: string[]) => void;
   onRespondToTool: (toolId: string, approve: boolean | string) => void;
   onCancelAgent?: () => void;
   reasoningEnabled?: boolean;
@@ -63,6 +65,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+
   const historyEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUpRef = useRef<boolean>(false);
@@ -122,6 +127,31 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
   }, [messages, agentStatus, liveTelemetry]);
+
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        showToast('Выберите файл изображения (PNG, JPEG, WEBP)', 'info');
+        return;
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        showToast('Размер файла превышает 15 МБ', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          setAttachedImages((prev) => [...prev, reader.result as string]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (e.target) e.target.value = '';
+  };
 
   const startRecording = async () => {
     try {
@@ -196,13 +226,35 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!inputText.trim() && attachedImages.length === 0) return;
     isUserScrolledUpRef.current = false;
-    onSendMessage(inputText.trim());
+    onSendMessage(inputText.trim(), attachedImages.length > 0 ? [...attachedImages] : undefined);
     setInputText('');
+    setAttachedImages([]);
   };
 
   const hasMessages = messages && messages.length > 0;
+
+  const renderAttachedImagesPreview = () => {
+    if (attachedImages.length === 0) return null;
+    return (
+      <div className="flex items-center gap-2.5 p-2 bg-slate-950/80 border border-white/10 rounded-xl overflow-x-auto my-1.5 scrollbar-thin">
+        {attachedImages.map((imgUrl, idx) => (
+          <div key={idx} className="relative group shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-emerald-500/40 bg-slate-900 shadow-md">
+            <img src={imgUrl} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
+            <button
+              type="button"
+              onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
+              className="absolute top-0.5 right-0.5 p-1 rounded-full bg-black/80 text-slate-300 hover:text-white hover:bg-rose-600 transition-colors"
+              title="Удалить изображение"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const renderPlanningToggle = () => {
     if (!onTogglePlanningMode) return null;
@@ -328,6 +380,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0b0c10] overflow-hidden relative select-text">
       
+      {/* Hidden File Input for Image Attachments */}
+      <input
+        type="file"
+        ref={imageFileInputRef}
+        onChange={handleImageFileChange}
+        accept="image/*"
+        multiple
+        className="hidden"
+      />
+
       {/* 1. EMPTY CHAT WELCOME HERO VIEW */}
       {!hasMessages && (
         <div className="flex-grow flex flex-col items-center justify-center p-6 text-center z-10 w-full max-w-3xl mx-auto my-auto font-sans">
@@ -351,6 +413,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* Floating Hero Card Prompt Box */}
           <div className="w-full max-w-2xl bg-[#14151c]/90 border border-white/12 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl space-y-3">
             <form onSubmit={handleSubmit} className="space-y-3">
+              {renderAttachedImagesPreview()}
+
               <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
@@ -361,7 +425,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   }
                 }}
                 rows={2}
-                placeholder="Ask anything, @ to mention, / for actions"
+                placeholder="Задайте вопрос, загрузите изображение или опишите задачу..."
                 className="w-full bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-xs sm:text-sm resize-none font-sans"
               />
 
@@ -370,6 +434,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 
                 {/* Left side actions */}
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => imageFileInputRef.current?.click()}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-white/10 transition-colors cursor-pointer"
+                    title="Загрузить изображение для анализа моделью"
+                  >
+                    <ImageIcon size={16} />
+                  </button>
+
                   <button
                     type="button"
                     onClick={onSelectWorkspace}
@@ -408,7 +481,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     {isRecording ? <Square size={16} /> : <Mic size={16} />}
                   </button>
 
-                  {inputText.trim() && (
+                  {(inputText.trim() || attachedImages.length > 0) && (
                     <button
                       type="submit"
                       disabled={isTranscribing}
@@ -439,8 +512,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               return (
                 <div key={msg.id} className="flex flex-col space-y-1 w-full select-text">
                   {msg.role === 'user' && (
-                    <div className="self-end max-w-[85%] rounded-xl glass-card border border-[var(--theme-accent)]/30 bg-[var(--theme-card-bg)] px-4 py-2.5 text-theme-text text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans select-text shadow-md">
-                      {msg.content}
+                    <div className="self-end max-w-[85%] rounded-xl glass-card border border-[var(--theme-accent)]/30 bg-[var(--theme-card-bg)] px-4 py-2.5 text-theme-text text-xs sm:text-sm leading-relaxed font-sans select-text shadow-md flex flex-col gap-2">
+                      {msg.images && msg.images.length > 0 && (
+                        <div className="flex flex-wrap gap-2 my-1">
+                          {msg.images.map((imgUrl, i) => (
+                            <img
+                              key={i}
+                              src={imgUrl}
+                              alt={`Прикрепленное изображение ${i + 1}`}
+                              className="max-w-[240px] max-h-[180px] rounded-lg border border-white/20 object-contain bg-slate-950/60 shadow-md"
+                            />
+                          ))}
+                        </div>
+                      )}
+                      {msg.content && <div className="whitespace-pre-wrap">{msg.content}</div>}
                     </div>
                   )}
 
@@ -573,25 +658,40 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {renderSummarizingBanner()}
 
           {/* INPUT FORM CONTAINER */}
-          <div className="p-3 border-t border-white/10 glass-panel select-none z-10 w-full">
+          <div className="p-3 border-t border-white/10 glass-panel select-none z-10 w-full flex flex-col gap-2">
+            {renderAttachedImagesPreview()}
+
             <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2">
-              <div className="relative flex-1">
+              <div className="relative flex-1 flex items-center">
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Задайте вопрос или опишите задачу..."
-                  className="w-full px-4 py-2.5 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none pr-10"
+                  placeholder="Задайте вопрос, загрузите изображение или опишите задачу..."
+                  className="w-full pl-4 pr-16 py-2.5 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={handleMicClick}
-                  className={`absolute right-2.5 top-2.5 p-1 rounded transition-colors ${
-                    isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {isRecording ? <Square size={16} /> : <Mic size={16} />}
-                </button>
+
+                <div className="absolute right-2.5 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => imageFileInputRef.current?.click()}
+                    className="p-1 rounded text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                    title="Прикрепить изображение"
+                  >
+                    <ImageIcon size={16} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleMicClick}
+                    className={`p-1 rounded transition-colors ${
+                      isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
+                    }`}
+                    title="Голосовой ввод"
+                  >
+                    {isRecording ? <Square size={16} /> : <Mic size={16} />}
+                  </button>
+                </div>
               </div>
 
               {agentStatus !== 'idle' && onCancelAgent ? (
@@ -606,7 +706,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               ) : (
                 <button
                   type="submit"
-                  disabled={!inputText.trim() || isTranscribing}
+                  disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
                   className="flat-btn rounded-md px-4 py-2.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
                 >
                   <Send size={14} />

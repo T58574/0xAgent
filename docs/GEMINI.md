@@ -192,6 +192,11 @@ Connection: `ws://localhost:3001/ws`. Messages: `{ event, payload }`.
    - On LLM failure or network disconnect, `server/agent.ts` and `server/index.ts` push the error message directly into `session.messages`, update `session.updated_at`, save to disk (`saveSession`), and broadcast `agent-error`.
    - `App.tsx` catches `agent-error` WebSocket events and instantly reloads/renders the session so errors appear immediately inside the chat dialogue without delay.
 
+3. **Multimodal Vision Image Analysis (`src/components/ChatArea.tsx` & `server/agent.ts`)**:
+   - Supports image attachment (PNG, JPEG, WEBP) via file picker or drag-and-drop.
+   - Encodes images to Base64 Data URLs (`data:image/...;base64,...`) and stores them in `ChatMessage.images`.
+   - Formats user prompt payloads using OpenAI Chat Completions Vision standard (`{ type: 'image_url', image_url: { url: ... } }`) for `llama-server.exe` / GGUF vision models (Llama 3.2 Vision, Qwen2-VL, Llava, Moondream).
+
 ---
 
 ## 9. Agent Tool System & Unified TOOLS.md Architecture

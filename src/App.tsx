@@ -358,13 +358,14 @@ export default function App() {
   };
 
   // 7. Chat Send message logic
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, images?: string[]) => {
     if (!currentSession) return;
 
     const userMsg: ChatMessage = {
       id: generateShortId(),
       role: 'user',
       content: text,
+      images: images || null,
       timestamp: Date.now(),
     };
 

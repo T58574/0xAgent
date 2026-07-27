@@ -135,6 +135,7 @@ export interface ChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   timestamp: number;
+  images?: string[] | null;
   tool_calls?: ToolCallInfo[] | null;
   metrics?: MessageMetrics | null;
 }

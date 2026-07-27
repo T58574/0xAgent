@@ -306,10 +306,10 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
 }
 
 export function pruneMessagesForContext(
-  messages: { role: string; content: string }[],
+  messages: { role: string; content: string | any[] }[],
   maxTokens: number
-): { role: string; content: string }[] {
-  const estTokens = (arr: { role: string; content: string }[]) =>
+): { role: string; content: string | any[] }[] {
+  const estTokens = (arr: { role: string; content: string | any[] }[]) =>
     Math.max(1, Math.round(JSON.stringify(arr).length / 3.8));
 
   // Safety context threshold (80% of contextMax)
@@ -329,7 +329,7 @@ export function pruneMessagesForContext(
 
   // Truncate long tool/file outputs in middle messages (Software Context Shift)
   const prunedMiddle = middleMsgs.map((m) => {
-    if (m.content.length > 500 && (m.role === 'user' || m.role === 'tool')) {
+    if (typeof m.content === 'string' && m.content.length > 500 && (m.role === 'user' || m.role === 'tool')) {
       const head = m.content.substring(0, 200);
       const tail = m.content.substring(m.content.length - 200);
       return {
@@ -484,18 +484,37 @@ ${activePersona.user}`;
     const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
     const fullSystemPrompt = personaContext + unifiedToolsContext + toolExecutionDirective + envContext + planningContext + memoryContext + workspaceMdContext;
 
-    const rawMessages = [
+    const formatMessageContent = (m: ChatMessage): string | any[] => {
+      if (Array.isArray(m.images) && m.images.length > 0) {
+        const parts: any[] = [];
+        if (m.content) {
+          parts.push({ type: 'text', text: m.content });
+        } else {
+          parts.push({ type: 'text', text: 'Посмотри на изображение и проанализируй его.' });
+        }
+        for (const imgUrl of m.images) {
+          parts.push({
+            type: 'image_url',
+            image_url: { url: imgUrl },
+          });
+        }
+        return parts;
+      }
+      return m.content;
+    };
+
+    const rawMessages: { role: string; content: string | any[] }[] = [
       { role: 'system', content: fullSystemPrompt },
       ...session.messages.map((m) => ({
         role: m.role === 'tool' ? 'user' : m.role,
-        content: m.content,
+        content: formatMessageContent(m),
       })),
     ];
 
     const contextMax = config.local_server?.ctx_size || config.max_tokens || 16384;
     const estPromptTokens = Math.max(1, Math.round(JSON.stringify(rawMessages).length / 3.8));
 
-    let messages = rawMessages;
+    let messages: { role: string; content: string | any[] }[] = rawMessages;
     if (estPromptTokens > Math.floor(contextMax * 0.75) && session.messages.length > 6) {
       console.log(`[agent] Context size (${estPromptTokens} tokens) exceeded 75% threshold (${contextMax}). Invoking LLM summarizer...`);
       try {
@@ -518,7 +537,7 @@ ${activePersona.user}`;
           { role: 'system', content: fullSystemPrompt },
           ...session.messages.map((m) => ({
             role: m.role === 'tool' ? 'user' : m.role,
-            content: m.content,
+            content: formatMessageContent(m),
           })),
         ];
       } catch (sumErr) {
