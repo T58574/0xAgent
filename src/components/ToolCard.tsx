@@ -1,10 +1,66 @@
 import React, { useState } from 'react';
-import { Check, X, Terminal, FileText, Layers, Search, Folder, CheckCircle2, AlertTriangle, Play, ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
+import {
+  Check,
+  X,
+  Terminal,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  Play,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+} from 'lucide-react';
 import { ToolCallInfo } from '../types';
 
 interface ToolCardProps {
   tool: ToolCallInfo;
   onRespond: (toolId: string, approve: boolean | string) => void;
+}
+
+function calculateDiffStats(toolName: string, args: Record<string, any>): { additions: number; deletions: number } {
+  let additions = 0;
+  let deletions = 0;
+
+  if (toolName === 'write_file' && args.content) {
+    additions = (args.content as string).split(/\r?\n/).length;
+  } else if (toolName === 'patch_file' && args.content) {
+    const raw = args.content as string;
+    const searchMatches = raw.match(/<<<<<<< SEARCH([\s\S]*?)=======/g) || [];
+    for (const m of searchMatches) {
+      deletions += Math.max(0, m.split(/\r?\n/).length - 2);
+    }
+    const replaceMatches = raw.match(/=======([\s\S]*?)>>>>>>> REPLACE/g) || [];
+    for (const m of replaceMatches) {
+      additions += Math.max(0, m.split(/\r?\n/).length - 2);
+    }
+  }
+
+  return { additions, deletions };
+}
+
+function getFileTypeBadge(filePath: string): { label: string; color: string } {
+  if (!filePath) return { label: 'FILE', color: 'bg-slate-800 text-slate-300 border-slate-700' };
+  const ext = filePath.split('.').pop()?.toLowerCase() || '';
+  switch (ext) {
+    case 'ts':
+    case 'tsx':
+      return { label: ext === 'tsx' ? 'TSX' : 'TS', color: 'bg-sky-950/80 text-sky-300 border-sky-500/40' };
+    case 'js':
+    case 'jsx':
+      return { label: 'JS', color: 'bg-amber-950/80 text-amber-300 border-amber-500/40' };
+    case 'md':
+      return { label: 'M+', color: 'bg-purple-950/80 text-purple-300 border-purple-500/40' };
+    case 'json':
+    case 'yml':
+    case 'yaml':
+      return { label: 'CFG', color: 'bg-emerald-950/80 text-emerald-300 border-emerald-500/40' };
+    case 'css':
+    case 'html':
+      return { label: 'UI', color: 'bg-rose-950/80 text-rose-300 border-rose-500/40' };
+    default:
+      return { label: 'FILE', color: 'bg-slate-800 text-slate-300 border-slate-700' };
+  }
 }
 
 export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
@@ -24,6 +80,10 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
     parsedArgs = { raw: tool.arguments };
   }
 
+  const filePath = parsedArgs.path || '';
+  const fileBadge = getFileTypeBadge(filePath);
+  const diffStats = calculateDiffStats(tool.name, parsedArgs);
+
   const getStatusInfo = () => {
     switch (tool.status) {
       case 'completed':
@@ -41,94 +101,154 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
     }
   };
 
-  const getToolIcon = () => {
-    switch (tool.name) {
-      case 'execute_command': return <Terminal size={14} className="text-sky-400" />;
-      case 'write_file': return <FileText size={14} className="text-emerald-400" />;
-      case 'patch_file': return <Layers size={14} className="text-cyan-400" />;
-      case 'read_file': return <FileText size={14} className="text-[var(--theme-text)]" />;
-      case 'grep_search': return <Search size={14} className="text-amber-400" />;
-      case 'list_dir': return <Folder size={14} className="text-emerald-400" />;
-      default: return <Terminal size={14} className="text-[var(--theme-text)]" />;
-    }
-  };
-
   const statusInfo = getStatusInfo();
 
-  return (
-    <div className="glass-card rounded-md p-3.5 my-2.5 border border-[var(--theme-border)] text-[var(--theme-text)] font-sans">
-      {/* Card Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded bg-[var(--theme-panel)] border border-[var(--theme-border)] flex items-center justify-center">
-            {getToolIcon()}
+  const renderPatchDiffFormatted = (patchText: string) => {
+    if (!patchText) return null;
+    const blocks: { search: string; replace: string }[] = [];
+    const searchRegex = /<<<<<<< SEARCH([\s\S]*?)=======([\s\S]*?)>>>>>>> REPLACE/g;
+    let match: RegExpExecArray | null;
+    while ((match = searchRegex.exec(patchText)) !== null) {
+      blocks.push({ search: match[1].trim(), replace: match[2].trim() });
+    }
+
+    if (blocks.length === 0) {
+      return (
+        <div className="text-slate-300 text-[11px] font-mono whitespace-pre-wrap p-2.5 bg-slate-950/80 rounded border border-white/10">
+          {patchText}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2 font-mono text-[11px]">
+        {blocks.map((b, idx) => (
+          <div key={idx} className="rounded overflow-hidden border border-white/10 bg-slate-950/90">
+            {b.search && (
+              <div className="bg-rose-950/40 text-rose-300 p-2.5 border-b border-rose-500/20 whitespace-pre-wrap">
+                <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
+                  <span>- УДАЛЯЕМЫЕ СТРОКИ</span>
+                </div>
+                {b.search.split('\n').map((line, lIdx) => (
+                  <div key={lIdx} className="flex gap-2">
+                    <span className="text-rose-500/60 select-none">-</span>
+                    <span>{line}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {b.replace && (
+              <div className="bg-emerald-950/40 text-emerald-300 p-2.5 whitespace-pre-wrap">
+                <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
+                  <span>+ НОВЫЕ СТРОКИ</span>
+                </div>
+                {b.replace.split('\n').map((line, lIdx) => (
+                  <div key={lIdx} className="flex gap-2">
+                    <span className="text-emerald-500/60 select-none">+</span>
+                    <span>{line}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <div className="text-[10px] text-slate-400 uppercase tracking-wider font-medium">
-              Запрос инструмента
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="rounded-xl p-3.5 my-2.5 bg-slate-900/90 border border-white/10 text-slate-100 font-sans shadow-lg backdrop-blur-md">
+      {/* Header Bar in Antigravity / Claude Code style */}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {/* File Extension Badge */}
+          {filePath ? (
+            <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold border shrink-0 ${fileBadge.color}`}>
+              {fileBadge.label}
+            </span>
+          ) : (
+            <div className="w-7 h-7 rounded bg-slate-800 border border-white/10 flex items-center justify-center shrink-0">
+              {tool.name === 'execute_command' ? <Terminal size={14} className="text-sky-400" /> : <FileText size={14} className="text-amber-400" />}
             </div>
-            <div className="text-xs font-mono font-medium text-white flex items-center gap-1.5">
-              <span>{tool.name}</span>
-              <span className="text-[10px] text-slate-500 font-normal">[{tool.id}]</span>
-            </div>
+          )}
+
+          {/* File path or command description */}
+          <div className="min-w-0">
+            {filePath ? (
+              <div className="text-xs font-mono font-medium text-slate-200 truncate" title={filePath}>
+                {filePath}
+              </div>
+            ) : (
+              <div className="text-xs font-mono font-medium text-slate-200 truncate">
+                {tool.name} <span className="text-[10px] text-slate-500">[{tool.id}]</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Status Badge */}
-        <div className={`px-2 py-0.5 rounded text-[10px] border font-medium flex items-center gap-1.5 ${statusInfo.color}`}>
-          {statusInfo.icon}
-          <span>{statusInfo.label}</span>
+        {/* Diff line stats (+lines -lines) or status badge */}
+        <div className="flex items-center gap-2 shrink-0">
+          {(diffStats.additions > 0 || diffStats.deletions > 0) && (
+            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-950 border border-white/10">
+              {diffStats.additions > 0 && <span className="text-emerald-400">+{diffStats.additions}</span>}
+              {diffStats.deletions > 0 && <span className="text-rose-400">-{diffStats.deletions}</span>}
+            </div>
+          )}
+
+          <div className={`px-2 py-0.5 rounded text-[10px] border font-semibold flex items-center gap-1.5 ${statusInfo.color}`}>
+            {statusInfo.icon}
+            <span>{statusInfo.label}</span>
+          </div>
         </div>
       </div>
 
-      {/* Main Parameters */}
-      <div className="mt-2.5 flat-input rounded-md p-2.5 text-xs font-mono text-slate-200 max-h-40 overflow-y-auto">
+      {/* Action Content Preview */}
+      <div className="mt-3 font-mono text-xs text-slate-200">
         {tool.name === 'execute_command' && (
-          <div className="flex items-start gap-1.5">
+          <div className="flat-input rounded-lg p-2.5 bg-slate-950 border border-white/10 flex items-start gap-2">
             <span className="text-emerald-400 font-bold select-none">PS &gt;</span>
             <span className="text-slate-100 break-all">{parsedArgs.command}</span>
           </div>
         )}
+
         {tool.name === 'write_file' && (
-          <div>
-            <div className="text-slate-400 text-[11px] mb-1">Файл: <span className="text-emerald-300 font-medium">{parsedArgs.path}</span></div>
-            <div className="mt-1 text-slate-300 text-[10px] whitespace-pre-wrap max-h-28 overflow-y-auto bg-slate-950/60 p-2 border border-white/5 rounded">
-              {parsedArgs.content}
-            </div>
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <span>{showDetails ? 'Скрыть содержимое файла' : 'Показать создаваемый файл'}</span>
+              {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+            {showDetails && (
+              <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-3 border border-white/10 rounded-lg text-slate-300">
+                {parsedArgs.content}
+              </div>
+            )}
           </div>
         )}
+
         {tool.name === 'patch_file' && (
-          <div>
-            <div className="text-slate-400 text-[11px] mb-1">Файл: <span className="text-cyan-300 font-medium">{parsedArgs.path}</span></div>
-            <div className="mt-1 text-slate-300 text-[10px] whitespace-pre-wrap max-h-28 overflow-y-auto bg-slate-950/60 p-2 border border-white/5 rounded font-mono">
-              {parsedArgs.content}
-            </div>
+          <div className="space-y-1.5">
+            <button
+              type="button"
+              onClick={() => setShowDetails(!showDetails)}
+              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <span>{showDetails ? 'Скрыть разницу строк (diff)' : 'Просмотреть изменения строк (diff)'}</span>
+              {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+            </button>
+            {showDetails && renderPatchDiffFormatted(parsedArgs.content)}
           </div>
         )}
-        {(tool.name === 'read_file' || tool.name === 'list_dir') && (
-          <div>
-            <span className="text-slate-400">Путь: </span>
-            <span className="text-slate-100">{parsedArgs.path}</span>
-          </div>
-        )}
-        {tool.name === 'grep_search' && (
-          <div className="space-y-1">
-            <div>
-              <span className="text-slate-400">Шаблон: </span>
-              <span className="text-amber-300 font-medium">"{parsedArgs.pattern}"</span>
-            </div>
-            <div>
-              <span className="text-slate-400">Путь: </span>
-              <span className="text-slate-100">{parsedArgs.path}</span>
-            </div>
-          </div>
-        )}
+
         {tool.name === 'ask_user' && (
-          <div className="space-y-2">
+          <div className="space-y-2 font-sans">
             <div className="text-amber-300 font-semibold text-xs flex items-center gap-1.5">
-              <span>Уточняющий вопрос от Агента:</span>
+              <span>Вопрос от Агента:</span>
             </div>
-            <div className="text-slate-100 text-xs font-sans font-medium bg-slate-900/80 p-2.5 rounded border border-white/10">
+            <div className="text-slate-100 text-xs font-medium bg-slate-950 p-3 rounded-lg border border-white/10">
               {parsedArgs.question}
             </div>
             {tool.status === 'pending' && (
@@ -140,7 +260,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
                         key={opt}
                         disabled={isSubmitting}
                         onClick={() => handleAction(opt)}
-                        className="flat-btn px-3 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40"
+                        className="flat-btn px-3 py-1 rounded-lg text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40"
                       >
                         {opt}
                       </button>
@@ -163,12 +283,12 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
                     disabled={isSubmitting}
                     onChange={(e) => setCustomAnswer(e.target.value)}
                     placeholder="Введите ваш ответ..."
-                    className="flex-1 px-3 py-1.5 rounded flat-input text-xs text-slate-100 focus:outline-none"
+                    className="flex-1 px-3 py-1.5 rounded-lg flat-input text-xs text-slate-100 focus:outline-none"
                   />
                   <button
                     type="submit"
                     disabled={!customAnswer.trim() || isSubmitting}
-                    className="flat-btn px-3 py-1.5 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40 flex items-center gap-1.5"
+                    className="flat-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
                   >
                     {isSubmitting && <RefreshCw size={12} className="animate-spin text-emerald-400" />}
                     <span>{isSubmitting ? 'Отправка...' : 'Отправить'}</span>
@@ -178,61 +298,59 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
             )}
           </div>
         )}
+
         {tool.name === 'run_scratch_script' && (
-          <div>
-            <div className="text-slate-400 text-[11px] mb-1">Scratch Script (<span className="text-purple-300 font-mono">{parsedArgs.language}</span>)</div>
-            <div className="text-slate-300 text-[10px] whitespace-pre-wrap max-h-28 overflow-y-auto bg-slate-950/60 p-2 border border-white/5 rounded font-mono">
+          <div className="space-y-1.5">
+            <div className="text-slate-400 text-[11px]">Скрипт ({parsedArgs.language})</div>
+            <div className="text-[10px] whitespace-pre-wrap max-h-36 overflow-y-auto bg-slate-950 p-2.5 border border-white/10 rounded-lg text-slate-300">
               {parsedArgs.code}
             </div>
           </div>
         )}
-        {tool.name === 'spawn_subagent' && (
-          <div className="space-y-1 font-mono">
-            <div><span className="text-slate-400">Суб-агент: </span><span className="text-purple-300 font-semibold">{parsedArgs.role}</span></div>
-            <div><span className="text-slate-400">Задача: </span><span className="text-slate-200">{parsedArgs.goal}</span></div>
-          </div>
-        )}
       </div>
 
-      {/* Interactive Approve / Reject buttons */}
+      {/* Approve / Reject Controls */}
       {tool.status === 'pending' && (
-        <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/5 pt-2.5">
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/10 pt-2.5">
           <button
+            type="button"
             disabled={isSubmitting}
             onClick={() => handleAction(false)}
-            className="flat-btn px-3.5 py-1 rounded text-rose-400 hover:text-rose-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-3.5 py-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 border border-rose-500/30"
           >
-            <X size={12} />
+            <X size={13} />
             <span>Отклонить</span>
           </button>
           <button
+            type="button"
             disabled={isSubmitting}
             onClick={() => handleAction(true)}
-            className="flat-btn px-4 py-1 rounded text-emerald-400 hover:text-emerald-300 text-xs font-medium flex items-center gap-1.5 cursor-pointer border-emerald-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-40"
           >
             {isSubmitting ? (
-              <RefreshCw size={12} className="animate-spin text-emerald-400" />
+              <RefreshCw size={13} className="animate-spin text-white" />
             ) : (
-              <Check size={12} />
+              <Check size={13} />
             )}
             <span>{isSubmitting ? 'Выполняется...' : 'Подтвердить'}</span>
           </button>
         </div>
       )}
 
-      {/* Output Log Drawer */}
+      {/* Execution Output Drawer */}
       {tool.output && (
-        <div className="mt-2">
+        <div className="mt-2.5 border-t border-white/5 pt-2">
           <button
+            type="button"
             onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-white cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-white cursor-pointer transition-colors"
           >
-            <span>{showDetails ? 'Скрыть лог выполнения' : 'Показать лог выполнения'}</span>
+            <span>{showDetails ? 'Скрыть лог выполнения' : 'Показать результат выполнения'}</span>
             {showDetails ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
           </button>
 
           {showDetails && (
-            <div className="mt-1.5 bg-slate-950/80 rounded-md p-2.5 border border-white/10 text-[10px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+            <div className="mt-2 bg-slate-950 rounded-lg p-3 border border-white/10 text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
               {tool.output}
             </div>
           )}

@@ -91,7 +91,7 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
   }
 
   // 2. Write File
-  const reWrite = /<write_file\s+path=["']([^"']+)["']\s*>(.*?)<\/write_file>/gs;
+  const reWrite = /<write_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)<\/write_file>/gs;
   while ((match = reWrite.exec(text)) !== null) {
     toolCalls.push({
       id: `write_${uuidv4().substring(0, 8)}`,
@@ -100,9 +100,23 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
       raw_content: match[0],
     });
   }
+  // Fallback for unclosed write_file
+  const reWriteFallback = /<write_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)(?:<\/write_file>|(?=<write_file|<patch_file|<read_file|<execute_command|$))/gi;
+  let matchWF: RegExpExecArray | null;
+  while ((matchWF = reWriteFallback.exec(text)) !== null) {
+    const raw = matchWF[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw || (tc.name === 'write_file' && tc.arguments.path === matchWF![1]))) {
+      toolCalls.push({
+        id: `write_${uuidv4().substring(0, 8)}`,
+        name: 'write_file',
+        arguments: { path: matchWF[1], content: matchWF[2].trim() },
+        raw_content: raw,
+      });
+    }
+  }
 
   // 3. Patch File
-  const rePatch = /<patch_file\s+path=["']([^"']+)["']\s*>(.*?)<\/patch_file>/gs;
+  const rePatch = /<patch_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)<\/patch_file>/gs;
   while ((match = rePatch.exec(text)) !== null) {
     toolCalls.push({
       id: `patch_${uuidv4().substring(0, 8)}`,
@@ -110,6 +124,24 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
       arguments: { path: match[1], content: match[2] },
       raw_content: match[0],
     });
+  }
+  // Fallback for unclosed or markdown-wrapped patch_file
+  const rePatchFallback = /<patch_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)(?:<\/patch_file>|(?=<patch_file|<write_file|<read_file|<execute_command|$))/gi;
+  let matchPF: RegExpExecArray | null;
+  while ((matchPF = rePatchFallback.exec(text)) !== null) {
+    const raw = matchPF[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw || (tc.name === 'patch_file' && tc.arguments.path === matchPF![1]))) {
+      let content = matchPF[2].trim();
+      content = content.replace(/^```[a-z]*\r?\n/i, '').replace(/\r?\n```$/i, '');
+      if (content.includes('<<<<<<< SEARCH')) {
+        toolCalls.push({
+          id: `patch_${uuidv4().substring(0, 8)}`,
+          name: 'patch_file',
+          arguments: { path: matchPF[1], content },
+          raw_content: raw,
+        });
+      }
+    }
   }
 
   // 4. List Dir
@@ -443,9 +475,14 @@ ${activePersona.soul}
 ## USER.md — USER PROFILE & OBSERVED TRAITS (${activePersona.metadata.user_id})
 ${activePersona.user}`;
 
+    const toolExecutionDirective = `\n\n# ⚠️ CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & USER COMMUNICATION
+1. EXPLANATION FIRST: Always write a brief natural language explanation of your diagnosis and intended changes BEFORE emitting XML tool calls.
+2. NO RAW CODE PATCH LEAKS: NEVER output raw SEARCH/REPLACE blocks (<<<<<<< SEARCH / ======= / >>>>>>> REPLACE) as raw conversational text. All code modifications MUST be enclosed in valid XML tool tags (<patch_file path="...">...</patch_file> or <write_file path="...">...</write_file>).
+3. PROPER XML TAGS: Always close every XML tool call tag (<patch_file path="...">...</patch_file>). The system will render a dedicated approval card for the user.`;
+
     const unifiedToolsContext = getUnifiedToolsContext();
     const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
-    const fullSystemPrompt = personaContext + unifiedToolsContext + envContext + planningContext + memoryContext + workspaceMdContext;
+    const fullSystemPrompt = personaContext + unifiedToolsContext + toolExecutionDirective + envContext + planningContext + memoryContext + workspaceMdContext;
 
     const rawMessages = [
       { role: 'system', content: fullSystemPrompt },

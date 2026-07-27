@@ -23,25 +23,32 @@ export function getRandomZoomerStatus(): string {
 }
 
 /**
- * Cleans tool execution XML tags from assistant responses so they don't render in the chat bubbles
+ * Cleans tool execution XML tags and raw diff blocks from assistant responses so they don't render in the chat bubbles
  */
 export function cleanContent(content: string): string {
   if (!content) return "";
   
   let cleaned = content;
-  // Strip write_file
-  cleaned = cleaned.replace(/<write_file\s+path=["'][^"']*["']\s*>([\s\S]*?)<\/write_file>/gi, "");
-  // Strip patch_file
-  cleaned = cleaned.replace(/<patch_file\s+path=["'][^"']*["']\s*>([\s\S]*?)<\/patch_file>/gi, "");
-  // Strip execute_command
-  cleaned = cleaned.replace(/<execute_command\s*>([\s\S]*?)<\/execute_command>/gi, "");
-  // Strip read_file
-  cleaned = cleaned.replace(/<read_file\s+path=["'][^"']*["']\s*\/?>/gi, "");
-  // Strip list_dir
-  cleaned = cleaned.replace(/<list_dir\s+path=["'][^"']*["']\s*\/?>/gi, "");
-  // Strip grep_search
-  cleaned = cleaned.replace(/<grep_search\s+[^>]*\/?>/gi, "");
+
+  // 1. Strip markdown code block wrappers containing tool tags
+  cleaned = cleaned.replace(/```(?:xml|bash|powershell|js|ts|python)?\s*<(?:write_file|patch_file|read_file|execute_command|run_scratch_script)[\s\S]*?```/gi, "");
+
+  // 2. Strip closed & unclosed tool tags for all tools
+  cleaned = cleaned.replace(/<write_file\s+path=["'][^"']*["']\s*>([\s\S]*?)(?:<\/write_file>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<patch_file\s+path=["'][^"']*["']\s*>([\s\S]*?)(?:<\/patch_file>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<execute_command\s*>([\s\S]*?)(?:<\/execute_command>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<run_scratch_script\s+language=["'][^"']*["']\s*>([\s\S]*?)(?:<\/run_scratch_script>|(?=<[a-z_]+|$))/gi, "");
   
+  // Single self-closing tags
+  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|ask_user|spawn_subagent)\s+[^>]*\/?>/gi, "");
+  
+  // 3. Strip any orphaned SEARCH / REPLACE diff blocks leaked outside XML tags
+  cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, "");
+
+  // 4. Remove empty code fences and excess vertical spacing
+  cleaned = cleaned.replace(/```[a-z]*\s*```/gi, "");
+  cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
+
   return cleaned.trim();
 }
 

@@ -15,6 +15,7 @@ import {
   Folder,
   ChevronDown,
   Eye,
+  Layers,
 } from 'lucide-react';
 import { ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent, getWorkspaceBaseName } from '../utils/helpers';
@@ -487,6 +488,42 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </details>
                         )}
                           <NotionMarkdown content={bodyText} />
+
+                        {msg.tool_calls && msg.tool_calls.length > 1 && (() => {
+                          let totalAdds = 0;
+                          let totalDels = 0;
+                          msg.tool_calls.forEach((t) => {
+                            try {
+                              const args = JSON.parse(t.arguments);
+                              if (t.name === 'write_file' && args.content) {
+                                totalAdds += (args.content as string).split(/\r?\n/).length;
+                              } else if (t.name === 'patch_file' && args.content) {
+                                const raw = args.content as string;
+                                const s = raw.match(/<<<<<<< SEARCH([\s\S]*?)=======/g) || [];
+                                for (const m of s) totalDels += Math.max(0, m.split(/\r?\n/).length - 2);
+                                const r = raw.match(/=======([\s\S]*?)>>>>>>> REPLACE/g) || [];
+                                for (const m of r) totalAdds += Math.max(0, m.split(/\r?\n/).length - 2);
+                              }
+                            } catch {}
+                          });
+
+                          return (
+                            <div className="my-2 p-2.5 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-between text-xs font-mono">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-200 flex items-center gap-1.5 font-sans">
+                                  <Layers size={14} className="text-amber-400" />
+                                  <span>{msg.tool_calls.length} файлов изменено</span>
+                                </span>
+                                {(totalAdds > 0 || totalDels > 0) && (
+                                  <span className="text-[11px] font-bold">
+                                    {totalAdds > 0 && <span className="text-emerald-400">+{totalAdds} </span>}
+                                    {totalDels > 0 && <span className="text-rose-400">-{totalDels}</span>}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {msg.tool_calls && msg.tool_calls.map((tool) => (
                           <ToolCard 
