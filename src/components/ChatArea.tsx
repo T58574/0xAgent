@@ -66,6 +66,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -128,10 +129,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   }, [messages, agentStatus, liveTelemetry]);
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
+  const processImageFiles = (files: FileList | File[]) => {
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith('image/')) {
         showToast('Выберите файл изображения (PNG, JPEG, WEBP)', 'info');
@@ -149,8 +147,52 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       };
       reader.readAsDataURL(file);
     });
+  };
 
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processImageFiles(e.target.files);
+    }
     if (e.target) e.target.value = '';
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const imageFiles: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) imageFiles.push(file);
+      }
+    }
+    if (imageFiles.length > 0) {
+      processImageFiles(imageFiles);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
+      setIsDraggingOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processImageFiles(e.dataTransfer.files);
+    }
   };
 
   const startRecording = async () => {
@@ -378,8 +420,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#0b0c10] overflow-hidden relative select-text">
-      
+    <div
+      onPaste={handlePaste}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="flex-1 flex flex-col h-full bg-[#0b0c10] overflow-hidden relative select-text"
+    >
+      {/* Drag & Drop Visual Overlay */}
+      {isDraggingOver && (
+        <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex flex-col items-center justify-center border-2 border-dashed border-emerald-400/80 rounded-2xl m-3 select-none animate-pulse">
+          <ImageIcon size={48} className="text-emerald-400 mb-3" />
+          <div className="text-base font-bold text-slate-100">Перетащите изображения сюда</div>
+          <div className="text-xs text-slate-400 mt-1">Изображения будут отправлены локальной ИИ-модели для анализа</div>
+        </div>
+      )}
+
       {/* Hidden File Input for Image Attachments */}
       <input
         type="file"
@@ -418,6 +474,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <textarea
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
+                onPaste={handlePaste}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -425,7 +482,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   }
                 }}
                 rows={2}
-                placeholder="Задайте вопрос, загрузите изображение или опишите задачу..."
+                placeholder="Задайте вопрос, вставьте картинку (Ctrl+V) или перетащите файл..."
                 className="w-full bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-xs sm:text-sm resize-none font-sans"
               />
 
@@ -667,7 +724,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Задайте вопрос, загрузите изображение или опишите задачу..."
+                  onPaste={handlePaste}
+                  placeholder="Задайте вопрос, вставьте картинку (Ctrl+V) или перетащите файл..."
                   className="w-full pl-4 pr-16 py-2.5 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
                 />
 
