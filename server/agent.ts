@@ -287,29 +287,39 @@ export function pruneMessagesForContext(
   }
 
   const systemMsg = messages[0];
-  const tailCount = Math.min(8, messages.length - 1);
-  const tailMsgs = messages.slice(messages.length - tailCount);
-  const middleMsgs = messages.slice(1, messages.length - tailCount);
+  // Preserve first user prompt (the core task goal) if available
+  const firstUserMsg = messages.length > 1 && messages[1].role === 'user' ? messages[1] : null;
+  const startIdx = firstUserMsg ? 2 : 1;
 
-  // Truncate long tool/file outputs in middle messages
+  const tailCount = Math.min(8, messages.length - startIdx);
+  const tailMsgs = messages.slice(messages.length - tailCount);
+  const middleMsgs = messages.slice(startIdx, messages.length - tailCount);
+
+  // Truncate long tool/file outputs in middle messages (Software Context Shift)
   const prunedMiddle = middleMsgs.map((m) => {
     if (m.content.length > 500 && (m.role === 'user' || m.role === 'tool')) {
       const head = m.content.substring(0, 200);
       const tail = m.content.substring(m.content.length - 200);
       return {
         ...m,
-        content: `${head}\n\n[... Вывод инструмента сжат для сохранения контекста (${m.content.length} байт) ...]\n\n${tail}`,
+        content: `${head}\n\n[... [Слайдинг Контекста] Вывод инструмента сжат (${m.content.length} байт) ...]\n\n${tail}`,
       };
     }
     return m;
   });
 
-  let result = [systemMsg, ...prunedMiddle, ...tailMsgs];
+  const buildResult = (middle: typeof prunedMiddle) => {
+    const list = [systemMsg];
+    if (firstUserMsg) list.push(firstUserMsg);
+    return [...list, ...middle, ...tailMsgs];
+  };
 
-  // If still above safety threshold, discard oldest middle messages
-  while (estTokens(result) > safeLimit && prunedMiddle.length > 1) {
+  let result = buildResult(prunedMiddle);
+
+  // Discard oldest middle messages until context falls below safety limit
+  while (estTokens(result) > safeLimit && prunedMiddle.length > 0) {
     prunedMiddle.shift();
-    result = [systemMsg, ...prunedMiddle, ...tailMsgs];
+    result = buildResult(prunedMiddle);
   }
 
   return result;

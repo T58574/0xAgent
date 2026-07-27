@@ -93,11 +93,18 @@ export default function App() {
         temp: ls.temp,
         repeatPenalty: ls.repeat_penalty,
         minP: ls.min_p,
+        topK: ls.top_k,
+        topP: ls.top_p,
+        predict: ls.predict,
         flashAttn: ls.flash_attn,
         mmap: ls.mmap,
         mlock: ls.mlock,
         embedding: ls.embedding,
         contBatching: ls.cont_batching,
+        parallelSlots: ls.parallel_slots,
+        cacheReuse: ls.cache_reuse,
+        slotSavePath: ls.slot_save_path,
+        customArgs: ls.custom_args,
       } : {};
 
       addLog('Sending launch request to local llama-server process...');
@@ -119,22 +126,13 @@ export default function App() {
 
   // Mobile Workspace view mode: 'files' tree or 'editor' code tab
   const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'files' | 'editor'>('editor');
+  const drawerLogsRef = useRef<HTMLDivElement>(null);
 
-  // Mobile keyboard scroll offset reset on input blur (focusout)
   useEffect(() => {
-    const handleFocusOut = (e: FocusEvent) => {
-      if (activeView !== 'chat') return;
-      const target = e.target as HTMLElement;
-      if (!target.closest('input, textarea')) {
-        window.scrollTo(0, 0);
-        document.body.scrollTop = 0;
-      }
-    };
-    document.addEventListener('focusout', handleFocusOut);
-    return () => {
-      document.removeEventListener('focusout', handleFocusOut);
-    };
-  }, [activeView]);
+    if (showLogsDrawer && drawerLogsRef.current) {
+      drawerLogsRef.current.scrollTop = drawerLogsRef.current.scrollHeight;
+    }
+  }, [logs, showLogsDrawer]);
 
   // Apply glassmorphism preset theme to document element
   useEffect(() => {
@@ -762,7 +760,7 @@ export default function App() {
               <X size={14} />
             </button>
           </div>
-          <div className="p-3 flex-1 overflow-y-auto space-y-1 text-emerald-400 text-[11px] leading-tight font-mono select-text scrollbar-thin">
+          <div ref={drawerLogsRef} className="p-3 flex-1 overflow-y-auto space-y-1 text-emerald-400 text-[11px] leading-tight font-mono select-text scrollbar-thin">
             {logs.length > 0 ? (
               logs.map((log, idx) => <div key={idx}>{log}</div>)
             ) : (

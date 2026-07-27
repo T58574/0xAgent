@@ -37,25 +37,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   // Active theme state
   const [activeTheme, setActiveTheme] = useState<'obsidian' | 'cyber' | 'graphite' | 'matrix'>('obsidian');
 
-  // Local Server state
+  // Local Server state matching user screenshot baseline defaults
   const [exePath, setExePath] = useState('');
   const [modelPath, setModelPath] = useState('');
   const [host, setHost] = useState('127.0.0.1');
   const [port, setPort] = useState(11434);
-  const [ctxSize, setCtxSize] = useState(8192);
-  const [threads, setThreads] = useState(8);
+  const [ctxSize, setCtxSize] = useState(65536);
+  const [threads, setThreads] = useState(12);
   const [gpuLayers, setGpuLayers] = useState(99);
-  const [temp, setTemp] = useState(0.7);
+  const [temp, setTemp] = useState(1.05);
   const [batchSize, setBatchSize] = useState(2048);
   const [ubatchSize, setUbatchSize] = useState(512);
   const [minP, setMinP] = useState(0.08);
+  const [topK, setTopK] = useState(40);
+  const [topP, setTopP] = useState(1);
+  const [predict, setPredict] = useState(4264);
   const [repeatPenalty, setRepeatPenalty] = useState(1.1);
   const [flashAttn, setFlashAttn] = useState(false);
   const [embedding, setEmbedding] = useState(false);
-  const [contBatching, setContBatching] = useState(false);
+  const [contBatching, setContBatching] = useState(true);
   const [promptCache, setPromptCache] = useState(true);
   const [mlock, setMlock] = useState(false);
   const [mmap, setMmap] = useState(true);
+  const [parallelSlots, setParallelSlots] = useState(2);
+  const [cacheReuse, setCacheReuse] = useState(256);
+  const [slotSavePath, setSlotSavePath] = useState('');
+  const [customArgs, setCustomArgs] = useState('');
 
   const [serverStatus, setServerStatus] = useState<'stopped' | 'running' | 'checking'>('stopped');
   const [serverLogs, setServerLogs] = useState<string[]>([]);
@@ -97,6 +104,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (ls.batch_size) setBatchSize(ls.batch_size);
         if (ls.ubatch_size) setUbatchSize(ls.ubatch_size);
         if (ls.min_p !== undefined && ls.min_p !== null) setMinP(ls.min_p);
+        if (ls.top_k !== undefined && ls.top_k !== null) setTopK(ls.top_k);
+        if (ls.top_p !== undefined && ls.top_p !== null) setTopP(ls.top_p);
+        if (ls.predict !== undefined && ls.predict !== null) setPredict(ls.predict);
         if (ls.repeat_penalty !== undefined && ls.repeat_penalty !== null) setRepeatPenalty(ls.repeat_penalty);
         if (ls.flash_attn !== undefined && ls.flash_attn !== null) setFlashAttn(ls.flash_attn);
         if (ls.embedding !== undefined && ls.embedding !== null) setEmbedding(ls.embedding);
@@ -104,6 +114,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (ls.prompt_cache !== undefined && ls.prompt_cache !== null) setPromptCache(ls.prompt_cache);
         if (ls.mlock !== undefined && ls.mlock !== null) setMlock(ls.mlock);
         if (ls.mmap !== undefined && ls.mmap !== null) setMmap(ls.mmap);
+        if (ls.parallel_slots !== undefined && ls.parallel_slots !== null) setParallelSlots(ls.parallel_slots);
+        if (ls.cache_reuse !== undefined && ls.cache_reuse !== null) setCacheReuse(ls.cache_reuse);
+        if (ls.slot_save_path) setSlotSavePath(ls.slot_save_path);
+        if (ls.custom_args) setCustomArgs(ls.custom_args);
       }
     }
   }, [config]);
@@ -146,6 +160,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             batch_size: batchSize,
             ubatch_size: ubatchSize,
             min_p: minP,
+            top_k: topK,
+            top_p: topP,
+            predict,
             repeat_penalty: repeatPenalty,
             flash_attn: flashAttn,
             embedding,
@@ -153,6 +170,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             prompt_cache: promptCache,
             mlock,
             mmap,
+            parallel_slots: parallelSlots,
+            cache_reuse: cacheReuse,
+            slot_save_path: slotSavePath.trim() || null,
+            custom_args: customArgs.trim() || null,
           },
         });
         setSaveStatus('saved');
@@ -186,6 +207,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     batchSize,
     ubatchSize,
     minP,
+    topK,
+    topP,
+    predict,
     repeatPenalty,
     flashAttn,
     embedding,
@@ -193,6 +217,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     promptCache,
     mlock,
     mmap,
+    parallelSlots,
+    cacheReuse,
+    slotSavePath,
+    customArgs,
   ]);
 
   const handleSelectTheme = (theme: 'obsidian' | 'cyber' | 'graphite' | 'matrix') => {
@@ -356,6 +384,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setUbatchSize={setUbatchSize}
               minP={minP}
               setMinP={setMinP}
+              topK={topK}
+              setTopK={setTopK}
+              topP={topP}
+              setTopP={setTopP}
+              predict={predict}
+              setPredict={setPredict}
               repeatPenalty={repeatPenalty}
               setRepeatPenalty={setRepeatPenalty}
               flashAttn={flashAttn}
@@ -370,6 +404,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setMlock={setMlock}
               mmap={mmap}
               setMmap={setMmap}
+              parallelSlots={parallelSlots}
+              setParallelSlots={setParallelSlots}
+              cacheReuse={cacheReuse}
+              setCacheReuse={setCacheReuse}
+              slotSavePath={slotSavePath}
+              setSlotSavePath={setSlotSavePath}
+              customArgs={customArgs}
+              setCustomArgs={setCustomArgs}
               serverStatus={serverStatus}
               setServerStatus={setServerStatus}
               serverLogs={serverLogs}

@@ -39,6 +39,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
   const historyEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const isUserScrolledUpRef = useRef<boolean>(false);
 
   // Microphone recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -83,8 +85,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     };
   }, []);
 
+  const handleChatScroll = () => {
+    if (!chatContainerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    isUserScrolledUpRef.current = !isAtBottom;
+  };
+
   useEffect(() => {
-    historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current && !isUserScrolledUpRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [messages, agentStatus, liveTelemetry]);
 
   const startRecording = async () => {
@@ -161,6 +172,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
+    isUserScrolledUpRef.current = false;
     onSendMessage(inputText.trim());
     setInputText('');
   };
@@ -334,6 +346,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <div className="flex-grow flex flex-col justify-between overflow-hidden relative w-full max-w-4xl mx-auto select-text">
           
           <div
+            ref={chatContainerRef}
+            onScroll={handleChatScroll}
             className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-none flex flex-col min-h-0 select-text"
           >
             {messages.map((msg) => {

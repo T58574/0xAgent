@@ -594,20 +594,76 @@ app.get('/api/detect-hardware', (_req, res) => {
   }
 });
 
+// Persistent Server Logs Buffer & File Storage (~/.0xagent/logs/llama-server.log)
+const serverLogsBuffer: string[] = [];
+const LLAMA_LOG_DIR = path.join(os.homedir(), '.0xagent', 'logs');
+const LLAMA_LOG_FILE = path.join(LLAMA_LOG_DIR, 'llama-server.log');
+
+if (!fs.existsSync(LLAMA_LOG_DIR)) {
+  try {
+    fs.mkdirSync(LLAMA_LOG_DIR, { recursive: true });
+  } catch {}
+}
+
+function appendServerLog(msg: string): void {
+  if (!msg) return;
+  const timeStr = new Date().toLocaleTimeString();
+  const formatted = msg.startsWith('[') ? msg : `[${timeStr}] ${msg}`;
+
+  serverLogsBuffer.push(formatted);
+  if (serverLogsBuffer.length > 1000) {
+    serverLogsBuffer.shift();
+  }
+
+  broadcast('llama-server-log', formatted);
+
+  try {
+    fs.appendFileSync(LLAMA_LOG_FILE, `${formatted}\n`, 'utf-8');
+  } catch {}
+}
+
+// Endpoint to fetch full historical server log lines & log file path
+app.get('/api/server-logs', (_req, res) => {
+  try {
+    const isRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+    res.json({
+      logs: serverLogsBuffer,
+      logFilePath: LLAMA_LOG_FILE,
+      running: isRunning,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Server Health Checker (/health polling)
 app.get('/api/server-health', async (req, res) => {
   try {
-    const host = (req.query.host as string) || '127.0.0.1';
-    const port = (req.query.port as string) || '11434';
-    const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(1500) });
-    if (response.ok) {
-      const data = await response.json();
-      res.json({ ok: true, status: data.status || 'ok' });
-    } else {
-      res.json({ ok: false, status: 'loading' });
+    const cfg = loadConfig();
+    const host = (req.query.host as string) || cfg.local_server?.host || '127.0.0.1';
+    const port = (req.query.port as string) || cfg.local_server?.port || 11434;
+    const isProcessRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+
+    try {
+      const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(1800) });
+      const data: any = await response.json().catch(() => ({}));
+      const isHealthy = response.ok || data.status === 'ok' || data.status === 'loading model' || data.status === 'no slot available';
+
+      res.json({
+        ok: isHealthy || isProcessRunning,
+        status: data.status || (isProcessRunning ? 'loading' : 'stopped'),
+        processRunning: isProcessRunning,
+      });
+    } catch {
+      res.json({
+        ok: isProcessRunning,
+        status: isProcessRunning ? 'loading' : 'stopped',
+        processRunning: isProcessRunning,
+      });
     }
   } catch {
-    res.json({ ok: false, status: 'stopped' });
+    const isProcessRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+    res.json({ ok: isProcessRunning, status: isProcessRunning ? 'loading' : 'stopped', processRunning: isProcessRunning });
   }
 });
 
@@ -851,34 +907,53 @@ app.post('/api/start-local-server', (req, res) => {
 
     const getVal = (bodyVal: any, cfgVal: any) => bodyVal !== undefined && bodyVal !== null ? bodyVal : cfgVal;
 
-    const ctxVal = getVal(body.ctxSize, cfg.local_server?.ctx_size ?? 16384);
+    const ctxVal = getVal(body.ctxSize, cfg.local_server?.ctx_size ?? 65536);
     if (typeof ctxVal === 'number' && ctxVal > 0) args.push('-c', String(ctxVal));
 
-    // Full GPU Offload rule: Always offload ALL model layers to GPU VRAM by default (-ngl 999)
-    const nglVal = getVal(body.gpuLayers, cfg.local_server?.gpu_layers ?? 999);
-    if (typeof nglVal === 'number' && nglVal >= 0) args.push('-ngl', String(nglVal));
+    const nglVal = getVal(body.gpuLayers, cfg.local_server?.gpu_layers ?? 99);
+    if (typeof nglVal === 'number') args.push('-ngl', String(nglVal));
 
-    const threadsVal = getVal(body.threads, cfg.local_server?.threads ?? 8);
-    if (typeof threadsVal === 'number' && threadsVal > 0) args.push('-t', String(threadsVal));
+    const rawThreads = getVal(body.threads, cfg.local_server?.threads);
+    const threadsVal = typeof rawThreads === 'number' && rawThreads > 0 ? rawThreads : 12;
+    args.push('-t', String(threadsVal));
 
-    const batchVal = getVal(body.batchSize, cfg.local_server?.batch_size ?? 2048);
-    if (typeof batchVal === 'number' && batchVal > 0) args.push('-b', String(batchVal));
+    const embVal = getVal(body.embedding, cfg.local_server?.embedding);
+    if (embVal === true) args.push('--embedding');
 
     const ubatchVal = getVal(body.ubatchSize, cfg.local_server?.ubatch_size ?? 512);
+    let batchVal = getVal(body.batchSize, cfg.local_server?.batch_size ?? 2048);
+
+    // If embedding is enabled, llama-server requires n_batch <= n_ubatch
+    if (embVal === true && typeof batchVal === 'number' && typeof ubatchVal === 'number' && batchVal > ubatchVal) {
+      batchVal = ubatchVal;
+    }
+
+    if (typeof batchVal === 'number' && batchVal > 0) args.push('-b', String(batchVal));
     if (typeof ubatchVal === 'number' && ubatchVal > 0) args.push('-ub', String(ubatchVal));
 
-    const tempVal = getVal(body.temp, cfg.local_server?.temp);
+    const tempVal = getVal(body.temp, cfg.local_server?.temp ?? 1.05);
     if (typeof tempVal === 'number') args.push('--temp', String(tempVal));
 
     const rpVal = getVal(body.repeatPenalty, cfg.local_server?.repeat_penalty ?? 1.1);
     if (typeof rpVal === 'number') args.push('--repeat-penalty', String(rpVal));
 
-    const minPVal = getVal(body.minP, cfg.local_server?.min_p);
+    const minPVal = getVal(body.minP, cfg.local_server?.min_p ?? 0.08);
     if (typeof minPVal === 'number') args.push('--min-p', String(minPVal));
 
-    // Flash Attention enabled by default for max GPU speed
-    const faVal = getVal(body.flashAttn, cfg.local_server?.flash_attn ?? true);
-    if (faVal !== false) args.push('-fa');
+    const topKVal = getVal(body.topK, cfg.local_server?.top_k ?? 40);
+    if (typeof topKVal === 'number') args.push('--top-k', String(topKVal));
+
+    const topPVal = getVal(body.topP, cfg.local_server?.top_p ?? 1);
+    if (typeof topPVal === 'number') args.push('--top-p', String(topPVal));
+
+    const predictVal = getVal(body.predict, cfg.local_server?.predict);
+    if (typeof predictVal === 'number' && predictVal > 0) args.push('-n', String(predictVal));
+
+    // Flash Attention: only pass -fa on if explicitly set to true
+    const faVal = getVal(body.flashAttn, cfg.local_server?.flash_attn);
+    if (faVal === true) {
+      args.push('-fa', 'on');
+    }
 
     const mmapVal = getVal(body.mmap, cfg.local_server?.mmap ?? true);
     if (mmapVal === false) args.push('--no-mmap');
@@ -886,26 +961,35 @@ app.post('/api/start-local-server', (req, res) => {
     const mlockVal = getVal(body.mlock, cfg.local_server?.mlock);
     if (mlockVal === true) args.push('--mlock');
 
-    const embVal = getVal(body.embedding, cfg.local_server?.embedding);
-    if (embVal === true) args.push('--embedding');
-
     const cbVal = getVal(body.contBatching, cfg.local_server?.cont_batching ?? true);
     if (cbVal !== false) args.push('--cont-batching');
 
-    // Context shift to prevent hard prompt context crashes
-    args.push('--ctx-shift');
-
-    // Multi-slot parallel processing (2 parallel execution slots)
+    // Multi-slot parallel processing (default 2 parallel execution slots)
     const npVal = getVal(body.parallelSlots, cfg.local_server?.parallel_slots ?? 2);
     if (typeof npVal === 'number' && npVal > 0) args.push('--parallel', String(npVal));
 
     // Prefix Caching & Instant TTFT
-    args.push('--cache-reuse', '256');
-    const slotsDir = path.join(os.homedir(), '.0xagent', 'slots');
-    if (!fs.existsSync(slotsDir)) {
-      fs.mkdirSync(slotsDir, { recursive: true });
+    const crVal = getVal(body.cacheReuse, cfg.local_server?.cache_reuse ?? 256);
+    if (typeof crVal === 'number' && crVal > 0) args.push('--cache-reuse', String(crVal));
+
+    // Slot Save Directory
+    const defaultSlotsDir = path.join(os.homedir(), '.0xagent', 'slots');
+    const slotsDir = getVal(body.slotSavePath, cfg.local_server?.slot_save_path || defaultSlotsDir);
+    if (slotsDir && typeof slotsDir === 'string') {
+      try {
+        if (!fs.existsSync(slotsDir)) {
+          fs.mkdirSync(slotsDir, { recursive: true });
+        }
+      } catch {}
+      args.push('--slot-save-path', slotsDir);
     }
-    args.push('--slot-save-path', slotsDir);
+
+    // Additional Custom CLI Arguments (e.g. --tensor-split 1,1)
+    const extraCustomArgs = getVal(body.customArgs, cfg.local_server?.custom_args);
+    if (extraCustomArgs && typeof extraCustomArgs === 'string' && extraCustomArgs.trim()) {
+      const tokens = extraCustomArgs.trim().split(/\s+/).filter(Boolean);
+      args.push(...tokens);
+    }
 
     // Save launch parameters for Watchdog Auto-Recovery
     isIntentionalStop = false;
@@ -914,7 +998,7 @@ app.post('/api/start-local-server', (req, res) => {
     // Log full launch command for diagnostics
     const cmdLine = `${path.basename(targetExe)} ${args.join(' ')}`;
     console.log(`[llama.cpp] Spawning: ${cmdLine}`);
-    broadcast('llama-server-log', `[CMD] ${cmdLine}`);
+    appendServerLog(`[CMD] ${cmdLine}`);
 
     activeLlamaProcess = spawn(targetExe, args, { cwd: path.dirname(targetExe) });
 
@@ -939,7 +1023,7 @@ app.post('/api/start-local-server', (req, res) => {
       }
       lastLogText = cleanStr;
       lastLogTime = now;
-      broadcast('llama-server-log', cleanStr);
+      appendServerLog(cleanStr);
     };
 
     activeLlamaProcess.stdout?.on('data', handleLogData);
@@ -947,7 +1031,7 @@ app.post('/api/start-local-server', (req, res) => {
 
     activeLlamaProcess.on('error', (err) => {
       console.error('[llama.cpp] Process error:', err.message);
-      broadcast('llama-server-log', `[ERROR] ${err.message}`);
+      appendServerLog(`[ERROR] ${err.message}`);
       broadcast('llama-server-status', { status: 'stopped', error: err.message });
       broadcast('agent-error', `Ошибка сервера llama.cpp: ${err.message}`);
       activeLlamaProcess = null;
@@ -956,11 +1040,11 @@ app.post('/api/start-local-server', (req, res) => {
     activeLlamaProcess.on('exit', (code, signal) => {
       const exitMsg = `[llama.cpp] Процесс завершён (код: ${code}, сигнал: ${signal})`;
       console.log(exitMsg);
-      broadcast('llama-server-log', exitMsg);
+      appendServerLog(exitMsg);
 
       if (!isIntentionalStop && lastLaunchParams) {
         console.warn(`[Watchdog 🛡️] ALERT: llama-server process died unexpectedly! Auto-recovering in 1.5s...`);
-        broadcast('llama-server-log', `[WATCHDOG 🛡️] WARNING: Process crashed (code ${code}). Auto-recovering in 1.5s...`);
+        appendServerLog(`[WATCHDOG 🛡️] WARNING: Process crashed (code ${code}). Auto-recovering in 1.5s...`);
         broadcast('llama-server-status', { status: 'recovering' });
         activeLlamaProcess = null;
 
