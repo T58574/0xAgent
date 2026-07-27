@@ -194,26 +194,36 @@ Connection: `ws://localhost:3001/ws`. Messages: `{ event, payload }`.
 
 ---
 
-## 9. Agent Tool System
+## 9. Agent Tool System & Unified TOOLS.md Architecture
 
-The agent uses XML-tagged tool calls parsed from LLM responses in `agent.ts`:
+The agent uses XML-tagged tool calls parsed from LLM responses in `agent.ts`.
+Tools configuration is decoupled from Personas and managed globally in `server/toolsConfig.ts`.
 
-| Tool | Requires Approval | Description |
-|------|:-:|---|
-| `read_file` | No | Read file contents |
-| `write_file` | **Yes** | Write/create file |
-| `patch_file` | **Yes** | Surgical search/replace patch |
-| `list_dir` | No | List directory contents |
-| `grep_search` | No | Regex search in files |
-| `execute_command` | **Yes** | Execute PowerShell command |
-| `remember_fact` | No | Store persistent memory |
-| `recall_memories` | No | Query stored memories |
-| `list_skills` | No | List available skills |
-| `execute_skill` | No | Execute a skill instruction |
-| `search_sessions` | No | Search chat history |
-| `run_scratch_script` | **Yes** | Run temporary script |
-| `ask_user` | N/A | Ask user for clarification |
-| `spawn_subagent` | No | Spawn a sub-agent |
+- **Persistence**: `~/.0xagent/tools_config.json` (toggles) & `~/.0xagent/TOOLS.md` (unified global system prompt snippet loaded in `agent.ts`).
+- **UI Management**: Configurable via the **Инструменты (TOOLS.md)** tab under Settings -> Personas. Each tool can be toggled on/off to optimize context length.
+- **Endpoints**:
+  - `GET /api/tools`: Get active tools list, toggle states, and `TOOLS.md` content.
+  - `POST /api/tools/toggles`: Update tool enabled/disabled states and regenerate `TOOLS.md`.
+  - `POST /api/tools/md`: Save custom `TOOLS.md` content directly.
+
+| Tool | Category | Requires Approval | Description |
+|------| font-mono |:-:|---|
+| `read_file` | Files | No | Read file contents |
+| `write_file` | Files | **Yes** | Write/create file |
+| `patch_file` | Files | **Yes** | Surgical search/replace patch |
+| `create_directory` | Files | No | Recursive directory creation |
+| `get_file_info` | Files | No | File/folder metadata inspection |
+| `list_dir` | Files | No | List directory contents |
+| `grep_search` | Files | No | Regex search across files |
+| `execute_command` | Terminal | **Yes** | Execute PowerShell command |
+| `remember_fact` | Memory | No | Store persistent memory |
+| `recall_memories` | Memory | No | Query stored memories |
+| `list_skills` | Skills | No | List available skills |
+| `execute_skill` | Skills | No | Execute a skill instruction |
+| `search_sessions` | Sessions | No | Search chat history |
+| `run_scratch_script` | Terminal | **Yes** | Run temporary script |
+| `ask_user` | Interactive | N/A | Ask user for clarification |
+| `spawn_subagent` | Agents | No | Spawn a sub-agent |
 
 ---
 
@@ -223,3 +233,4 @@ When making changes to 0xAgent:
 1. Run `npx tsc --noEmit` to verify type safety across frontend and backend.
 2. Run `npm run build` to verify Vite production build.
 3. Test process cleanup using `powershell -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1`.
+

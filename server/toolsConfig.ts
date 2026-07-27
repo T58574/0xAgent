@@ -1,0 +1,296 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
+
+export interface ToolDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: 'files' | 'terminal' | 'memory' | 'skills' | 'sessions' | 'agents' | 'interactive';
+  requiresApproval: boolean;
+  enabled: boolean;
+  xmlSpec: string;
+}
+
+export interface ToolsConfigState {
+  toggles: Record<string, boolean>;
+  updated_at: number;
+}
+
+const TOOLS_CONFIG_PATH = path.join(os.homedir(), '.0xagent', 'tools_config.json');
+const UNIFIED_TOOLS_MD_PATH = path.join(os.homedir(), '.0xagent', 'TOOLS.md');
+
+export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
+  {
+    id: 'read_file',
+    name: 'read_file',
+    description: 'Чтение точного содержимого текстовых файлов в текущей рабочей области.',
+    category: 'files',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `1. <read_file path="..." />
+   - Чтение точного содержимого файла.`,
+  },
+  {
+    id: 'write_file',
+    name: 'write_file',
+    description: 'Создание нового файла или полное пересоздание существующего.',
+    category: 'files',
+    requiresApproval: true,
+    enabled: true,
+    xmlSpec: `2. <write_file path="...">content</write_file>
+   - Создает новый файл или полностью перезаписывает существующий.`,
+  },
+  {
+    id: 'patch_file',
+    name: 'patch_file',
+    description: 'Точечная замена фрагментов кода в существующем файле по маркерам SEARCH/REPLACE.',
+    category: 'files',
+    requiresApproval: true,
+    enabled: true,
+    xmlSpec: `3. <patch_file path="...">
+<<<<<<< SEARCH
+точные строки для замены
+=======
+новые строки для вставки
+>>>>>>> REPLACE
+</patch_file>
+   - Применяет точечную замену строк в файле.`,
+  },
+  {
+    id: 'create_directory',
+    name: 'create_directory',
+    description: 'Рекурсивное создание структуры директорий в проекте.',
+    category: 'files',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `4. <create_directory path="..." />
+   - Рекурсивно создает директорию.`,
+  },
+  {
+    id: 'get_file_info',
+    name: 'get_file_info',
+    description: 'Получение метаданных файла или папки (размер, число строк, дата изменения).',
+    category: 'files',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `5. <get_file_info path="..." />
+   - Возвращает размер, количество строк и дату изменения без чтения всего содержимого.`,
+  },
+  {
+    id: 'list_dir',
+    name: 'list_dir',
+    description: 'Просмотр списка файлов и поддиректорий в указанном каталоге.',
+    category: 'files',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `6. <list_dir path="..." />
+   - Выводит содержимое директории.`,
+  },
+  {
+    id: 'grep_search',
+    name: 'grep_search',
+    description: 'Быстрый поиск по регулярным выражениям во всех файлах каталога.',
+    category: 'files',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `7. <grep_search pattern="..." path="..." />
+   - Выполняет поиск по регулярному выражению в файлах.`,
+  },
+  {
+    id: 'execute_command',
+    name: 'execute_command',
+    description: 'Запуск одноразовых PowerShell команд в корне рабочей области (сборка, тесты, проверка типов).',
+    category: 'terminal',
+    requiresApproval: true,
+    enabled: true,
+    xmlSpec: `8. <execute_command>cmd</execute_command>
+   - Выполняет одноразовую команду PowerShell в рабочей области (запрещен запуск бесконечных dev-серверов).`,
+  },
+  {
+    id: 'remember_fact',
+    name: 'remember_fact',
+    description: 'Сохранение важного факта или правила в долговременную память Агента.',
+    category: 'memory',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `9. <remember_fact key="..." value="..." category="..." />
+   - Сохраняет факт в долговременную память.`,
+  },
+  {
+    id: 'recall_memories',
+    name: 'recall_memories',
+    description: 'Поиск сохраненных фактов и пользовательских заметок из долговременной памяти.',
+    category: 'memory',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `10. <recall_memories query="..." />
+    - Запрашивает сохраненные факты из памяти.`,
+  },
+  {
+    id: 'list_skills',
+    name: 'list_skills',
+    description: 'Получение списка всех доступных пользователю файлов скиллов.',
+    category: 'skills',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `11. <list_skills />
+    - Выводит список доступных скиллов.`,
+  },
+  {
+    id: 'execute_skill',
+    name: 'execute_skill',
+    description: 'Загрузка и выполнение специализированных инструкций из скилла.',
+    category: 'skills',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `12. <execute_skill name="..." args="..." />
+    - Загружает инструкции указанного скилла.`,
+  },
+  {
+    id: 'search_sessions',
+    name: 'search_sessions',
+    description: 'Поиск по прошлым диалогам и сессиям чатов для получения исторического контекста.',
+    category: 'sessions',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `13. <search_sessions query="..." />
+    - Ищет информацию в истории прошлых сессий.`,
+  },
+  {
+    id: 'run_scratch_script',
+    name: 'run_scratch_script',
+    description: 'Запуск временного скрипта (Node.js, Python, PowerShell) во временном окружении.',
+    category: 'terminal',
+    requiresApproval: true,
+    enabled: true,
+    xmlSpec: `14. <run_scratch_script language="...">code</run_scratch_script>
+    - Выполняет временный скрипт для быстрого тестирования гипотез.`,
+  },
+  {
+    id: 'ask_user',
+    name: 'ask_user',
+    description: 'Запрос уточнения или выбора вариантов у пользователя.',
+    category: 'interactive',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `15. <ask_user question="..." options="opt1,opt2" />
+    - Задает уточняющий вопрос пользователю в интерфейсе.`,
+  },
+  {
+    id: 'spawn_subagent',
+    name: 'spawn_subagent',
+    description: 'Создание и запуск специализированного дочернего ИИ-агента для автономной подзадачи.',
+    category: 'agents',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `16. <spawn_subagent role="..." goal="..." />
+    - Делегирует задачу узкоспециализированному субагенту.`,
+  },
+];
+
+export function loadToolsToggles(): Record<string, boolean> {
+  try {
+    if (fs.existsSync(TOOLS_CONFIG_PATH)) {
+      const raw = fs.readFileSync(TOOLS_CONFIG_PATH, 'utf-8');
+      const parsed: ToolsConfigState = JSON.parse(raw);
+      if (parsed && typeof parsed.toggles === 'object') {
+        return parsed.toggles;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to read tools_config.json:', err);
+  }
+
+  // Fallback: all enabled by default
+  const defaultToggles: Record<string, boolean> = {};
+  for (const t of DEFAULT_TOOLS_REGISTRY) {
+    defaultToggles[t.id] = true;
+  }
+  return defaultToggles;
+}
+
+export function generateToolsMdContent(toggles: Record<string, boolean>): string {
+  const activeTools = DEFAULT_TOOLS_REGISTRY.filter((t) => togglingIsEnabled(t.id, toggles));
+
+  let md = `# 🧰 UNIFIED SYSTEM TOOL REGISTRY & XML SPECIFICATION\n`;
+  md += `You have access to ${activeTools.length} native execution tools. Always emit valid XML tool calls inside your response:\n\n`;
+
+  activeTools.forEach((tool, index) => {
+    // Adapt index in generated prompt XML
+    const formattedSpec = tool.xmlSpec.replace(/^\d+\.\s*/, `${index + 1}. `);
+    md += `${formattedSpec}\n\n`;
+  });
+
+  return md.trim();
+}
+
+function togglingIsEnabled(toolId: string, toggles: Record<string, boolean>): boolean {
+  if (Object.prototype.hasOwnProperty.call(toggles, toolId)) {
+    return Boolean(toggles[toolId]);
+  }
+  return true;
+}
+
+export function saveToolsToggles(toggles: Record<string, boolean>): { tools: ToolDefinition[]; content: string } {
+  const dir = path.dirname(TOOLS_CONFIG_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  const payload: ToolsConfigState = {
+    toggles,
+    updated_at: Date.now(),
+  };
+
+  fs.writeFileSync(TOOLS_CONFIG_PATH, JSON.stringify(payload, null, 2), 'utf-8');
+
+  const content = generateToolsMdContent(toggles);
+  fs.writeFileSync(UNIFIED_TOOLS_MD_PATH, content, 'utf-8');
+
+  return getToolsState();
+}
+
+export function saveCustomToolsMd(content: string): { tools: ToolDefinition[]; content: string } {
+  const dir = path.dirname(UNIFIED_TOOLS_MD_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(UNIFIED_TOOLS_MD_PATH, content, 'utf-8');
+  return getToolsState();
+}
+
+export function loadUnifiedToolsMdContent(): string {
+  if (fs.existsSync(UNIFIED_TOOLS_MD_PATH)) {
+    try {
+      const content = fs.readFileSync(UNIFIED_TOOLS_MD_PATH, 'utf-8');
+      if (content.trim().length > 0) {
+        return content;
+      }
+    } catch (err) {
+      console.error('Failed to load UNIFIED_TOOLS_MD_PATH:', err);
+    }
+  }
+
+  // If not exists, generate initial content and write it
+  const toggles = loadToolsToggles();
+  const generated = generateToolsMdContent(toggles);
+  try {
+    const dir = path.dirname(UNIFIED_TOOLS_MD_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(UNIFIED_TOOLS_MD_PATH, generated, 'utf-8');
+  } catch {}
+  return generated;
+}
+
+export function getToolsState(): { tools: ToolDefinition[]; content: string } {
+  const toggles = loadToolsToggles();
+  const tools = DEFAULT_TOOLS_REGISTRY.map((tool) => ({
+    ...tool,
+    enabled: togglingIsEnabled(tool.id, toggles),
+  }));
+
+  const content = loadUnifiedToolsMdContent();
+  return { tools, content };
+}

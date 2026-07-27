@@ -9,6 +9,7 @@ import {
   deletePersona,
 } from '../personas';
 import { loadSummarizerPrompt, saveSummarizerPrompt } from '../summarizer';
+import { getToolsState, saveToolsToggles, saveCustomToolsMd } from '../toolsConfig';
 
 export const personasRouter = Router();
 
@@ -99,6 +100,36 @@ personasRouter.post('/summarizer-prompt', (req, res) => {
     const { content } = req.body;
     saveSummarizerPrompt(content || '');
     res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Tools System API Endpoints
+personasRouter.get('/tools', (_req, res) => {
+  try {
+    const state = getToolsState();
+    res.json(state);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+personasRouter.post('/tools/toggles', (req, res) => {
+  try {
+    const { toggles } = req.body || {};
+    const state = saveToolsToggles(toggles || {});
+    res.json(state);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+personasRouter.post('/tools/md', (req, res) => {
+  try {
+    const { content } = req.body || {};
+    const state = saveCustomToolsMd(content || '');
+    res.json(state);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

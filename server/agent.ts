@@ -440,9 +440,6 @@ Before executing modifying tool calls (<write_file>, <patch_file>, <execute_comm
 ## SOUL.md — CHARACTER & BEHAVIOR
 ${activePersona.soul}
 
-## TOOLS.md — PERSONA TOOL INSTRUCTIONS
-${activePersona.tools}
-
 ## USER.md — USER PROFILE & OBSERVED TRAITS (${activePersona.metadata.user_id})
 ${activePersona.user}`;
 

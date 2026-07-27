@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail } from '../types';
+import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState } from '../types';
 
 const API_BASE = '/api';
 
@@ -26,11 +26,10 @@ export function clearStoredToken(): void {
 
 function getWsUrl(): string {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.hostname;
-  const port = '3001';
+  const host = window.location.host; // includes hostname:port — goes through Vite proxy on 5173
   const token = getStoredToken();
   const query = token ? `?token=${encodeURIComponent(token)}` : '';
-  return `${protocol}//${host}:${port}/ws${query}`;
+  return `${protocol}//${host}/ws${query}`;
 }
 
 export function reconnectWebSocket() {
@@ -545,6 +544,32 @@ export async function save_summarizer_prompt(content: string): Promise<void> {
 
 export async function get_local_ips(): Promise<{ urls: string[] }> {
   const res = await authFetch(`${API_BASE}/get-local-ips`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_tools_state(): Promise<ToolsState> {
+  const res = await authFetch(`${API_BASE}/tools`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function save_tools_toggles(toggles: Record<string, boolean>): Promise<ToolsState> {
+  const res = await authFetch(`${API_BASE}/tools/toggles`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ toggles }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function save_tools_md(content: string): Promise<ToolsState> {
+  const res = await authFetch(`${API_BASE}/tools/md`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

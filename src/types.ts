@@ -95,6 +95,21 @@ export interface ToolCallInfo {
   output?: string | null;
 }
 
+export interface ToolDefinition {
+  id: string;
+  name: string;
+  description: string;
+  category: 'files' | 'terminal' | 'memory' | 'skills' | 'sessions' | 'agents' | 'interactive';
+  requiresApproval: boolean;
+  enabled: boolean;
+  xmlSpec: string;
+}
+
+export interface ToolsState {
+  tools: ToolDefinition[];
+  content: string;
+}
+
 export interface MessageMetrics {
   tokensPerSec?: number;
   promptTokens?: number;
