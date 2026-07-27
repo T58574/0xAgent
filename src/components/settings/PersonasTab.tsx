@@ -25,8 +25,10 @@ import {
   get_summarizer_prompt,
   save_summarizer_prompt,
 } from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 
 export const PersonasTab: React.FC = () => {
+  const { showToast } = useToast();
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersonaId, setActivePersonaId] = useState<string>('default');
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('default');
@@ -97,9 +99,10 @@ export const PersonasTab: React.FC = () => {
       setIsSaving(true);
       await save_summarizer_prompt(summarizerPrompt);
       setSaveSuccess(true);
+      showToast('SUMMARIZER.md успешно сохранен!', 'success');
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err: any) {
-      alert(`Ошибка сохранения SUMMARIZER.md: ${err.message}`);
+      showToast(`Ошибка сохранения SUMMARIZER.md: ${err.message}`, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -124,8 +127,9 @@ export const PersonasTab: React.FC = () => {
       const updatedList = await activate_persona(id);
       setPersonas(updatedList);
       setActivePersonaId(id);
+      showToast('Личность успешно активирована!', 'success');
     } catch (err: any) {
-      alert(` Ошибка активации личности: ${err.message}`);
+      showToast(`Ошибка активации личности: ${err.message}`, 'error');
     }
   };
 
@@ -139,14 +143,15 @@ export const PersonasTab: React.FC = () => {
       setNewDesc('');
       await loadPersonas();
       setSelectedPersonaId(created.metadata.id);
+      showToast(`Личность "${created.metadata.name}" создана!`, 'success');
     } catch (err: any) {
-      alert(` Ошибка создания личности: ${err.message}`);
+      showToast(`Ошибка создания личности: ${err.message}`, 'error');
     }
   };
 
   const handleDelete = async (id: string) => {
     if (id === 'default') {
-      alert('Базовая личность (0xAgent Core) не может быть удалена!');
+      showToast('Базовая личность (0xAgent Core) не может быть удалена!', 'info');
       return;
     }
     if (!confirm('Вы уверены, что хотите удалить эту личность и все её конфигурационные файлы?')) return;
@@ -156,8 +161,9 @@ export const PersonasTab: React.FC = () => {
         setSelectedPersonaId('default');
       }
       await loadPersonas();
+      showToast('Личность удалена.', 'success');
     } catch (err: any) {
-      alert(` Ошибка удаления: ${err.message}`);
+      showToast(`Ошибка удаления: ${err.message}`, 'error');
     }
   };
 
@@ -169,13 +175,15 @@ export const PersonasTab: React.FC = () => {
       const updated = await save_persona_file(selectedPersonaId, filename, fileContent);
       setPersonaDetail(updated);
       setSaveSuccess(true);
+      showToast(`Файл ${filename} сохранен!`, 'success');
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err: any) {
-      alert(` Ошибка сохранения файла ${activeFileTab.toUpperCase()}.md: ${err.message}`);
+      showToast(`Ошибка сохранения файла ${activeFileTab.toUpperCase()}.md: ${err.message}`, 'error');
     } finally {
       setIsSaving(false);
     }
   };
+
 
   const getIconComponent = (iconName: string) => {
     switch (iconName) {
@@ -204,7 +212,7 @@ export const PersonasTab: React.FC = () => {
           }`}
         >
           <User size={15} />
-          <span>🎭 Личности Агента (Personas)</span>
+          <span>Личности Агента (Personas)</span>
         </button>
 
         <button
@@ -217,7 +225,7 @@ export const PersonasTab: React.FC = () => {
           }`}
         >
           <Sparkles size={15} />
-          <span>⚙️ Системный Суммаризатор (SUMMARIZER.md)</span>
+          <span>Системный Суммаризатор (SUMMARIZER.md)</span>
         </button>
       </div>
 
@@ -258,7 +266,7 @@ export const PersonasTab: React.FC = () => {
           <div className="p-3.5 rounded-xl bg-slate-900/70 border border-cyan-500/20 flex items-start gap-3 text-xs">
             <Info size={16} className="text-cyan-400 shrink-0 mt-0.5" />
             <div className="text-slate-300 space-y-1">
-              <p className="font-semibold text-cyan-300">⚙️ Как работает Фоновый LLM-Суммаризатор?</p>
+              <p className="font-semibold text-cyan-300">Как работает Фоновый LLM-Суммаризатор?</p>
               <p className="text-slate-400">
                 Когда объем токенов контекста превышает 75% от лимита вашей модели, 0xAgent в фоновом режиме отправляет историю диалога локальному LLM с инструкциями из этого файла. Сжатая сводка заменяет устаревшие средние сообщения, освобождая место для новых вызовов без потери сути задачи.
               </p>
@@ -457,7 +465,7 @@ export const PersonasTab: React.FC = () => {
             <div className="flex-1 text-slate-300 space-y-1">
               {activeFileTab === 'soul' && (
                 <>
-                  <p className="font-semibold text-emerald-300">✨ SOUL.md — Основная «душа» и харизма Агента</p>
+                  <p className="font-semibold text-emerald-300">SOUL.md — Основная «душа» и харизма Агента</p>
                   <p className="text-slate-400">
                     Определяет мировоззрение, роль, цели и правила общения этой личности. Пользователь может свободно менять характер (например, сделать Агента саркастичным программистом или строгим архитектором).
                   </p>
@@ -466,7 +474,7 @@ export const PersonasTab: React.FC = () => {
 
               {activeFileTab === 'tools' && (
                 <>
-                  <p className="font-semibold text-emerald-300">🛠️ TOOLS.md — Инструкции вызова инструментов</p>
+                  <p className="font-semibold text-emerald-300">TOOLS.md — Инструкции вызова инструментов</p>
                   <p className="text-slate-400">
                     Задает индивидуальные предпочтения личности по работе с файлами и консолью (например, заставлять ли Агента запускать тесты перед патчами или запрещать перезапись определенных файлов).
                   </p>
@@ -475,7 +483,7 @@ export const PersonasTab: React.FC = () => {
 
               {activeFileTab === 'user' && (
                 <>
-                  <p className="font-semibold text-emerald-300">👤 USER.md — Накопленный профиль пользователя (`{personaDetail?.metadata.user_id}`)</p>
+                  <p className="font-semibold text-emerald-300">USER.md — Накопленный профиль пользователя (`{personaDetail?.metadata.user_id}`)</p>
                   <p className="text-slate-400">
                     Агент тихо аккумулирует и записывает сюда сведения о ваших привычках, ОС, стеке и стилях написания кода во время общения. Данные привязаны к этой конкретной личности, и вы можете редактировать их вручную.
                   </p>

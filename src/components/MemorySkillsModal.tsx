@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Brain, Sparkles, X, Plus, Trash2, Save, Search } from 'lucide-react';
 import { MemoryItem, SkillInfo } from '../types';
 import * as api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface MemorySkillsModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface MemorySkillsModalProps {
 }
 
 export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, onClose }) => {
+  const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'memory' | 'skills'>('memory');
   const [memories, setMemories] = useState<MemoryItem[]>([]);
   const [skills, setSkills] = useState<SkillInfo[]>([]);
@@ -55,18 +57,20 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
       await api.add_memory(newMemKey.trim(), newMemVal.trim(), newMemCategory);
       setNewMemKey('');
       setNewMemVal('');
+      showToast('Факт успешно сохранен в память!', 'success');
       await loadData();
     } catch (err: any) {
-      alert(`Ошибка добавления памяти: ${err.message || err}`);
+      showToast(`Ошибка добавления памяти: ${err.message || err}`, 'error');
     }
   };
 
   const handleDeleteMemory = async (id: string) => {
     try {
       await api.delete_memory(id);
+      showToast('Факт удален из памяти.', 'success');
       await loadData();
     } catch (err: any) {
-      alert(`Ошибка удаления: ${err.message || err}`);
+      showToast(`Ошибка удаления: ${err.message || err}`, 'error');
     }
   };
 
@@ -84,10 +88,10 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
     if (!selectedSkillName) return;
     try {
       await api.save_skill(selectedSkillName, skillContent);
-      alert('Скилл сохранен!');
+      showToast('Скилл сохранен!', 'success');
       await loadData();
     } catch (err: any) {
-      alert(`Ошибка сохранения: ${err.message || err}`);
+      showToast(`Ошибка сохранения: ${err.message || err}`, 'error');
     }
   };
 
@@ -99,10 +103,11 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
       await api.save_skill(name, template);
       setIsCreatingSkill(false);
       setNewSkillNameInput('');
+      showToast(`Скилл ${name} создан!`, 'success');
       await loadData();
       await handleSelectSkill(name);
     } catch (err: any) {
-      alert(`Ошибка создания скилла: ${err.message || err}`);
+      showToast(`Ошибка создания скилла: ${err.message || err}`, 'error');
     }
   };
 
@@ -110,11 +115,13 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
     if (!confirm(`Удалить скилл "${name}"?`)) return;
     try {
       await api.delete_skill(name);
+      showToast(`Скилл ${name} удален.`, 'success');
       await loadData();
     } catch (err: any) {
-      alert(`Ошибка удаления: ${err.message || err}`);
+      showToast(`Ошибка удаления: ${err.message || err}`, 'error');
     }
   };
+
 
   if (!isOpen) return null;
 

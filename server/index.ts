@@ -454,8 +454,8 @@ app.get('/api/sessions/:id', (req, res) => {
 
 app.post('/api/sessions', (req, res) => {
   try {
-    const { title } = req.body;
-    const newSession = createNewSession(title);
+    const { title, workspace_dir } = req.body || {};
+    const newSession = createNewSession(title, workspace_dir);
     res.json(newSession);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1186,6 +1186,12 @@ app.post('/api/install-llama-version', async (req, res) => {
     cfg.local_server.exe_path = exePath;
     saveConfig(cfg);
 
+    // Handle auto-cleanup if requested
+    const { autoCleanup } = req.body;
+    if (autoCleanup) {
+      performCleanupOldLlama(tag);
+    }
+
     broadcast('agent-error', `Версия llama.cpp ${tag} успешно установлена!`);
     res.json({ exePath, message: `Llama.cpp (${tag}) успешно установлен!` });
   } catch (err: any) {
@@ -1193,6 +1199,42 @@ app.post('/api/install-llama-version', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// Helper for cleaning up older llama version folders
+function performCleanupOldLlama(currentKeepTag?: string): number {
+  const appDir = path.join(os.homedir(), '.0xagent');
+  const llamaDir = path.join(appDir, 'llama');
+  if (!fs.existsSync(llamaDir)) return 0;
+
+  const cfg = loadConfig();
+  const activeExe = cfg.local_server?.exe_path || '';
+  let removedCount = 0;
+
+  const items = fs.readdirSync(llamaDir, { withFileTypes: true });
+  for (const item of items) {
+    if (item.isDirectory()) {
+      const itemTag = item.name;
+      const subDir = path.join(llamaDir, itemTag);
+      const subExe = path.join(subDir, 'llama-server.exe');
+      const altExe = path.join(subDir, 'llama.exe');
+      const exe = fs.existsSync(subExe) ? subExe : fs.existsSync(altExe) ? altExe : '';
+
+      const isCurrentActive = Boolean(exe && activeExe.toLowerCase() === exe.toLowerCase());
+      const isTargetTag = Boolean(currentKeepTag && itemTag.toLowerCase() === currentKeepTag.toLowerCase());
+
+      if (!isCurrentActive && !isTargetTag) {
+        try {
+          fs.rmSync(subDir, { recursive: true, force: true });
+          removedCount++;
+        } catch (err) {
+          console.error(`Failed to remove old llama version ${itemTag}:`, err);
+        }
+      }
+    }
+  }
+
+  return removedCount;
+}
 
 // 4. Select installed llama.cpp version without re-downloading
 app.post('/api/select-installed-llama', (req, res) => {
@@ -1213,6 +1255,77 @@ app.post('/api/select-installed-llama', (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// 5. Delete specified installed llama.cpp build
+app.post('/api/delete-installed-llama', (req, res) => {
+  try {
+    const { tag, exePath } = req.body || {};
+    if (!tag && !exePath) {
+      res.status(400).json({ error: 'tag or exePath is required' });
+      return;
+    }
+
+    const appDir = path.join(os.homedir(), '.0xagent');
+    const llamaDir = path.join(appDir, 'llama');
+
+    let deleted = false;
+    if (tag && tag !== 'default') {
+      const versionDir = path.join(llamaDir, tag);
+      if (fs.existsSync(versionDir)) {
+        fs.rmSync(versionDir, { recursive: true, force: true });
+        deleted = true;
+      }
+    } else if (exePath && fs.existsSync(exePath)) {
+      if (fs.statSync(exePath).isDirectory()) {
+        fs.rmSync(exePath, { recursive: true, force: true });
+      } else {
+        fs.unlinkSync(exePath);
+      }
+      deleted = true;
+    }
+
+    if (!deleted) {
+      res.status(404).json({ error: 'Указанная сборка не найдена' });
+      return;
+    }
+
+    const cfg = loadConfig();
+    const activeExe = cfg.local_server?.exe_path || '';
+    if (exePath && activeExe.toLowerCase() === exePath.toLowerCase()) {
+      let fallbackExe = '';
+      if (fs.existsSync(llamaDir)) {
+        const items = fs.readdirSync(llamaDir, { withFileTypes: true });
+        for (const item of items) {
+          if (item.isDirectory()) {
+            const subExe = path.join(llamaDir, item.name, 'llama-server.exe');
+            const altExe = path.join(llamaDir, item.name, 'llama.exe');
+            if (fs.existsSync(subExe)) { fallbackExe = subExe; break; }
+            if (fs.existsSync(altExe)) { fallbackExe = altExe; break; }
+          }
+        }
+      }
+      if (!cfg.local_server) cfg.local_server = {};
+      cfg.local_server.exe_path = fallbackExe;
+      saveConfig(cfg);
+    }
+
+    res.json({ success: true, message: `Сборка llama.cpp (${tag || 'выбранная'}) успешно удалена!` });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. Manual trigger to clean up old installed llama.cpp versions
+app.post('/api/cleanup-old-llama', (req, res) => {
+  try {
+    const { keepTag } = req.body || {};
+    const removedCount = performCleanupOldLlama(keepTag);
+    res.json({ success: true, removedCount, message: removedCount > 0 ? `Удалено устаревших версий: ${removedCount}` : 'Устаревших версий не обнаружено' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 app.get('/api/gguf-models', (_req, res) => {
   const models = [

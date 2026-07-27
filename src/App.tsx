@@ -1,17 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
-import { AppConfig, ChatSession, ChatMessage, FileNode, ToolCallInfo, LiveTelemetry } from './types';
-import { Header } from './components/Header';
-import { WorkspaceTree } from './components/WorkspaceTree';
+import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry } from './types';
+import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
+import { ResizableSplitter } from './components/ResizableSplitter';
 import { ChatArea } from './components/ChatArea';
-import { BottomPanel } from './components/BottomPanel';
 import { SettingsPage } from './components/settings/SettingsPage';
-import { FileViewer } from './components/FileViewer';
 import { CodeEditor } from './components/CodeEditor';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { LockScreen } from './components/LockScreen';
-import { FolderTree, Code } from 'lucide-react';
+import { FolderTree, Code, Terminal, X } from 'lucide-react';
 
 export default function App() {
   // Authentication & Security state
@@ -29,18 +28,21 @@ export default function App() {
   const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'waiting_approval' | 'executing_tool'>('idle');
   const [liveTelemetry, setLiveTelemetry] = useState<LiveTelemetry | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const [showLogsDrawer, setShowLogsDrawer] = useState<boolean>(false);
   
-  // Workspace File tree state
+  // Workspace File tree & Split View state
   const [workspaceTree, setWorkspaceTree] = useState<FileNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; content: string } | null>(null);
   const [has0xAgentMd, setHas0xAgentMd] = useState<boolean>(false);
+  const [splitLeftWidthPercent, setSplitLeftWidthPercent] = useState<number>(45);
   
-  // Navigation view state
+  // Navigation view & Sidebar state
   const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings' | 'analytics'>('chat');
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
 
   // Mobile Workspace view mode: 'files' tree or 'editor' code tab
-  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'files' | 'editor'>('files');
+  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'files' | 'editor'>('editor');
 
   // Mobile keyboard scroll offset reset on input blur (focusout)
   useEffect(() => {
@@ -68,7 +70,7 @@ export default function App() {
   }, [config]);
 
   const handleSelectTab = (path: string) => {
-    const tab = openTabs.find(t => t.path === path);
+    const tab = openTabs.find((t) => t.path === path);
     if (tab) {
       setSelectedFile(tab);
       setMobileWorkspaceTab('editor');
@@ -77,7 +79,7 @@ export default function App() {
 
   const handleCloseTab = (path: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const updated = openTabs.filter(t => t.path !== path);
+    const updated = openTabs.filter((t) => t.path !== path);
     setOpenTabs(updated);
     if (selectedFile && selectedFile.path === path) {
       if (updated.length > 0) {
@@ -126,7 +128,7 @@ export default function App() {
         setCurrentSession(fullSession);
         addLog(`Restored session: "${fullSession.title}"`);
       } else {
-        await handleCreateSession('Default Session');
+        await handleCreateSession('Default Session', cfg.workspace_dir || null);
       }
     } catch (err: any) {
       addLog(`Error during startup: ${err.message || err}`);
@@ -163,10 +165,6 @@ export default function App() {
     setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 99)]);
   };
 
-  const handleClearLogs = () => {
-    setLogs([]);
-  };
-
   // 3. Session management commands
   const handleSelectSession = async (id: string) => {
     try {
@@ -179,10 +177,11 @@ export default function App() {
     }
   };
 
-  const handleCreateSession = async (title?: string) => {
+  const handleCreateSession = async (title?: string, workspace_dir?: string | null) => {
     try {
       const name = title || `Session ${sessions.length + 1}`;
-      const newSess = await api.create_session(name);
+      const targetWs = workspace_dir !== undefined ? workspace_dir : (config?.workspace_dir || null);
+      const newSess = await api.create_session(name, targetWs);
       setSessions((prev) => [newSess, ...prev]);
       setCurrentSessionId(newSess.id);
       setCurrentSession(newSess);
@@ -204,7 +203,7 @@ export default function App() {
         if (updatedList.length > 0) {
           handleSelectSession(updatedList[0].id);
         } else {
-          handleCreateSession('Default Session');
+          handleCreateSession('Default Session', config?.workspace_dir || null);
         }
       }
     } catch (err: any) {
@@ -263,9 +262,8 @@ export default function App() {
       });
 
       setSelectedFile(newFile);
-      setMobileWorkspaceTab('editor'); // Auto-switch to code editor on mobile
-      setActiveView('workspace');
-      addLog(`Opened raw file: ${fileName}`);
+      setMobileWorkspaceTab('editor');
+      addLog(`Opened file: ${fileName}`);
     } catch (err: any) {
       addLog(`Failed to read file contents: ${err.message || err}`);
     }
@@ -309,7 +307,7 @@ export default function App() {
       await api.send_message(currentSession.id);
     } catch (err: any) {
       addLog(`Failed to execute completions: ${err.message || err}`);
-      const errText = `⚠️ **Системная ошибка подключения:** ${err.message || err}`;
+      const errText = `**Системная ошибка подключения:** ${err.message || err}`;
       const sessWithErr: ChatSession = {
         ...updatedSession,
         messages: [
@@ -350,8 +348,6 @@ export default function App() {
     }
   };
 
-  // 8. Listen to SSE completions events streamed from Node.js Backend
-  // Helper to update currentSession both in React state and ref synchronously
   const updateSessionState = (newSession: ChatSession) => {
     currentSessionRef.current = newSession;
     setCurrentSession(newSession);
@@ -443,7 +439,7 @@ export default function App() {
       }
     });
 
-    const un4 = api.listen<{ message_id: string; tools: ToolCallInfo[] }>('agent-tools-updated', (event) => {
+    const un4 = api.listen<{ message_id: string; tools: any[] }>('agent-tools-updated', (event) => {
       const sess = currentSessionRef.current;
       if (!sess) return;
 
@@ -523,139 +519,183 @@ export default function App() {
     }
   };
 
+  const isSplitMode = activeView === 'workspace' || (activeView === 'chat' && selectedFile !== null);
+
   return (
     <div className="fixed inset-0 h-[100dvh] flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans">
       
-      {/* TOP SESSION HEADER */}
-      {activeView !== 'settings' && (
-        <div className="px-3 pt-3 shrink-0 select-none">
-          <Header
-            sessions={sessions}
-            currentSessionId={currentSessionId}
-            onSelectSession={handleSelectSession}
-            onCreateSession={() => handleCreateSession()}
-            onDeleteSession={handleDeleteSession}
-            onOpenSettings={() => setActiveView('settings')}
-            has0xAgentMd={has0xAgentMd}
-          />
-        </div>
-      )}
+      {/* 1. TOP EDGE-TO-EDGE GLASS NAVBAR */}
+      <Navbar
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+        activeView={activeView}
+        onChangeView={setActiveView}
+        config={config}
+        onSelectWorkspace={handleSelectWorkspace}
+        has0xAgentMd={has0xAgentMd}
+        onToggleLogs={() => setShowLogsDrawer(!showLogsDrawer)}
+      />
 
-      {/* MAIN VIEWPORT SWITCHER */}
-      <div className="flex-1 w-full min-h-0 relative flex flex-col mt-2 pb-20">
+      {/* 2. MAIN APPLICATION WORKSPACE AREA */}
+      <div className="flex-1 w-full min-h-0 relative flex flex-row overflow-hidden">
         
-        {activeView === 'chat' && (
-          <div className="flex-grow w-full h-full flex flex-col relative px-2 sm:px-6 md:px-12 overflow-hidden">
-            <ChatArea
-              messages={currentSession ? currentSession.messages : []}
-              agentStatus={agentStatus}
-              onSendMessage={handleSendMessage}
-              onRespondToTool={handleRespondToTool}
-              onCancelAgent={handleCancelAgent}
-              reasoningEnabled={config?.reasoning_enabled !== false}
-              groqApiKey={config?.groq_api_key}
-              liveTelemetry={liveTelemetry}
-              planningMode={config?.planning_mode !== false}
-              onTogglePlanningMode={handleTogglePlanningMode}
-              onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
-            />
-          </div>
-        )}
+        {/* LEFT COLLAPSIBLE SIDEBAR */}
+        <Sidebar
+          isOpen={sidebarOpen}
+          onToggleOpen={() => setSidebarOpen(!sidebarOpen)}
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          onSelectSession={handleSelectSession}
+          onCreateSession={handleCreateSession}
+          onDeleteSession={handleDeleteSession}
+          workspaceDir={config?.workspace_dir}
+          onSelectWorkspace={handleSelectWorkspace}
+          workspaceTreeNodes={workspaceTree}
+          onFileClick={handleFileClick}
+          onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
+        />
 
-        {activeView === 'workspace' && (
-          <div className="flex-grow w-full h-full flex flex-col md:flex-row overflow-hidden border-t border-theme-border">
-            
-            {/* Mobile Workspace Toggle (Visible on md:hidden) */}
-            <div className="flex md:hidden glass-panel p-1 border-b border-white/10 shrink-0 select-none">
-              <button
-                onClick={() => setMobileWorkspaceTab('files')}
-                className={`flex-1 py-1.5 text-xs font-hud font-bold uppercase flex items-center justify-center gap-1.5 rounded-lg transition-colors ${
-                  mobileWorkspaceTab === 'files' ? 'bg-slate-800 text-white border border-indigo-500/40' : 'text-slate-400'
-                }`}
-              >
-                <FolderTree size={14} />
-                <span>Дерево файлов</span>
-              </button>
-              <button
-                onClick={() => setMobileWorkspaceTab('editor')}
-                className={`flex-1 py-1.5 text-xs font-hud font-bold uppercase flex items-center justify-center gap-1.5 rounded-lg transition-colors ${
-                  mobileWorkspaceTab === 'editor' ? 'bg-slate-800 text-white border border-indigo-500/40' : 'text-slate-400'
-                }`}
-              >
-                <Code size={14} />
-                <span>Редактор ({openTabs.length})</span>
-              </button>
+        {/* CONTENT VIEWPORT */}
+        <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">
+          
+          {/* SETTINGS VIEW */}
+          {activeView === 'settings' && (
+            <div className="w-full h-full overflow-hidden bg-theme-bg">
+              <SettingsPage
+                config={config}
+                onSaveConfig={handleSaveConfig}
+                onCancel={() => setActiveView('chat')}
+              />
             </div>
+          )}
 
-            {/* Sidebar Workspace tree (Full width on mobile when 'files', 64 width on desktop) */}
-            <div className={`w-full md:w-64 h-full flex-col bg-theme-bg border-r border-theme-border overflow-hidden ${
-              mobileWorkspaceTab === 'files' ? 'flex' : 'hidden md:flex'
-            }`}>
-              <div className="flex-grow overflow-hidden">
-                <WorkspaceTree
-                  workspaceDir={config?.workspace_dir}
-                  treeNodes={workspaceTree}
-                  onSelectWorkspace={handleSelectWorkspace}
-                  onFileClick={handleFileClick}
+          {/* ANALYTICS VIEW */}
+          {activeView === 'analytics' && (
+            <div className="w-full h-full overflow-hidden bg-theme-bg">
+              <AnalyticsPage
+                sessions={sessions}
+                serverLogs={logs}
+                onRefresh={() => window.location.reload()}
+              />
+            </div>
+          )}
+
+          {/* SPLIT-SCREEN VIEW MODE (Editor on Left + Chat on Right) */}
+          {isSplitMode && (
+            <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
+              
+              {/* Left Pane: Code Editor / Workspace Tree */}
+              <div
+                className="h-full overflow-hidden flex flex-col border-r border-white/10"
+                style={{ width: `${splitLeftWidthPercent}%` }}
+              >
+                {/* Mobile Tab Switcher */}
+                <div className="flex md:hidden glass-panel p-1 border-b border-white/10 shrink-0 select-none">
+                  <button
+                    type="button"
+                    onClick={() => setMobileWorkspaceTab('files')}
+                    className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
+                      mobileWorkspaceTab === 'files' ? 'bg-slate-800 text-white' : 'text-slate-400'
+                    }`}
+                  >
+                    <FolderTree size={13} />
+                    <span>Файлы</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileWorkspaceTab('editor')}
+                    className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
+                      mobileWorkspaceTab === 'editor' ? 'bg-slate-800 text-white' : 'text-slate-400'
+                    }`}
+                  >
+                    <Code size={13} />
+                    <span>Редактор ({openTabs.length})</span>
+                  </button>
+                </div>
+
+                <div className="flex-1 w-full h-full overflow-hidden">
+                  <CodeEditor
+                    selectedFile={selectedFile}
+                    openTabs={openTabs}
+                    onSelectTab={handleSelectTab}
+                    onCloseTab={handleCloseTab}
+                  />
+                </div>
+              </div>
+
+              {/* Draggable Divider Handle */}
+              <ResizableSplitter
+                onResize={(pct) => setSplitLeftWidthPercent(pct)}
+                minPercent={20}
+                maxPercent={80}
+              />
+
+              {/* Right Pane: Chat Window */}
+              <div
+                className="h-full overflow-hidden flex flex-col flex-1"
+                style={{ width: `${100 - splitLeftWidthPercent}%` }}
+              >
+                <ChatArea
+                  messages={currentSession ? currentSession.messages : []}
+                  agentStatus={agentStatus}
+                  onSendMessage={handleSendMessage}
+                  onRespondToTool={handleRespondToTool}
+                  onCancelAgent={handleCancelAgent}
+                  reasoningEnabled={config?.reasoning_enabled !== false}
+                  groqApiKey={config?.groq_api_key}
+                  liveTelemetry={liveTelemetry}
+                  planningMode={config?.planning_mode !== false}
+                  onTogglePlanningMode={handleTogglePlanningMode}
                 />
               </div>
             </div>
+          )}
 
-            {/* Main code editor area (Full width on mobile when 'editor', flex-1 on desktop) */}
-            <div className={`w-full md:flex-1 h-full overflow-hidden ${
-              mobileWorkspaceTab === 'editor' ? 'flex flex-col' : 'hidden md:flex'
-            }`}>
-              <CodeEditor
-                selectedFile={selectedFile}
-                openTabs={openTabs}
-                onSelectTab={handleSelectTab}
-                onCloseTab={handleCloseTab}
+          {/* FULL SCREEN CHAT MODE (When no split view active) */}
+          {!isSplitMode && activeView === 'chat' && (
+            <div className="w-full h-full flex flex-col overflow-hidden">
+              <ChatArea
+                messages={currentSession ? currentSession.messages : []}
+                agentStatus={agentStatus}
+                onSendMessage={handleSendMessage}
+                onRespondToTool={handleRespondToTool}
+                onCancelAgent={handleCancelAgent}
+                reasoningEnabled={config?.reasoning_enabled !== false}
+                groqApiKey={config?.groq_api_key}
+                liveTelemetry={liveTelemetry}
+                planningMode={config?.planning_mode !== false}
+                onTogglePlanningMode={handleTogglePlanningMode}
               />
             </div>
-          </div>
-        )}
+          )}
 
-        {activeView === 'settings' && (
-          <div className="flex-grow w-full h-full overflow-hidden border-t border-theme-border bg-theme-bg">
-            <SettingsPage
-              config={config}
-              onSaveConfig={handleSaveConfig}
-              onCancel={() => setActiveView('chat')}
-            />
-          </div>
-        )}
-
-        {activeView === 'analytics' && (
-          <div className="flex-grow w-full h-full overflow-hidden border-t border-theme-border bg-theme-bg">
-            <AnalyticsPage
-              sessions={sessions}
-              serverLogs={logs}
-              onRefresh={() => window.location.reload()}
-            />
-          </div>
-        )}
-
+        </div>
       </div>
 
-      {/* BOTTOM NAVIGATION FOOTER PANEL */}
-      <BottomPanel
-        logs={logs}
-        systemInstructions={config ? config.system_prompt : ''}
-        modelName={config ? config.model_name : 'No model selected'}
-        onClearLogs={handleClearLogs}
-        onSelectWorkspace={handleSelectWorkspace}
-        activeView={activeView}
-        onChangeView={setActiveView}
-      />
-
-      {/* RAW TEXT FILE VIEWER OVERLAY */}
-      {activeView !== 'workspace' && selectedFile && (
-        <FileViewer
-          fileName={selectedFile.name}
-          filePath={selectedFile.path}
-          content={selectedFile.content}
-          onClose={() => setSelectedFile(null)}
-        />
+      {/* CONSOLE LOGS DRAWER OVERLAY */}
+      {showLogsDrawer && (
+        <div className="fixed bottom-0 left-0 right-0 h-48 bg-slate-950/95 border-t border-white/10 z-40 flex flex-col font-mono text-xs shadow-2xl backdrop-blur-md">
+          <div className="px-3 py-1.5 bg-slate-900 border-b border-white/10 flex items-center justify-between text-slate-300">
+            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+              <Terminal size={13} />
+              <span>Логи системной консоли</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowLogsDrawer(false)}
+              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="p-3 flex-1 overflow-y-auto space-y-1 text-emerald-400 text-[11px] leading-tight font-mono select-text scrollbar-thin">
+            {logs.length > 0 ? (
+              logs.map((log, idx) => <div key={idx}>{log}</div>)
+            ) : (
+              <div className="text-slate-500 italic">Логов пока нет.</div>
+            )}
+          </div>
+        </div>
       )}
 
       {/* MEMORY & SKILLS MODAL */}

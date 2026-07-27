@@ -399,7 +399,7 @@ ${activePersona.tools}
 ${activePersona.user}`;
 
     const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
-    const fullSystemPrompt = config.system_prompt + personaContext + envContext + planningContext + memoryContext + workspaceMdContext;
+    const fullSystemPrompt = personaContext + envContext + planningContext + memoryContext + workspaceMdContext;
 
     const rawMessages = [
       { role: 'system', content: fullSystemPrompt },

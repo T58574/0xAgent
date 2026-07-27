@@ -50,11 +50,12 @@ export function saveSession(session: ChatSession): void {
   fs.writeFileSync(filePath, JSON.stringify(session, null, 2), 'utf-8');
 }
 
-export function createNewSession(title: string): ChatSession {
+export function createNewSession(title?: string, workspace_dir?: string | null): ChatSession {
   const now = Date.now();
   const session: ChatSession = {
     id: uuidv4(),
     title: title || 'New Session',
+    workspace_dir: workspace_dir || null,
     messages: [],
     created_at: now,
     updated_at: now,

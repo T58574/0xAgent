@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, FileText, Shield, User } from 'lucide-react';
+import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, Shield, User } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { GeneralTab } from './GeneralTab';
-import { PromptsTab } from './PromptsTab';
 import { PersonasTab } from './PersonasTab';
 import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
@@ -19,12 +18,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onSaveConfig,
   onCancel,
 }) => {
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'prompts' | 'themes' | 'local_server' | 'security'>('general');
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'themes' | 'local_server' | 'security'>('general');
 
   // General state
   const [apiUrl, setApiUrl] = useState('');
   const [modelName, setModelName] = useState('');
-  const [systemPrompt, setSystemPrompt] = useState('');
   const [groqApiKey, setGroqApiKey] = useState('');
   const [modelsPath, setModelsPath] = useState('');
   const [reasoningEnabled, setReasoningEnabled] = useState(true);
@@ -78,7 +76,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     if (config) {
       setApiUrl(config.api_url || 'http://127.0.0.1:11434/v1');
       setModelName(config.model_name || 'qwen2.5-coder:7b');
-      setSystemPrompt(config.system_prompt || '');
       setGroqApiKey(config.groq_api_key || '');
       setModelsPath(config.models_path || '');
       setReasoningEnabled(config.reasoning_enabled !== false);
@@ -140,7 +137,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           ...config,
           api_url: apiUrl,
           model_name: modelName,
-          system_prompt: systemPrompt,
           groq_api_key: groqApiKey.trim() || null,
           models_path: modelsPath.trim() || null,
           reasoning_enabled: reasoningEnabled,
@@ -190,7 +186,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   }, [
     apiUrl,
     modelName,
-    systemPrompt,
     groqApiKey,
     modelsPath,
     reasoningEnabled,
@@ -297,19 +292,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           <button
             type="button"
-            onClick={() => setActiveSubtab('prompts')}
-            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
-              activeSubtab === 'prompts'
-                ? 'bg-slate-800 text-white font-semibold border border-white/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
-            }`}
-          >
-            <FileText size={14} className={activeSubtab === 'prompts' ? 'text-amber-400' : 'text-slate-500'} />
-            <span>Инструкции Агента</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setActiveSubtab('themes')}
             className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
               activeSubtab === 'themes'
@@ -369,12 +351,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           {activeSubtab === 'personas' && (
             <PersonasTab />
-          )}
-
-          {activeSubtab === 'prompts' && (
-            <PromptsTab
-              onConfigUpdated={(updatedCfg) => onSaveConfig(updatedCfg)}
-            />
           )}
 
           {activeSubtab === 'themes' && (

@@ -123,6 +123,7 @@ export interface ChatMessage {
 export interface ChatSession {
   id: string;
   title: string;
+  workspace_dir?: string | null;
   messages: ChatMessage[];
   created_at: number;
   updated_at: number;

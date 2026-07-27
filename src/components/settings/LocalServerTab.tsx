@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Cpu, Play, Square, Folder, Download, HardDrive, RefreshCw, AlertTriangle, Zap, Layers, Activity, Eye, Search } from 'lucide-react';
+import { Cpu, Play, Square, Folder, Download, HardDrive, RefreshCw, AlertTriangle, Zap, Layers, Activity, Eye, Search, Trash2, CheckCircle2, Trash } from 'lucide-react';
 import { GgufMetadata, HardwareInfo } from '../../types';
 import { ModelPickerModal } from '../ModelPickerModal';
 import * as api from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 
 interface LocalServerTabProps {
   exePath: string;
@@ -95,6 +96,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   setServerLogsAutoScroll,
   setApiUrl,
 }) => {
+  const { showToast } = useToast();
   const [isInstallingLlama, setIsInstallingLlama] = useState(false);
   const [githubReleases, setGithubReleases] = useState<any[]>([]);
   const [selectedTag, setSelectedTag] = useState<string>('');
@@ -102,6 +104,13 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   const [selectedAssetName, setSelectedAssetName] = useState<string>('');
   const [installedVersions, setInstalledVersions] = useState<{ tag: string; exePath: string; isCurrent: boolean }[]>([]);
   const [isLoadingReleases, setIsLoadingReleases] = useState(false);
+
+  // Auto cleanup & Download animation states
+  const [autoCleanupOld, setAutoCleanupOld] = useState(true);
+  const [justDownloadedTag, setJustDownloadedTag] = useState<string | null>(null);
+  const [isCleaningOld, setIsCleaningOld] = useState(false);
+  const [deletingTag, setDeletingTag] = useState<string | null>(null);
+
 
   // New Phase 1 States: Metadata, Hardware, Slots, Modal, Adviser
   const [modelMeta, setModelMeta] = useState<GgufMetadata | null>(null);
@@ -256,13 +265,18 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   const handleInstallSelectedLlamaVersion = async () => {
     if (!selectedTag) return;
     setIsInstallingLlama(true);
+    setJustDownloadedTag(null);
     try {
-      const res = await api.install_llama_version(selectedTag, selectedAssetUrl, selectedAssetName);
+      const res = await api.install_llama_version(selectedTag, selectedAssetUrl, selectedAssetName, autoCleanupOld);
       setExePath(res.exePath);
       await refreshInstalledVersions();
-      alert(res.message || `Llama.cpp (${selectedTag}) успешно установлен!`);
+      setJustDownloadedTag(selectedTag);
+      showToast(res.message || `Llama.cpp (${selectedTag}) успешно установлен!`, 'success');
+      setTimeout(() => {
+        setJustDownloadedTag((prev) => (prev === selectedTag ? null : prev));
+      }, 6000);
     } catch (err: any) {
-      alert(`Ошибка установки: ${err.message || err}`);
+      showToast(`Ошибка установки: ${err.message || err}`, 'error');
     } finally {
       setIsInstallingLlama(false);
     }
@@ -273,9 +287,43 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       const res = await api.select_installed_llama(vExePath);
       setExePath(res.exePath);
       await refreshInstalledVersions();
-      alert(res.message || 'Активная версия переключена!');
+      showToast(res.message || 'Активная версия переключена!', 'success');
     } catch (err: any) {
-      alert(`Ошибка переключения версии: ${err.message || err}`);
+      showToast(`Ошибка переключения версии: ${err.message || err}`, 'error');
+    }
+  };
+
+  const handleDeleteInstalledVersion = async (tag: string, vExePath: string) => {
+    setDeletingTag(tag);
+    try {
+      const res = await api.delete_installed_llama(tag, vExePath);
+      await refreshInstalledVersions();
+      if (exePath.toLowerCase() === vExePath.toLowerCase()) {
+        const updated = await api.get_installed_llama_versions();
+        if (updated.length > 0) {
+          setExePath(updated[0].exePath);
+        } else {
+          setExePath('');
+        }
+      }
+      showToast(res.message || `Сборка ${tag} удалена!`, 'success');
+    } catch (err: any) {
+      showToast(`Ошибка удаления сборки: ${err.message || err}`, 'error');
+    } finally {
+      setDeletingTag(null);
+    }
+  };
+
+  const handleCleanupOldVersions = async () => {
+    setIsCleaningOld(true);
+    try {
+      const res = await api.cleanup_old_llama_versions(selectedTag);
+      await refreshInstalledVersions();
+      showToast(res.message, res.removedCount > 0 ? 'success' : 'info');
+    } catch (err: any) {
+      showToast(`Ошибка очистки старых версий: ${err.message || err}`, 'error');
+    } finally {
+      setIsCleaningOld(false);
     }
   };
 
@@ -333,9 +381,10 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       setHealthStatus('stopped');
       const errMsg = err.message || err;
       setServerLogs((prev) => [...prev, `[SYSTEM ERROR] Failed to start server:\n${errMsg}`]);
-      alert(`Ошибка запуска сервера llama.cpp:\n${errMsg}`);
+      showToast(`Ошибка запуска сервера llama.cpp:\n${errMsg}`, 'error');
     }
   };
+
 
   const handleStopServer = async () => {
     try {
@@ -477,22 +526,42 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             </div>
           </div>
 
-          <div className="flex justify-end pt-1">
-            <button
-              type="button"
-              onClick={handleInstallSelectedLlamaVersion}
-              disabled={isInstallingLlama || !selectedTag}
-              className="flat-btn px-4 py-2 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer flex items-center gap-2 disabled:opacity-50"
-            >
-              {isInstallingLlama ? <RefreshCw size={13} className="animate-spin" /> : <HardDrive size={13} />}
-              <span>
-                {isInstallingLlama
-                  ? 'Установка...'
-                  : isSelectedVersionInstalled
-                  ? `Переключить / Выбрать установленную ${selectedTag}`
-                  : `Скачать и установить ${selectedTag} с GitHub`}
-              </span>
-            </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
+            <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={autoCleanupOld}
+                onChange={(e) => setAutoCleanupOld(e.target.checked)}
+                className="rounded bg-slate-900 border-white/20 text-emerald-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+              />
+              <span>Автоочистка старых версий (удалять предыдущие при скачивании новой)</span>
+            </label>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Inline Download Success Animated Badge */}
+              {justDownloadedTag === selectedTag && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 text-xs font-semibold animate-pulse shadow-lg shadow-emerald-950/50">
+                  <CheckCircle2 size={15} className="text-emerald-400 shrink-0" />
+                  <span>Скачано и установлено!</span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleInstallSelectedLlamaVersion}
+                disabled={isInstallingLlama || !selectedTag}
+                className="flat-btn px-4 py-2 rounded text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer flex items-center gap-2 disabled:opacity-50"
+              >
+                {isInstallingLlama ? <RefreshCw size={13} className="animate-spin" /> : <HardDrive size={13} />}
+                <span>
+                  {isInstallingLlama
+                    ? 'Установка...'
+                    : isSelectedVersionInstalled
+                    ? `Переключить / Выбрать установленную ${selectedTag}`
+                    : `Скачать и установить ${selectedTag} с GitHub`}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -501,21 +570,33 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           <div className="space-y-2">
             <div className="text-[11px] font-medium text-slate-300 flex items-center justify-between">
               <span>Сохраненные локально версии llama.cpp (Без повторного скачивания):</span>
-              <button
-                type="button"
-                onClick={refreshInstalledVersions}
-                className="text-slate-400 hover:text-white cursor-pointer"
-                title="Обновить список"
-              >
-                <RefreshCw size={11} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCleanupOldVersions}
+                  disabled={isCleaningOld}
+                  className="text-[11px] text-rose-400 hover:text-rose-300 cursor-pointer flex items-center gap-1 hover:underline disabled:opacity-50"
+                  title="Удалить все предыдущие версии кроме текущей активной"
+                >
+                  {isCleaningOld ? <RefreshCw size={11} className="animate-spin" /> : <Trash size={11} />}
+                  <span>Очистить старые версии</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={refreshInstalledVersions}
+                  className="text-slate-400 hover:text-white cursor-pointer ml-1"
+                  title="Обновить список"
+                >
+                  <RefreshCw size={11} />
+                </button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {installedVersions.map((item) => (
                 <div
                   key={item.exePath}
-                  className={`p-2.5 rounded border text-xs flex items-center justify-between gap-2 ${
+                  className={`p-2.5 rounded border text-xs flex items-center justify-between gap-2 transition-all ${
                     item.isCurrent
                       ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-medium'
                       : 'border-white/10 bg-slate-900/40 text-slate-300'
@@ -535,20 +616,33 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                     </div>
                   </div>
 
-                  {!item.isCurrent && (
+                  <div className="flex items-center gap-1 shrink-0">
+                    {!item.isCurrent && (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectInstalledVersion(item.exePath)}
+                        className="flat-btn px-2 py-1 rounded text-[11px] font-medium text-slate-200 hover:text-white border-white/20 shrink-0 cursor-pointer"
+                      >
+                        Выбрать
+                      </button>
+                    )}
+
                     <button
                       type="button"
-                      onClick={() => handleSelectInstalledVersion(item.exePath)}
-                      className="flat-btn px-2 py-1 rounded text-[11px] font-medium text-slate-200 hover:text-white border-white/20 shrink-0 cursor-pointer"
+                      onClick={() => handleDeleteInstalledVersion(item.tag, item.exePath)}
+                      disabled={deletingTag === item.tag}
+                      className="p-1.5 rounded text-rose-400 hover:text-rose-200 hover:bg-rose-500/20 border border-transparent hover:border-rose-500/30 shrink-0 cursor-pointer transition-colors disabled:opacity-50"
+                      title={item.isCurrent ? 'Удалить текущую сборку (будет автоматически переключена другая)' : `Удалить сборку [${item.tag}]`}
                     >
-                      Выбрать
+                      {deletingTag === item.tag ? <RefreshCw size={12} className="animate-spin" /> : <Trash2 size={12} />}
                     </button>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
+
       </div>
 
       {/* Executable & Model Files Grid */}
@@ -616,7 +710,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           {modelMeta.isMmproj ? (
             <div className="flex items-center gap-2 text-amber-300 font-semibold text-xs">
               <Eye size={15} />
-              <span>⚠️ Выбранный файл является Vision-проектором (mmproj), а не основной моделью LLM!</span>
+              <span>Выбранный файл является Vision-проектором (mmproj), а не основной моделью LLM!</span>
             </div>
           ) : (
             <div className="flex items-center justify-between">

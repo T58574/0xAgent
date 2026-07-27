@@ -51,7 +51,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
           if (pct > maxContextPercent) maxContextPercent = pct;
         }
       }
-      if (item.msg.content.includes('⚠️') || item.msg.content.includes('Ошибка')) {
+      if (item.msg.content.includes('Ошибка') || item.msg.content.includes('Error')) {
         errorCount++;
       }
     }
@@ -86,7 +86,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
 
       if (selectedCategory === 'high_speed') return (m?.tokensPerSec || 0) >= 30;
       if (selectedCategory === 'high_context') return ((m?.contextUsed || 0) / (m?.contextMax || 8192)) >= 0.4;
-      if (selectedCategory === 'errors') return item.msg.content.includes('⚠️') || item.msg.content.includes('Ошибка');
+      if (selectedCategory === 'errors') return item.msg.content.includes('Ошибка') || item.msg.content.includes('Error');
 
       return true;
     });
@@ -131,7 +131,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
             {stats.avgSpeed} <span className="text-xs font-sans text-slate-400">т/сек</span>
           </div>
           <div className="text-[11px] text-slate-400 mt-2 flex items-center gap-1 font-mono">
-            <span className="text-emerald-400 font-semibold">⚡ Живой расчет</span> генерации токенов
+            <span className="text-emerald-400 font-semibold">Живой расчет</span> генерации токенов
           </div>
           <div className="absolute right-0 bottom-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
         </div>
@@ -288,7 +288,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
                       <td className="p-3">
                         {m?.tokensPerSec ? (
                           <span className="font-bold text-emerald-400 text-xs">
-                            ⚡ {m.tokensPerSec} t/s
+                            {m.tokensPerSec} t/s
                           </span>
                         ) : (
                           <span className="text-slate-500">—</span>

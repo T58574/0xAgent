@@ -202,11 +202,11 @@ export async function save_session(session: ChatSession): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
-export async function create_session(title: string): Promise<ChatSession> {
+export async function create_session(title?: string, workspace_dir?: string | null): Promise<ChatSession> {
   const res = await authFetch(`${API_BASE}/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ title, workspace_dir }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -317,11 +317,11 @@ export async function get_installed_llama_versions(): Promise<{ tag: string; exe
   return res.json();
 }
 
-export async function install_llama_version(tag: string, downloadUrl?: string, assetName?: string): Promise<{ exePath: string; message: string }> {
+export async function install_llama_version(tag: string, downloadUrl?: string, assetName?: string, autoCleanup?: boolean): Promise<{ exePath: string; message: string }> {
   const res = await authFetch(`${API_BASE}/install-llama-version`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tag, downloadUrl, assetName }),
+    body: JSON.stringify({ tag, downloadUrl, assetName, autoCleanup }),
   });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
@@ -336,6 +336,27 @@ export async function select_installed_llama(exePath: string): Promise<{ exePath
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function delete_installed_llama(tag: string, exePath: string): Promise<{ success: boolean; message: string }> {
+  const res = await authFetch(`${API_BASE}/delete-installed-llama`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tag, exePath }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function cleanup_old_llama_versions(keepTag?: string): Promise<{ success: boolean; removedCount: number; message: string }> {
+  const res = await authFetch(`${API_BASE}/cleanup-old-llama`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keepTag }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 
 export async function get_gguf_models(): Promise<any[]> {
   const res = await authFetch(`${API_BASE}/gguf-models`);

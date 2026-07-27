@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, AlertTriangle, Play, Zap, Cpu, ClipboardList } from 'lucide-react';
+import { Mic, Square, Send, Brain, Terminal, Sparkles, RefreshCw, Zap, Cpu } from 'lucide-react';
 import { ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
 import * as api from '../services/api';
+import { useToast } from '../context/ToastContext';
 
 interface ChatAreaProps {
   messages: ChatMessage[];
@@ -17,7 +18,6 @@ interface ChatAreaProps {
   liveTelemetry?: LiveTelemetry | null;
   planningMode?: boolean;
   onTogglePlanningMode?: () => void;
-  onOpenMemorySkills?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -31,8 +31,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   liveTelemetry,
   planningMode = true,
   onTogglePlanningMode,
-  onOpenMemorySkills,
 }) => {
+  const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
   const historyEndRef = useRef<HTMLDivElement>(null);
   const mainHistoryRef = useRef<HTMLDivElement>(null);
@@ -43,15 +43,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Server health state for 1-click launch banner
-  const [isServerOffline, setIsServerOffline] = useState(false);
-  const [isStartingServer, setIsStartingServer] = useState(false);
-  const [serverHost] = useState('127.0.0.1');
-  const [serverPort] = useState(11434);
-
   // Summarization WebSocket events state
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [summarizePhase, setSummarizePhase] = useState('🧠 Инициализация фоновой суммаризации...');
+  const [summarizePhase, setSummarizePhase] = useState('Инициализация фоновой суммаризации...');
   const [summarizePercent, setSummarizePercent] = useState(0);
   const [summarizeMetrics, setSummarizeMetrics] = useState<{ oldTokens?: number; newTokens?: number }>({});
 
@@ -59,7 +53,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     const u1 = api.listen<{ promptTokens: number; estimatedNewTokens: number }>('agent-summarizing-start', (e) => {
       setIsSummarizing(true);
       setSummarizePercent(15);
-      setSummarizePhase('🧠 Инициализация фоновой LLM-суммаризации...');
+      setSummarizePhase('Инициализация фоновой LLM-суммаризации...');
       setSummarizeMetrics({ oldTokens: e.payload.promptTokens });
     });
 
@@ -71,7 +65,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     let sumTimer: any = null;
     const u3 = api.listen<{ oldTokens: number; newTokens: number; summary: string }>('agent-summarizing-end', (e) => {
       setSummarizePercent(100);
-      setSummarizePhase('✨ Контекст успешно сжат!');
+      setSummarizePhase('Контекст успешно сжат!');
       setSummarizeMetrics({ oldTokens: e.payload.oldTokens, newTokens: e.payload.newTokens });
       sumTimer = setTimeout(() => {
         setIsSummarizing(false);
@@ -89,32 +83,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, agentStatus, liveTelemetry]);
-
-  useEffect(() => {
-    const checkHealth = async () => {
-      try {
-        const h = await api.get_server_health(serverHost, serverPort);
-        setIsServerOffline(!h.ok);
-      } catch {
-        setIsServerOffline(true);
-      }
-    };
-    checkHealth();
-    const interval = setInterval(checkHealth, 3000);
-
-    const unlisten = api.listen<{ status: string }>('llama-server-status', (event) => {
-      if (event.payload.status === 'running') {
-        setIsServerOffline(false);
-      } else if (event.payload.status === 'stopped') {
-        setIsServerOffline(true);
-      }
-    });
-
-    return () => {
-      clearInterval(interval);
-      unlisten();
-    };
-  }, [serverHost, serverPort]);
 
   const startRecording = async () => {
     try {
@@ -134,7 +102,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         stream.getTracks().forEach((track) => track.stop());
 
         if (!groqApiKey) {
-          alert('Для использования распознавания речи введите API токен Groq в Настройках!');
+          showToast('Для использования распознавания речи введите API токен Groq в Настройках!', 'info');
           return;
         }
 
@@ -150,21 +118,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 setInputText((prev) => (prev ? `${prev} ${text}` : text));
               }
             } catch (err: any) {
-              alert(`Ошибка распознавания: ${err.message || err}`);
+              showToast(`Ошибка распознавания: ${err.message || err}`, 'error');
             } finally {
               setIsTranscribing(false);
             }
           };
         } catch (err: any) {
           setIsTranscribing(false);
-          alert(`Ошибка записи: ${err.message || err}`);
+          showToast(`Ошибка записи: ${err.message || err}`, 'error');
         }
       };
 
       mediaRecorder.start();
       setIsRecording(true);
     } catch (err) {
-      alert('Не удалось получить доступ к микрофону.');
+      showToast('Не удалось получить доступ к микрофону.', 'error');
     }
   };
 
@@ -187,114 +155,37 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  const handleStartServerDirectly = async (autoSendPrompt?: string) => {
-    setIsStartingServer(true);
-    const textToSend = autoSendPrompt || inputText.trim();
-    try {
-      const res = await api.start_local_server();
-      if (res && res.success) {
-        let serverReady = false;
-        for (let i = 0; i < 20; i++) {
-          await new Promise((r) => setTimeout(r, 1000));
-          const h = await api.get_server_health(serverHost, serverPort);
-          if (h.ok) {
-            serverReady = true;
-            setIsServerOffline(false);
-            break;
-          }
-        }
-        if (serverReady && textToSend) {
-          onSendMessage(textToSend);
-          setInputText('');
-        }
-      }
-    } catch (err: any) {
-      alert(`Ошибка запуска сервера llama.cpp:\n${err.message || err}`);
-    } finally {
-      setIsStartingServer(false);
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim()) return;
-
-    if (isServerOffline) {
-      handleStartServerDirectly(inputText.trim());
-      return;
-    }
-
     onSendMessage(inputText.trim());
     setInputText('');
   };
 
   const hasMessages = messages && messages.length > 0;
 
-  const renderWarningBanner = () => {
-    if (!isServerOffline) return null;
+  const renderPlanningToggle = () => {
+    if (!onTogglePlanningMode) return null;
     return (
-      <div className="mx-4 my-2 p-3 rounded-lg border border-amber-500/40 bg-amber-950/40 text-amber-200 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg z-20">
-        <div className="flex items-center gap-2">
-          <AlertTriangle size={18} className="text-amber-400 shrink-0 animate-pulse" />
-          <div>
-            <span className="font-semibold text-slate-100">Локальный сервер llama.cpp не запущен!</span>
-            <p className="text-[11px] text-slate-300 mt-0.5">
-              Для отправки сообщений запустите сервер в 1-клик или загрузите модель в Настройках.
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => handleStartServerDirectly()}
-          disabled={isStartingServer}
-          className="flat-btn px-3.5 py-1.5 rounded-md text-xs font-semibold text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/20 flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+      <div className="flex items-center justify-center pt-2 select-none">
+        <label
+          onClick={onTogglePlanningMode}
+          className="flex items-center gap-2 text-xs text-[var(--theme-text)] opacity-80 hover:opacity-100 cursor-pointer transition-opacity"
         >
-          {isStartingServer ? (
-            <>
-              <RefreshCw size={13} className="animate-spin" />
-              <span>Запуск...</span>
-            </>
-          ) : (
-            <>
-              <Play size={13} />
-              <span>Запустить LLM в 1-клик</span>
-            </>
-          )}
-        </button>
-      </div>
-    );
-  };
-
-  const renderQuickControls = () => {
-    if (!onTogglePlanningMode && !onOpenMemorySkills) return null;
-    return (
-      <div className="flex items-center gap-2 mb-2">
-        {onTogglePlanningMode && (
-          <button
-            type="button"
-            onClick={onTogglePlanningMode}
-            className={`flat-btn px-2.5 py-1 rounded text-xs font-medium cursor-pointer flex items-center gap-1.5 transition-colors ${
-              planningMode
-                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm font-semibold'
-                : 'text-slate-400 border-white/10 hover:text-slate-200'
+          <div
+            className={`w-8 h-4 flex items-center rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+              planningMode ? 'bg-[var(--theme-accent)] justify-end' : 'bg-slate-700 justify-start'
             }`}
-            title={planningMode ? 'Режим Планирования активен' : 'Включить Режим Планирования'}
           >
-            <ClipboardList size={13} className={planningMode ? 'text-purple-400' : 'text-slate-400'} />
-            <span>{planningMode ? '📋 План: ВКЛ' : '📋 План: ВЫКЛ'}</span>
-          </button>
-        )}
-
-        {onOpenMemorySkills && (
-          <button
-            type="button"
-            onClick={onOpenMemorySkills}
-            className="flat-btn px-2.5 py-1 rounded text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer flex items-center gap-1.5"
-            title="Долгосрочная память и скиллы"
-          >
-            <Brain size={13} />
-            <span>🧠 Память & Скиллы</span>
-          </button>
-        )}
+            <div className="w-3 h-3 rounded-full bg-white shadow-md" />
+          </div>
+          <span className="font-medium text-[11px]">
+            Режим планирования:{' '}
+            <strong className={planningMode ? 'text-[var(--theme-accent)]' : 'text-slate-400'}>
+              {planningMode ? 'ВКЛ' : 'ВЫКЛ'}
+            </strong>
+          </span>
+        </label>
       </div>
     );
   };
@@ -347,7 +238,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-cyan-400 animate-spin" />
-            <span className="font-bold text-cyan-300 tracking-wider">🧠 ФОНОВОЕ СЖАТИЕ КОНТЕКСТА...</span>
+            <span className="font-bold text-cyan-300 tracking-wider">ФОНОВОЕ СЖАТИЕ КОНТЕКСТА...</span>
           </div>
 
           {summarizeMetrics.oldTokens !== undefined && (
@@ -375,24 +266,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-hidden relative select-text">
       
-      {/* 1. EMPTY CHAT WELCOME VIEW */}
+      {/* 1. EMPTY CHAT WELCOME VIEW (Centered hero prompt input) */}
       {!hasMessages && (
-        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center z-10 max-w-xl mx-auto space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-purple-500/20 border border-white/10 flex items-center justify-center shadow-xl">
-            <Sparkles size={32} className="text-emerald-400 animate-pulse" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-100 tracking-tight">
-            0xAgent AI Pair Programmer
-          </h2>
-          <p className="text-xs text-slate-400 leading-relaxed font-sans">
-            Введите вашу задачу или выберите локальную GGUF модель в Настройках для начала автономной написания кода.
-          </p>
-
+        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center z-10 w-full max-w-2xl mx-auto my-auto">
           {renderSummarizingBanner()}
-          {renderWarningBanner()}
 
-          <div className="w-full mt-4">
-            {renderQuickControls()}
+          <div className="w-full space-y-3">
             <form onSubmit={handleSubmit} className="w-full flex items-center gap-2">
               <div className="relative flex-1">
                 <input
@@ -400,12 +279,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   placeholder="Что строим сегодня?.."
-                  className="w-full px-4 py-3 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none pr-10"
+                  className="w-full px-4 py-3.5 rounded-xl flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none pr-10 shadow-xl border border-white/10"
                 />
                 <button
                   type="button"
                   onClick={handleMicClick}
-                  className={`absolute right-2.5 top-2.5 p-1 rounded transition-colors ${
+                  className={`absolute right-3 top-3 p-1 rounded transition-colors ${
                     isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
                   }`}
                 >
@@ -415,11 +294,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               <button
                 type="submit"
                 disabled={!inputText.trim() || isTranscribing}
-                className="flat-btn rounded-lg px-5 py-3 text-xs font-medium text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/10 cursor-pointer"
+                className="flat-btn rounded-xl px-5 py-3.5 text-xs font-medium text-[var(--theme-text)] border-[var(--theme-border)] hover:bg-white/10 cursor-pointer shadow-xl"
               >
                 <Send size={16} />
               </button>
             </form>
+            {renderPlanningToggle()}
           </div>
         </div>
       )}
@@ -571,9 +451,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* SUMMARIZING SCI-FI BANNER */}
           {renderSummarizingBanner()}
 
-          {/* SERVER OFFLINE WARNING & 1-CLICK LAUNCH BANNER */}
-          {renderWarningBanner()}
-
           {/* INPUT FORM CONTAINER */}
           <div className="p-3 border-t border-white/10 glass-panel select-none z-10 w-full">
             <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2">
@@ -615,6 +492,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 </button>
               )}
             </form>
+
+            {renderPlanningToggle()}
           </div>
         </div>
       )}
