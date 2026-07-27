@@ -43,7 +43,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
       </div>
 
       {/* 1. Connection Card */}
-      <div className="p-4 rounded-md glass-card border border-white/10 space-y-4">
+      <div className="p-4 rounded-md glass-card border border-[var(--theme-border)] space-y-4">
         <div className="text-xs font-semibold text-slate-200 flex items-center gap-1.5 border-b border-white/10 pb-2">
           <Globe size={14} className="text-sky-400" />
           <span>Параметры сетевого API подключения</span>
@@ -87,7 +87,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         {/* Think Toggle */}
         <div
           onClick={() => setReasoningEnabled(!reasoningEnabled)}
-          className="p-3.5 rounded-md glass-card flex items-center justify-between border border-white/10 cursor-pointer hover:border-white/20 transition-colors"
+          className="p-3.5 rounded-md glass-card flex items-center justify-between border border-[var(--theme-border)] cursor-pointer hover:border-white/20 transition-colors"
         >
           <div>
             <div className="text-xs font-medium text-slate-200 flex items-center gap-1.5">
@@ -97,18 +97,21 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             <div className="text-[11px] text-slate-400 mt-0.5">Показывать блок рассуждений модели в ответах</div>
           </div>
           <div
-            className={`w-9 h-5 flex items-center rounded-full p-0.5 transition-colors duration-200 shrink-0 ${
-              reasoningEnabled ? 'bg-emerald-500 justify-end' : 'bg-slate-700 justify-start'
-            }`}
+            className="w-9 h-5 flex items-center rounded-full p-0.5 transition-colors duration-200 shrink-0"
+            style={{ backgroundColor: reasoningEnabled ? 'var(--theme-accent)' : 'rgba(255, 255, 255, 0.1)', justifyContent: reasoningEnabled ? 'flex-end' : 'flex-start' }}
           >
-            <div className="w-3.5 h-3.5 rounded-full bg-white shadow-md" />
+            <div
+              className={`w-3.5 h-3.5 rounded-full bg-white shadow-md transition-transform ${
+                reasoningEnabled ? 'translate-x-4' : 'translate-x-0'
+              }`}
+            />
           </div>
         </div>
 
         {/* Auto-save History Toggle */}
         <div
           onClick={() => setAutoSaveHistory(!autoSaveHistory)}
-          className="p-3.5 rounded-md glass-card flex items-center justify-between border border-white/10 cursor-pointer hover:border-white/20 transition-colors"
+          className="p-3.5 rounded-md glass-card flex items-center justify-between border border-[var(--theme-border)] cursor-pointer hover:border-white/20 transition-colors"
         >
           <div>
             <div className="text-xs font-medium text-slate-200 flex items-center gap-1.5">
@@ -129,7 +132,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         {/* Sound Notifications Toggle */}
         <div
           onClick={() => setSoundNotifications(!soundNotifications)}
-          className="p-3.5 rounded-md glass-card flex items-center justify-between border border-white/10 cursor-pointer hover:border-white/20 transition-colors"
+          className="p-3.5 rounded-md glass-card flex items-center justify-between border border-[var(--theme-border)] cursor-pointer hover:border-white/20 transition-colors"
         >
           <div>
             <div className="text-xs font-medium text-slate-200 flex items-center gap-1.5">
@@ -150,7 +153,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         {/* Compact Mode Toggle */}
         <div
           onClick={() => setCompactChat(!compactChat)}
-          className="p-3.5 rounded-md glass-card flex items-center justify-between border border-white/10 cursor-pointer hover:border-white/20 transition-colors"
+          className="p-3.5 rounded-md glass-card flex items-center justify-between border border-[var(--theme-border)] cursor-pointer hover:border-white/20 transition-colors"
         >
           <div>
             <div className="text-xs font-medium text-slate-200 flex items-center gap-1.5">

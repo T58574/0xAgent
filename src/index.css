@@ -2,41 +2,53 @@
 
 @import "tailwindcss";
 
-/* 4 GLASSMORPHISM PRESET THEMES (No purple, no manual HEX pickers, minimal rounding) */
+/* 4 UNIFIED GLASSMORPHISM PRESET THEMES */
 :root, [data-theme="obsidian"] {
   --theme-bg: #090d16;
   --theme-text: #f8fafc;
+  --theme-text-muted: #94a3b8;
   --theme-border: rgba(255, 255, 255, 0.08);
-  --theme-panel: rgba(15, 23, 42, 0.8);
+  --theme-panel: rgba(15, 23, 42, 0.85);
+  --theme-card-bg: rgba(15, 23, 42, 0.5);
   --theme-accent: #10b981;
   --theme-accent-hover: #059669;
+  --theme-accent-glow: rgba(16, 185, 129, 0.2);
 }
 
 [data-theme="cyber"] {
   --theme-bg: #080e1a;
   --theme-text: #f1f5f9;
-  --theme-border: rgba(56, 189, 248, 0.12);
-  --theme-panel: rgba(15, 23, 42, 0.85);
+  --theme-text-muted: #94a3b8;
+  --theme-border: rgba(56, 189, 248, 0.14);
+  --theme-panel: rgba(15, 23, 42, 0.88);
+  --theme-card-bg: rgba(15, 23, 42, 0.55);
   --theme-accent: #06b6d4;
   --theme-accent-hover: #0891b2;
+  --theme-accent-glow: rgba(6, 182, 212, 0.2);
 }
 
 [data-theme="graphite"] {
   --theme-bg: #09090b;
   --theme-text: #fafafa;
-  --theme-border: rgba(255, 255, 255, 0.1);
-  --theme-panel: rgba(24, 24, 27, 0.85);
+  --theme-text-muted: #a1a1aa;
+  --theme-border: rgba(255, 255, 255, 0.12);
+  --theme-panel: rgba(24, 24, 27, 0.88);
+  --theme-card-bg: rgba(24, 24, 27, 0.55);
   --theme-accent: #e4e4e7;
   --theme-accent-hover: #ffffff;
+  --theme-accent-glow: rgba(228, 228, 231, 0.18);
 }
 
 [data-theme="matrix"] {
   --theme-bg: #06120e;
   --theme-text: #ecfdf5;
-  --theme-border: rgba(52, 211, 153, 0.12);
-  --theme-panel: rgba(6, 32, 22, 0.85);
+  --theme-text-muted: #6ee7b7;
+  --theme-border: rgba(52, 211, 153, 0.14);
+  --theme-panel: rgba(6, 32, 22, 0.88);
+  --theme-card-bg: rgba(6, 32, 22, 0.55);
   --theme-accent: #34d399;
   --theme-accent-hover: #059669;
+  --theme-accent-glow: rgba(52, 211, 153, 0.2);
 }
 
 /* Custom Sleek Scrollbar */
@@ -59,7 +71,7 @@
 }
 
 html, body {
-  font-family: var(--font-sans);
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13.5px;
   line-height: 1.5;
   background-color: var(--theme-bg);
@@ -80,7 +92,7 @@ html, body {
     linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
 }
 
-/* Minimal Glassmorphism Panels (Minimal Rounding: rounded-md) */
+/* Glassmorphism Panels & Cards */
 .glass-panel {
   background: var(--theme-panel);
   backdrop-filter: blur(16px);
@@ -90,18 +102,64 @@ html, body {
 }
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--theme-card-bg);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--theme-border);
   border-radius: 6px;
 }
 
-/* Flat Glass Buttons (No Skeuomorphism, Crisp & Clean) */
+/* Flat Glass Buttons & Inputs Design System */
+.btn-primary {
+  background: var(--theme-accent);
+  color: #020617;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--theme-accent);
+  box-shadow: 0 4px 14px var(--theme-accent-glow);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: var(--theme-accent-hover);
+  border-color: var(--theme-accent-hover);
+  box-shadow: 0 6px 20px var(--theme-accent-glow);
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--theme-border);
+  border-radius: 8px;
+  color: var(--theme-text);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--theme-text-muted);
+  transition: all 0.15s ease-in-out;
+  cursor: pointer;
+}
+
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--theme-text);
+}
+
 .flat-btn {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--theme-border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--theme-text);
   transition: all 0.12s ease-in-out;
 }
@@ -116,37 +174,16 @@ html, body {
 }
 
 .flat-input {
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.35);
   border: 1px solid var(--theme-border);
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--theme-text);
-  transition: border-color 0.12s ease-in-out;
+  transition: border-color 0.12s ease-in-out, box-shadow 0.12s ease-in-out;
 }
 
 .flat-input:focus {
   border-color: var(--theme-accent);
-  outline: none;
-}
-
-/* Legacy alias fallback */
-.skeuo-btn {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--theme-border);
-  border-radius: 6px;
-  transition: all 0.12s ease-in-out;
-}
-.skeuo-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-.skeuo-input {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--theme-border);
-  border-radius: 6px;
-  color: var(--theme-text);
-}
-.skeuo-input:focus {
-  border-color: var(--theme-accent);
+  box-shadow: 0 0 0 2px var(--theme-accent-glow);
   outline: none;
 }
 
@@ -159,6 +196,10 @@ html, body {
   color: var(--theme-text);
 }
 
+@utility text-theme-muted {
+  color: var(--theme-text-muted);
+}
+
 @utility border-theme-border {
   border-color: var(--theme-border);
 }
@@ -167,6 +208,11 @@ html, body {
   background-color: var(--theme-panel);
 }
 
+@utility bg-theme-card {
+  background-color: var(--theme-card-bg);
+}
+
 @utility text-theme-accent {
   color: var(--theme-accent);
 }
+

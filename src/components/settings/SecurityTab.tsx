@@ -54,7 +54,7 @@ export const SecurityTab: React.FC = () => {
     <div className="w-full max-w-3xl flex flex-col gap-6 font-sans text-slate-100">
       
       {/* Header Banner */}
-      <div className="flex items-center gap-3 p-4 rounded-xl glass-panel border border-white/10">
+      <div className="flex items-center gap-3 p-4 rounded-xl glass-panel border border-[var(--theme-border)]">
         <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
           <Shield size={20} />
         </div>
@@ -66,7 +66,7 @@ export const SecurityTab: React.FC = () => {
 
       {/* Security Status Badges */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="p-3.5 rounded-lg glass-panel border border-white/10 flex items-center gap-3">
+        <div className="p-3.5 rounded-lg glass-panel border border-[var(--theme-border)] flex items-center gap-3">
           <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
           <div>
             <div className="text-xs font-semibold text-white">PBKDF2 Хеширование</div>
@@ -74,7 +74,7 @@ export const SecurityTab: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-3.5 rounded-lg glass-panel border border-white/10 flex items-center gap-3">
+        <div className="p-3.5 rounded-lg glass-panel border border-[var(--theme-border)] flex items-center gap-3">
           <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
           <div>
             <div className="text-xs font-semibold text-white">Защита от Брутфорса</div>
@@ -82,7 +82,7 @@ export const SecurityTab: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-3.5 rounded-lg glass-panel border border-white/10 flex items-center gap-3">
+        <div className="p-3.5 rounded-lg glass-panel border border-[var(--theme-border)] flex items-center gap-3">
           <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
           <div>
             <div className="text-xs font-semibold text-white">Авторизация WebSocket</div>
@@ -90,7 +90,7 @@ export const SecurityTab: React.FC = () => {
           </div>
         </div>
 
-        <div className="p-3.5 rounded-lg glass-panel border border-white/10 flex items-center gap-3">
+        <div className="p-3.5 rounded-lg glass-panel border border-[var(--theme-border)] flex items-center gap-3">
           <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
           <div>
             <div className="text-xs font-semibold text-white">Изоляция REST API</div>
@@ -114,7 +114,7 @@ export const SecurityTab: React.FC = () => {
       )}
 
       {/* Change Password Form */}
-      <div className="p-5 rounded-xl glass-panel border border-white/10 flex flex-col gap-4">
+      <div className="p-5 rounded-xl glass-panel border border-[var(--theme-border)] flex flex-col gap-4">
         <div className="flex items-center gap-2 border-b border-white/10 pb-3">
           <KeyRound size={16} className="text-amber-400" />
           <h4 className="text-xs font-bold text-white uppercase tracking-wider">Смена Мастер-Пароля</h4>
@@ -171,7 +171,7 @@ export const SecurityTab: React.FC = () => {
       </div>
 
       {/* Active Session Logout Box */}
-      <div className="p-4 rounded-xl glass-panel border border-white/10 flex items-center justify-between">
+      <div className="p-4 rounded-xl glass-panel border border-[var(--theme-border)] flex items-center justify-between">
         <div>
           <div className="text-xs font-semibold text-white">Выход из активной сессии</div>
           <div className="text-[11px] text-slate-400">Сбросить текущий токен авторизации в этом браузере.</div>

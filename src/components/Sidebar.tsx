@@ -123,7 +123,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* 1. TOP CREATION BUTTONS */}
       <div className="p-3 border-b border-[var(--theme-border)] space-y-2 shrink-0">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+          <span className="text-[11px] font-bold text-theme-muted uppercase tracking-wider flex items-center gap-1.5 font-sans">
             <MessageSquare size={13} className="text-[var(--theme-accent)]" />
             <span>Сессии и Чат</span>
           </span>
@@ -131,41 +131,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             type="button"
             onClick={onToggleOpen}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="p-1 rounded text-theme-muted hover:text-theme-text hover:bg-white/10 transition-colors cursor-pointer"
             title="Свернуть боковое меню"
           >
             <PanelLeftClose size={15} />
           </button>
         </div>
 
-        {/* Action Button: General Chat without Workspace */}
+        {/* Primary Unified New Chat Button */}
         <button
           type="button"
-          onClick={() => onCreateSession('Новый чат', null)}
-          className="w-full flat-btn py-2 px-3 rounded-lg text-xs font-semibold text-[var(--theme-text)] bg-white/[0.04] border-[var(--theme-border)] hover:bg-white/10 cursor-pointer flex items-center justify-start gap-2 shadow-sm transition-all"
+          onClick={() =>
+            onCreateSession(
+              workspaceDir ? `Чат (${getWorkspaceBaseName(workspaceDir)})` : 'Новый чат',
+              workspaceDir || null
+            )
+          }
+          className="w-full btn-primary py-2 px-3 text-xs flex items-center justify-center gap-2 shadow-md"
         >
-          <Plus size={14} className="text-[var(--theme-accent)] shrink-0" />
-          <span>Новый чат без Workspace</span>
+          <Plus size={15} />
+          <span>{workspaceDir ? `Чат в ${getWorkspaceBaseName(workspaceDir)}` : 'Создать новый чат'}</span>
         </button>
 
-        {/* Action Button: Chat inside Current Workspace */}
-        {workspaceDir ? (
-          <button
-            type="button"
-            onClick={() => onCreateSession(`Чат (${getWorkspaceBaseName(workspaceDir)})`, workspaceDir)}
-            className="w-full flat-btn py-2 px-3 rounded-lg text-xs font-semibold text-[var(--theme-text)] bg-white/[0.04] border-[var(--theme-border)] hover:bg-white/10 cursor-pointer flex items-center justify-start gap-2 shadow-sm transition-all"
-          >
-            <FolderPlus size={14} className="text-[var(--theme-accent)] shrink-0" />
-            <span className="truncate">Чат в {getWorkspaceBaseName(workspaceDir)}</span>
-          </button>
-        ) : (
+        {/* Sub-Action: Open Workspace Directory if not set */}
+        {!workspaceDir && (
           <button
             type="button"
             onClick={onSelectWorkspace}
-            className="w-full flat-btn py-2 px-3 rounded-lg text-xs font-medium text-slate-300 bg-black/40 border-[var(--theme-border)] hover:border-white/20 hover:text-white cursor-pointer flex items-center justify-start gap-2 transition-all"
+            className="w-full flat-btn py-1.5 px-3 rounded-lg text-xs font-medium text-theme-muted hover:text-theme-text flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            <Folder size={14} className="text-slate-400 shrink-0" />
-            <span>Открыть папку Workspace...</span>
+            <Folder size={13} />
+            <span>Открыть воркспейс...</span>
           </button>
         )}
       </div>

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { AppConfig, PromptFileInfo } from '../src/types';
+import { AppConfig } from '../src/types';
 
 const APP_DIR = path.join(os.homedir(), '.0xagent');
 const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
@@ -137,89 +137,4 @@ export function saveConfig(config: AppConfig): void {
   }
 }
 
-// Prompt Files Management API
-export function listPromptFiles(): PromptFileInfo[] {
-  getAppDir();
-  const cfg = loadConfig();
-  const activeFile = cfg.active_prompt_file || 'default.md';
 
-  const files = fs.readdirSync(PROMPTS_DIR);
-  const result: PromptFileInfo[] = [];
-
-  for (const filename of files) {
-    if (filename.endsWith('.md') || filename.endsWith('.txt')) {
-      const fullPath = path.join(PROMPTS_DIR, filename);
-      const stat = fs.statSync(fullPath);
-      
-      // Generate readable title
-      let title = filename.replace(/\.(md|txt)$/i, '').replace(/_/g, ' ');
-      title = title.charAt(0).toUpperCase() + title.slice(1);
-
-      result.push({
-        filename,
-        title,
-        is_active: filename.toLowerCase() === activeFile.toLowerCase(),
-        updated_at: stat.mtimeMs,
-      });
-    }
-  }
-
-  result.sort((a, b) => (a.is_active ? -1 : b.is_active ? 1 : b.updated_at - a.updated_at));
-  return result;
-}
-
-export function readPromptFile(filename: string): string {
-  getAppDir();
-  const safeName = path.basename(filename);
-  const filePath = path.join(PROMPTS_DIR, safeName);
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Prompt file not found: ${safeName}`);
-  }
-  return fs.readFileSync(filePath, 'utf-8');
-}
-
-export function writePromptFile(filename: string, content: string): void {
-  getAppDir();
-  let safeName = path.basename(filename);
-  if (!safeName.endsWith('.md') && !safeName.endsWith('.txt')) {
-    safeName += '.md';
-  }
-  const filePath = path.join(PROMPTS_DIR, safeName);
-  fs.writeFileSync(filePath, content, 'utf-8');
-
-  const cfg = loadConfig();
-  if (cfg.active_prompt_file === safeName) {
-    cfg.system_prompt = content;
-    saveConfig(cfg);
-  }
-}
-
-export function deletePromptFile(filename: string): void {
-  getAppDir();
-  const safeName = path.basename(filename);
-  if (safeName.toLowerCase() === 'default.md') {
-    throw new Error('Default prompt file (default.md) cannot be deleted');
-  }
-  const filePath = path.join(PROMPTS_DIR, safeName);
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
-  }
-
-  const cfg = loadConfig();
-  if (cfg.active_prompt_file === safeName) {
-    cfg.active_prompt_file = 'default.md';
-    cfg.system_prompt = readPromptFile('default.md');
-    saveConfig(cfg);
-  }
-}
-
-export function setActivePromptFile(filename: string): AppConfig {
-  getAppDir();
-  const safeName = path.basename(filename);
-  const content = readPromptFile(safeName);
-  const cfg = loadConfig();
-  cfg.active_prompt_file = safeName;
-  cfg.system_prompt = content;
-  saveConfig(cfg);
-  return cfg;
-}

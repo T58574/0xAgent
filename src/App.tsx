@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
 import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry } from './types';
+import { generateShortId } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ResizableSplitter } from './components/ResizableSplitter';
@@ -267,14 +268,6 @@ export default function App() {
     } catch (err: any) {
       addLog(`Failed to read file contents: ${err.message || err}`);
     }
-  };
-
-  // Safe ID generator that works in non-secure HTTP / LAN contexts
-  const generateShortId = (): string => {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID().substring(0, 8);
-    }
-    return Math.random().toString(36).substring(2, 10);
   };
 
   // 7. Chat Send message logic

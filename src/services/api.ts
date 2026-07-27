@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, PromptFileInfo, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail } from '../types';
+import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail } from '../types';
 
 const API_BASE = '/api';
 
@@ -298,12 +298,6 @@ export async function transcribe_audio(audioBase64: string, apiKey: string): Pro
   return data.text;
 }
 
-export async function get_local_ips(): Promise<string[]> {
-  const res = await authFetch(`${API_BASE}/get-local-ips`);
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.urls;
-}
 
 export async function get_llama_releases(): Promise<any[]> {
   const res = await authFetch(`${API_BASE}/llama-releases`);
@@ -357,61 +351,6 @@ export async function cleanup_old_llama_versions(keepTag?: string): Promise<{ su
   return res.json();
 }
 
-
-export async function get_gguf_models(): Promise<any[]> {
-  const res = await authFetch(`${API_BASE}/gguf-models`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function download_gguf_model(downloadUrl: string, fileName: string): Promise<{ modelPath: string }> {
-  const res = await authFetch(`${API_BASE}/download-model`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ downloadUrl, fileName }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function get_prompts(): Promise<PromptFileInfo[]> {
-  const res = await authFetch(`${API_BASE}/prompts`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
-export async function get_prompt_content(filename: string): Promise<string> {
-  const res = await authFetch(`${API_BASE}/prompts/${encodeURIComponent(filename)}`);
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.content;
-}
-
-export async function save_prompt_file(filename: string, content: string): Promise<void> {
-  const res = await authFetch(`${API_BASE}/prompts/${encodeURIComponent(filename)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function delete_prompt_file(filename: string): Promise<void> {
-  const res = await authFetch(`${API_BASE}/prompts/${encodeURIComponent(filename)}`, {
-    method: 'DELETE',
-  });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function select_prompt_file(filename: string): Promise<AppConfig> {
-  const res = await authFetch(`${API_BASE}/prompts-select`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ filename }),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
 
 export async function parse_gguf(filePath: string): Promise<GgufMetadata> {
   const res = await authFetch(`${API_BASE}/parse-gguf`, {
@@ -566,16 +505,6 @@ export async function save_persona_file(id: string, filename: 'SOUL.md' | 'TOOLS
   return res.json();
 }
 
-export async function update_persona_metadata(id: string, patch: Partial<PersonaMetadata>): Promise<PersonaMetadata> {
-  const res = await authFetch(`${API_BASE}/personas/${encodeURIComponent(id)}/meta`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(patch),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
-
 export async function delete_persona(id: string): Promise<void> {
   const res = await authFetch(`${API_BASE}/personas/${encodeURIComponent(id)}`, {
     method: 'DELETE',
@@ -599,10 +528,5 @@ export async function save_summarizer_prompt(content: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
-export async function autotune_hardware(): Promise<{ hardware: any; optimal: any }> {
-  const res = await authFetch(`${API_BASE}/autotune-hardware`);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
 
 

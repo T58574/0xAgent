@@ -4,7 +4,7 @@ import os from 'node:os';
 import { exec } from 'node:child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { AppConfig, ChatMessage, ToolCallInfo } from '../src/types';
-import { loadSession, saveSession } from './session';
+import { loadSession, saveSession, listSessions } from './session';
 import {
   executeReadFile,
   executeWriteFile,
@@ -18,7 +18,6 @@ import {
 } from './tools';
 import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
 import { listSkills, readSkill } from './skills';
-import { listSessions, loadSession as getSessionById } from './session';
 import { getActivePersona, appendSilentUserTrait, getUnifiedToolsContext } from './personas';
 import { summarizeContext } from './summarizer';
 
@@ -827,7 +826,7 @@ ${activePersona.user}`;
               const query = (tc.arguments.query || '').toLowerCase();
               const results: any[] = [];
               for (const s of sessionSummaries) {
-                const full = getSessionById(s.id);
+                const full = loadSession(s.id);
                 if (full) {
                   const matches = full.messages.filter((m) => m.content.toLowerCase().includes(query));
                   if (matches.length > 0) {

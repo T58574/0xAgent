@@ -1,9 +1,18 @@
+
+
 export interface ThemeColors {
-  bg_color: string;
-  text_color: string;
-  border_color: string;
-  active_color: string;
-  send_btn_color: string;
+  bg_color?: string;
+  text_color?: string;
+  border_color?: string;
+  active_color?: string;
+  send_btn_color?: string;
+}
+
+export interface PromptFileInfo {
+  filename: string;
+  title: string;
+  is_active: boolean;
+  updated_at: number;
 }
 
 export interface LocalServerConfig {
@@ -33,13 +42,6 @@ export interface LocalServerConfig {
   mmap?: boolean | null;
   parallel_slots?: number | null;
   custom_args?: string | null;
-}
-
-export interface PromptFileInfo {
-  filename: string;
-  title: string;
-  is_active: boolean;
-  updated_at: number;
 }
 
 export interface PersonaMetadata {

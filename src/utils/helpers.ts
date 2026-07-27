@@ -69,3 +69,14 @@ export function getWorkspaceBaseName(dirPath?: string | null): string {
   return parts[parts.length - 1] || dirPath;
 }
 
+/**
+ * Generate a short unique ID for messages and transient components
+ */
+export function generateShortId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().substring(0, 8);
+  }
+  return Math.random().toString(36).substring(2, 10);
+}
+
+

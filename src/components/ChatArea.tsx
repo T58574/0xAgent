@@ -35,7 +35,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
   const historyEndRef = useRef<HTMLDivElement>(null);
-  const mainHistoryRef = useRef<HTMLDivElement>(null);
 
   // Microphone recording state
   const [isRecording, setIsRecording] = useState(false);
@@ -299,7 +298,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <Send size={16} />
               </button>
             </form>
-            {renderPlanningToggle()}
           </div>
         </div>
       )}
@@ -309,7 +307,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <div className="flex-grow flex flex-col justify-between overflow-hidden relative w-full max-w-4xl mx-auto select-text">
           
           <div
-            ref={mainHistoryRef}
             className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-none flex flex-col min-h-0 select-text"
           >
             {messages.map((msg) => {
@@ -317,14 +314,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               return (
                 <div key={msg.id} className="flex flex-col space-y-1 w-full select-text">
                   {msg.role === 'user' && (
-                    <div className="self-end max-w-[85%] rounded-md glass-card border border-emerald-500/30 bg-slate-900/80 px-4 py-2.5 text-slate-100 text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans select-text">
+                    <div className="self-end max-w-[85%] rounded-xl glass-card border border-[var(--theme-accent)]/30 bg-[var(--theme-card-bg)] px-4 py-2.5 text-theme-text text-xs sm:text-sm whitespace-pre-wrap leading-relaxed font-sans select-text shadow-md">
                       {msg.content}
                     </div>
                   )}
 
                   {msg.role === 'tool' && (
-                    <div className="self-start max-w-[95%] w-full rounded-md glass-card border border-white/10 p-3 bg-slate-950/80 text-slate-300 font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1 select-text">
-                      <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
+                    <div className="self-start max-w-[95%] w-full rounded-xl glass-card border border-[var(--theme-border)] p-3 bg-black/40 text-theme-muted font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1 select-text">
+                      <div className="text-[10px] text-theme-muted font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
                         <Terminal size={10} />
                         <span>Результат выполнения инструмента</span>
                       </div>

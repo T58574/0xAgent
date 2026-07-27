@@ -68,7 +68,7 @@ export const ThemesTab: React.FC<ThemesTabProps> = ({
               className={`p-4 rounded-md border cursor-pointer transition-all ${
                 isSelected
                   ? 'border-[var(--theme-accent,#10b981)] bg-white/[0.04] shadow-lg'
-                  : 'border-white/10 bg-white/[0.015] hover:border-white/20 hover:bg-white/[0.03]'
+                  : 'border-[var(--theme-border)] bg-white/[0.015] hover:border-white/20 hover:bg-white/[0.03]'
               }`}
             >
               {/* Card Top */}

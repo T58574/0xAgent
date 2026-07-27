@@ -4,19 +4,12 @@ import http from 'node:http';
 import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import { v4 as uuidv4 } from 'uuid';
 import { execSync, spawn, ChildProcess } from 'node:child_process';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   loadConfig,
   saveConfig,
-  listPromptFiles,
-  readPromptFile,
-  writePromptFile,
-  deletePromptFile,
-  setActivePromptFile,
 } from './config';
 import {
   listSessions,
@@ -39,7 +32,7 @@ import {
   respondToToolConfirmation,
 } from './agent';
 import { parseGgufMetadata, GgufMetadata } from './ggufParser';
-import { detectGpuHardware, calculateOptimalLlamaConfig } from './hardware';
+import { detectGpuHardware } from './hardware';
 import { loadMemories, addOrUpdateMemory, deleteMemory, queryMemories } from './memory';
 import { listSkills, readSkill, writeSkill, deleteSkill } from './skills';
 import {
@@ -196,53 +189,6 @@ app.post('/api/config', (req, res) => {
   }
 });
 
-// System Prompts Files endpoints (~/.0xagent/prompts/)
-app.get('/api/prompts', (_req, res) => {
-  try {
-    const files = listPromptFiles();
-    res.json(files);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.get('/api/prompts/:filename', (req, res) => {
-  try {
-    const content = readPromptFile(req.params.filename);
-    res.json({ filename: req.params.filename, content });
-  } catch (err: any) {
-    res.status(404).json({ error: err.message });
-  }
-});
-
-app.post('/api/prompts/:filename', (req, res) => {
-  try {
-    const { content } = req.body;
-    writePromptFile(req.params.filename, content || '');
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.delete('/api/prompts/:filename', (req, res) => {
-  try {
-    deletePromptFile(req.params.filename);
-    res.json({ success: true });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post('/api/prompts-select', (req, res) => {
-  try {
-    const { filename } = req.body;
-    const updatedCfg = setActivePromptFile(filename);
-    res.json(updatedCfg);
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Memory Endpoints (~/.0xagent/memory.json)
 app.get('/api/memories', (req, res) => {
@@ -826,16 +772,6 @@ app.get('/api/server-status', (_req, res) => {
   }
 });
 
-// Hardware Auto-Tuner Endpoint
-app.get('/api/autotune-hardware', (_req, res) => {
-  try {
-    const hw = detectGpuHardware();
-    const optimal = calculateOptimalLlamaConfig(hw);
-    res.json({ hardware: hw, optimal });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // 2. Start Local Llama.cpp Server Endpoint
 app.post('/api/start-local-server', (req, res) => {
@@ -1327,92 +1263,7 @@ app.post('/api/cleanup-old-llama', (req, res) => {
 });
 
 
-app.get('/api/gguf-models', (_req, res) => {
-  const models = [
-    {
-      id: 'qwen2.5-coder-7b',
-      name: 'Qwen2.5 Coder 7B Instruct (Q4_K_M)',
-      desc: 'Лучшая модель для написания кода (4.7 GB)',
-      filename: 'Qwen2.5-Coder-7B-Instruct-Q4_K_M.gguf',
-      url: 'https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct-GGUF/resolve/main/qwen2.5-coder-7b-instruct-q4_k_m.gguf',
-      size: '4.7 GB',
-    },
-    {
-      id: 'llama-3.2-3b',
-      name: 'Llama 3.2 3B Instruct (Q4_K_M)',
-      desc: 'Быстрая компактная модель от Meta (2.0 GB)',
-      filename: 'Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-      url: 'https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf',
-      size: '2.0 GB',
-    },
-    {
-      id: 'deepseek-r1-qwen-7b',
-      name: 'DeepSeek R1 Distill Qwen 7B (Q4_K_M)',
-      desc: 'Мощная модель с рефлексией <think> (4.7 GB)',
-      filename: 'DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf',
-      url: 'https://huggingface.co/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF/resolve/main/DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf',
-      size: '4.7 GB',
-    },
-  ];
-  res.json(models);
-});
 
-app.post('/api/download-model', async (req, res) => {
-  try {
-    const { downloadUrl, fileName } = req.body || {};
-    if (!downloadUrl || !fileName) {
-      res.status(400).json({ error: 'downloadUrl and fileName are required' });
-      return;
-    }
-
-    const appDir = path.join(os.homedir(), '.0xagent');
-    const modelsDir = path.join(appDir, 'models');
-    if (!fs.existsSync(modelsDir)) {
-      fs.mkdirSync(modelsDir, { recursive: true });
-    }
-
-    const modelPath = path.join(modelsDir, path.basename(fileName));
-    if (fs.existsSync(modelPath)) {
-      const cfg = loadConfig();
-      if (!cfg.local_server) cfg.local_server = {};
-      cfg.local_server.model_path = modelPath;
-      saveConfig(cfg);
-      res.json({ modelPath, message: 'Модель уже загружена!' });
-      return;
-    }
-
-    broadcast('agent-error', `Начало загрузки GGUF: ${fileName}`);
-    const downloadRes = await fetch(downloadUrl);
-    if (!downloadRes.ok) throw new Error(`Download failed (${downloadRes.status}): ${downloadRes.statusText}`);
-
-    const fileStream = fs.createWriteStream(modelPath);
-    try {
-      // @ts-ignore
-      const body = downloadRes.body;
-      if (body) {
-        // @ts-ignore
-        const nodeStream = Readable.fromWeb ? Readable.fromWeb(body as any) : body;
-        // @ts-ignore
-        await pipeline(nodeStream, fileStream);
-      }
-    } catch (streamErr) {
-      fileStream.close();
-      if (fs.existsSync(modelPath)) fs.unlinkSync(modelPath);
-      throw streamErr;
-    }
-
-    const cfg = loadConfig();
-    if (!cfg.local_server) cfg.local_server = {};
-    cfg.local_server.model_path = modelPath;
-    saveConfig(cfg);
-
-    broadcast('agent-error', `Загрузка завершена: ${fileName}`);
-    res.json({ modelPath, message: 'Модель успешно загружена!' });
-  } catch (err: any) {
-    console.error('Model download error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // Agent execution endpoints
 app.post('/api/send-message', (req, res) => {

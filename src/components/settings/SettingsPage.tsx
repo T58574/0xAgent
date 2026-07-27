@@ -50,13 +50,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const [ubatchSize, setUbatchSize] = useState(512);
   const [minP, setMinP] = useState(0.08);
   const [repeatPenalty, setRepeatPenalty] = useState(1.1);
-  const [predict, setPredict] = useState<number | null>(null);
-  const [topK, setTopK] = useState<number | null>(null);
-  const [topP, setTopP] = useState<number | null>(null);
-  const [seed, setSeed] = useState<number | null>(null);
-  const [presencePenalty, setPresencePenalty] = useState<number | null>(null);
-  const [frequencyPenalty, setFrequencyPenalty] = useState<number | null>(null);
-  const [customArgs, setCustomArgs] = useState<string>('');
   const [flashAttn, setFlashAttn] = useState(false);
   const [embedding, setEmbedding] = useState(false);
   const [contBatching, setContBatching] = useState(false);
@@ -105,13 +98,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         if (ls.ubatch_size) setUbatchSize(ls.ubatch_size);
         if (ls.min_p !== undefined && ls.min_p !== null) setMinP(ls.min_p);
         if (ls.repeat_penalty !== undefined && ls.repeat_penalty !== null) setRepeatPenalty(ls.repeat_penalty);
-        if (ls.predict !== undefined && ls.predict !== null) setPredict(ls.predict);
-        if (ls.top_k !== undefined && ls.top_k !== null) setTopK(ls.top_k);
-        if (ls.top_p !== undefined && ls.top_p !== null) setTopP(ls.top_p);
-        if (ls.seed !== undefined && ls.seed !== null) setSeed(ls.seed);
-        if (ls.presence_penalty !== undefined && ls.presence_penalty !== null) setPresencePenalty(ls.presence_penalty);
-        if (ls.frequency_penalty !== undefined && ls.frequency_penalty !== null) setFrequencyPenalty(ls.frequency_penalty);
-        if (ls.custom_args) setCustomArgs(ls.custom_args);
         if (ls.flash_attn !== undefined && ls.flash_attn !== null) setFlashAttn(ls.flash_attn);
         if (ls.embedding !== undefined && ls.embedding !== null) setEmbedding(ls.embedding);
         if (ls.cont_batching !== undefined && ls.cont_batching !== null) setContBatching(ls.cont_batching);
@@ -157,23 +143,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             threads,
             gpu_layers: gpuLayers,
             temp,
-            predict,
             batch_size: batchSize,
             ubatch_size: ubatchSize,
             min_p: minP,
-            top_k: topK,
-            top_p: topP,
             repeat_penalty: repeatPenalty,
-            seed,
-            presence_penalty: presencePenalty,
-            frequency_penalty: frequencyPenalty,
             flash_attn: flashAttn,
             embedding,
             cont_batching: contBatching,
             prompt_cache: promptCache,
             mlock,
             mmap,
-            custom_args: customArgs.trim() || null,
           },
         });
         setSaveStatus('saved');
@@ -204,17 +183,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
     threads,
     gpuLayers,
     temp,
-    predict,
     batchSize,
     ubatchSize,
     minP,
-    topK,
-    topP,
     repeatPenalty,
-    seed,
-    presencePenalty,
-    frequencyPenalty,
-    customArgs,
     flashAttn,
     embedding,
     contBatching,
@@ -267,65 +239,65 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <button
             type="button"
             onClick={() => setActiveSubtab('general')}
-            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
               activeSubtab === 'general'
-                ? 'bg-slate-800 text-white font-semibold border border-white/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
+                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
             }`}
           >
-            <Sliders size={14} className={activeSubtab === 'general' ? 'text-emerald-400' : 'text-slate-500'} />
+            <Sliders size={14} className={activeSubtab === 'general' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
             <span>Основные</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubtab('personas')}
-            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
               activeSubtab === 'personas'
-                ? 'bg-slate-800 text-white font-semibold border border-white/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
+                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
             }`}
           >
-            <User size={14} className={activeSubtab === 'personas' ? 'text-emerald-400' : 'text-slate-500'} />
+            <User size={14} className={activeSubtab === 'personas' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
             <span>Личности (Personas)</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubtab('themes')}
-            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
               activeSubtab === 'themes'
-                ? 'bg-slate-800 text-white font-semibold border border-white/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
+                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
             }`}
           >
-            <Palette size={14} className={activeSubtab === 'themes' ? 'text-cyan-400' : 'text-slate-500'} />
+            <Palette size={14} className={activeSubtab === 'themes' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
             <span>Темы оформления</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubtab('local_server')}
-            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
               activeSubtab === 'local_server'
-                ? 'bg-slate-800 text-white font-semibold border border-white/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
+                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
             }`}
           >
-            <Cpu size={14} className={activeSubtab === 'local_server' ? 'text-emerald-400' : 'text-slate-500'} />
+            <Cpu size={14} className={activeSubtab === 'local_server' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
             <span>Сервер LLM</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveSubtab('security')}
-            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
               activeSubtab === 'security'
-                ? 'bg-slate-800 text-white font-semibold border border-white/10'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
+                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
             }`}
           >
-            <Shield size={14} className={activeSubtab === 'security' ? 'text-emerald-400' : 'text-slate-500'} />
+            <Shield size={14} className={activeSubtab === 'security' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
             <span>Безопасность</span>
           </button>
         </div>

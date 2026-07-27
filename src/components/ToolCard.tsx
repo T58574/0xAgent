@@ -46,21 +46,21 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
       case 'execute_command': return <Terminal size={14} className="text-sky-400" />;
       case 'write_file': return <FileText size={14} className="text-emerald-400" />;
       case 'patch_file': return <Layers size={14} className="text-cyan-400" />;
-      case 'read_file': return <FileText size={14} className="text-slate-300" />;
+      case 'read_file': return <FileText size={14} className="text-[var(--theme-text)]" />;
       case 'grep_search': return <Search size={14} className="text-amber-400" />;
       case 'list_dir': return <Folder size={14} className="text-emerald-400" />;
-      default: return <Terminal size={14} className="text-slate-300" />;
+      default: return <Terminal size={14} className="text-[var(--theme-text)]" />;
     }
   };
 
   const statusInfo = getStatusInfo();
 
   return (
-    <div className="glass-card rounded-md p-3.5 my-2.5 border border-white/10 text-slate-100 font-sans">
+    <div className="glass-card rounded-md p-3.5 my-2.5 border border-[var(--theme-border)] text-[var(--theme-text)] font-sans">
       {/* Card Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded bg-slate-900/80 border border-white/10 flex items-center justify-center">
+          <div className="w-7 h-7 rounded bg-[var(--theme-panel)] border border-[var(--theme-border)] flex items-center justify-center">
             {getToolIcon()}
           </div>
           <div>

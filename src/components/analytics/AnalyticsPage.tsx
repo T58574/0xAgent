@@ -96,7 +96,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
     <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin font-sans">
       
       {/* HEADER BAR */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--theme-border)] pb-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-100 flex items-center gap-2.5">
             <Activity className="text-emerald-400" size={24} />
@@ -110,7 +110,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         {onRefresh && (
           <button
             onClick={onRefresh}
-            className="flat-btn px-3.5 py-1.5 rounded-md text-xs font-medium text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer self-start sm:self-auto border-white/10"
+            className="flat-btn px-3.5 py-1.5 rounded-md text-xs font-medium text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer self-start sm:self-auto border-[var(--theme-border)]"
           >
             <RefreshCw size={14} />
             <span>Обновить данные</span>
@@ -189,7 +189,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
       </div>
 
       {/* TELEMETRY TABLE & FILTERS */}
-      <div className="glass-panel rounded-xl border border-white/10 bg-slate-900/40 p-4 space-y-4 shadow-xl">
+      <div className="glass-panel rounded-xl border border-[var(--theme-border)] bg-slate-900/40 p-4 space-y-4 shadow-xl">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Layers className="text-emerald-400" size={18} />
@@ -250,7 +250,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         {/* TABLE */}
         <div className="overflow-x-auto rounded-lg border border-white/5">
           <table className="w-full text-xs text-left border-collapse">
-            <thead className="bg-slate-950 text-slate-300 font-semibold border-b border-white/10 uppercase tracking-wider text-[10px]">
+            <thead className="bg-slate-950 text-slate-300 font-semibold border-b border-[var(--theme-border)] uppercase tracking-wider text-[10px]">
               <tr>
                 <th className="p-3">Время / Сессия</th>
                 <th className="p-3">Модель</th>
@@ -329,7 +329,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
       </div>
 
       {/* DIAGNOSTIC SERVER LOGS */}
-      <div className="glass-panel rounded-xl border border-white/10 bg-slate-900/40 p-4 space-y-3 shadow-xl">
+      <div className="glass-panel rounded-xl border border-[var(--theme-border)] bg-slate-900/40 p-4 space-y-3 shadow-xl">
         <div className="flex items-center gap-2">
           <Terminal className="text-purple-400" size={18} />
           <h2 className="text-sm font-semibold text-slate-100 uppercase tracking-wider">

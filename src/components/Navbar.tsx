@@ -71,12 +71,32 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleStartServer = async () => {
     setIsStartingServer(true);
     try {
-      const res = await api.start_local_server();
+      const serverConfig = config?.local_server ? {
+        exePath: config.local_server.exe_path || undefined,
+        modelPath: config.local_server.model_path || undefined,
+        host: config.local_server.host || '127.0.0.1',
+        port: config.local_server.port || 11434,
+        ctxSize: config.local_server.ctx_size,
+        gpuLayers: config.local_server.gpu_layers,
+        threads: config.local_server.threads,
+        batchSize: config.local_server.batch_size,
+        ubatchSize: config.local_server.ubatch_size,
+        temp: config.local_server.temp,
+        repeatPenalty: config.local_server.repeat_penalty,
+        minP: config.local_server.min_p,
+        flashAttn: config.local_server.flash_attn,
+        mmap: config.local_server.mmap,
+        mlock: config.local_server.mlock,
+        embedding: config.local_server.embedding,
+        contBatching: config.local_server.cont_batching,
+      } : undefined;
+
+      const res = await api.start_local_server(serverConfig);
       if (res && res.success) {
         setIsServerOffline(false);
       }
     } catch (err) {
-      console.error('Failed to start server:', err);
+      console.error('Failed to start server from Navbar:', err);
     } finally {
       setIsStartingServer(false);
     }
