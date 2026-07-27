@@ -12,6 +12,8 @@ import {
   executeListDir,
   executeGrepSearch,
   executeShellCommand,
+  executeCreateDirectory,
+  executeGetFileInfo,
   getWorkspace0xAgentMdContext,
 } from './tools';
 import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
@@ -247,6 +249,28 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
     });
   }
 
+  // 15. Create Directory
+  const reMkdir = /<create_directory\s+path=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reMkdir.exec(text)) !== null) {
+    toolCalls.push({
+      id: `mkdir_${uuidv4().substring(0, 8)}`,
+      name: 'create_directory',
+      arguments: { path: match[1] },
+      raw_content: match[0],
+    });
+  }
+
+  // 16. Get File Info
+  const reFileInfo = /<get_file_info\s+path=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reFileInfo.exec(text)) !== null) {
+    toolCalls.push({
+      id: `fileinfo_${uuidv4().substring(0, 8)}`,
+      name: 'get_file_info',
+      arguments: { path: match[1] },
+      raw_content: match[0],
+    });
+  }
+
   return toolCalls;
 }
 
@@ -327,6 +351,21 @@ export function detectRepetitionLoop(history: ChatMessage[], newContent: string)
     if (prevAssistantContent.length > 50 && trimmedNew.length > 50) {
       const minLen = Math.min(100, Math.floor(prevAssistantContent.length * 0.8));
       if (trimmedNew.substring(0, minLen) === prevAssistantContent.substring(0, minLen)) {
+        return true;
+      }
+    }
+
+    // Check for exact duplicate tool calls repeated 3 times in a row
+    const newToolCalls = parseToolCalls(newContent);
+    if (newToolCalls.length > 0 && assistantMsgs.length >= 2) {
+      const newSignature = newToolCalls.map((t) => `${t.name}:${JSON.stringify(t.arguments)}`).join('|');
+      const prev1 = assistantMsgs[assistantMsgs.length - 1];
+      const prev2 = assistantMsgs[assistantMsgs.length - 2];
+
+      const sig1 = parseToolCalls(prev1.content).map((t) => `${t.name}:${JSON.stringify(t.arguments)}`).join('|');
+      const sig2 = parseToolCalls(prev2.content).map((t) => `${t.name}:${JSON.stringify(t.arguments)}`).join('|');
+
+      if (newSignature && newSignature === sig1 && newSignature === sig2) {
         return true;
       }
     }
@@ -745,6 +784,12 @@ ${activePersona.user}`;
               break;
             case 'patch_file':
               output = executePatchFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
+              break;
+            case 'create_directory':
+              output = executeCreateDirectory(config.workspace_dir, tc.arguments.path);
+              break;
+            case 'get_file_info':
+              output = executeGetFileInfo(config.workspace_dir, tc.arguments.path);
               break;
             case 'list_dir':
               output = executeListDir(config.workspace_dir, tc.arguments.path);

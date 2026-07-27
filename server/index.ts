@@ -481,9 +481,9 @@ app.delete('/api/sessions/:id', (req, res) => {
 });
 
 // Native Workspace & File Dialogs
-app.post('/api/select-workspace', (_req, res) => {
+app.post('/api/select-workspace', async (_req, res) => {
   try {
-    const folder = selectWorkspaceNative();
+    const folder = await selectWorkspaceNative();
     if (folder) {
       const cfg = loadConfig();
       cfg.workspace_dir = folder;
@@ -497,10 +497,10 @@ app.post('/api/select-workspace', (_req, res) => {
   }
 });
 
-app.post('/api/select-file', (req, res) => {
+app.post('/api/select-file', async (req, res) => {
   try {
     const { filter } = req.body;
-    const filePath = selectFileNative(filter);
+    const filePath = await selectFileNative(filter);
     res.json({ filePath });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

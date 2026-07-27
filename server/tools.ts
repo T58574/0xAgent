@@ -32,6 +32,31 @@ export function executeWriteFile(workspaceDir: string | null | undefined, pathSt
   return `Successfully wrote file: ${targetPath}`;
 }
 
+export function executeCreateDirectory(workspaceDir: string | null | undefined, pathStr: string): string {
+  const targetPath = resolvePath(workspaceDir, pathStr);
+  if (!fs.existsSync(targetPath)) {
+    fs.mkdirSync(targetPath, { recursive: true });
+    return `Successfully created directory: ${targetPath}`;
+  }
+  return `Directory already exists: ${targetPath}`;
+}
+
+export function executeGetFileInfo(workspaceDir: string | null | undefined, pathStr: string): string {
+  const targetPath = resolvePath(workspaceDir, pathStr);
+  if (!fs.existsSync(targetPath)) {
+    throw new Error(`Path does not exist: ${targetPath}`);
+  }
+  const stat = fs.statSync(targetPath);
+  if (stat.isDirectory()) {
+    const entries = fs.readdirSync(targetPath);
+    return `[Directory Info]\nPath: ${targetPath}\nTotal Items: ${entries.length}\nLast Modified: ${stat.mtime.toISOString()}`;
+  }
+  const content = fs.readFileSync(targetPath, 'utf-8');
+  const lines = content.split(/\r?\n/).length;
+  const sizeKb = (stat.size / 1024).toFixed(2);
+  return `[File Info]\nPath: ${targetPath}\nSize: ${stat.size} bytes (${sizeKb} KB)\nTotal Lines: ${lines}\nLast Modified: ${stat.mtime.toISOString()}`;
+}
+
 export function executePatchFile(workspaceDir: string | null | undefined, pathStr: string, patchContent: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
   if (!fs.existsSync(targetPath)) {
@@ -72,12 +97,34 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
     const currentContentClean = currentContent.replace(/\r\n/g, '\n');
 
     if (!currentContentClean.includes(searchBlockClean)) {
-      // Fallback: try normalized line matching (trimming trailing whitespace)
+      // Fallback 1: try normalized line matching (trimming trailing whitespace)
       const normSearch = searchBlockClean.split('\n').map((l) => l.trimEnd()).join('\n');
       const normCurrent = currentContentClean.split('\n').map((l) => l.trimEnd()).join('\n');
 
       if (normCurrent.includes(normSearch)) {
         currentContent = normCurrent.replace(normSearch, replaceBlock);
+        remaining = afterDiv.substring(endIdx + replaceMarker.length);
+        appliedCount++;
+        continue;
+      }
+
+      // Fallback 2: try fully trimmed line matching
+      const trimSearch = searchBlockClean.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+      const currentLines = currentContentClean.split('\n');
+      let foundIndex = -1;
+
+      for (let i = 0; i <= currentLines.length - searchBlockClean.split('\n').length; i++) {
+        const sliceTrimmed = currentLines.slice(i, i + searchBlockClean.split('\n').length).map((l) => l.trim()).filter(Boolean).join('\n');
+        if (sliceTrimmed === trimSearch) {
+          foundIndex = i;
+          break;
+        }
+      }
+
+      if (foundIndex !== -1) {
+        const searchLinesCount = searchBlockClean.split('\n').length;
+        currentLines.splice(foundIndex, searchLinesCount, replaceBlock);
+        currentContent = currentLines.join('\n');
         remaining = afterDiv.substring(endIdx + replaceMarker.length);
         appliedCount++;
         continue;
@@ -329,54 +376,72 @@ export function getWorkspaceTree(workspaceDir?: string | null): FileNode[] {
   return readDirRecursive(workspaceDir, 0);
 }
 
-export function selectWorkspaceNative(): string | null {
+export async function selectWorkspaceNative(): Promise<string | null> {
   if (process.platform === 'win32') {
-    try {
-      const psScript = `
-        Add-Type -AssemblyName System.Windows.Forms
-        $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-        $dialog.Description = "Select Workspace Folder for 0xAgent"
-        $result = $dialog.ShowDialog()
-        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-            Write-Output $dialog.SelectedPath
-        }
-      `;
-      const buf = Buffer.from(psScript, 'utf-16le');
-      const base64 = buf.toString('base64');
-      const stdout = execSync(`powershell -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' });
-      const folder = stdout.trim();
-      return folder.length > 0 ? folder : null;
-    } catch (err) {
-      console.error('Failed to open native Windows folder dialog:', err);
-      return null;
-    }
+    return new Promise((resolve) => {
+      try {
+        const psScript = `
+          Add-Type -AssemblyName System.Windows.Forms
+          $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+          $dialog.Description = "Select Workspace Folder for 0xAgent"
+          $result = $dialog.ShowDialog()
+          if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+              Write-Output $dialog.SelectedPath
+          }
+        `;
+        const buf = Buffer.from(psScript, 'utf-16le');
+        const base64 = buf.toString('base64');
+        const { exec } = require('node:child_process');
+        exec(`powershell -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' }, (err: any, stdout: string) => {
+          if (err) {
+            console.error('Failed to open native Windows folder dialog:', err);
+            resolve(null);
+          } else {
+            const folder = (stdout || '').trim();
+            resolve(folder.length > 0 ? folder : null);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to open native Windows folder dialog:', err);
+        resolve(null);
+      }
+    });
   }
   return null;
 }
 
-export function selectFileNative(filter?: string): string | null {
+export async function selectFileNative(filter?: string): Promise<string | null> {
   if (process.platform === 'win32') {
-    try {
-      const filterStr = filter || "All Files (*.*)|*.*|Executables (*.exe)|*.exe|GGUF Models (*.gguf)|*.gguf";
-      const psScript = `
-        Add-Type -AssemblyName System.Windows.Forms
-        $dialog = New-Object System.Windows.Forms.OpenFileDialog
-        $dialog.Title = "Select File"
-        $dialog.Filter = "${filterStr}"
-        $result = $dialog.ShowDialog()
-        if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-            Write-Output $dialog.FileName
-        }
-      `;
-      const buf = Buffer.from(psScript, 'utf-16le');
-      const base64 = buf.toString('base64');
-      const stdout = execSync(`powershell -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' });
-      const filePath = stdout.trim();
-      return filePath.length > 0 ? filePath : null;
-    } catch (err) {
-      console.error('Failed to open native Windows file dialog:', err);
-      return null;
-    }
+    return new Promise((resolve) => {
+      try {
+        const filterStr = filter || "All Files (*.*)|*.*|Executables (*.exe)|*.exe|GGUF Models (*.gguf)|*.gguf";
+        const psScript = `
+          Add-Type -AssemblyName System.Windows.Forms
+          $dialog = New-Object System.Windows.Forms.OpenFileDialog
+          $dialog.Title = "Select File"
+          $dialog.Filter = "${filterStr}"
+          $result = $dialog.ShowDialog()
+          if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+              Write-Output $dialog.FileName
+          }
+        `;
+        const buf = Buffer.from(psScript, 'utf-16le');
+        const base64 = buf.toString('base64');
+        const { exec } = require('node:child_process');
+        exec(`powershell -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' }, (err: any, stdout: string) => {
+          if (err) {
+            console.error('Failed to open native Windows file dialog:', err);
+            resolve(null);
+          } else {
+            const filePath = (stdout || '').trim();
+            resolve(filePath.length > 0 ? filePath : null);
+          }
+        });
+      } catch (err) {
+        console.error('Failed to open native Windows file dialog:', err);
+        resolve(null);
+      }
+    });
   }
   return null;
 }

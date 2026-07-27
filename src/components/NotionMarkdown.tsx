@@ -236,13 +236,15 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
 };
 
 const InlineFormattedText: React.FC<{ text: string }> = ({ text }) => {
-  // Parse inline code `code` and inline math $ math $
+  if (!text) return null;
+
+  // Split by inline code blocks and math blocks first to avoid formatting inside code/math
   const parts = text.split(/(`[^`]+`|\$[^\$]+\$)/g);
 
   return (
     <>
       {parts.map((part, idx) => {
-        if (part.startsWith('`') && part.endsWith('`')) {
+        if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) {
           return (
             <code
               key={idx}
@@ -252,7 +254,7 @@ const InlineFormattedText: React.FC<{ text: string }> = ({ text }) => {
             </code>
           );
         }
-        if (part.startsWith('$') && part.endsWith('$')) {
+        if (part.startsWith('$') && part.endsWith('$') && part.length >= 2) {
           return (
             <span
               key={idx}
@@ -262,7 +264,62 @@ const InlineFormattedText: React.FC<{ text: string }> = ({ text }) => {
             </span>
           );
         }
-        return part;
+        return <FormattedSubSpan key={idx} subtext={part} />;
+      })}
+    </>
+  );
+};
+
+const FormattedSubSpan: React.FC<{ subtext: string }> = ({ subtext }) => {
+  const regex = /(\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|~~[^~]+~~|\*[^*]+\*|_[^_]+_)/g;
+  const subparts = subtext.split(regex);
+
+  return (
+    <>
+      {subparts.map((sub, i) => {
+        const linkMatch = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(sub);
+        if (linkMatch) {
+          return (
+            <a
+              key={i}
+              href={linkMatch[2]}
+              target="_blank"
+              rel="noreferrer"
+              className="text-emerald-400 hover:text-emerald-300 underline font-medium cursor-pointer transition-colors"
+            >
+              {linkMatch[1]}
+            </a>
+          );
+        }
+
+        if (sub.startsWith('**') && sub.endsWith('**') && sub.length >= 4) {
+          return (
+            <strong key={i} className="font-semibold text-slate-100">
+              {sub.substring(2, sub.length - 2)}
+            </strong>
+          );
+        }
+
+        if (sub.startsWith('~~') && sub.endsWith('~~') && sub.length >= 4) {
+          return (
+            <del key={i} className="line-through text-slate-400">
+              {sub.substring(2, sub.length - 2)}
+            </del>
+          );
+        }
+
+        if (
+          ((sub.startsWith('*') && sub.endsWith('*')) || (sub.startsWith('_') && sub.endsWith('_'))) &&
+          sub.length >= 2
+        ) {
+          return (
+            <em key={i} className="italic text-slate-200">
+              {sub.substring(1, sub.length - 1)}
+            </em>
+          );
+        }
+
+        return sub;
       })}
     </>
   );
