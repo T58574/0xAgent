@@ -43,7 +43,6 @@ export interface LocalServerConfig {
   parallel_slots?: number | null;
   cache_reuse?: number | null;
   slot_save_path?: string | null;
-  mtp_draft?: number | null;
   custom_args?: string | null;
 }
 
