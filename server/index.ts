@@ -43,6 +43,16 @@ import { detectGpuHardware } from './hardware';
 import { loadMemories, addOrUpdateMemory, deleteMemory, queryMemories } from './memory';
 import { listSkills, readSkill, writeSkill, deleteSkill } from './skills';
 import {
+  listPersonas,
+  getPersonaDetail,
+  setActivePersona,
+  createPersona,
+  updatePersonaFile,
+  updatePersonaMetadata,
+  deletePersona,
+} from './personas';
+import { loadSummarizerPrompt, saveSummarizerPrompt } from './summarizer';
+import {
   isPasswordSet,
   setupMasterPassword,
   loginMasterPassword,
@@ -296,6 +306,100 @@ app.post('/api/skills/:name', (req, res) => {
 app.delete('/api/skills/:name', (req, res) => {
   try {
     deleteSkill(req.params.name);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Personas & Modification Window Endpoints (~/.0xagent/personas/)
+app.get('/api/personas', (_req, res) => {
+  try {
+    const personas = listPersonas();
+    res.json(personas);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/personas/:id', (req, res) => {
+  try {
+    const detail = getPersonaDetail(req.params.id);
+    if (!detail) {
+      res.status(404).json({ error: 'Persona not found' });
+      return;
+    }
+    res.json(detail);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/personas', (req, res) => {
+  try {
+    const { name, description, icon } = req.body || {};
+    const created = createPersona(name, description, icon);
+    res.json(created);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/personas/:id/activate', (req, res) => {
+  try {
+    const personas = setActivePersona(req.params.id);
+    res.json(personas);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/personas/:id/file', (req, res) => {
+  try {
+    const { filename, content } = req.body;
+    if (!['SOUL.md', 'TOOLS.md', 'USER.md'].includes(filename)) {
+      res.status(400).json({ error: 'Filename must be SOUL.md, TOOLS.md, or USER.md' });
+      return;
+    }
+    const updated = updatePersonaFile(req.params.id, filename, content || '');
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/personas/:id/meta', (req, res) => {
+  try {
+    const updated = updatePersonaMetadata(req.params.id, req.body);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/personas/:id', (req, res) => {
+  try {
+    deletePersona(req.params.id);
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Summarizer Prompt Endpoints (~/.0xagent/prompts/summarizer.md)
+app.get('/api/summarizer-prompt', (_req, res) => {
+  try {
+    const content = loadSummarizerPrompt();
+    res.json({ content });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/summarizer-prompt', (req, res) => {
+  try {
+    const { content } = req.body;
+    saveSummarizerPrompt(content || '');
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -799,28 +903,28 @@ app.post('/api/start-local-server', (req, res) => {
 
     const getVal = (bodyVal: any, cfgVal: any) => bodyVal !== undefined && bodyVal !== null ? bodyVal : cfgVal;
 
-    const ctxVal = getVal(body.ctxSize, cfg.local_server.ctx_size);
+    const ctxVal = getVal(body.ctxSize, cfg.local_server?.ctx_size ?? 16384);
     if (typeof ctxVal === 'number' && ctxVal > 0) args.push('-c', String(ctxVal));
 
-    const nglVal = getVal(body.gpuLayers, cfg.local_server.gpu_layers);
+    const nglVal = getVal(body.gpuLayers, cfg.local_server?.gpu_layers);
     if (typeof nglVal === 'number' && nglVal >= 0) args.push('-ngl', String(nglVal));
 
-    const threadsVal = getVal(body.threads, cfg.local_server.threads);
+    const threadsVal = getVal(body.threads, cfg.local_server?.threads);
     if (typeof threadsVal === 'number' && threadsVal > 0) args.push('-t', String(threadsVal));
 
-    const batchVal = getVal(body.batchSize, cfg.local_server.batch_size);
+    const batchVal = getVal(body.batchSize, cfg.local_server?.batch_size);
     if (typeof batchVal === 'number' && batchVal > 0) args.push('-b', String(batchVal));
 
-    const ubatchVal = getVal(body.ubatchSize, cfg.local_server.ubatch_size);
+    const ubatchVal = getVal(body.ubatchSize, cfg.local_server?.ubatch_size);
     if (typeof ubatchVal === 'number' && ubatchVal > 0) args.push('-ub', String(ubatchVal));
 
-    const tempVal = getVal(body.temp, cfg.local_server.temp);
+    const tempVal = getVal(body.temp, cfg.local_server?.temp);
     if (typeof tempVal === 'number') args.push('--temp', String(tempVal));
 
-    const rpVal = getVal(body.repeatPenalty, cfg.local_server.repeat_penalty);
+    const rpVal = getVal(body.repeatPenalty, cfg.local_server?.repeat_penalty ?? 1.1);
     if (typeof rpVal === 'number') args.push('--repeat-penalty', String(rpVal));
 
-    const minPVal = getVal(body.minP, cfg.local_server.min_p);
+    const minPVal = getVal(body.minP, cfg.local_server?.min_p);
     if (typeof minPVal === 'number') args.push('--min-p', String(minPVal));
 
     const faVal = getVal(body.flashAttn, cfg.local_server.flash_attn);

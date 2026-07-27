@@ -41,11 +41,30 @@ export interface PromptFileInfo {
   updated_at: number;
 }
 
+export interface PersonaMetadata {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  user_id: string;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface PersonaDetail {
+  metadata: PersonaMetadata;
+  soul: string;
+  tools: string;
+  user: string;
+}
+
 export interface AppConfig {
   api_url: string;
   model_name: string;
   system_prompt: string;
   active_prompt_file?: string | null;
+  active_persona_id?: string | null;
   workspace_dir?: string | null;
   groq_api_key?: string | null;
   active_theme?: 'obsidian' | 'cyber' | 'graphite' | 'matrix' | string | null;

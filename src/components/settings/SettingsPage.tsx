@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, FileText, Shield } from 'lucide-react';
+import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, FileText, Shield, User } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { GeneralTab } from './GeneralTab';
 import { PromptsTab } from './PromptsTab';
+import { PersonasTab } from './PersonasTab';
 import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
 import { SecurityTab } from './SecurityTab';
@@ -18,7 +19,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   onSaveConfig,
   onCancel,
 }) => {
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'prompts' | 'themes' | 'local_server' | 'security'>('general');
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'prompts' | 'themes' | 'local_server' | 'security'>('general');
 
   // General state
   const [apiUrl, setApiUrl] = useState('');
@@ -283,6 +284,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
 
           <button
             type="button"
+            onClick={() => setActiveSubtab('personas')}
+            className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
+              activeSubtab === 'personas'
+                ? 'bg-slate-800 text-white font-semibold border border-white/10'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]'
+            }`}
+          >
+            <User size={14} className={activeSubtab === 'personas' ? 'text-emerald-400' : 'text-slate-500'} />
+            <span>Личности (Personas)</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveSubtab('prompts')}
             className={`w-full px-3 py-2 rounded-md text-xs font-medium flex items-center gap-2 transition-colors cursor-pointer text-left ${
               activeSubtab === 'prompts'
@@ -351,6 +365,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               compactChat={compactChat}
               setCompactChat={setCompactChat}
             />
+          )}
+
+          {activeSubtab === 'personas' && (
+            <PersonasTab />
           )}
 
           {activeSubtab === 'prompts' && (

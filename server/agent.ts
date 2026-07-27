@@ -17,6 +17,8 @@ import {
 import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
 import { listSkills, readSkill } from './skills';
 import { listSessions, loadSession as getSessionById } from './session';
+import { getActivePersona, appendSilentUserTrait } from './personas';
+import { summarizeContext } from './summarizer';
 
 export interface ParsedToolCall {
   id: string;
@@ -247,6 +249,91 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
   return toolCalls;
 }
 
+export function pruneMessagesForContext(
+  messages: { role: string; content: string }[],
+  maxTokens: number
+): { role: string; content: string }[] {
+  const estTokens = (arr: { role: string; content: string }[]) =>
+    Math.max(1, Math.round(JSON.stringify(arr).length / 3.8));
+
+  // Safety context threshold (80% of contextMax)
+  const safeLimit = Math.floor(maxTokens * 0.8);
+  if (estTokens(messages) <= safeLimit) {
+    return messages;
+  }
+
+  const systemMsg = messages[0];
+  const tailCount = Math.min(8, messages.length - 1);
+  const tailMsgs = messages.slice(messages.length - tailCount);
+  const middleMsgs = messages.slice(1, messages.length - tailCount);
+
+  // Truncate long tool/file outputs in middle messages
+  const prunedMiddle = middleMsgs.map((m) => {
+    if (m.content.length > 500 && (m.role === 'user' || m.role === 'tool')) {
+      const head = m.content.substring(0, 200);
+      const tail = m.content.substring(m.content.length - 200);
+      return {
+        ...m,
+        content: `${head}\n\n[... Вывод инструмента сжат для сохранения контекста (${m.content.length} байт) ...]\n\n${tail}`,
+      };
+    }
+    return m;
+  });
+
+  let result = [systemMsg, ...prunedMiddle, ...tailMsgs];
+
+  // If still above safety threshold, discard oldest middle messages
+  while (estTokens(result) > safeLimit && prunedMiddle.length > 1) {
+    prunedMiddle.shift();
+    result = [systemMsg, ...prunedMiddle, ...tailMsgs];
+  }
+
+  return result;
+}
+
+export function detectRepetitionLoop(history: ChatMessage[], newContent: string): boolean {
+  const trimmedNew = newContent.trim().toLowerCase();
+  if (!trimmedNew) return false;
+
+  const loopTriggers = [
+    'скажи продолжи',
+    'напиши продолжи',
+    'ответь продолжи',
+    'скажите продолжи',
+    'say continue',
+    'reply continue',
+    'если ты хочешь что бы написал код',
+    'если вы хотите чтобы я продолжил',
+  ];
+
+  for (const trigger of loopTriggers) {
+    if (trimmedNew.includes(trigger)) {
+      const assistantMsgs = history.filter((m) => m.role === 'assistant');
+      const prevAssistant = assistantMsgs[assistantMsgs.length - 1];
+      if (prevAssistant && prevAssistant.content.toLowerCase().includes(trigger)) {
+        return true;
+      }
+    }
+  }
+
+  const assistantMsgs = history.filter((m) => m.role === 'assistant');
+  if (assistantMsgs.length > 0) {
+    const prevAssistantContent = assistantMsgs[assistantMsgs.length - 1].content.trim().toLowerCase();
+    if (prevAssistantContent.length > 30 && trimmedNew === prevAssistantContent) {
+      return true;
+    }
+
+    if (prevAssistantContent.length > 50 && trimmedNew.length > 50) {
+      const minLen = Math.min(100, Math.floor(prevAssistantContent.length * 0.8));
+      if (trimmedNew.substring(0, minLen) === prevAssistantContent.substring(0, minLen)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 export type EventBroadcaster = (event: string, payload: any) => void;
 
 export async function runAgentLoop(
@@ -258,6 +345,7 @@ export async function runAgentLoop(
   activeCancelTokens.delete(sessionId);
 
   broadcast('agent-status-changed', 'thinking');
+  let loopRetryCount = 0;
 
   while (true) {
     if (activeCancelTokens.has(sessionId)) {
@@ -290,10 +378,22 @@ Before executing modifying tool calls (<write_file>, <patch_file>, <execute_comm
 3. Explain your technical rationale concisely.`
       : '';
 
-    const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
-    const fullSystemPrompt = config.system_prompt + envContext + planningContext + memoryContext + workspaceMdContext;
+    const activePersona = getActivePersona();
+    const personaContext = `\n\n# 🎭 ACTIVE AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
 
-    const messages = [
+## SOUL.md — CHARACTER & BEHAVIOR
+${activePersona.soul}
+
+## TOOLS.md — PERSONA TOOL INSTRUCTIONS
+${activePersona.tools}
+
+## USER.md — USER PROFILE & OBSERVED TRAITS (${activePersona.metadata.user_id})
+${activePersona.user}`;
+
+    const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
+    const fullSystemPrompt = config.system_prompt + personaContext + envContext + planningContext + memoryContext + workspaceMdContext;
+
+    const rawMessages = [
       { role: 'system', content: fullSystemPrompt },
       ...session.messages.map((m) => ({
         role: m.role === 'tool' ? 'user' : m.role,
@@ -301,12 +401,52 @@ Before executing modifying tool calls (<write_file>, <patch_file>, <execute_comm
       })),
     ];
 
+    const contextMax = config.local_server?.ctx_size || config.max_tokens || 16384;
+    const estPromptTokens = Math.max(1, Math.round(JSON.stringify(rawMessages).length / 3.8));
+
+    let messages = rawMessages;
+    if (estPromptTokens > Math.floor(contextMax * 0.75) && session.messages.length > 6) {
+      console.log(`[agent] Context size (${estPromptTokens} tokens) exceeded 75% threshold (${contextMax}). Invoking LLM summarizer...`);
+      try {
+        const summaryText = await summarizeContext(session.messages, config, broadcast);
+        const tailMsgs = session.messages.slice(session.messages.length - 4);
+
+        session.messages = [
+          {
+            id: uuidv4(),
+            role: 'system' as any,
+            content: `[🧠 АВТОМАТИЧЕСКИ СЖАТЫЙ КОНТЕКСТ СЕССИИ]:\n${summaryText}`,
+            timestamp: Date.now(),
+          },
+          ...tailMsgs,
+        ];
+        session.updated_at = Date.now();
+        saveSession(session);
+
+        messages = [
+          { role: 'system', content: fullSystemPrompt },
+          ...session.messages.map((m) => ({
+            role: m.role === 'tool' ? 'user' : m.role,
+            content: m.content,
+          })),
+        ];
+      } catch (sumErr) {
+        console.error('LLM context summarization failed, falling back to basic pruning:', sumErr);
+        messages = pruneMessagesForContext(rawMessages, contextMax);
+      }
+    } else {
+      messages = pruneMessagesForContext(rawMessages, contextMax);
+    }
+
     const apiEndpoint = `${config.api_url.replace(/\/$/, '')}/chat/completions`;
-    const requestBody = {
+    const requestBody: any = {
       model: config.model_name,
       messages,
       stream: true,
-      temperature: 0.2,
+      temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
+      frequency_penalty: loopRetryCount > 0 ? 0.5 : (config.local_server?.frequency_penalty ?? 0.3),
+      presence_penalty: config.local_server?.presence_penalty ?? 0.1,
+      repeat_penalty: config.local_server?.repeat_penalty ?? 1.1,
     };
 
     let response: Response | null = null;
@@ -394,7 +534,6 @@ Before executing modifying tool calls (<write_file>, <patch_file>, <execute_comm
 
     const genStartTime = Date.now();
     let tokenCount = 0;
-    const contextMax = config.local_server?.ctx_size || 8192;
     const estimatedPromptTokens = Math.max(1, Math.round(JSON.stringify(messages).length / 3.8));
     const modelName = config.model_name || 'qwen2.5-coder:7b';
 
@@ -497,6 +636,29 @@ Before executing modifying tool calls (<write_file>, <patch_file>, <execute_comm
     session.updated_at = Date.now();
     saveSession(session);
 
+    // Check if generated assistant response triggered a repetition loop
+    if (detectRepetitionLoop(session.messages.slice(0, -1), assistantMessage.content)) {
+      if (loopRetryCount < 2) {
+        loopRetryCount++;
+        console.warn(`[agent] Repetition loop detected! Attempt ${loopRetryCount}. Injecting anti-loop directive...`);
+
+        session.messages.push({
+          id: uuidv4(),
+          role: 'user',
+          content: '[SYSTEM DIRECTIVE: Обнаружено зацикливание / повторение предыдущего ответа! Не повторяйте текст и не просите пользователя писать "продолжи". Сразу переходите к исполнению нужного XML инструмента (<read_file>, <write_file>, <patch_file>, <execute_command>) или завершите решение.]',
+          timestamp: Date.now(),
+        });
+        session.updated_at = Date.now();
+        saveSession(session);
+
+        broadcast('agent-error', {
+          sessionId,
+          message: '⚠️ Зафиксировано зацикливание модели. Автоматический сброс петли и повторный вызов с повышенным штрафом за повторы...',
+        });
+        continue;
+      }
+    }
+
     // Parse tools from assistant response content
     const parsedCalls = parseToolCalls(assistantMessage.content);
     if (parsedCalls.length === 0) {
@@ -587,7 +749,8 @@ Before executing modifying tool calls (<write_file>, <patch_file>, <execute_comm
               break;
             case 'remember_fact': {
               const saved = addOrUpdateMemory(tc.arguments.key, tc.arguments.value, tc.arguments.category);
-              output = `Successfully stored fact in long-term memory: [${saved.category}] ${saved.key} = ${saved.value}`;
+              appendSilentUserTrait(activePersona.metadata.id, `[${saved.category}] ${saved.key} = ${saved.value}`);
+              output = `Successfully stored fact in long-term memory & persona profile USER.md: [${saved.category}] ${saved.key} = ${saved.value}`;
               break;
             }
             case 'recall_memories': {

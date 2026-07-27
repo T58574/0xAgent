@@ -49,6 +49,41 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [serverHost] = useState('127.0.0.1');
   const [serverPort] = useState(11434);
 
+  // Summarization WebSocket events state
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [summarizePhase, setSummarizePhase] = useState('🧠 Инициализация фоновой суммаризации...');
+  const [summarizePercent, setSummarizePercent] = useState(0);
+  const [summarizeMetrics, setSummarizeMetrics] = useState<{ oldTokens?: number; newTokens?: number }>({});
+
+  useEffect(() => {
+    const u1 = api.listen<{ promptTokens: number; estimatedNewTokens: number }>('agent-summarizing-start', (e) => {
+      setIsSummarizing(true);
+      setSummarizePercent(15);
+      setSummarizePhase('🧠 Инициализация фоновой LLM-суммаризации...');
+      setSummarizeMetrics({ oldTokens: e.payload.promptTokens });
+    });
+
+    const u2 = api.listen<{ phase: string; percent: number }>('agent-summarizing-progress', (e) => {
+      setSummarizePhase(e.payload.phase);
+      setSummarizePercent(e.payload.percent);
+    });
+
+    const u3 = api.listen<{ oldTokens: number; newTokens: number; summary: string }>('agent-summarizing-end', (e) => {
+      setSummarizePercent(100);
+      setSummarizePhase('✨ Контекст успешно сжат!');
+      setSummarizeMetrics({ oldTokens: e.payload.oldTokens, newTokens: e.payload.newTokens });
+      setTimeout(() => {
+        setIsSummarizing(false);
+      }, 3500);
+    });
+
+    return () => {
+      u1();
+      u2();
+      u3();
+    };
+  }, []);
+
   useEffect(() => {
     historyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, agentStatus, liveTelemetry]);
@@ -301,6 +336,40 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     );
   };
 
+  const renderSummarizingBanner = () => {
+    if (!isSummarizing) return null;
+    return (
+      <div className="mx-4 my-2 p-3.5 rounded-xl bg-slate-950/90 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 text-xs text-slate-100 flex flex-col gap-2 font-mono relative overflow-hidden backdrop-blur-md animate-pulse">
+        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 via-emerald-400 to-purple-500" />
+        
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-cyan-400 animate-spin" />
+            <span className="font-bold text-cyan-300 tracking-wider">🧠 ФОНОВОЕ СЖАТИЕ КОНТЕКСТА...</span>
+          </div>
+
+          {summarizeMetrics.oldTokens !== undefined && (
+            <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold">
+              [{summarizeMetrics.oldTokens.toLocaleString()} → {summarizeMetrics.newTokens ? summarizeMetrics.newTokens.toLocaleString() : '...'} tok]
+            </span>
+          )}
+        </div>
+
+        <div className="text-[11px] text-slate-300 font-sans flex items-center justify-between">
+          <span>{summarizePhase}</span>
+          <span className="text-cyan-400 font-mono font-bold">{summarizePercent}%</span>
+        </div>
+
+        <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-cyan-500/30 p-0.5">
+          <div
+            className="bg-gradient-to-r from-cyan-500 via-emerald-400 to-purple-500 h-full rounded-full transition-all duration-500"
+            style={{ width: `${summarizePercent}%` }}
+          />
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-hidden relative select-text">
       
@@ -317,6 +386,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             Введите вашу задачу или выберите локальную GGUF модель в Настройках для начала автономной написания кода.
           </p>
 
+          {renderSummarizingBanner()}
           {renderWarningBanner()}
 
           <div className="w-full mt-4">
@@ -495,6 +565,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* STREAMING TELEMETRY BADGE */}
           {renderStreamingBanner()}
+
+          {/* SUMMARIZING SCI-FI BANNER */}
+          {renderSummarizingBanner()}
 
           {/* SERVER OFFLINE WARNING & 1-CLICK LAUNCH BANNER */}
           {renderWarningBanner()}

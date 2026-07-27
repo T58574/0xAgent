@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, PromptFileInfo, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo } from '../types';
+import { AppConfig, ChatSession, FileNode, PromptFileInfo, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail } from '../types';
 
 const API_BASE = '/api';
 
@@ -503,6 +503,79 @@ export async function get_server_status(): Promise<ServerStatusInfo> {
   const res = await authFetch(`${API_BASE}/server-status`);
   if (!res.ok) throw new Error(await res.text());
   return res.json();
+}
+
+export async function get_personas(): Promise<PersonaMetadata[]> {
+  const res = await authFetch(`${API_BASE}/personas`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_persona_detail(id: string): Promise<PersonaDetail> {
+  const res = await authFetch(`${API_BASE}/personas/${encodeURIComponent(id)}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function create_persona(name: string, description?: string, icon?: string): Promise<PersonaDetail> {
+  const res = await authFetch(`${API_BASE}/personas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, description, icon }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function activate_persona(id: string): Promise<PersonaMetadata[]> {
+  const res = await authFetch(`${API_BASE}/personas/${encodeURIComponent(id)}/activate`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function save_persona_file(id: string, filename: 'SOUL.md' | 'TOOLS.md' | 'USER.md', content: string): Promise<PersonaDetail> {
+  const res = await authFetch(`${API_BASE}/personas/${encodeURIComponent(id)}/file`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename, content }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function update_persona_metadata(id: string, patch: Partial<PersonaMetadata>): Promise<PersonaMetadata> {
+  const res = await authFetch(`${API_BASE}/personas/${encodeURIComponent(id)}/meta`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function delete_persona(id: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/personas/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function get_summarizer_prompt(): Promise<string> {
+  const res = await authFetch(`${API_BASE}/summarizer-prompt`);
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.content;
+}
+
+export async function save_summarizer_prompt(content: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/summarizer-prompt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  if (!res.ok) throw new Error(await res.text());
 }
 
 
