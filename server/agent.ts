@@ -19,7 +19,7 @@ import {
 import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
 import { listSkills, readSkill } from './skills';
 import { getActivePersona, appendSilentUserTrait, getUnifiedToolsContext } from './personas';
-import { summarizeContext } from './summarizer';
+import { summarizeContext, estimatePromptTokens } from './summarizer';
 
 export interface ParsedToolCall {
   id: string;
@@ -309,12 +309,9 @@ export function pruneMessagesForContext(
   messages: { role: string; content: string | any[] }[],
   maxTokens: number
 ): { role: string; content: string | any[] }[] {
-  const estTokens = (arr: { role: string; content: string | any[] }[]) =>
-    Math.max(1, Math.round(JSON.stringify(arr).length / 3.8));
-
   // Safety context threshold (80% of contextMax)
   const safeLimit = Math.floor(maxTokens * 0.8);
-  if (estTokens(messages) <= safeLimit) {
+  if (estimatePromptTokens(messages) <= safeLimit) {
     return messages;
   }
 
@@ -349,7 +346,7 @@ export function pruneMessagesForContext(
   let result = buildResult(prunedMiddle);
 
   // Discard oldest middle messages until context falls below safety limit
-  while (estTokens(result) > safeLimit && prunedMiddle.length > 0) {
+  while (estimatePromptTokens(result) > safeLimit && prunedMiddle.length > 0) {
     prunedMiddle.shift();
     result = buildResult(prunedMiddle);
   }
@@ -512,20 +509,23 @@ ${activePersona.user}`;
     ];
 
     const contextMax = config.local_server?.ctx_size || config.max_tokens || 16384;
-    const estPromptTokens = Math.max(1, Math.round(JSON.stringify(rawMessages).length / 3.8));
+    const estPromptTokens = estimatePromptTokens(rawMessages);
 
     let messages: { role: string; content: string | any[] }[] = rawMessages;
     if (estPromptTokens > Math.floor(contextMax * 0.75) && session.messages.length > 6) {
       console.log(`[agent] Context size (${estPromptTokens} tokens) exceeded 75% threshold (${contextMax}). Invoking LLM summarizer...`);
       try {
-        const summaryText = await summarizeContext(session.messages, config, broadcast);
-        const tailMsgs = session.messages.slice(session.messages.length - 4);
+        const tailCount = 4;
+        const msgsToSummarize = session.messages.slice(0, Math.max(1, session.messages.length - tailCount));
+        const tailMsgs = session.messages.slice(session.messages.length - tailCount);
+
+        const summaryText = await summarizeContext(msgsToSummarize, config, broadcast);
 
         session.messages = [
           {
             id: uuidv4(),
             role: 'user',
-            content: `[🧠 АВТОМАТИЧЕСКИ СЖАТЫЙ КОНТЕКСТ СЕССИИ]:\n${summaryText}`,
+            content: `[СВОДКА ПРЕДЫДУЩЕЙ ЧАСТИ ДИАЛОГА]:\n${summaryText}`,
             timestamp: Date.now(),
           },
           ...tailMsgs,
@@ -644,7 +644,7 @@ ${activePersona.user}`;
 
     const genStartTime = Date.now();
     let tokenCount = 0;
-    const estimatedPromptTokens = Math.max(1, Math.round(JSON.stringify(messages).length / 3.8));
+    const estimatedPromptTokens = estimatePromptTokens(messages);
     const modelName = config.model_name || 'qwen2.5-coder:7b';
 
     const emitToken = (content: string) => {
