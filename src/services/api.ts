@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState } from '../types';
+import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse } from '../types';
 
 const API_BASE = '/api';
 
@@ -573,6 +573,13 @@ export async function save_tools_md(content: string): Promise<ToolsState> {
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function get_available_models(): Promise<AvailableModelsResponse> {
+  const res = await authFetch(`${API_BASE}/models`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 
 
 

@@ -617,6 +617,7 @@ export default function App() {
         onToggleLogs={() => setShowLogsDrawer(!showLogsDrawer)}
         isServerOffline={isServerOffline}
         onStartServer={handleStartServer}
+        onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
       />
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}

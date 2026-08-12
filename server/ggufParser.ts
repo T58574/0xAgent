@@ -15,6 +15,9 @@ export interface GgufMetadata {
   contextLength: number; // Max trained context size (n_ctx_train)
   expertCount: number; // MoE expert count
   isMmproj: boolean; // Vision projector flag
+  cleanTitle?: string;
+  sizeGB?: string;
+  formattedName?: string;
   rawKv: Record<string, any>;
 }
 
@@ -161,6 +164,27 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
     }
   }
 
+  // Calculate clean title, size in GB, and formatted display string
+  const sizeGBNum = fileSizeBytes / (1024 * 1024 * 1024);
+  const sizeGB = `${sizeGBNum.toFixed(2)} GB`;
+  
+  // Clean title from filename
+  let cleanTitle = result.modelName || fileName.replace(/\.gguf$/i, '');
+  // Strip quantization tags from title if present
+  cleanTitle = cleanTitle
+    .replace(/[-_.]?(Q\d_[A-Z0-9_]+|Q\d_K_[SML]|IQ\d_[A-Z0-9_]+|F16|F32|BF16)$/i, '')
+    .replace(/[-_.]?(Q\d_[A-Z0-9_]+|Q\d_K_[SML]|IQ\d_[A-Z0-9_]+|F16|F32|BF16)[-_.]/i, ' ')
+    .replace(/[-_]/g, ' ')
+    .trim();
+
+  if (!cleanTitle) {
+    cleanTitle = fileName.replace(/\.gguf$/i, '');
+  }
+
+  result.cleanTitle = cleanTitle;
+  result.sizeGB = sizeGB;
+  result.formattedName = `${cleanTitle} [${result.quantization}] (${sizeGB})`;
+
   return result;
 }
 
@@ -256,7 +280,7 @@ function getGgufTypeSize(type: GgufValueType): number {
 }
 
 function detectQuantFromFilename(name: string): string {
-  const match = name.match(/Q\d_[A-Z0-9_]+|F16|F32|IQ\d_[A-Z0-9_]+/i);
+  const match = name.match(/Q\d_[A-Z0-9_]+|Q\d_K_[A-Z0-9_]+|Q\d_K|IQ\d_[A-Z0-9_]+|BF16|F16|F32/i);
   return match ? match[0].toUpperCase() : 'GGUF';
 }
 

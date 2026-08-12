@@ -73,6 +73,7 @@ export interface AppConfig {
   active_persona_id?: string | null;
   workspace_dir?: string | null;
   groq_api_key?: string | null;
+  gemini_api_key?: string | null;
   active_theme?: 'obsidian' | 'cyber' | 'graphite' | 'matrix' | string | null;
   theme_colors?: ThemeColors | null;
   models_path?: string | null;
@@ -86,6 +87,34 @@ export interface AppConfig {
   compact_chat?: boolean | null;
   local_server?: LocalServerConfig | null;
 }
+
+export interface CloudModelItem {
+  id: string;
+  name: string;
+  badge: 'Medium' | 'Fast' | 'Ultra Fast' | string;
+  speed: string;
+  provider: string;
+  isAudio?: boolean;
+}
+
+export interface LocalModelItem {
+  id: string;
+  fileName: string;
+  filePath: string;
+  title: string;
+  quantization: string;
+  sizeGB: string;
+  formattedName: string;
+  isMmproj?: boolean;
+  contextLength?: number;
+}
+
+export interface AvailableModelsResponse {
+  cloud: CloudModelItem[];
+  local: LocalModelItem[];
+  activeModelId: string;
+}
+
 
 
 export interface ToolCallInfo {

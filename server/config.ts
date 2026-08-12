@@ -74,11 +74,12 @@ export function getAppDir(): string {
 export function getDefaultConfig(): AppConfig {
   return {
     api_url: 'http://127.0.0.1:11434/v1',
-    model_name: 'llama3:latest',
+    model_name: 'gemini-3.6-flash',
     system_prompt: DEFAULT_PROMPT_CONTENT,
     active_prompt_file: 'default.md',
     workspace_dir: null,
     groq_api_key: null,
+    gemini_api_key: null,
     theme_colors: {
       bg_color: '#090d16',
       text_color: '#f8fafc',

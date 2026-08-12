@@ -19,6 +19,7 @@ import { AppConfig } from '../types';
 import { getWorkspaceBaseName } from '../utils/helpers';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { ModelSelectorDropdown } from './ModelSelectorDropdown';
 
 interface NavbarProps {
   sidebarOpen: boolean;
@@ -31,6 +32,7 @@ interface NavbarProps {
   onToggleLogs?: () => void;
   isServerOffline?: boolean;
   onStartServer?: () => Promise<void>;
+  onModelChanged?: (newModelId: string) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -44,6 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleLogs,
   isServerOffline: isServerOfflineProp,
   onStartServer: onStartServerProp,
+  onModelChanged,
 }) => {
   const { showToast } = useToast();
   const [internalIsServerOffline, setInternalIsServerOffline] = useState(true);
@@ -220,6 +223,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             {getWorkspaceBaseName(config?.workspace_dir)}
           </span>
         </button>
+
+        {/* IDE Model Selector Dropdown (Cloud + Local) */}
+        <ModelSelectorDropdown config={config} onModelChanged={onModelChanged} />
 
         {has0xAgentMd && (
           <span

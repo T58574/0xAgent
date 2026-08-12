@@ -11,6 +11,7 @@ export function useSettingsState(
   const [apiUrl, setApiUrl] = useState('');
   const [modelName, setModelName] = useState('');
   const [groqApiKey, setGroqApiKey] = useState('');
+  const [geminiApiKey, setGeminiApiKey] = useState('');
   const [modelsPath, setModelsPath] = useState('');
   const [reasoningEnabled, setReasoningEnabled] = useState(true);
   const [planningEnabled, setPlanningEnabled] = useState(true);
@@ -62,8 +63,9 @@ export function useSettingsState(
   useEffect(() => {
     if (config) {
       setApiUrl(config.api_url || 'http://127.0.0.1:11434/v1');
-      setModelName(config.model_name || 'qwen2.5-coder:7b');
+      setModelName(config.model_name || 'gemini-3.6-flash');
       setGroqApiKey(config.groq_api_key || '');
+      setGeminiApiKey(config.gemini_api_key || '');
       setModelsPath(config.models_path || '');
       setReasoningEnabled(config.reasoning_enabled !== false);
       setPlanningEnabled(config.planning_mode !== false);
@@ -125,6 +127,7 @@ export function useSettingsState(
           api_url: apiUrl,
           model_name: modelName,
           groq_api_key: groqApiKey.trim() || null,
+          gemini_api_key: geminiApiKey.trim() || null,
           models_path: modelsPath.trim() || null,
           reasoning_enabled: reasoningEnabled,
           planning_mode: planningEnabled,
@@ -174,6 +177,7 @@ export function useSettingsState(
     apiUrl,
     modelName,
     groqApiKey,
+    geminiApiKey,
     modelsPath,
     reasoningEnabled,
     temperature,
@@ -224,6 +228,8 @@ export function useSettingsState(
     setModelName,
     groqApiKey,
     setGroqApiKey,
+    geminiApiKey,
+    setGeminiApiKey,
     modelsPath,
     setModelsPath,
     reasoningEnabled,

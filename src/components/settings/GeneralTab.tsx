@@ -6,6 +6,8 @@ interface GeneralTabProps {
   setApiUrl: (val: string) => void;
   groqApiKey: string;
   setGroqApiKey: (val: string) => void;
+  geminiApiKey?: string;
+  setGeminiApiKey?: (val: string) => void;
   reasoningEnabled: boolean;
   setReasoningEnabled: (val: boolean) => void;
   autoSaveHistory: boolean;
@@ -21,6 +23,8 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   setApiUrl,
   groqApiKey,
   setGroqApiKey,
+  geminiApiKey = '',
+  setGeminiApiKey,
   reasoningEnabled,
   setReasoningEnabled,
   autoSaveHistory,
@@ -49,12 +53,12 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
           <span>Параметры сетевого API подключения</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* API Endpoint URL */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
               <Globe size={12} className="text-sky-400" />
-              <span>Ссылка подключения к API (LLM Server URL)</span>
+              <span>Ссылка подключения к API</span>
             </label>
             <input
               type="text"
@@ -65,11 +69,26 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             />
           </div>
 
+          {/* Google AI Studio (Gemini) API Key */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
+              <Key size={12} className="text-sky-400" />
+              <span>Google AI Studio API Key</span>
+            </label>
+            <input
+              type="password"
+              value={geminiApiKey}
+              onChange={(e) => setGeminiApiKey && setGeminiApiKey(e.target.value)}
+              placeholder="AIzaSy..."
+              className="w-full px-3 py-2 rounded-md flat-input text-xs font-mono text-slate-100 focus:outline-none"
+            />
+          </div>
+
           {/* Groq API Key */}
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
               <Key size={12} className="text-amber-400" />
-              <span>API Токен Groq (Для распознавания речи Whisper)</span>
+              <span>Groq API Key (Whisper)</span>
             </label>
             <input
               type="password"

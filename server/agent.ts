@@ -21,6 +21,46 @@ import { listSkills, readSkill } from './skills';
 import { getActivePersona, appendSilentUserTrait, getUnifiedToolsContext } from './personas';
 import { summarizeContext, estimatePromptTokens } from './summarizer';
 
+// 0xVoice2Text Model Configuration Stack & Fallback Chain
+export const PRIMARY_TEXT_MODEL = 'gemini-3.6-flash';
+export const GEMMA_MODEL = 'gemma-4-31b-it';
+export const FAST_LITE_MODEL = 'gemini-3.5-flash-lite';
+export const NATIVE_AUDIO_MODEL = 'gemini-2.5-flash-preview-tts';
+
+export const FALLBACK_CHAIN: string[] = [
+  'gemini-3.6-flash',
+  'gemma-4-31b-it',
+  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+];
+
+/**
+ * Sanitizes LLM response content by removing drafts, metadata headers,
+ * reasoning fluff, and converting LaTeX arrows to standard unicode arrows.
+ */
+export function strip_ai_reasoning_fluff(text: string): string {
+  if (!text) return text;
+  let cleaned = text;
+
+  // 1. Remove draft headers like "Draft 1:", "Draft 2:", "[Draft 1]"
+  cleaned = cleaned.replace(/^(?:Draft\s*\d+:?|\[Draft\s*\d+\])/gim, '');
+
+  // 2. Remove metadata header lines: "Constraints: ...", "Topic: ...", "Closing: ..."
+  cleaned = cleaned.replace(/^(?:Constraints|Topic|Closing)\s*:\s*.*$/gim, '');
+
+  // 3. Convert LaTeX arrows to standard arrows
+  cleaned = cleaned.replace(/\$\s*\\rightarrow\s*\$/gi, '→');
+  cleaned = cleaned.replace(/\\rightarrow/gi, '→');
+  cleaned = cleaned.replace(/\$\s*\\Rightarrow\s*\$/gi, '⇒');
+  cleaned = cleaned.replace(/\\Rightarrow/gi, '⇒');
+
+  // 4. Remove service headers and thinking fluff
+  cleaned = cleaned.replace(/^(?:Thinking Process|Reasoning Fluff|Draft Notes):\s*/gim, '');
+
+  return cleaned;
+}
+
+
 export interface ParsedToolCall {
   id: string;
   name: string;
@@ -548,41 +588,67 @@ ${activePersona.user}`;
       messages = pruneMessagesForContext(rawMessages, contextMax);
     }
 
-    const apiEndpoint = `${config.api_url.replace(/\/$/, '')}/chat/completions`;
-    const requestBody: any = {
-      model: config.model_name,
-      messages,
-      stream: true,
-      temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
-      frequency_penalty: loopRetryCount > 0 ? 0.5 : (config.local_server?.frequency_penalty ?? 0.3),
-      presence_penalty: config.local_server?.presence_penalty ?? 0.1,
-      repeat_penalty: config.local_server?.repeat_penalty ?? 1.1,
-    };
+    const selectedModel = config.model_name || PRIMARY_TEXT_MODEL;
+    const isLocalModel = selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf') || config.api_url.includes('127.0.0.1') || config.api_url.includes('localhost');
 
     let response: Response | null = null;
-    let attempts = 0;
-    const maxAttempts = 6; // Initial attempt + up to 5 retries (10 seconds total)
+    let activeModelName = selectedModel;
 
-    while (attempts < maxAttempts) {
-      attempts++;
-      try {
-        response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-        });
-        if (response.status === 503 && attempts < maxAttempts) {
-          console.log(`[agent] LLM server returning 503 (loading model). Retrying in 2s (${attempts}/${maxAttempts})...`);
-          await new Promise((r) => setTimeout(r, 2000));
-          continue;
+    if (isLocalModel && (selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf'))) {
+      // Route local model to llama.cpp local server
+      const localHost = config.local_server?.host || '127.0.0.1';
+      const localPort = config.local_server?.port || 11434;
+      const apiEndpoint = `http://${localHost}:${localPort}/v1/chat/completions`;
+      const requestBody: any = {
+        model: selectedModel.replace(/^local:/, ''),
+        messages,
+        stream: true,
+        temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
+        frequency_penalty: loopRetryCount > 0 ? 0.5 : (config.local_server?.frequency_penalty ?? 0.3),
+        presence_penalty: config.local_server?.presence_penalty ?? 0.1,
+        repeat_penalty: config.local_server?.repeat_penalty ?? 1.1,
+      };
+
+      let attempts = 0;
+      const maxAttempts = 6;
+      while (attempts < maxAttempts) {
+        attempts++;
+        try {
+          response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          });
+          if (response.status === 503 && attempts < maxAttempts) {
+            await new Promise((r) => setTimeout(r, 2000));
+            continue;
+          }
+          break;
+        } catch (err: any) {
+          if (attempts < maxAttempts) {
+            await new Promise((r) => setTimeout(r, 1500));
+            continue;
+          }
+          const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Нажмите кнопку **🚀 Запустить LLM Сервер в 1-клик** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
+          session.messages.push({
+            id: uuidv4(),
+            role: 'assistant',
+            content: errMsg,
+            timestamp: Date.now(),
+          });
+          session.updated_at = Date.now();
+          saveSession(session);
+          broadcast('agent-error', { sessionId, message: errMsg });
+          broadcast('agent-status-changed', 'idle');
+          return;
         }
-        break;
-      } catch (err: any) {
-        if (attempts < maxAttempts) {
-          await new Promise((r) => setTimeout(r, 1500));
-          continue;
-        }
-        const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Нажмите кнопку **🚀 Запустить LLM Сервер в 1-клик** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
+      }
+    } else {
+      // Cloud AI (Google AI Studio / Gemini API with Fallback Chain)
+      const apiKey = config.gemini_api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || config.groq_api_key || '';
+      
+      if (!apiKey && !selectedModel.includes('localhost') && !selectedModel.includes('127.0.0.1')) {
+        const errMsg = `⚠️ **Google AI Studio API Key не задан!**\nДля использования облачной модели \`${selectedModel}\` требуется API ключ Google AI Studio.\n\n👉 **Решение:** Укажите Ваш **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)** или в переменной окружения.`;
         session.messages.push({
           id: uuidv4(),
           role: 'assistant',
@@ -595,10 +661,69 @@ ${activePersona.user}`;
         broadcast('agent-status-changed', 'idle');
         return;
       }
+
+      // Build model target candidate list (Fallback Chain)
+      const modelCandidates = [selectedModel];
+      for (const m of FALLBACK_CHAIN) {
+        if (!modelCandidates.includes(m)) modelCandidates.push(m);
+      }
+
+      const cloudEndpoint = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+
+      for (const candidateModel of modelCandidates) {
+        activeModelName = candidateModel;
+        console.log(`[agent] Trying Cloud AI model: ${candidateModel}`);
+
+        const requestBody: any = {
+          model: candidateModel,
+          messages,
+          stream: true,
+          temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
+        };
+
+        try {
+          let res = await fetch(cloudEndpoint, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify(requestBody),
+          });
+
+          // HTTP 400 Fallback (for models/endpoints not supporting systemInstruction)
+          if (res.status === 400) {
+            console.warn(`[agent] Model ${candidateModel} returned 400 (possible systemInstruction issue). Retrying without system instruction...`);
+            const strippedMessages = messages.filter((m) => m.role !== 'system');
+            const fallbackBody = { ...requestBody, messages: strippedMessages };
+            const retryRes = await fetch(cloudEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify(fallbackBody),
+            });
+            if (retryRes.ok) {
+              res = retryRes;
+            }
+          }
+
+          if (res.ok) {
+            response = res;
+            break;
+          } else {
+            const errText = await res.text().catch(() => '');
+            console.warn(`[agent] Cloud model ${candidateModel} failed (${res.status}): ${errText.substring(0, 200)}. Falling back to next model...`);
+          }
+        } catch (fetchErr: any) {
+          console.warn(`[agent] Cloud model ${candidateModel} network error: ${fetchErr.message}. Falling back...`);
+        }
+      }
     }
 
     if (!response || !response.ok) {
-      const errorText = response ? await response.text() : 'No response from server';
+      const errorText = response ? await response.text() : 'No response from LLM server / all fallback models exhausted';
       const errMsg = `⚠️ **LLM Сервер вернул ошибку (${response?.status || 500}):**\n\`\`\`\n${errorText}\n\`\`\``;
       session.messages.push({
         id: uuidv4(),
@@ -645,7 +770,7 @@ ${activePersona.user}`;
     const genStartTime = Date.now();
     let tokenCount = 0;
     const estimatedPromptTokens = estimatePromptTokens(messages);
-    const modelName = config.model_name || 'qwen2.5-coder:7b';
+    const modelName = activeModelName || config.model_name || PRIMARY_TEXT_MODEL;
 
     const emitToken = (content: string) => {
       assistantMessage.content += content;
@@ -725,6 +850,9 @@ ${activePersona.user}`;
         }
       }
     }
+
+    // Sanitize assistant content from drafts, metadata headers, and LaTeX arrows
+    assistantMessage.content = strip_ai_reasoning_fluff(assistantMessage.content);
 
     const totalElapsedMs = Date.now() - genStartTime;
     const finalTokensPerSec = totalElapsedMs > 100 ? Math.round((tokenCount / (totalElapsedMs / 1000)) * 10) / 10 : 0;
