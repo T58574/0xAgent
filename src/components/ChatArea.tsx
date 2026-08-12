@@ -6,23 +6,25 @@ import {
   Brain,
   Terminal,
   Sparkles,
-  RefreshCw,
   Zap,
   Cpu,
   Play,
   AlertCircle,
   Plus,
   Folder,
-  ChevronDown,
-  Eye,
   Layers,
   Image as ImageIcon,
   X,
+  Code,
+  ShieldAlert,
+  RefreshCw,
+  Compass,
 } from 'lucide-react';
-import { ChatMessage, LiveTelemetry } from '../types';
+import { AppConfig, ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent, getWorkspaceBaseName } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
+import { ModelSelectorDropdown } from './ModelSelectorDropdown';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -42,7 +44,8 @@ interface ChatAreaProps {
   workspaceDir?: string | null;
   onSelectWorkspace?: () => void;
   modelName?: string;
-  onOpenModelPicker?: () => void;
+  config?: AppConfig | null;
+  onModelChanged?: (newModelId: string) => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -61,7 +64,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   workspaceDir,
   onSelectWorkspace,
   modelName,
-  onOpenModelPicker,
+  config,
+  onModelChanged,
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
@@ -84,6 +88,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [summarizePhase, setSummarizePhase] = useState('Инициализация фоновой суммаризации...');
   const [summarizePercent, setSummarizePercent] = useState(0);
   const [summarizeMetrics, setSummarizeMetrics] = useState<{ oldTokens?: number; newTokens?: number }>({});
+
+  const activeModelId = config?.model_name || modelName || 'gemini-3.6-flash';
+  const isLocalModelActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
+  const showOfflineBanner = isServerOffline && isLocalModelActive;
 
   useEffect(() => {
     const u1 = api.listen<{ promptTokens: number; estimatedNewTokens: number }>('agent-summarizing-start', (e) => {
@@ -149,55 +157,55 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     });
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      processImageFiles(e.target.files);
-    }
-    if (e.target) e.target.value = '';
-  };
-
   const handlePaste = (e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    const imageFiles: File[] = [];
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        if (file) imageFiles.push(file);
+    if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+      const imageFiles = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        processImageFiles(imageFiles);
       }
-    }
-    if (imageFiles.length > 0) {
-      e.preventDefault();
-      e.stopPropagation();
-      processImageFiles(imageFiles);
     }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes('Files')) {
-      setIsDraggingOver(true);
-    }
+    setIsDraggingOver(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     setIsDraggingOver(false);
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
-    e.stopPropagation();
     setIsDraggingOver(false);
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    if (e.dataTransfer && e.dataTransfer.files) {
       processImageFiles(e.dataTransfer.files);
     }
   };
 
-  const startRecording = async () => {
+  const handleRemoveImage = (index: number) => {
+    setAttachedImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim() && attachedImages.length === 0) return;
+    onSendMessage(inputText, attachedImages.length > 0 ? attachedImages : undefined);
+    setInputText('');
+    setAttachedImages([]);
+  };
+
+  const handleMicClick = async () => {
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
@@ -211,86 +219,67 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach((track) => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
 
-        if (!groqApiKey) {
-          showToast('Для использования распознавания речи введите API токен Groq в Настройках!', 'info');
+        if (audioBlob.size < 2000) {
+          showToast('Аудиозапись слишком короткая', 'info');
           return;
         }
 
-        setIsTranscribing(true);
-        try {
-          const reader = new FileReader();
-          reader.readAsDataURL(audioBlob);
-          reader.onloadend = async () => {
-            const base64Audio = (reader.result as string).split(',')[1];
-            try {
-              const text = await api.transcribe_audio(base64Audio, groqApiKey);
-              if (text) {
-                setInputText((prev) => (prev ? `${prev} ${text}` : text));
-              }
-            } catch (err: any) {
-              showToast(`Ошибка распознавания: ${err.message || err}`, 'error');
-            } finally {
-              setIsTranscribing(false);
+        const reader = new FileReader();
+        reader.onloadend = async () => {
+          const base64Audio = (reader.result as string).split(',')[1];
+          if (!base64Audio) return;
+
+          const keyToUse = groqApiKey || '';
+          if (!keyToUse) {
+            showToast('Укажите Groq API Key в Настройках для использования распознавания речи Whisper', 'error');
+            return;
+          }
+
+          setIsTranscribing(true);
+          try {
+            const transcribedText = await api.transcribe_audio(base64Audio, keyToUse);
+            if (transcribedText.trim()) {
+              setInputText((prev) => (prev ? `${prev} ${transcribedText}` : transcribedText));
+              showToast('Речь успешно распознана!', 'success');
             }
-          };
-        } catch (err: any) {
-          setIsTranscribing(false);
-          showToast(`Ошибка записи: ${err.message || err}`, 'error');
-        }
+          } catch (err: any) {
+            console.error('STT Transcription error:', err);
+            showToast(`Ошибка распознавания речи: ${err.message || err}`, 'error');
+          } finally {
+            setIsTranscribing(false);
+          }
+        };
+        reader.readAsDataURL(audioBlob);
       };
 
       mediaRecorder.start();
       setIsRecording(true);
-    } catch (err) {
-      showToast('Не удалось получить доступ к микрофону.', 'error');
+    } catch (err: any) {
+      console.error('Microphone access error:', err);
+      showToast('Не удалось получить доступ к микрофону', 'error');
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch (err) {
-        console.error('Stop recording error:', err);
-      }
-      setIsRecording(false);
-    }
-  };
-
-  const handleMicClick = () => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  };
-
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!inputText.trim() && attachedImages.length === 0) return;
-    isUserScrolledUpRef.current = false;
-    onSendMessage(inputText.trim(), attachedImages.length > 0 ? [...attachedImages] : undefined);
-    setInputText('');
-    setAttachedImages([]);
-  };
-
-  const hasMessages = messages && messages.length > 0;
+  const hasMessages = messages.length > 0;
 
   const renderAttachedImagesPreview = () => {
     if (attachedImages.length === 0) return null;
     return (
-      <div className="flex items-center gap-2.5 p-2 bg-slate-950/80 border border-white/10 rounded-xl overflow-x-auto my-1.5 scrollbar-thin">
-        {attachedImages.map((imgUrl, idx) => (
-          <div key={idx} className="relative group shrink-0 w-16 h-16 rounded-lg overflow-hidden border border-emerald-500/40 bg-slate-900 shadow-md">
-            <img src={imgUrl} alt={`Upload ${idx}`} className="w-full h-full object-cover" />
+      <div className="flex flex-wrap gap-2 p-2 bg-slate-950/60 rounded-lg border border-white/10 max-h-32 overflow-y-auto">
+        {attachedImages.map((img, idx) => (
+          <div key={idx} className="relative group shrink-0">
+            <img
+              src={img}
+              alt={`Прикрепленное изображение ${idx + 1}`}
+              className="w-14 h-14 object-cover rounded-md border border-white/20"
+            />
             <button
               type="button"
-              onClick={() => setAttachedImages((prev) => prev.filter((_, i) => i !== idx))}
-              className="absolute top-0.5 right-0.5 p-1 rounded-full bg-black/80 text-slate-300 hover:text-white hover:bg-rose-600 transition-colors"
-              title="Удалить изображение"
+              onClick={() => handleRemoveImage(idx)}
+              className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-rose-500 text-white shadow hover:bg-rose-600 cursor-pointer"
             >
               <X size={10} />
             </button>
@@ -300,67 +289,54 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     );
   };
 
-  const renderPlanningToggle = () => {
-    if (!onTogglePlanningMode) return null;
-    return (
-      <div className="flex items-center justify-center pt-2 select-none">
-        <label
-          onClick={onTogglePlanningMode}
-          className="flex items-center gap-2 text-xs text-slate-300 opacity-80 hover:opacity-100 cursor-pointer transition-opacity"
-        >
-          <div
-            className={`w-8 h-4 flex items-center rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
-              planningMode ? 'bg-emerald-500 justify-end' : 'bg-slate-700 justify-start'
+  const renderPlanningToggle = () => (
+    <div className="flex items-center justify-between px-2 pt-1 border-t border-white/5 text-[11px] text-slate-400 select-none">
+      <div className="flex items-center gap-2">
+        {onTogglePlanningMode && (
+          <button
+            type="button"
+            onClick={onTogglePlanningMode}
+            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-mono transition-colors cursor-pointer ${
+              planningMode
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-semibold'
+                : 'bg-white/[0.02] border-white/10 text-slate-500 hover:text-slate-300'
             }`}
+            title="Режим планирования: агент анализирует код и строит план перед внесением изменений"
           >
-            <div className="w-3 h-3 rounded-full bg-white shadow-md" />
-          </div>
-          <span className="font-medium text-[11px]">
-            Режим планирования:{' '}
-            <strong className={planningMode ? 'text-emerald-400' : 'text-slate-400'}>
-              {planningMode ? 'ВКЛ' : 'ВЫКЛ'}
-            </strong>
-          </span>
-        </label>
+            <Compass size={11} className={planningMode ? 'text-emerald-400' : 'text-slate-500'} />
+            <span>{planningMode ? 'Планирование: ВКЛ' : 'Планирование: ВЫКЛ'}</span>
+          </button>
+        )}
       </div>
-    );
-  };
+
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">Ctrl+Enter или Enter для отправки</span>
+      </div>
+    </div>
+  );
 
   const renderStreamingBanner = () => {
-    if (agentStatus !== 'thinking' && agentStatus !== 'executing_tool') return null;
+    if (!liveTelemetry || agentStatus !== 'thinking') return null;
     return (
-      <div className="self-start w-full max-w-full my-2 p-3 rounded-xl bg-slate-900/90 border border-emerald-500/30 text-xs text-slate-200 shadow-md space-y-2 font-sans">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 font-medium">
-            <RefreshCw size={13} className="animate-spin text-emerald-400" />
-            <span>
-              {agentStatus === 'thinking' ? 'Агент генерирует ответ...' : 'Агент выполняет инструмент...'}
-            </span>
-          </div>
-          {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
-            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/30 animate-pulse flex items-center gap-1">
+      <div className="p-3 rounded-xl bg-slate-900/90 border border-sky-500/30 text-xs font-mono text-slate-200 flex items-center justify-between gap-3 shadow-lg animate-pulse my-2">
+        <div className="flex items-center gap-2">
+          <RefreshCw size={14} className="animate-spin text-sky-400" />
+          <span className="text-sky-300 font-semibold">Генерация ответа ИИ...</span>
+        </div>
+        <div className="flex items-center gap-3 text-[10px] text-slate-400">
+          {liveTelemetry.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
+            <span className="text-emerald-400 font-bold flex items-center gap-1">
               <Zap size={11} />
               <span>{liveTelemetry.tokensPerSec} t/s</span>
             </span>
           )}
+          {liveTelemetry.contextUsed !== undefined && (
+            <span className="text-blue-300 flex items-center gap-1">
+              <Brain size={11} />
+              <span>{liveTelemetry.contextUsed.toLocaleString()} tok</span>
+            </span>
+          )}
         </div>
-
-        {liveTelemetry?.contextUsed !== undefined && (
-          <div className="space-y-1 pt-1 font-mono text-[11px] text-slate-400 border-t border-white/5">
-            <div className="flex justify-between items-center">
-              <span>Заполнение контекста: <strong className="text-slate-200">{liveTelemetry.contextUsed.toLocaleString()}</strong> / {liveTelemetry.contextMax?.toLocaleString()} tok</span>
-              <span className="text-blue-300 font-semibold">
-                {((liveTelemetry.contextUsed / (liveTelemetry.contextMax || 8192)) * 100).toFixed(1)}%
-              </span>
-            </div>
-            <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5">
-              <div
-                className="bg-emerald-400 h-full transition-all duration-300"
-                style={{ width: `${Math.min(100, (liveTelemetry.contextUsed / (liveTelemetry.contextMax || 8192)) * 100)}%` }}
-              />
-            </div>
-          </div>
-        )}
       </div>
     );
   };
@@ -368,54 +344,27 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const renderSummarizingBanner = () => {
     if (!isSummarizing) return null;
     return (
-      <div className="mx-4 my-2 p-3.5 rounded-xl bg-slate-950/90 border border-cyan-500/40 shadow-xl shadow-cyan-950/40 text-xs text-slate-100 flex flex-col gap-2 font-mono relative overflow-hidden backdrop-blur-md animate-pulse">
-        <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-cyan-500 via-emerald-400 to-purple-500" />
-        
+      <div className="p-3 rounded-xl bg-purple-950/80 border border-purple-500/40 text-xs font-mono text-purple-200 flex flex-col gap-1.5 shadow-lg my-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-cyan-400 animate-spin" />
-            <span className="font-bold text-cyan-300 tracking-wider">ФОНОВОЕ СЖАТИЕ КОНТЕКСТА...</span>
+            <Sparkles size={14} className="animate-spin text-purple-400" />
+            <span className="font-bold text-purple-300">{summarizePhase}</span>
           </div>
-
-          {summarizeMetrics.oldTokens !== undefined && (
-            <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/40 text-[11px] font-bold">
-              [{summarizeMetrics.oldTokens.toLocaleString()} → {summarizeMetrics.newTokens ? summarizeMetrics.newTokens.toLocaleString() : '...'} tok]
-            </span>
-          )}
+          <span className="text-[10px] font-bold text-purple-400">{summarizePercent}%</span>
         </div>
-
-        <div className="text-[11px] text-slate-300 font-sans flex items-center justify-between">
-          <span>{summarizePhase}</span>
-          <span className="text-cyan-400 font-mono font-bold">{summarizePercent}%</span>
-        </div>
-
-        <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-cyan-500/30 p-0.5">
+        <div className="w-full h-1.5 rounded-full bg-purple-900/60 overflow-hidden">
           <div
-            className="bg-gradient-to-r from-cyan-500 via-emerald-400 to-purple-500 h-full rounded-full transition-all duration-500"
+            className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-400 transition-all duration-300"
             style={{ width: `${summarizePercent}%` }}
           />
         </div>
-      </div>
-    );
-  };
-
-  const renderServerOfflineBanner = () => {
-    if (!isServerOffline) return null;
-    return (
-      <div className="mx-auto my-3 w-full max-w-xl p-3.5 rounded-xl bg-rose-950/80 border border-rose-500/40 text-xs text-rose-200 flex items-center justify-between gap-3 shadow-xl font-sans backdrop-blur-md">
-        <div className="flex items-center gap-2.5">
-          <AlertCircle size={16} className="text-rose-400 shrink-0 animate-pulse" />
-          <span className="font-semibold text-slate-100">Локальный ИИ-сервер llama.cpp не запущен</span>
-        </div>
-        {onStartServer && (
-          <button
-            type="button"
-            onClick={onStartServer}
-            className="flat-btn px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/50 font-semibold cursor-pointer flex items-center gap-1.5 text-xs transition-all shrink-0 shadow-md"
-          >
-            <Play size={13} />
-            <span>Запустить сервер</span>
-          </button>
+        {summarizeMetrics.oldTokens && (
+          <div className="text-[10px] text-purple-300/80 flex items-center justify-between">
+            <span>Сжатие контекста: {summarizeMetrics.oldTokens.toLocaleString()} токенов</span>
+            {summarizeMetrics.newTokens && (
+              <span className="text-emerald-400 font-bold">➔ {summarizeMetrics.newTokens.toLocaleString()} токенов</span>
+            )}
+          </div>
         )}
       </div>
     );
@@ -423,136 +372,178 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   return (
     <div
-      onPaste={handlePaste}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
-      className="flex-1 flex flex-col h-full bg-[#0b0c10] overflow-hidden relative select-text"
+      onPaste={handlePaste}
+      className={`w-full h-full flex flex-col overflow-hidden relative font-sans ${
+        isDraggingOver ? 'bg-sky-500/5 ring-2 ring-sky-500/40 ring-inset' : ''
+      }`}
     >
-      {/* Drag & Drop Visual Overlay */}
-      {isDraggingOver && (
-        <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex flex-col items-center justify-center border-2 border-dashed border-emerald-400/80 rounded-2xl m-3 select-none animate-pulse">
-          <ImageIcon size={48} className="text-emerald-400 mb-3" />
-          <div className="text-base font-bold text-slate-100">Перетащите изображения сюда</div>
-          <div className="text-xs text-slate-400 mt-1">Изображения будут отправлены локальной ИИ-модели для анализа</div>
-        </div>
-      )}
-
-      {/* Hidden File Input for Image Attachments */}
       <input
-        type="file"
         ref={imageFileInputRef}
-        onChange={handleImageFileChange}
+        type="file"
         accept="image/*"
         multiple
         className="hidden"
+        onChange={(e) => e.target.files && processImageFiles(e.target.files)}
       />
 
-      {/* 1. EMPTY CHAT WELCOME HERO VIEW */}
-      {!hasMessages && (
-        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center z-10 w-full max-w-3xl mx-auto my-auto font-sans">
-          
-          {/* Top Center Workspace Selector Dropdown */}
-          <div className="mb-8">
+      {/* OFFLINE LOCAL SERVER WARNING BANNER (Only displayed if a LOCAL model is active AND server is offline) */}
+      {showOfflineBanner && (
+        <div className="p-2.5 bg-rose-950/80 border-b border-rose-500/30 text-xs text-rose-200 flex items-center justify-between gap-3 shrink-0 z-20">
+          <div className="flex items-center gap-2">
+            <AlertCircle size={15} className="text-rose-400 shrink-0" />
+            <span>Локальный ИИ-сервер llama.cpp не запущен для модели <code className="font-mono text-white bg-black/40 px-1 py-0.5 rounded">{activeModelId}</code></span>
+          </div>
+          {onStartServer && (
             <button
               type="button"
-              onClick={onSelectWorkspace}
-              className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/20 text-slate-200 text-xs font-semibold shadow-sm transition-all cursor-pointer"
+              onClick={onStartServer}
+              className="flat-btn px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-semibold cursor-pointer flex items-center gap-1 text-xs shrink-0"
             >
-              <Folder size={14} className="text-emerald-400" />
-              <span>{getWorkspaceBaseName(workspaceDir)}</span>
-              <ChevronDown size={13} className="text-slate-400" />
+              <Play size={11} />
+              <span>Запустить сервер</span>
             </button>
-          </div>
+          )}
+        </div>
+      )}
 
-          {renderServerOfflineBanner()}
-          {renderSummarizingBanner()}
+      {/* 1. EMPTY CHAT STATE */}
+      {!hasMessages && (
+        <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto scrollbar-none">
+          <div className="w-full max-w-2xl space-y-6 text-center">
+            
+            {/* Hero Brand Icon & Title */}
+            <div className="space-y-3">
+              <div className="inline-flex items-center justify-center p-3.5 rounded-2xl bg-gradient-to-tr from-sky-500/20 to-purple-500/20 border border-white/15 shadow-xl backdrop-blur-xl">
+                <Sparkles size={28} className="text-sky-400 animate-pulse" />
+              </div>
 
-          {/* Floating Hero Card Prompt Box */}
-          <div className="w-full max-w-2xl bg-[#14151c]/90 border border-white/12 rounded-2xl p-4 shadow-2xl backdrop-blur-2xl space-y-3">
-            <form onSubmit={handleSubmit} className="space-y-3">
-              {renderAttachedImagesPreview()}
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                0xAgent <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400">Autonomous Developer</span>
+              </h1>
 
-              <textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                  }
-                }}
-                rows={2}
-                placeholder="Задайте вопрос, вставьте картинку (Ctrl+V) или перетащите файл..."
-                className="w-full bg-transparent text-slate-100 placeholder-slate-500 focus:outline-none text-xs sm:text-sm resize-none font-sans"
-              />
+              <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
+                Локальный автономный ИИ-ассистент. Поддержка вызова облачных моделей Google AI Studio и локальных .gguf файлов.
+              </p>
+            </div>
 
-              {/* Bottom bar inside hero input card */}
-              <div className="flex items-center justify-between pt-2 border-t border-white/5 text-xs">
-                
-                {/* Left side actions */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => imageFileInputRef.current?.click()}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-white/10 transition-colors cursor-pointer"
-                    title="Загрузить изображение для анализа моделью"
-                  >
-                    <ImageIcon size={16} />
-                  </button>
+            {/* Workspace & Model Selector Bar */}
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {onSelectWorkspace && (
+                <button
+                  type="button"
+                  onClick={onSelectWorkspace}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/20 text-xs text-slate-200 transition-colors cursor-pointer"
+                  title={workspaceDir || 'Выбрать папку проекта'}
+                >
+                  <Folder size={13} className="text-emerald-400" />
+                  <span className="font-mono text-xs">{getWorkspaceBaseName(workspaceDir)}</span>
+                </button>
+              )}
 
-                  <button
-                    type="button"
-                    onClick={onSelectWorkspace}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                    title="Прикрепить файл / контекст (@)"
-                  >
-                    <Plus size={16} />
-                  </button>
+              {/* IDE Glassmorphism Model Selector Dropdown */}
+              <ModelSelectorDropdown config={config || null} onModelChanged={onModelChanged} />
+            </div>
 
-                  <button
-                    type="button"
-                    onClick={onOpenModelPicker}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-white/[0.06] border border-white/10 hover:border-white/20 text-slate-200 text-xs font-medium cursor-pointer transition-colors"
-                  >
-                    <Cpu size={13} className="text-emerald-400" />
-                    <span className="truncate max-w-[170px] font-mono text-[11px]">
-                      {modelName || 'Local LLM Server'}
-                    </span>
-                    <Eye size={12} className="text-slate-400 ml-0.5" />
-                    <ChevronDown size={12} className="text-slate-400" />
-                  </button>
+            {/* Quick Action Prompt Suggestion Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left max-w-xl mx-auto pt-2">
+              <button
+                type="button"
+                onClick={() => setInputText('Создай новое веб-приложение React с современным стеклом и анимациями.')}
+                className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-sky-500/40 hover:bg-sky-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
+              >
+                <Code size={16} className="text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                <div>
+                  <div className="font-semibold text-slate-100">Создать веб-приложение</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Разработка интерфейса React с CSS-стилями</div>
                 </div>
+              </button>
 
-                {/* Right side microphone recording & submit */}
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleMicClick}
-                    className={`p-2 rounded-xl transition-colors cursor-pointer ${
-                      isRecording
-                        ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
-                        : 'text-slate-400 hover:text-white hover:bg-white/10'
-                    }`}
-                    title="Голосовой ввод"
-                  >
-                    {isRecording ? <Square size={16} /> : <Mic size={16} />}
-                  </button>
+              <button
+                type="button"
+                onClick={() => setInputText('Проведи аудит безопасности и найди баги в активном проекте.')}
+                className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
+              >
+                <ShieldAlert size={16} className="text-purple-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                <div>
+                  <div className="font-semibold text-slate-100">Поиск и исправление багов</div>
+                  <div className="text-[10px] text-slate-400 mt-0.5">Анализ кода, типов и потенциальных уязвимостей</div>
+                </div>
+              </button>
+            </div>
 
-                  {(inputText.trim() || attachedImages.length > 0) && (
+            {/* Input Form Box */}
+            <div className="pt-2">
+              <form onSubmit={handleSubmit} className="w-full max-w-xl mx-auto flex flex-col gap-2 p-3 rounded-2xl glass-panel border border-white/15 shadow-2xl bg-[#0d0f17]/90 backdrop-blur-2xl">
+                {renderAttachedImagesPreview()}
+
+                <textarea
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
+                  placeholder="Задайте вопрос, опишите задачу, вставьте картинку (Ctrl+V) или перетащите файл..."
+                  rows={3}
+                  className="w-full p-2 bg-transparent text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none"
+                />
+
+                <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => imageFileInputRef.current?.click()}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-white/10 transition-colors cursor-pointer"
+                      title="Прикрепить изображение"
+                    >
+                      <ImageIcon size={15} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={onSelectWorkspace}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-white/10 transition-colors cursor-pointer"
+                      title="Выбрать рабочий каталог"
+                    >
+                      <Plus size={15} />
+                    </button>
+
+                    <ModelSelectorDropdown config={config || null} onModelChanged={onModelChanged} />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleMicClick}
+                      className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                        isRecording
+                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
+                          : 'text-slate-400 hover:text-white hover:bg-white/10'
+                      }`}
+                      title="Голосовой ввод"
+                    >
+                      {isRecording ? <Square size={15} /> : <Mic size={15} />}
+                    </button>
+
                     <button
                       type="submit"
-                      disabled={isTranscribing}
-                      className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition-all shadow-md cursor-pointer"
+                      disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
+                      className="flat-btn rounded-xl px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-sky-400 to-emerald-400 hover:from-sky-300 hover:to-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer shadow-md"
                     >
-                      <Send size={15} />
+                      <Send size={13} />
+                      <span>Отправить</span>
                     </button>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </form>
-          </div>
+              </form>
+            </div>
 
+          </div>
         </div>
       )}
 
@@ -570,7 +561,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               return (
                 <div key={msg.id} className="flex flex-col space-y-1 w-full select-text">
                   {msg.role === 'user' && (
-                    <div className="self-end max-w-[85%] rounded-xl glass-card border border-[var(--theme-accent)]/30 bg-[var(--theme-card-bg)] px-4 py-2.5 text-theme-text text-xs sm:text-sm leading-relaxed font-sans select-text shadow-md flex flex-col gap-2">
+                    <div className="self-end max-w-[85%] rounded-2xl glass-card border border-[var(--theme-accent)]/30 bg-[var(--theme-card-bg)] px-4 py-2.5 text-theme-text text-xs sm:text-sm leading-relaxed font-sans select-text shadow-md flex flex-col gap-2">
                       {msg.images && msg.images.length > 0 && (
                         <div className="flex flex-wrap gap-2 my-1">
                           {msg.images.map((imgUrl, i) => (
@@ -598,7 +589,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   )}
 
                   {msg.role === 'assistant' && (() => {
-                    let thinkText = "";
+                    let thinkText = '';
                     let bodyText = textOutput;
 
                     if (textOutput) {
@@ -606,22 +597,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       const match = textOutput.match(thinkRegex);
                       if (match) {
                         thinkText = match[1].trim();
-                        bodyText = textOutput.replace(thinkRegex, "").trim();
-                      } else if (textOutput.includes("<think>")) {
-                        const startIdx = textOutput.indexOf("<think>");
+                        bodyText = textOutput.replace(thinkRegex, '').trim();
+                      } else if (textOutput.includes('<think>')) {
+                        const startIdx = textOutput.indexOf('<think>');
                         thinkText = textOutput.substring(startIdx + 7).trim();
                         bodyText = textOutput.substring(0, startIdx).trim();
                       }
                     }
 
                     return (
-                      <div className="self-start max-w-[95%] w-full rounded-md glass-panel border border-white/10 p-4 text-slate-100 text-xs sm:text-sm leading-relaxed my-1.5 select-text">
+                      <div className="self-start max-w-[95%] w-full rounded-xl glass-panel border border-white/10 p-4 text-slate-100 text-xs sm:text-sm leading-relaxed my-1.5 select-text">
                         {reasoningEnabled && thinkText && (
-                          <details open className="mb-3 border border-white/10 rounded bg-slate-950/40 overflow-hidden group">
+                          <details open className="mb-3 border border-white/10 rounded-lg bg-slate-950/40 overflow-hidden group">
                             <summary className="px-3 py-1.5 text-[11px] font-medium text-slate-300 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
                               <span className="flex items-center gap-1.5 text-purple-300 font-semibold">
                                 <Sparkles size={12} className="text-purple-400" />
-                                Ход мыслей локальной модели
+                                Ход мыслей модели
                               </span>
                               <span className="text-[10px] text-slate-500 group-open:rotate-180 transition-transform">▼</span>
                             </summary>
@@ -630,7 +621,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                             </div>
                           </details>
                         )}
-                          <NotionMarkdown content={bodyText} />
+                        <NotionMarkdown content={bodyText} />
 
                         {msg.tool_calls && msg.tool_calls.length > 1 && (() => {
                           let totalAdds = 0;
@@ -720,20 +711,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {renderAttachedImagesPreview()}
 
             <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2">
-              <div className="relative flex-1 flex items-center">
+              <div className="relative flex-1 flex items-center gap-2">
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   placeholder="Задайте вопрос, вставьте картинку (Ctrl+V) или перетащите файл..."
-                  className="w-full pl-4 pr-16 py-2.5 rounded-lg flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
+                  className="w-full pl-4 pr-24 py-2.5 rounded-xl flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
                 />
 
-                <div className="absolute right-2.5 flex items-center gap-1">
+                <div className="absolute right-2.5 flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => imageFileInputRef.current?.click()}
-                    className="p-1 rounded text-slate-400 hover:text-emerald-400 transition-colors cursor-pointer"
+                    className="p-1 rounded text-slate-400 hover:text-sky-400 transition-colors cursor-pointer"
                     title="Прикрепить изображение"
                   >
                     <ImageIcon size={16} />
@@ -749,6 +740,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   >
                     {isRecording ? <Square size={16} /> : <Mic size={16} />}
                   </button>
+
+                  <ModelSelectorDropdown config={config || null} onModelChanged={onModelChanged} />
                 </div>
               </div>
 
@@ -756,7 +749,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <button
                   type="button"
                   onClick={onCancelAgent}
-                  className="flat-btn rounded-md px-3.5 py-2.5 text-xs font-semibold text-rose-400 border-rose-500/30 hover:bg-rose-500/10 cursor-pointer flex items-center gap-1.5 shrink-0"
+                  className="flat-btn rounded-xl px-3.5 py-2.5 text-xs font-semibold text-rose-400 border-rose-500/30 hover:bg-rose-500/10 cursor-pointer flex items-center gap-1.5 shrink-0"
                 >
                   <Square size={13} />
                   <span>Стоп</span>
@@ -765,7 +758,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <button
                   type="submit"
                   disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
-                  className="flat-btn rounded-md px-4 py-2.5 text-xs font-medium text-emerald-400 hover:text-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer border-emerald-500/30"
+                  className="flat-btn rounded-xl px-4 py-2.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-sky-400 to-emerald-400 hover:from-sky-300 hover:to-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer shadow-md"
                 >
                   <Send size={14} />
                 </button>

@@ -9,7 +9,6 @@ import { ChatArea } from './components/ChatArea';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { CodeEditor } from './components/CodeEditor';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
-import { ModelPickerModal } from './components/ModelPickerModal';
 import { WorkspacePickerModal } from './components/WorkspacePickerModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { LockScreen } from './components/LockScreen';
@@ -26,7 +25,6 @@ export default function App() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
-  const [isModelPickerOpen, setIsModelPickerOpen] = useState<boolean>(false);
   const [isWorkspacePickerOpen, setIsWorkspacePickerOpen] = useState<boolean>(false);
 
 
@@ -736,7 +734,8 @@ export default function App() {
                   workspaceDir={config?.workspace_dir}
                   onSelectWorkspace={handleSelectWorkspace}
                   modelName={config?.model_name}
-                  onOpenModelPicker={() => setIsModelPickerOpen(true)}
+                  config={config}
+                  onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
                 />
               </div>
             </div>
@@ -761,7 +760,8 @@ export default function App() {
                 workspaceDir={config?.workspace_dir}
                 onSelectWorkspace={handleSelectWorkspace}
                 modelName={config?.model_name}
-                onOpenModelPicker={() => setIsModelPickerOpen(true)}
+                config={config}
+                onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
               />
             </div>
           )}
@@ -799,25 +799,6 @@ export default function App() {
       <MemorySkillsModal
         isOpen={isMemorySkillsOpen}
         onClose={() => setIsMemorySkillsOpen(false)}
-      />
-
-      {/* GGUF MODEL PICKER MODAL */}
-      <ModelPickerModal
-        isOpen={isModelPickerOpen}
-        onClose={() => setIsModelPickerOpen(false)}
-        onSelectModel={async (filePath, metadata) => {
-          const mName = metadata?.modelName || filePath.split(/[/\\]/).pop() || filePath;
-          const updated = {
-            ...config!,
-            model_name: mName,
-            local_server: {
-              ...config?.local_server,
-              model_path: filePath,
-            },
-          };
-          await handleSaveConfig(updated);
-        }}
-        initialDir={config?.models_path || undefined}
       />
 
       {/* WORKSPACE DIRECTORY PICKER MODAL */}

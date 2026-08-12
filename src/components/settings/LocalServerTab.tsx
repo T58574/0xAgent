@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Cpu, Play, Square, Folder, AlertTriangle, Zap, Activity, Search } from 'lucide-react';
+import { Cpu, Play, Square, Folder, AlertTriangle, Zap, Activity } from 'lucide-react';
 import { GgufMetadata, HardwareInfo } from '../../types';
-import { ModelPickerModal } from '../ModelPickerModal';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { LlamaInstallerSection } from './localServer/LlamaInstallerSection';
@@ -151,7 +150,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   // Metadata, Hardware, Slots, Modal, Adviser
   const [modelMeta, setModelMeta] = useState<GgufMetadata | null>(null);
   const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | null>(null);
-  const [isPickerModalOpen, setIsPickerModalOpen] = useState(false);
   const [healthStatus, setHealthStatus] = useState<'ok' | 'loading' | 'stopped'>('stopped');
   const [slotMetrics, setSlotMetrics] = useState<{ totalSlots: number; activeSlots: number }>({ totalSlots: 0, activeSlots: 0 });
   const [crashAdvice, setCrashAdvice] = useState<string | null>(null);
@@ -615,24 +613,14 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 <label className="text-xs font-semibold text-slate-200">
                   Файл GGUF Модели (.gguf)
                 </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsPickerModalOpen(true)}
-                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30"
-                  >
-                    <Search size={12} />
-                    <span>Сканер моделей</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSelectModel}
-                    className="text-[11px] text-sky-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer font-normal"
-                  >
-                    <Folder size={12} />
-                    <span>Обзор...</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleSelectModel}
+                  className="text-[11px] text-sky-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer font-normal"
+                >
+                  <Folder size={12} />
+                  <span>Обзор...</span>
+                </button>
               </div>
               <input
                 type="text"
@@ -748,13 +736,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
         </div>
 
       </div>
-
-      {/* Model Picker Modal */}
-      <ModelPickerModal
-        isOpen={isPickerModalOpen}
-        onClose={() => setIsPickerModalOpen(false)}
-        onSelectModel={(selectedPath) => setModelPath(selectedPath)}
-      />
     </div>
   );
 };
