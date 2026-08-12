@@ -1,14 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { SkillInfo } from '../src/types';
 
-export interface SkillInfo {
-  name: string;
-  filename: string;
-  title: string;
-  description: string;
-  updatedAt: number;
-}
+export type { SkillInfo };
 
 const APP_DIR = path.join(os.homedir(), '.0xagent');
 const SKILLS_DIR = path.join(APP_DIR, 'skills');

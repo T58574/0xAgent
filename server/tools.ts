@@ -97,7 +97,6 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
     const currentContentClean = currentContent.replace(/\r\n/g, '\n');
 
     if (!currentContentClean.includes(searchBlockClean)) {
-      // Fallback 1: try normalized line matching (trimming trailing whitespace)
       const normSearch = searchBlockClean.split('\n').map((l) => l.trimEnd()).join('\n');
       const normCurrent = currentContentClean.split('\n').map((l) => l.trimEnd()).join('\n');
 
@@ -108,7 +107,6 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
         continue;
       }
 
-      // Fallback 2: try fully trimmed line matching
       const trimSearch = searchBlockClean.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
       const currentLines = currentContentClean.split('\n');
       let foundIndex = -1;
@@ -132,7 +130,7 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
 
       throw new Error(
         `Could not find the SEARCH block in file: \n\`\`\`\n${searchBlock}\n\`\`\`\n\n` +
-        `[SYSTEM HINT]: The exact SEARCH block was not found. Use <read_file path="${pathStr}" /> to inspect the file's current lines and whitespace before retrying <patch_file> or <write_file>.`
+        `[SYSTEM HINT]: The exact SEARCH block was not found. Use <read_file path="${pathStr}" /> to inspect current content before patching.`
       );
     }
 
@@ -199,14 +197,29 @@ export function executeListDir(workspaceDir: string | null | undefined, pathStr:
   }
 
   let result = list.join('\n');
-
-  // Automatic Context Loading: If target directory contains 0xagent.md, load it into context immediately
   const localContext = find0xAgentContext(targetPath);
   if (localContext) {
     result += `\n\n📌 [AUTOMATIC CONTEXT LOADED FROM ${path.basename(localContext.filePath)} IN ${targetPath}]:\n${localContext.content}`;
   }
 
   return result;
+}
+
+const IGNORED_DIRS = new Set(['.git', 'node_modules', 'target', 'dist', 'build', '.idea', '.vscode']);
+
+function searchSingleFile(filePath: string, regex: RegExp, results: string[], maxResults = 100): void {
+  try {
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const lines = content.split(/\r?\n/);
+    for (let i = 0; i < lines.length; i++) {
+      if (regex.test(lines[i])) {
+        results.push(`${filePath}:${i + 1}: ${lines[i].trim()}`);
+        if (results.length >= maxResults) break;
+      }
+    }
+  } catch {
+    // Ignore binary / unreadable files
+  }
 }
 
 export function executeGrepSearch(workspaceDir: string | null | undefined, patternStr: string, pathStr: string): string {
@@ -219,47 +232,31 @@ export function executeGrepSearch(workspaceDir: string | null | undefined, patte
   const results: string[] = [];
 
   function walkDir(dir: string, depth: number) {
-    if (depth > 8 || results.length > 100) return;
+    if (depth > 8 || results.length >= 100) return;
+    let entries: fs.Dirent[];
     try {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (results.length > 100) return;
-        const fullPath = path.join(dir, entry.name);
-
-        if (entry.isDirectory()) {
-          if (['.git', 'node_modules', 'target', 'dist', 'build', '.idea', '.vscode'].includes(entry.name)) {
-            continue;
-          }
-          walkDir(fullPath, depth + 1);
-        } else if (entry.isFile()) {
-          try {
-            const content = fs.readFileSync(fullPath, 'utf-8');
-            const lines = content.split(/\r?\n/);
-            for (let i = 0; i < lines.length; i++) {
-              if (regex.test(lines[i])) {
-                results.push(`${fullPath}:${i + 1}: ${lines[i].trim()}`);
-                if (results.length > 100) break;
-              }
-            }
-          } catch {
-            // Ignore binary / unreadable files
-          }
-        }
-      }
+      entries = fs.readdirSync(dir, { withFileTypes: true });
     } catch {
-      // Ignore directory access errors
+      return;
+    }
+
+    for (const entry of entries) {
+      if (results.length >= 100) break;
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        if (!IGNORED_DIRS.has(entry.name)) {
+          walkDir(fullPath, depth + 1);
+        }
+      } else if (entry.isFile()) {
+        searchSingleFile(fullPath, regex, results);
+      }
     }
   }
 
   const stat = fs.statSync(targetPath);
   if (stat.isFile()) {
-    const content = fs.readFileSync(targetPath, 'utf-8');
-    const lines = content.split(/\r?\n/);
-    for (let i = 0; i < lines.length; i++) {
-      if (regex.test(lines[i])) {
-        results.push(`${targetPath}:${i + 1}: ${lines[i].trim()}`);
-      }
-    }
+    searchSingleFile(targetPath, regex, results);
   } else {
     walkDir(targetPath, 0);
   }
@@ -270,7 +267,6 @@ export function executeGrepSearch(workspaceDir: string | null | undefined, patte
 export function executeShellCommand(workspaceDir: string | null | undefined, commandStr: string): Promise<string> {
   return new Promise((resolve) => {
     let cleanCmd = commandStr.trim();
-    // Strip redundant powershell -Command "cd '...'; ..." wrapper if present
     const psWrapperRegex = /^powershell(?:\.exe)?\s+(?:-[a-zA-Z]+\s+)*-Command\s+["'](.*)["']$/is;
     const match = psWrapperRegex.exec(cleanCmd);
     if (match) {
@@ -287,7 +283,6 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
     let stderr = '';
     let isTimedOut = false;
 
-    // 30-second timeout guard to prevent infinite process hangs
     const timeoutTimer = setTimeout(() => {
       isTimedOut = true;
       try {
@@ -301,8 +296,7 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
       const partialOutput = (stdout + (stderr ? `\n--- STDERR ---\n${stderr}` : '')).trim();
       resolve(
         `⚠️ Ошибка: Команда превысила 30-секундный лимит и была принудительно остановлена.\n` +
-        `Полученный вывод до останова:\n${partialOutput || '(Вывод отсутствует)'}\n\n` +
-        `[СИСТЕМНОЕ ПРЕДУПРЕЖДЕНИЕ ДЛЯ АГЕНТА]: Запрещено запускать фоновые бессрочные dev-серверы (например, 'npm run dev' или 'vite') через <execute_command>, так как они никогда не завершаются сами. Используйте одноразовые команды сборки или тестов (например 'npm run build' или 'npx tsc').`
+        `Полученный вывод до останова:\n${partialOutput || '(Вывод отсутствует)'}\n`
       );
     }, 30000);
 
@@ -359,14 +353,10 @@ export function getWorkspaceTree(workspaceDir?: string | null): FileNode[] {
           children: isDir ? readDirRecursive(fullPath, depth + 1) : null,
         });
       }
-    } catch (err) {
-      console.error(`Error reading tree directory ${dir}:`, err);
-    }
+    } catch {}
 
     nodes.sort((a, b) => {
-      if (a.is_dir !== b.is_dir) {
-        return a.is_dir ? -1 : 1;
-      }
+      if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
       return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
     });
 
@@ -376,74 +366,55 @@ export function getWorkspaceTree(workspaceDir?: string | null): FileNode[] {
   return readDirRecursive(workspaceDir, 0);
 }
 
+async function runPowerShellDialogScript(psScript: string): Promise<string | null> {
+  if (process.platform !== 'win32') return null;
+  return new Promise((resolve) => {
+    try {
+      const buf = Buffer.from(psScript, 'utf-16le');
+      const base64 = buf.toString('base64');
+      const { execFile } = require('node:child_process');
+      execFile('powershell', ['-Sta', '-NoProfile', '-EncodedCommand', base64], { encoding: 'utf-8' }, (err: any, stdout: string) => {
+        if (err) {
+          console.error('Failed to open native Windows dialog:', err);
+          resolve(null);
+        } else {
+          const res = (stdout || '').trim();
+          resolve(res.length > 0 ? res : null);
+        }
+      });
+    } catch (err) {
+      console.error('Failed to open native Windows dialog:', err);
+      resolve(null);
+    }
+  });
+}
+
 export async function selectWorkspaceNative(): Promise<string | null> {
-  if (process.platform === 'win32') {
-    return new Promise((resolve) => {
-      try {
-        const psScript = `
-          [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null
-          $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
-          $dialog.Description = "Выберите папку Workspace для 0xAgent"
-          $dialog.ShowNewFolderButton = $true
-          $result = $dialog.ShowDialog()
-          if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-              Write-Output $dialog.SelectedPath
-          }
-        `;
-        const buf = Buffer.from(psScript, 'utf-16le');
-        const base64 = buf.toString('base64');
-        const { execFile } = require('node:child_process');
-        execFile('powershell', ['-Sta', '-NoProfile', '-EncodedCommand', base64], { encoding: 'utf-8' }, (err: any, stdout: string) => {
-          if (err) {
-            console.error('Failed to open native Windows folder dialog:', err);
-            resolve(null);
-          } else {
-            const folder = (stdout || '').trim();
-            resolve(folder.length > 0 ? folder : null);
-          }
-        });
-      } catch (err) {
-        console.error('Failed to open native Windows folder dialog:', err);
-        resolve(null);
-      }
-    });
-  }
-  return null;
+  const psScript = `
+    [System.Reflection.Assembly]::LoadWithPartialName("System.windows.forms") | Out-Null
+    $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
+    $dialog.Description = "Выберите папку Workspace для 0xAgent"
+    $dialog.ShowNewFolderButton = $true
+    $result = $dialog.ShowDialog()
+    if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+        Write-Output $dialog.SelectedPath
+    }
+  `;
+  return runPowerShellDialogScript(psScript);
 }
 
 export async function selectFileNative(filter?: string): Promise<string | null> {
-  if (process.platform === 'win32') {
-    return new Promise((resolve) => {
-      try {
-        const filterStr = filter || "All Files (*.*)|*.*|Executables (*.exe)|*.exe|GGUF Models (*.gguf)|*.gguf";
-        const psScript = `
-          Add-Type -AssemblyName System.Windows.Forms
-          $dialog = New-Object System.Windows.Forms.OpenFileDialog
-          $dialog.Title = "Select File"
-          $dialog.Filter = "${filterStr}"
-          $result = $dialog.ShowDialog()
-          if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
-              Write-Output $dialog.FileName
-          }
-        `;
-        const buf = Buffer.from(psScript, 'utf-16le');
-        const base64 = buf.toString('base64');
-        const { execFile } = require('node:child_process');
-        execFile('powershell', ['-Sta', '-NoProfile', '-EncodedCommand', base64], { encoding: 'utf-8' }, (err: any, stdout: string) => {
-          if (err) {
-            console.error('Failed to open native Windows file dialog:', err);
-            resolve(null);
-          } else {
-            const filePath = (stdout || '').trim();
-            resolve(filePath.length > 0 ? filePath : null);
-          }
-        });
-      } catch (err) {
-        console.error('Failed to open native Windows file dialog:', err);
-        resolve(null);
-      }
-    });
-  }
-  return null;
+  const filterStr = filter || "All Files (*.*)|*.*|Executables (*.exe)|*.exe|GGUF Models (*.gguf)|*.gguf";
+  const psScript = `
+    Add-Type -AssemblyName System.Windows.Forms
+    $dialog = New-Object System.Windows.Forms.OpenFileDialog
+    $dialog.Title = "Select File"
+    $dialog.Filter = "${filterStr}"
+    $result = $dialog.ShowDialog()
+    if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+        Write-Output $dialog.FileName
+    }
+  `;
+  return runPowerShellDialogScript(psScript);
 }
 

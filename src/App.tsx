@@ -600,6 +600,28 @@ export default function App() {
 
   const isSplitMode = activeView === 'workspace' || (activeView === 'chat' && selectedFile !== null);
 
+  const renderChatComponent = () => (
+    <ChatArea
+      messages={currentSession ? currentSession.messages : []}
+      agentStatus={agentStatus}
+      onSendMessage={handleSendMessage}
+      onRespondToTool={handleRespondToTool}
+      onCancelAgent={handleCancelAgent}
+      reasoningEnabled={config?.reasoning_enabled !== false}
+      groqApiKey={config?.groq_api_key}
+      liveTelemetry={liveTelemetry}
+      planningMode={config?.planning_mode !== false}
+      onTogglePlanningMode={handleTogglePlanningMode}
+      isServerOffline={isServerOffline}
+      onStartServer={handleStartServer}
+      workspaceDir={config?.workspace_dir}
+      onSelectWorkspace={handleSelectWorkspace}
+      modelName={config?.model_name}
+      config={config}
+      onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
+    />
+  );
+
   return (
     <div className="fixed inset-0 h-[100dvh] flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans">
       
@@ -718,25 +740,7 @@ export default function App() {
                 className="h-full overflow-hidden flex flex-col flex-1"
                 style={{ width: `${100 - splitLeftWidthPercent}%` }}
               >
-                <ChatArea
-                  messages={currentSession ? currentSession.messages : []}
-                  agentStatus={agentStatus}
-                  onSendMessage={handleSendMessage}
-                  onRespondToTool={handleRespondToTool}
-                  onCancelAgent={handleCancelAgent}
-                  reasoningEnabled={config?.reasoning_enabled !== false}
-                  groqApiKey={config?.groq_api_key}
-                  liveTelemetry={liveTelemetry}
-                  planningMode={config?.planning_mode !== false}
-                  onTogglePlanningMode={handleTogglePlanningMode}
-                  isServerOffline={isServerOffline}
-                  onStartServer={handleStartServer}
-                  workspaceDir={config?.workspace_dir}
-                  onSelectWorkspace={handleSelectWorkspace}
-                  modelName={config?.model_name}
-                  config={config}
-                  onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
-                />
+                {renderChatComponent()}
               </div>
             </div>
           )}
@@ -744,25 +748,7 @@ export default function App() {
           {/* FULL SCREEN CHAT MODE (When no split view active) */}
           {!isSplitMode && activeView === 'chat' && (
             <div className="w-full h-full flex flex-col overflow-hidden">
-              <ChatArea
-                messages={currentSession ? currentSession.messages : []}
-                agentStatus={agentStatus}
-                onSendMessage={handleSendMessage}
-                onRespondToTool={handleRespondToTool}
-                onCancelAgent={handleCancelAgent}
-                reasoningEnabled={config?.reasoning_enabled !== false}
-                groqApiKey={config?.groq_api_key}
-                liveTelemetry={liveTelemetry}
-                planningMode={config?.planning_mode !== false}
-                onTogglePlanningMode={handleTogglePlanningMode}
-                isServerOffline={isServerOffline}
-                onStartServer={handleStartServer}
-                workspaceDir={config?.workspace_dir}
-                onSelectWorkspace={handleSelectWorkspace}
-                modelName={config?.model_name}
-                config={config}
-                onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
-              />
+              {renderChatComponent()}
             </div>
           )}
 

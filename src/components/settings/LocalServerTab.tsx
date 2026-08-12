@@ -231,7 +231,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       timer = setInterval(async () => {
         try {
           const h = await api.get_server_health(host, port);
-          setHealthStatus(h.status as any);
+          setHealthStatus(h.status === 'ok' || h.status === 'loading' ? h.status : 'stopped');
           if (h.ok) {
             const s = await api.get_server_slots(host, port);
             setSlotMetrics({ totalSlots: s.totalSlots, activeSlots: s.activeSlots });

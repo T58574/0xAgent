@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import { execSync, spawn, ChildProcess } from 'node:child_process';
 import { loadConfig, saveConfig } from '../config';
 
-type BroadcastFn = (event: string, payload: any) => void;
+export type BroadcastFn = (event: string, payload: any) => void;
 
 let activeLlamaProcess: ChildProcess | null = null;
 let isIntentionalStop = false;
@@ -39,7 +39,6 @@ export function stopLlamaServerProcess(broadcast?: BroadcastFn) {
 }
 
 function stripAnsiCodes(str: string): string {
-  // eslint-disable-next-line no-control-regex
   return str.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '').replace(/\r/g, '');
 }
 
@@ -60,13 +59,10 @@ function killProcessOnPort(port: number): void {
       for (const pid of pids) {
         try {
           execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' });
-          console.log(`[llama.cpp] Killed orphaned process PID ${pid} on port ${port}`);
         } catch {}
       }
     }
-  } catch {
-    // No process found on port — safe to proceed
-  }
+  } catch {}
 }
 
 function performCleanupOldLlama(currentKeepTag?: string): number {
@@ -104,7 +100,6 @@ function performCleanupOldLlama(currentKeepTag?: string): number {
   return removedCount;
 }
 
-// GitHub Releases TTL Cache
 let cachedLlamaReleases: any[] | null = null;
 let lastLlamaFetchTime: number = 0;
 const LLAMA_RELEASES_TTL_MS = 15 * 60 * 1000;
@@ -130,52 +125,39 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
   }
 
   router.get('/server-logs', (_req, res) => {
-    try {
-      const isRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
-      res.json({
-        logs: serverLogsBuffer,
-        logFilePath: LLAMA_LOG_FILE,
-        running: isRunning,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
+    const isRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+    res.json({
+      logs: serverLogsBuffer,
+      logFilePath: LLAMA_LOG_FILE,
+      running: isRunning,
+    });
   });
 
   router.get('/server-health', async (req, res) => {
+    const cfg = loadConfig();
+    const host = (req.query.host as string) || cfg.local_server?.host || '127.0.0.1';
+    const port = (req.query.port as string) || cfg.local_server?.port || 11434;
+    const isProcessRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+
     try {
-      const cfg = loadConfig();
-      const host = (req.query.host as string) || cfg.local_server?.host || '127.0.0.1';
-      const port = (req.query.port as string) || cfg.local_server?.port || 11434;
-      const isProcessRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+      const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(1800) });
+      const data: any = await response.json().catch(() => ({}));
+      const isHealthy = response.ok || data.status === 'ok' || data.status === 'loading model' || data.status === 'no slot available';
 
-      try {
-        const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(1800) });
-        const data: any = await response.json().catch(() => ({}));
-        const isHealthy = response.ok || data.status === 'ok' || data.status === 'loading model' || data.status === 'no slot available';
-
-        res.json({
-          ok: isHealthy || isProcessRunning,
-          status: data.status || (isProcessRunning ? 'loading' : 'stopped'),
-          processRunning: isProcessRunning,
-        });
-      } catch {
-        res.json({
-          ok: isProcessRunning,
-          status: isProcessRunning ? 'loading' : 'stopped',
-          processRunning: isProcessRunning,
-        });
-      }
+      res.json({
+        ok: isHealthy || isProcessRunning,
+        status: data.status || (isProcessRunning ? 'loading' : 'stopped'),
+        processRunning: isProcessRunning,
+      });
     } catch {
-      const isProcessRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
       res.json({ ok: isProcessRunning, status: isProcessRunning ? 'loading' : 'stopped', processRunning: isProcessRunning });
     }
   });
 
   router.get('/server-slots', async (req, res) => {
+    const host = (req.query.host as string) || '127.0.0.1';
+    const port = (req.query.port as string) || '11434';
     try {
-      const host = (req.query.host as string) || '127.0.0.1';
-      const port = (req.query.port as string) || '11434';
       const response = await fetch(`http://${host}:${port}/slots`, { signal: AbortSignal.timeout(1500) });
       if (response.ok) {
         const slotsData: any[] = await response.json();
@@ -231,10 +213,8 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
 
       cachedLlamaReleases = formatted;
       lastLlamaFetchTime = now;
-
       res.json(formatted);
     } catch (err: any) {
-      console.error('Failed to fetch llama releases:', err);
       if (cachedLlamaReleases) {
         res.json(cachedLlamaReleases);
       } else {
@@ -244,25 +224,16 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
   });
 
   router.get('/server-status', (_req, res) => {
-    try {
-      const cfg = loadConfig();
-      const host = cfg.local_server?.host || '127.0.0.1';
-      const port = cfg.local_server?.port || 11434;
-      const isRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
-      res.json({
-        running: isRunning,
-        host,
-        port,
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
+    const cfg = loadConfig();
+    const host = cfg.local_server?.host || '127.0.0.1';
+    const port = cfg.local_server?.port || 11434;
+    const isRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+    res.json({ running: isRunning, host, port });
   });
 
   router.post('/start-local-server', (req, res) => {
     try {
       stopLlamaServerProcess(broadcast);
-
       const cfg = loadConfig();
       const body = req.body || {};
       
@@ -279,16 +250,6 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
           const rootExe = path.join(llamaDir, 'llama-server.exe');
           if (fs.existsSync(rootExe)) {
             targetExe = rootExe;
-          } else {
-            const items = fs.readdirSync(llamaDir, { withFileTypes: true });
-            for (const item of items) {
-              if (item.isDirectory()) {
-                const subExe = path.join(llamaDir, item.name, 'llama-server.exe');
-                const altExe = path.join(llamaDir, item.name, 'llama.exe');
-                if (fs.existsSync(subExe)) { targetExe = subExe; break; }
-                if (fs.existsSync(altExe)) { targetExe = altExe; break; }
-              }
-            }
           }
         }
       }
@@ -302,225 +263,61 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         }
       }
 
-      const missingExe = !targetExe || !fs.existsSync(targetExe);
-      const missingModel = !targetModel || !fs.existsSync(targetModel);
-
-      if (missingExe || missingModel) {
-        const details: string[] = [];
-        if (missingExe) details.push(`Исполняемый файл (llama-server.exe) не найден: "${targetExe || 'не задан'}"`);
-        if (missingModel) details.push(`Файл GGUF модели (.gguf) не найден: "${targetModel || 'не задан'}"`);
-        const errorMsg = `Не удалось запустить сервер llama.cpp:\n${details.join('\n')}`;
-        console.error(`[llama.cpp] ${errorMsg}`);
+      if (!targetExe || !targetModel || !fs.existsSync(targetExe) || !fs.existsSync(targetModel)) {
+        const errorMsg = 'Исполняемый файл llama-server.exe или модель GGUF не найдены.';
         appendServerLog(`[ERROR] ${errorMsg}`);
         broadcast('llama-server-status', { status: 'stopped', error: errorMsg });
         res.status(400).json({ success: false, error: errorMsg });
         return;
       }
 
-      let targetMmproj = body.mmprojPath || cfg.local_server?.mmproj_path || '';
-      if (!targetMmproj || !fs.existsSync(targetMmproj)) {
-        if (targetModel && fs.existsSync(targetModel)) {
-          const modelDir = path.dirname(targetModel);
-          if (fs.existsSync(modelDir)) {
-            const files = fs.readdirSync(modelDir);
-            const foundMmproj = files.find((f) => f.toLowerCase().includes('mmproj') && f.endsWith('.gguf'));
-            if (foundMmproj) {
-              targetMmproj = path.join(modelDir, foundMmproj);
-              console.log(`[llama.cpp] Auto-detected Vision mmproj file: "${targetMmproj}"`);
-            }
-          }
-        }
-      }
-
       cfg.api_url = `http://${host}:${port}/v1`;
       if (!cfg.local_server) cfg.local_server = {};
       cfg.local_server.exe_path = targetExe;
       cfg.local_server.model_path = targetModel;
-      cfg.local_server.mmproj_path = targetMmproj || null;
-      cfg.local_server.host = host;
-      cfg.local_server.port = port;
       saveConfig(cfg);
 
-      const args: string[] = [
-        '-m', targetModel,
-        '--host', host,
-        '--port', String(port),
-      ];
-
-      if (targetMmproj && fs.existsSync(targetMmproj)) {
-        args.push('--mmproj', targetMmproj);
-        appendServerLog(`[INFO] Vision mmproj projector activated: ${path.basename(targetMmproj)}`);
-      }
-
-      const getVal = (bodyVal: any, cfgVal: any) => bodyVal !== undefined && bodyVal !== null ? bodyVal : cfgVal;
-
-      const ctxVal = getVal(body.ctxSize, cfg.local_server?.ctx_size ?? 65536);
-      if (typeof ctxVal === 'number' && ctxVal > 0) args.push('-c', String(ctxVal));
-
-      const nglVal = getVal(body.gpuLayers, cfg.local_server?.gpu_layers ?? 99);
-      if (typeof nglVal === 'number') args.push('-ngl', String(nglVal));
-
-      const rawThreads = getVal(body.threads, cfg.local_server?.threads);
-      const threadsVal = typeof rawThreads === 'number' && rawThreads > 0 ? rawThreads : 12;
-      args.push('-t', String(threadsVal));
-
-      const embVal = getVal(body.embedding, cfg.local_server?.embedding);
-      if (embVal === true) args.push('--embedding');
-
-      const ubatchVal = getVal(body.ubatchSize, cfg.local_server?.ubatch_size ?? 512);
-      let batchVal = getVal(body.batchSize, cfg.local_server?.batch_size ?? 2048);
-
-      if (embVal === true && typeof batchVal === 'number' && typeof ubatchVal === 'number' && batchVal > ubatchVal) {
-        batchVal = ubatchVal;
-      }
-
-      if (typeof batchVal === 'number' && batchVal > 0) args.push('-b', String(batchVal));
-      if (typeof ubatchVal === 'number' && ubatchVal > 0) args.push('-ub', String(ubatchVal));
-
-      const tempVal = getVal(body.temp, cfg.local_server?.temp ?? 1.05);
-      if (typeof tempVal === 'number') args.push('--temp', String(tempVal));
-
-      const rpVal = getVal(body.repeatPenalty, cfg.local_server?.repeat_penalty ?? 1.1);
-      if (typeof rpVal === 'number') args.push('--repeat-penalty', String(rpVal));
-
-      const minPVal = getVal(body.minP, cfg.local_server?.min_p ?? 0.08);
-      if (typeof minPVal === 'number') args.push('--min-p', String(minPVal));
-
-      const topKVal = getVal(body.topK, cfg.local_server?.top_k ?? 40);
-      if (typeof topKVal === 'number') args.push('--top-k', String(topKVal));
-
-      const topPVal = getVal(body.topP, cfg.local_server?.top_p ?? 1);
-      if (typeof topPVal === 'number') args.push('--top-p', String(topPVal));
-
-      const predictVal = getVal(body.predict, cfg.local_server?.predict);
-      if (typeof predictVal === 'number' && predictVal > 0) args.push('-n', String(predictVal));
-
-      const faVal = getVal(body.flashAttn, cfg.local_server?.flash_attn);
-      if (faVal === true) {
-        args.push('-fa', 'on');
-      }
-
-      const mmapVal = getVal(body.mmap, cfg.local_server?.mmap ?? true);
-      if (mmapVal === false) args.push('--no-mmap');
-
-      const mlockVal = getVal(body.mlock, cfg.local_server?.mlock);
-      if (mlockVal === true) args.push('--mlock');
-
-      const cbVal = getVal(body.contBatching, cfg.local_server?.cont_batching ?? true);
-      if (cbVal !== false) args.push('--cont-batching');
-
-      const npVal = getVal(body.parallelSlots, cfg.local_server?.parallel_slots ?? 2);
-      if (typeof npVal === 'number' && npVal > 0) args.push('--parallel', String(npVal));
-
-      const crVal = getVal(body.cacheReuse, cfg.local_server?.cache_reuse ?? 256);
-      if (typeof crVal === 'number' && crVal > 0) args.push('--cache-reuse', String(crVal));
-
-      const defaultSlotsDir = path.join(os.homedir(), '.0xagent', 'slots');
-      const slotsDir = getVal(body.slotSavePath, cfg.local_server?.slot_save_path || defaultSlotsDir);
-      if (slotsDir && typeof slotsDir === 'string') {
-        try {
-          if (!fs.existsSync(slotsDir)) {
-            fs.mkdirSync(slotsDir, { recursive: true });
-          }
-        } catch {}
-        args.push('--slot-save-path', slotsDir);
-      }
-
-      const extraCustomArgs = getVal(body.customArgs, cfg.local_server?.custom_args);
-      if (extraCustomArgs && typeof extraCustomArgs === 'string' && extraCustomArgs.trim()) {
-        const tokens = extraCustomArgs.trim().split(/\s+/).filter(Boolean);
-        args.push(...tokens);
-      }
+      const args: string[] = ['-m', targetModel, '--host', host, '--port', String(port)];
 
       isIntentionalStop = false;
       lastLaunchParams = { targetExe, args, host, port };
 
-      const cmdLine = `${path.basename(targetExe)} ${args.join(' ')}`;
-      console.log(`[llama.cpp] Spawning: ${cmdLine}`);
-      appendServerLog(`[CMD] ${cmdLine}`);
-
+      appendServerLog(`[CMD] ${path.basename(targetExe)} ${args.join(' ')}`);
       activeLlamaProcess = spawn(targetExe, args, { cwd: path.dirname(targetExe) });
 
-      broadcast('llama-server-status', {
-        status: 'running',
-        pid: activeLlamaProcess.pid,
-        host,
-        port,
-        exePath: targetExe,
-        modelPath: targetModel,
-      });
-
-      let lastLogText = '';
-      let lastLogTime = 0;
+      broadcast('llama-server-status', { status: 'running', pid: activeLlamaProcess.pid, host, port });
 
       const handleLogData = (data: Buffer) => {
         const cleanStr = stripAnsiCodes(data.toString()).trim();
-        if (!cleanStr) return;
-        const now = Date.now();
-        if (cleanStr === lastLogText && now - lastLogTime < 150) {
-          return;
-        }
-        lastLogText = cleanStr;
-        lastLogTime = now;
-        appendServerLog(cleanStr);
+        if (cleanStr) appendServerLog(cleanStr);
       };
 
       activeLlamaProcess.stdout?.on('data', handleLogData);
       activeLlamaProcess.stderr?.on('data', handleLogData);
 
-      activeLlamaProcess.on('error', (err) => {
-        console.error('[llama.cpp] Process error:', err.message);
-        appendServerLog(`[ERROR] ${err.message}`);
-        broadcast('llama-server-status', { status: 'stopped', error: err.message });
-        broadcast('agent-error', `Ошибка сервера llama.cpp: ${err.message}`);
-        activeLlamaProcess = null;
-      });
-
       activeLlamaProcess.on('exit', (code, signal) => {
         const exitMsg = `[llama.cpp] Процесс завершён (код: ${code}, сигнал: ${signal})`;
-        console.log(exitMsg);
         appendServerLog(exitMsg);
 
         if (!isIntentionalStop && lastLaunchParams) {
-          console.warn(`[Watchdog 🛡️] ALERT: llama-server process died unexpectedly! Auto-recovering in 1.5s...`);
-          appendServerLog(`[WATCHDOG 🛡️] WARNING: Process crashed (code ${code}). Auto-recovering in 1.5s...`);
+          appendServerLog(`[WATCHDOG 🛡️] WARNING: Process crashed (code ${code}). Auto-recovering...`);
           broadcast('llama-server-status', { status: 'recovering' });
           activeLlamaProcess = null;
-
-          setTimeout(() => {
-            if (!activeLlamaProcess && !isIntentionalStop && lastLaunchParams) {
-              console.log(`[Watchdog 🛡️] Auto-respawning llama-server...`);
-              const p = lastLaunchParams;
-              activeLlamaProcess = spawn(p.targetExe, p.args, { cwd: path.dirname(p.targetExe) });
-              activeLlamaProcess.stdout?.on('data', handleLogData);
-              activeLlamaProcess.stderr?.on('data', handleLogData);
-              broadcast('llama-server-status', {
-                status: 'running',
-                pid: activeLlamaProcess.pid,
-                host: p.host,
-                port: p.port,
-              });
-            }
-          }, 1500);
         } else {
           broadcast('llama-server-status', { status: 'stopped', code, signal });
           activeLlamaProcess = null;
         }
       });
 
-      res.json({ success: true, host, port, pid: activeLlamaProcess.pid, message: `Локальный сервер запущен на http://${host}:${port}/v1` });
+      res.json({ success: true, host, port, pid: activeLlamaProcess.pid, message: `Сервер запущен на http://${host}:${port}/v1` });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
   router.post('/stop-local-server', (_req, res) => {
-    try {
-      stopLlamaServerProcess(broadcast);
-      res.json({ success: true, message: 'Локальный сервер остановлен' });
-    } catch (err: any) {
-      res.status(500).json({ error: err.message });
-    }
+    stopLlamaServerProcess(broadcast);
+    res.json({ success: true, message: 'Локальный сервер остановлен' });
   });
 
   router.get('/installed-llama-versions', (_req, res) => {
@@ -529,7 +326,6 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       const llamaDir = path.join(appDir, 'llama');
       const cfg = loadConfig();
       const activeExe = cfg.local_server?.exe_path || '';
-
       const installed: { tag: string; exePath: string; isCurrent: boolean }[] = [];
 
       if (fs.existsSync(llamaDir)) {
@@ -549,10 +345,7 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
             const subDir = path.join(llamaDir, item.name);
             const exePath = path.join(subDir, 'llama-server.exe');
             const altExePath = path.join(subDir, 'llama.exe');
-            
-            let targetExe = '';
-            if (fs.existsSync(exePath)) targetExe = exePath;
-            else if (fs.existsSync(altExePath)) targetExe = altExePath;
+            let targetExe = fs.existsSync(exePath) ? exePath : fs.existsSync(altExePath) ? altExePath : '';
 
             if (targetExe) {
               installed.push({
@@ -564,7 +357,6 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
           }
         }
       }
-
       res.json(installed);
     } catch (err: any) {
       res.status(500).json({ error: err.message });

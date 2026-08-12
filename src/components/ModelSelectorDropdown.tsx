@@ -15,6 +15,42 @@ import { AppConfig, AvailableModelsResponse } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
+interface LocalModelOptionProps {
+  model: any;
+  isActive: boolean;
+  onSelect: (id: string) => void;
+}
+
+const LocalModelOptionItem: React.FC<LocalModelOptionProps> = ({ model, isActive, onSelect }) => (
+  <button
+    type="button"
+    onClick={() => onSelect(model.id)}
+    className={`w-full px-2.5 py-2 rounded-lg border transition-all text-left flex items-center justify-between gap-2 cursor-pointer ${
+      isActive
+        ? 'bg-purple-500/15 border-purple-500/40 text-white font-medium shadow-[0_0_10px_rgba(168,85,247,0.15)]'
+        : 'bg-white/[0.02] border-transparent hover:bg-white/[0.06] hover:border-white/10 text-slate-300'
+    }`}
+  >
+    <div className="flex items-center gap-2 min-w-0">
+      <HardDrive size={14} className={isActive ? 'text-purple-400' : 'text-slate-400'} />
+      <div className="truncate">
+        <div className="text-xs font-semibold truncate">{model.title}</div>
+        <div className="text-[10px] text-slate-400 font-mono truncate">{model.fileName}</div>
+      </div>
+    </div>
+
+    <div className="flex items-center gap-1.5 shrink-0">
+      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
+        {model.quantization}
+      </span>
+      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-white/10">
+        {model.sizeGB}
+      </span>
+      {isActive && <Check size={14} className="text-purple-400 ml-1" />}
+    </div>
+  </button>
+);
+
 interface ModelSelectorDropdownProps {
   config: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
@@ -121,28 +157,9 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     return id;
   };
 
-  const getDisplayBadge = (id: string): { label: string; color: string } => {
-    const cloudMatch = modelsData.cloud.find((m) => m.id === id);
-    if (cloudMatch) {
-      if (cloudMatch.badge === 'Ultra Fast') return { label: 'Ultra Fast', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10' };
-      if (cloudMatch.badge === 'Fast') return { label: 'Fast', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' };
-      return { label: 'Medium', color: 'text-sky-400 border-sky-500/30 bg-sky-500/10' };
-    }
 
-    const localMatch = modelsData.local.find((m) => m.id === id || m.fileName === id || `local:${m.fileName}` === id);
-    if (localMatch) {
-      return { label: `${localMatch.quantization} • ${localMatch.sizeGB}`, color: 'text-purple-300 border-purple-500/30 bg-purple-500/10' };
-    }
-
-    if (id.startsWith('local:')) {
-      return { label: 'Local GGUF', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10' };
-    }
-
-    return { label: 'Cloud', color: 'text-sky-400 border-sky-500/30 bg-sky-500/10' };
-  };
 
   const isLocalActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
-  const activeBadge = getDisplayBadge(activeModelId);
 
   // Filtering lists
   const filteredCloud = modelsData.cloud.filter((m) =>
@@ -179,59 +196,46 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
         )}
 
         <span className="font-semibold text-xs text-slate-100 truncate max-w-[150px] sm:max-w-[200px]">
-          {getDisplayTitle(activeModelId)}
+          {activeModelId}
         </span>
-
-        {/* Speed / Quant Badge */}
-        <span
-          className={`text-[10px] px-1.5 py-0.5 rounded font-mono font-medium border shrink-0 hidden sm:inline-block ${activeBadge.color}`}
-        >
-          {activeBadge.label}
-        </span>
-
-        <ChevronDown size={13} className={`text-slate-400 transition-transform duration-200 ${isOpen ? 'rotate-180 text-sky-400' : ''}`} />
+        <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
-      {/* Glassmorphism Dropdown Popup */}
       {isOpen && (
-        <div
-          className="absolute left-0 sm:right-0 sm:left-auto top-full mt-2 w-80 sm:w-96 rounded-xl border border-white/15 bg-[#0d0f17]/95 backdrop-blur-2xl shadow-2xl shadow-black/80 z-50 overflow-hidden text-xs text-slate-200"
-          style={{ animation: 'fadeSlideDown 0.15s ease-out' }}
-        >
-          {/* Header & Search */}
-          <div className="p-3 border-b border-white/10 bg-slate-900/80 space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Sliders size={13} className="text-sky-400" />
-                <span className="font-bold text-slate-100 tracking-wide text-[11px] uppercase">Выбор ИИ Модели</span>
-              </div>
-
-              <button
-                type="button"
-                onClick={fetchModels}
-                disabled={loading}
-                className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer disabled:opacity-50"
-                title="Обновить список .gguf моделей"
-              >
-                <RefreshCw size={12} className={loading ? 'animate-spin text-sky-400' : ''} />
-              </button>
+        <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-slate-950/95 border border-white/15 shadow-2xl backdrop-blur-xl z-50 overflow-hidden font-sans">
+          {/* Header */}
+          <div className="p-3 border-b border-white/10 bg-slate-900/40 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-semibold text-white">
+              <Sliders size={14} className="text-sky-400" />
+              <span>Выбор модели ИИ</span>
             </div>
+            <button
+              type="button"
+              onClick={fetchModels}
+              disabled={loading}
+              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+            >
+              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
 
-            <div className="relative">
-              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          {/* Search Bar */}
+          <div className="p-2 border-b border-white/10 bg-slate-900/20">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-white/10 text-xs">
+              <Search size={13} className="text-slate-400 shrink-0" />
               <input
                 type="text"
+                placeholder="Поиск модели..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Поиск по названию или кванту..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500/50"
+                className="w-full bg-transparent text-white placeholder-slate-500 focus:outline-none text-xs"
               />
             </div>
           </div>
 
           {/* Model Lists */}
           <div className="max-h-[360px] overflow-y-auto p-2 space-y-3 scrollbar-none">
-            {/* Section 1: Cloud AI (Google AI Studio) */}
+            {/* Section 1: Cloud AI */}
             <div>
               <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-400/90">
                 <Cloud size={12} />
@@ -284,7 +288,7 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
               </div>
             </div>
 
-            {/* Section 2: Local llama.cpp (models/*.gguf) */}
+            {/* Section 2: Local llama.cpp */}
             <div>
               <div className="flex items-center justify-between px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-purple-400/90">
                 <div className="flex items-center gap-1.5">
@@ -307,34 +311,12 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
                   filteredLocal.map((model) => {
                     const isActive = activeModelId === model.id || activeModelId === model.fileName || activeModelId === `local:${model.fileName}`;
                     return (
-                      <button
+                      <LocalModelOptionItem
                         key={model.id}
-                        type="button"
-                        onClick={() => handleSelectModel(model.id)}
-                        className={`w-full px-2.5 py-2 rounded-lg border transition-all text-left flex items-center justify-between gap-2 cursor-pointer ${
-                          isActive
-                            ? 'bg-purple-500/15 border-purple-500/40 text-white font-medium shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-                            : 'bg-white/[0.02] border-transparent hover:bg-white/[0.06] hover:border-white/10 text-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <HardDrive size={14} className={isActive ? 'text-purple-400' : 'text-slate-400'} />
-                          <div className="truncate">
-                            <div className="text-xs font-semibold truncate">{model.title}</div>
-                            <div className="text-[10px] text-slate-400 font-mono truncate">{model.fileName}</div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
-                            {model.quantization}
-                          </span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-white/10">
-                            {model.sizeGB}
-                          </span>
-                          {isActive && <Check size={14} className="text-purple-400 ml-1" />}
-                        </div>
-                      </button>
+                        model={model}
+                        isActive={isActive}
+                        onSelect={handleSelectModel}
+                      />
                     );
                   })
                 )}

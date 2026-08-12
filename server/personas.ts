@@ -3,25 +3,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { v4 as uuidv4 } from 'uuid';
 
+import { PersonaMetadata, PersonaDetail } from '../src/types';
 import { loadUnifiedToolsMdContent } from './toolsConfig';
 
-export interface PersonaMetadata {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  user_id: string;
-  is_active: boolean;
-  created_at: number;
-  updated_at: number;
-}
-
-export interface PersonaDetail {
-  metadata: PersonaMetadata;
-  soul: string;
-  tools: string;
-  user: string;
-}
+export type { PersonaMetadata, PersonaDetail };
 
 const PERSONAS_DIR = path.join(os.homedir(), '.0xagent', 'personas');
 

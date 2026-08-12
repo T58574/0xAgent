@@ -14,36 +14,46 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onSelectTab,
   onCloseTab,
 }) => {
-  const highlightCode = (code: string) => {
-    if (!code) return '&nbsp;';
+  const renderSafeHighlightedLine = (code: string): React.ReactNode => {
+    if (!code) return '\u00A0';
 
-    const escapeHtml = (str: string) =>
-      str
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
+    // Regex matching comments, strings, keywords, function calls, numbers
+    const tokenRegex = /(\/\/.*|\/\*[\s\S]*?\*\/)|(["'].*?["'])|\b(const|let|var|function|return|import|export|from|default|class|interface|type|extends|implements|pub|struct|fn|impl|use|enum|match|if|else|for|while|async|await|true|false|null|undefined|void|string|number|boolean|any|as|in|of|mut|extern|crate|mod|where|dyn|static|self|Self)\b|\b([a-zA-Z_]\w*)(?=\()|\b(\d+)\b/g;
 
-    const escaped = escapeHtml(code);
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
 
-    let html = escaped;
+    while ((match = tokenRegex.exec(code)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(code.substring(lastIndex, match.index));
+      }
 
-    html = html.replace(/(\/\/.*)/g, '<span class="opacity-40 text-slate-400 italic">$1</span>');
-    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="opacity-40 text-slate-400 italic">$1</span>');
+      const [fullMatch, comment, stringLit, keyword, fnCall, numberLit] = match;
+      const key = `${match.index}-${fullMatch}`;
 
-    html = html.replace(/(["'&quot;&#39;])(.*?)\1/g, (_match, quote, content) => {
-      return `<span class="text-emerald-400 font-medium">${quote}${content}${quote}</span>`;
-    });
+      if (comment) {
+        parts.push(<span key={key} className="opacity-40 text-slate-400 italic">{comment}</span>);
+      } else if (stringLit) {
+        parts.push(<span key={key} className="text-emerald-400 font-medium">{stringLit}</span>);
+      } else if (keyword) {
+        parts.push(<span key={key} className="text-amber-400 font-medium">{keyword}</span>);
+      } else if (fnCall) {
+        parts.push(<span key={key} className="text-sky-400 font-medium">{fnCall}</span>);
+      } else if (numberLit) {
+        parts.push(<span key={key} className="text-emerald-300 font-medium">{numberLit}</span>);
+      } else {
+        parts.push(fullMatch);
+      }
 
-    const keywords = /\b(const|let|var|function|return|import|export|from|default|class|interface|type|extends|implements|pub|struct|fn|impl|use|enum|match|if|else|for|while|async|await|true|false|null|undefined|void|string|number|boolean|any|as|in|of|mut|extern|crate|mod|where|dyn|static|self|Self)\b/g;
-    html = html.replace(keywords, (match) => `<span class="text-amber-400 font-medium">${match}</span>`);
+      lastIndex = tokenRegex.lastIndex;
+    }
 
-    html = html.replace(/\b([a-zA-Z_]\w*)(?=\()/g, (match) => `<span class="text-sky-400 font-medium">${match}</span>`);
+    if (lastIndex < code.length) {
+      parts.push(code.substring(lastIndex));
+    }
 
-    html = html.replace(/\b(\d+)\b/g, (match) => `<span class="text-emerald-300 font-medium">${match}</span>`);
-
-    return html;
+    return parts.length > 0 ? parts : '\u00A0';
   };
 
   const lines = selectedFile ? selectedFile.content.split('\n') : [];
@@ -94,13 +104,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             <pre className="flex-1 pl-4 leading-5 select-text overflow-visible whitespace-pre m-0">
               <code>
                 {lines.map((line, i) => (
-                  <div
-                    key={i}
-                    className="h-5"
-                    dangerouslySetInnerHTML={{
-                      __html: highlightCode(line) || '&nbsp;',
-                    }}
-                  />
+                  <div key={i} className="h-5">
+                    {renderSafeHighlightedLine(line)}
+                  </div>
                 ))}
               </code>
             </pre>

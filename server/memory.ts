@@ -1,15 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { MemoryItem } from '../src/types';
 
-export interface MemoryItem {
-  id: string;
-  key: string;
-  value: string;
-  category: 'user_preference' | 'project_convention' | 'architecture' | 'fact' | 'general';
-  createdAt: number;
-  updatedAt: number;
-}
+export type { MemoryItem };
 
 const APP_DIR = path.join(os.homedir(), '.0xagent');
 const MEMORY_FILE = path.join(APP_DIR, 'memory.json');
@@ -61,7 +55,8 @@ export function saveMemories(items: MemoryItem[]): void {
 export function addOrUpdateMemory(key: string, value: string, category?: string): MemoryItem {
   const memories = loadMemories();
   const validCategories: MemoryItem['category'][] = ['user_preference', 'project_convention', 'architecture', 'fact', 'general'];
-  const cat: MemoryItem['category'] = validCategories.includes(category as any) ? (category as MemoryItem['category']) : 'fact';
+  const isCategoryValid = (c: any): c is MemoryItem['category'] => validCategories.includes(c);
+  const cat: MemoryItem['category'] = isCategoryValid(category) ? category : 'fact';
   const existingIdx = memories.findIndex(m => m.key.toLowerCase() === key.toLowerCase());
 
   const now = Date.now();

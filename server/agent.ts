@@ -33,103 +33,21 @@ export const FALLBACK_CHAIN: string[] = [
   'gemini-3.5-flash-lite',
 ];
 
-/**
- * Sanitizes LLM response content by removing drafts, metadata headers,
- * reasoning fluff, and converting LaTeX arrows to standard unicode arrows.
- */
-export function strip_ai_reasoning_fluff(text: string): string {
-  if (!text) return text;
-  let cleaned = text;
-
-  // 1. Remove draft headers like "Draft 1:", "Draft 2:", "[Draft 1]"
-  cleaned = cleaned.replace(/^(?:Draft\s*\d+:?|\[Draft\s*\d+\])/gim, '');
-
-  // 2. Remove metadata header lines: "Constraints: ...", "Topic: ...", "Closing: ..."
-  cleaned = cleaned.replace(/^(?:Constraints|Topic|Closing)\s*:\s*.*$/gim, '');
-
-  // 3. Convert LaTeX arrows to standard arrows
-  cleaned = cleaned.replace(/\$\s*\\rightarrow\s*\$/gi, '→');
-  cleaned = cleaned.replace(/\\rightarrow/gi, '→');
-  cleaned = cleaned.replace(/\$\s*\\Rightarrow\s*\$/gi, '⇒');
-  cleaned = cleaned.replace(/\\Rightarrow/gi, '⇒');
-
-  // 4. Remove service headers and thinking fluff
-  cleaned = cleaned.replace(/^(?:Thinking Process|Reasoning Fluff|Draft Notes):\s*/gim, '');
-
-  return cleaned;
-}
-
-
-import { parseToolCalls, ParsedToolCall } from './agent/toolParser';
+import { strip_ai_reasoning_fluff } from './agent/fluffSanitizer';
 import { pruneMessagesForContext, detectRepetitionLoop } from './agent/contextManager';
+import { parseToolCalls } from './agent/toolParser';
+import {
+  PendingConfirmation,
+  activeConfirmations,
+  activeCancelTokens,
+  activeRunningLoops,
+  handleAgentError,
+  respondToToolConfirmation,
+  cancelAgentSession,
+} from './agent/agentState';
 
-export { parseToolCalls, pruneMessagesForContext, detectRepetitionLoop };
-export type { ParsedToolCall };
-
-export interface PendingConfirmation {
-  sessionId: string;
-  toolCallId: string;
-  resolve: (approved: boolean | string) => void;
-}
-
-// Global active confirmations map and cancellation tokens
-const activeConfirmations = new Map<string, PendingConfirmation>();
-const activeCancelTokens = new Set<string>();
-const activeRunningLoops = new Set<string>();
-
-export function handleAgentError(
-  session: any,
-  sessionId: string,
-  broadcast: (event: string, payload: any) => void,
-  errMsg: string
-): void {
-  session.messages.push({
-    id: uuidv4(),
-    role: 'assistant',
-    content: errMsg,
-    timestamp: Date.now(),
-  });
-  session.updated_at = Date.now();
-  saveSession(session);
-  broadcast('agent-error', { sessionId, message: errMsg });
-  broadcast('agent-status-changed', 'idle');
-}
-
-export function respondToToolConfirmation(sessionId: string, toolCallId: string, approve: boolean | string): boolean {
-  const key = `${sessionId}:${toolCallId}`;
-  let pending = activeConfirmations.get(key);
-
-  if (!pending) {
-    // Fallback: search by toolCallId alone in case sessionId desynchronized
-    for (const [k, p] of activeConfirmations.entries()) {
-      if (p.toolCallId === toolCallId || k.endsWith(`:${toolCallId}`)) {
-        pending = p;
-        activeConfirmations.delete(k);
-        break;
-      }
-    }
-  } else {
-    activeConfirmations.delete(key);
-  }
-
-  if (pending) {
-    pending.resolve(approve);
-    return true;
-  }
-  return false;
-}
-
-export function cancelAgentSession(sessionId: string): void {
-  activeCancelTokens.add(sessionId);
-
-  // Cancel any pending tool confirmation for this session
-  for (const [key, pending] of activeConfirmations.entries()) {
-    if (pending.sessionId === sessionId) {
-      pending.resolve(false);
-      activeConfirmations.delete(key);
-    }
-  }
-}
+export { strip_ai_reasoning_fluff, handleAgentError, respondToToolConfirmation, cancelAgentSession };
+export type { PendingConfirmation };
 
 
 
@@ -311,21 +229,11 @@ ${activePersona.user}`;
             continue;
           }
           const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Нажмите кнопку **🚀 Запустить LLM Сервер в 1-клик** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
-          session.messages.push({
-            id: uuidv4(),
-            role: 'assistant',
-            content: errMsg,
-            timestamp: Date.now(),
-          });
-          session.updated_at = Date.now();
-          saveSession(session);
-          broadcast('agent-error', { sessionId, message: errMsg });
-          broadcast('agent-status-changed', 'idle');
+          handleAgentError(session, sessionId, broadcast, errMsg);
           return;
         }
       }
     } else {
-      // Cloud AI (Google AI Studio / Gemini API with Fallback Chain)
       const apiKey = config.gemini_api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || config.groq_api_key || '';
       
       if (!apiKey && !selectedModel.includes('localhost') && !selectedModel.includes('127.0.0.1')) {
@@ -334,7 +242,6 @@ ${activePersona.user}`;
         return;
       }
 
-      // Build model target candidate list (Fallback Chain)
       const modelCandidates = [selectedModel];
       for (const m of FALLBACK_CHAIN) {
         if (!modelCandidates.includes(m)) modelCandidates.push(m);
@@ -344,13 +251,12 @@ ${activePersona.user}`;
 
       for (const candidateModel of modelCandidates) {
         activeModelName = candidateModel;
-        console.log(`[agent] Trying Cloud AI model: ${candidateModel}`);
-
         const requestBody: any = {
           model: candidateModel,
           messages,
           stream: true,
           temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
+          max_tokens: config.max_tokens ?? 8192,
         };
 
         try {

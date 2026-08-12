@@ -1,44 +1,9 @@
 import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse } from '../types';
+import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
+
+export { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen };
 
 const API_BASE = '/api';
-
-type EventCallback = (eventData: { payload: any }) => void;
-const eventListeners = new Map<string, Set<EventCallback>>();
-let ws: WebSocket | null = null;
-let reconnectTimer: any = null;
-
-export function getStoredToken(): string {
-  return localStorage.getItem('0xagent_auth_token') || '';
-}
-
-export function setStoredToken(token: string): void {
-  localStorage.setItem('0xagent_auth_token', token);
-  reconnectWebSocket();
-}
-
-export function clearStoredToken(): void {
-  localStorage.removeItem('0xagent_auth_token');
-  if (ws) {
-    ws.close();
-    ws = null;
-  }
-}
-
-function getWsUrl(): string {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host; // includes hostname:port — goes through Vite proxy on 5173
-  const token = getStoredToken();
-  const query = token ? `?token=${encodeURIComponent(token)}` : '';
-  return `${protocol}//${host}/ws${query}`;
-}
-
-export function reconnectWebSocket() {
-  if (ws) {
-    ws.close();
-    ws = null;
-  }
-  initWebSocket();
-}
 
 async function authFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const token = getStoredToken();
@@ -48,46 +13,6 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
   }
   return fetch(url, { ...options, headers });
 }
-
-function initWebSocket() {
-  if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
-    return;
-  }
-
-  try {
-    ws = new WebSocket(getWsUrl());
-
-    ws.onmessage = (messageEvent) => {
-      try {
-        const { event, payload } = JSON.parse(messageEvent.data);
-        const listeners = eventListeners.get(event);
-        if (listeners) {
-          listeners.forEach((cb) => cb({ payload }));
-        }
-      } catch (err) {
-        console.error('Failed to parse WebSocket message:', err);
-      }
-    };
-
-    ws.onclose = () => {
-      ws = null;
-      if (!reconnectTimer) {
-        reconnectTimer = setTimeout(() => {
-          reconnectTimer = null;
-          initWebSocket();
-        }, 2000);
-      }
-    };
-
-    ws.onerror = () => {
-      if (ws) ws.close();
-    };
-  } catch (err) {
-    console.error('WebSocket connection error:', err);
-  }
-}
-
-initWebSocket();
 
 export async function get_auth_status(): Promise<{
   isPasswordSet: boolean;
@@ -148,17 +73,7 @@ export async function logout(): Promise<void> {
   clearStoredToken();
 }
 
-export function listen<T>(event: string, callback: (eventData: { payload: T }) => void): () => void {
-  if (!eventListeners.has(event)) {
-    eventListeners.set(event, new Set());
-  }
-  const listeners = eventListeners.get(event)!;
-  listeners.add(callback as EventCallback);
 
-  return () => {
-    listeners.delete(callback as EventCallback);
-  };
-}
 
 export async function get_config(): Promise<AppConfig> {
   const res = await authFetch(`${API_BASE}/config`);
@@ -571,6 +486,16 @@ export async function save_tools_md(content: string): Promise<ToolsState> {
 
 export async function get_available_models(): Promise<AvailableModelsResponse> {
   const res = await authFetch(`${API_BASE}/models`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function set_active_model(modelId: string): Promise<{ success: boolean; activeModelId: string }> {
+  const res = await authFetch(`${API_BASE}/models/active`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ modelId }),
+  });
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }

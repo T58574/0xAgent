@@ -7,8 +7,7 @@ export interface ParsedToolCall {
   raw_content: string;
 }
 
-export function parseToolCalls(text: string): ParsedToolCall[] {
-  const toolCalls: ParsedToolCall[] = [];
+function parseFileToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
   let match: RegExpExecArray | null;
 
   // 1. Read File
@@ -73,8 +72,12 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
       }
     }
   }
+}
 
-  // 4. List Dir
+function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
+  let match: RegExpExecArray | null;
+
+  // List Dir
   const reList = /<list_dir\s+path=["']([^"']+)["']\s*\/?>/gs;
   while ((match = reList.exec(text)) !== null) {
     toolCalls.push({
@@ -85,7 +88,7 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
     });
   }
 
-  // 5. Grep Search
+  // Grep Search
   const reGrep1 = /<grep_search\s+pattern=["']([^"']+)["']\s+path=["']([^"']+)["']\s*\/?>/gs;
   while ((match = reGrep1.exec(text)) !== null) {
     toolCalls.push({
@@ -109,7 +112,22 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
     }
   }
 
-  // 6. Execute Command
+  // Search Session History
+  const reSearchHist = /<search_session_history\s+query=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reSearchHist.exec(text)) !== null) {
+    toolCalls.push({
+      id: `search_hist_${uuidv4().substring(0, 8)}`,
+      name: 'search_session_history',
+      arguments: { query: match[1] },
+      raw_content: match[0],
+    });
+  }
+}
+
+function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
+  let match: RegExpExecArray | null;
+
+  // Execute Command
   const reExec = /<execute_command\s+command=["']([^"']+)["']\s*\/?>/gs;
   while ((match = reExec.exec(text)) !== null) {
     toolCalls.push({
@@ -130,7 +148,7 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
     });
   }
 
-  // 7. Ask User
+  // Ask User
   const reAsk = /<ask_user\s+question=["']([^"']+)["'](?:\s+options=["']([^"']+)["'])?\s*\/?>/gs;
   while ((match = reAsk.exec(text)) !== null) {
     let options: string[] | undefined = undefined;
@@ -145,18 +163,7 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
     });
   }
 
-  // 8. Search Session History
-  const reSearchHist = /<search_session_history\s+query=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reSearchHist.exec(text)) !== null) {
-    toolCalls.push({
-      id: `search_hist_${uuidv4().substring(0, 8)}`,
-      name: 'search_session_history',
-      arguments: { query: match[1] },
-      raw_content: match[0],
-    });
-  }
-
-  // 9. Run Scratch Script
+  // Run Scratch Script
   const reScratch = /<run_scratch_script\s+language=["']([^"']+)["']\s*>([\s\S]*?)<\/run_scratch_script>/gs;
   while ((match = reScratch.exec(text)) !== null) {
     toolCalls.push({
@@ -167,7 +174,7 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
     });
   }
 
-  // 10. Spawn Subagent
+  // Spawn Subagent
   const reSpawn = /<spawn_subagent\s+task=["']([^"']+)["'](?:\s+role=["']([^"']+)["'])?\s*\/?>/gs;
   while ((match = reSpawn.exec(text)) !== null) {
     toolCalls.push({
@@ -177,6 +184,12 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
       raw_content: match[0],
     });
   }
+}
 
+export function parseToolCalls(text: string): ParsedToolCall[] {
+  const toolCalls: ParsedToolCall[] = [];
+  parseFileToolCalls(text, toolCalls);
+  parseSearchAndDirToolCalls(text, toolCalls);
+  parseExecAndInteractiveToolCalls(text, toolCalls);
   return toolCalls;
 }

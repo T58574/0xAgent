@@ -1,16 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { ToolDefinition } from '../src/types';
 
-export interface ToolDefinition {
-  id: string;
-  name: string;
-  description: string;
-  category: 'files' | 'terminal' | 'memory' | 'skills' | 'sessions' | 'agents' | 'interactive';
-  requiresApproval: boolean;
-  enabled: boolean;
-  xmlSpec: string;
-}
+export type { ToolDefinition };
 
 export interface ToolsConfigState {
   toggles: Record<string, boolean>;

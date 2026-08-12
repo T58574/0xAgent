@@ -99,6 +99,6 @@ process.on('uncaughtException', (err) => {
 });
 
 server.listen(Number(PORT), '0.0.0.0', () => {
-  console.log(`🚀 0xAgent Local Server running at http://0.0.0.0:${PORT}`);
-  console.log(`🔌 WebSocket server listening on ws://0.0.0.0:${PORT}/ws`);
+  process.stdout.write(`🚀 0xAgent Local Server running at http://0.0.0.0:${PORT}\n`);
+  process.stdout.write(`🔌 WebSocket server listening on ws://0.0.0.0:${PORT}/ws\n`);
 });
