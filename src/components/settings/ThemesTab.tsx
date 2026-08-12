@@ -64,7 +64,7 @@ export const ThemesTab: React.FC<ThemesTabProps> = ({
           return (
             <div
               key={t.id}
-              onClick={() => onSelectTheme(t.id as any)}
+              onClick={() => onSelectTheme(t.id as 'obsidian' | 'cyber' | 'graphite' | 'matrix')}
               className={`p-4 rounded-md border cursor-pointer transition-all ${
                 isSelected
                   ? 'border-[var(--theme-accent,#10b981)] bg-white/[0.04] shadow-lg'

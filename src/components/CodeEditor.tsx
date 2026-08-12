@@ -15,26 +15,33 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onCloseTab,
 }) => {
   const highlightCode = (code: string) => {
-    let html = code;
+    if (!code) return '&nbsp;';
 
-    html = html.replace(/&/g, '&amp;')
-               .replace(/</g, '&lt;')
-               .replace(/>/g, '&gt;');
+    const escapeHtml = (str: string) =>
+      str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 
-    html = html.replace(/(\/\/.*)/g, '<span class="opacity-40 text-slate-400 italic" title="$1">$1</span>');
-    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="opacity-40 text-slate-400 italic" title="$1">$1</span>');
+    const escaped = escapeHtml(code);
 
-    html = html.replace(/(["'`])(.*?)\1/g, (_match, quote, content) => {
-      const safeContent = content.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-      return `<span class="text-emerald-400 font-medium" title="${quote}${safeContent}${quote}">${quote}${content}${quote}</span>`;
+    let html = escaped;
+
+    html = html.replace(/(\/\/.*)/g, '<span class="opacity-40 text-slate-400 italic">$1</span>');
+    html = html.replace(/(\/\*[\s\S]*?\*\/)/g, '<span class="opacity-40 text-slate-400 italic">$1</span>');
+
+    html = html.replace(/(["'&quot;&#39;])(.*?)\1/g, (_match, quote, content) => {
+      return `<span class="text-emerald-400 font-medium">${quote}${content}${quote}</span>`;
     });
 
-    const keywords = /\b(const|let|var|function|return|import|export|from|default|class|interface|type|extends|implements|pub|struct|fn|impl|use|enum|match|if|else|for|while|async|await|true|false|null|undefined|void|string|number|boolean|any|as|in|of|let|mut|extern|crate|mod|where|dyn|static|self|Self)\b/g;
-    html = html.replace(keywords, (match) => `<span class="text-amber-400 font-medium" title="${match}">${match}</span>`);
+    const keywords = /\b(const|let|var|function|return|import|export|from|default|class|interface|type|extends|implements|pub|struct|fn|impl|use|enum|match|if|else|for|while|async|await|true|false|null|undefined|void|string|number|boolean|any|as|in|of|mut|extern|crate|mod|where|dyn|static|self|Self)\b/g;
+    html = html.replace(keywords, (match) => `<span class="text-amber-400 font-medium">${match}</span>`);
 
-    html = html.replace(/\b([a-zA-Z_]\w*)(?=\()/g, (match) => `<span class="text-sky-400 font-medium" title="${match}()">${match}</span>`);
+    html = html.replace(/\b([a-zA-Z_]\w*)(?=\()/g, (match) => `<span class="text-sky-400 font-medium">${match}</span>`);
 
-    html = html.replace(/\b(\d+)\b/g, (match) => `<span class="text-emerald-300 font-medium" title="${match}">${match}</span>`);
+    html = html.replace(/\b(\d+)\b/g, (match) => `<span class="text-emerald-300 font-medium">${match}</span>`);
 
     return html;
   };

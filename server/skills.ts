@@ -74,7 +74,6 @@ export function listSkills(): SkillInfo[] {
       const stat = fs.statSync(fullPath);
       const content = fs.readFileSync(fullPath, 'utf-8');
 
-      // Extract title & description from markdown header
       let title = filename.replace(/\.(md|txt)$/i, '').replace(/_/g, ' ');
       title = title.charAt(0).toUpperCase() + title.slice(1);
 

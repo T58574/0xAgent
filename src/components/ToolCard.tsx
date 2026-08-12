@@ -18,6 +18,22 @@ interface ToolCardProps {
   onRespond: (toolId: string, approve: boolean | string) => void;
 }
 
+const DetailToggle: React.FC<{ isOpen: boolean; onToggle: () => void; labelOpen: string; labelClosed: string }> = ({
+  isOpen,
+  onToggle,
+  labelOpen,
+  labelClosed,
+}) => (
+  <button
+    type="button"
+    onClick={onToggle}
+    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+  >
+    <span>{isOpen ? labelOpen : labelClosed}</span>
+    {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+  </button>
+);
+
 function calculateDiffStats(toolName: string, args: Record<string, any>): { additions: number; deletions: number } {
   let additions = 0;
   let deletions = 0;
@@ -213,14 +229,12 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
 
         {tool.name === 'write_file' && (
           <div className="space-y-1.5">
-            <button
-              type="button"
-              onClick={() => setShowDetails(!showDetails)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              <span>{showDetails ? 'Скрыть содержимое файла' : 'Показать создаваемый файл'}</span>
-              {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            </button>
+            <DetailToggle
+              isOpen={showDetails}
+              onToggle={() => setShowDetails(!showDetails)}
+              labelOpen="Скрыть содержимое файла"
+              labelClosed="Показать создаваемый файл"
+            />
             {showDetails && (
               <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-3 border border-white/10 rounded-lg text-slate-300">
                 {parsedArgs.content}
@@ -231,14 +245,12 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
 
         {tool.name === 'patch_file' && (
           <div className="space-y-1.5">
-            <button
-              type="button"
-              onClick={() => setShowDetails(!showDetails)}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              <span>{showDetails ? 'Скрыть разницу строк (diff)' : 'Просмотреть изменения строк (diff)'}</span>
-              {showDetails ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-            </button>
+            <DetailToggle
+              isOpen={showDetails}
+              onToggle={() => setShowDetails(!showDetails)}
+              labelOpen="Скрыть разницу строк (diff)"
+              labelClosed="Просмотреть изменения строк (diff)"
+            />
             {showDetails && renderPatchDiffFormatted(parsedArgs.content)}
           </div>
         )}

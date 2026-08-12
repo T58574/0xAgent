@@ -78,7 +78,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const standaloneSessions = filteredSessions.filter((s) => !s.workspace_dir);
 
-  // Render Collapsed Bar Mode
+  const renderSessionItem = (session: ChatSession, isStandalone: boolean = false) => {
+    const isActive = session.id === currentSessionId;
+    const relTime = formatRelativeTime(session.updated_at);
+    return (
+      <div
+        key={session.id}
+        onClick={() => onSelectSession(session.id)}
+        className={`group p-2 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+          isActive
+            ? 'bg-white/15 text-white font-medium shadow-sm border border-white/20'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {isActive && (
+            <span
+              className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
+                isStandalone ? 'bg-cyan-400' : 'bg-emerald-400'
+              }`}
+            />
+          )}
+          <span className="truncate text-xs font-sans">{session.title}</span>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          {relTime && (
+            <span className="text-[10px] text-slate-500 font-mono group-hover:hidden">
+              {relTime}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={(e) => onDeleteSession(session.id, e)}
+            className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            title="Удалить сессию"
+          >
+            <Trash2 size={12} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!isOpen) {
     return (
       <aside className="w-12 h-full bg-[#0b0c10] border-r border-white/10 flex flex-col items-center justify-between py-3 z-20 shrink-0 font-sans select-none">
@@ -138,7 +180,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   }
 
-  // Render Full Expanded Sidebar Mode
   return (
     <aside className="w-64 md:w-72 h-full bg-[#0d0e12] border-r border-white/10 flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-xl text-slate-200">
       
@@ -287,42 +328,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {!isCollapsed && (
                 <div className="pl-3 space-y-0.5 border-l border-white/10 ml-3">
                   {projSessions.length > 0 ? (
-                    projSessions.map((session) => {
-                      const isActive = session.id === currentSessionId;
-                      const relTime = formatRelativeTime(session.updated_at);
-                      return (
-                        <div
-                          key={session.id}
-                          onClick={() => onSelectSession(session.id)}
-                          className={`group p-2 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
-                            isActive
-                              ? 'bg-white/15 text-white font-medium shadow-sm border border-white/20'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            {isActive && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
-                            <span className="truncate text-xs font-sans">{session.title}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1 shrink-0">
-                            {relTime && (
-                              <span className="text-[10px] text-slate-500 font-mono group-hover:hidden">
-                                {relTime}
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={(e) => onDeleteSession(session.id, e)}
-                              className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                              title="Удалить сессию"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })
+                    projSessions.map((session) => renderSessionItem(session, false))
                   ) : (
                     <div className="text-[11px] text-slate-500 italic py-1 px-2">Нет чатов в этом проекте</div>
                   )}
@@ -348,42 +354,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {!collapsedGroups['standalone'] && (
               <div className="pl-3 space-y-0.5 border-l border-white/10 ml-3">
-                {standaloneSessions.map((session) => {
-                  const isActive = session.id === currentSessionId;
-                  const relTime = formatRelativeTime(session.updated_at);
-                  return (
-                    <div
-                      key={session.id}
-                      onClick={() => onSelectSession(session.id)}
-                      className={`group p-2 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
-                        isActive
-                          ? 'bg-white/15 text-white font-medium shadow-sm border border-white/20'
-                          : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {isActive && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse shrink-0" />}
-                        <span className="truncate text-xs font-sans">{session.title}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1 shrink-0">
-                        {relTime && (
-                          <span className="text-[10px] text-slate-500 font-mono group-hover:hidden">
-                            {relTime}
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => onDeleteSession(session.id, e)}
-                          className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                          title="Удалить сессию"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                {standaloneSessions.map((session) => renderSessionItem(session, true))}
               </div>
             )}
           </div>

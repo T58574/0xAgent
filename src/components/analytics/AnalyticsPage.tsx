@@ -12,7 +12,6 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'high_speed' | 'high_context' | 'errors'>('all');
 
-  // Extract all assistant messages with metrics
   const allAssistantMessages = useMemo(() => {
     const msgs: Array<{ sessionTitle: string; sessionId: string; msg: ChatMessage }> = [];
     for (const session of sessions) {

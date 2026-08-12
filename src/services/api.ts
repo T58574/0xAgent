@@ -100,17 +100,21 @@ export async function get_auth_status(): Promise<{
   return res.json();
 }
 
-export async function setup_password(password: string): Promise<{ success: boolean; token?: string; error?: string }> {
-  const res = await fetch(`${API_BASE}/auth/setup`, {
+async function postAuthPayload<T>(endpoint: string, payload: Record<string, any>): Promise<T> {
+  const res = await fetch(`${API_BASE}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password }),
+    body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (res.ok && data.token) {
     setStoredToken(data.token);
   }
   return data;
+}
+
+export async function setup_password(password: string): Promise<{ success: boolean; token?: string; error?: string }> {
+  return postAuthPayload('/auth/setup', { password });
 }
 
 export async function login_password(password: string): Promise<{
@@ -121,16 +125,7 @@ export async function login_password(password: string): Promise<{
   remainingSec?: number;
   attemptsLeft?: number;
 }> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ password }),
-  });
-  const data = await res.json();
-  if (res.ok && data.token) {
-    setStoredToken(data.token);
-  }
-  return data;
+  return postAuthPayload('/auth/login', { password });
 }
 
 export async function change_password(currentPassword: string, newPassword: string): Promise<{ success: boolean; token?: string; error?: string }> {

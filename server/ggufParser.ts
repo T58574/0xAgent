@@ -37,13 +37,51 @@ enum GgufValueType {
   FLOAT64 = 12,
 }
 
+function readGgufKvPairs(buffer: Buffer, bytesRead: number, kvCount: number): Record<string, any> {
+  const rawKv: Record<string, any> = {};
+  let offset = 20;
+
+  for (let i = 0; i < kvCount && offset < bytesRead - 8; i++) {
+    try {
+      const keyLen = Number(buffer.readBigUInt64LE(offset));
+      offset += 8;
+      if (keyLen <= 0 || keyLen > 256 || offset + keyLen >= bytesRead) break;
+
+      const key = buffer.toString('utf-8', offset, offset + keyLen);
+      offset += keyLen;
+
+      if (offset + 4 >= bytesRead) break;
+      const valType = buffer.readUInt32LE(offset) as GgufValueType;
+      offset += 4;
+
+      const { value, newOffset } = parseGgufValue(buffer, offset, valType);
+      offset = newOffset;
+
+      rawKv[key] = value;
+    } catch {
+      break;
+    }
+  }
+  return rawKv;
+}
+
+function formatModelTitle(modelName: string, fileName: string): string {
+  let cleanTitle = modelName || fileName.replace(/\.gguf$/i, '');
+  cleanTitle = cleanTitle
+    .replace(/[-_.]?(Q\d_[A-Z0-9_]+|Q\d_K_[SML]|IQ\d_[A-Z0-9_]+|F16|F32|BF16)$/i, '')
+    .replace(/[-_.]?(Q\d_[A-Z0-9_]+|Q\d_K_[SML]|IQ\d_[A-Z0-9_]+|F16|F32|BF16)[-_.]/i, ' ')
+    .replace(/[-_]/g, ' ')
+    .trim();
+  if (!cleanTitle) cleanTitle = fileName.replace(/\.gguf$/i, '');
+  return cleanTitle;
+}
+
 export function parseGgufMetadata(filePath: string): GgufMetadata {
   const fileName = path.basename(filePath);
   const stats = fs.statSync(filePath);
   const fileSizeBytes = stats.size;
   const fileSizeFormatted = formatBytes(fileSizeBytes);
 
-  // Quick fallback default structure
   const result: GgufMetadata = {
     filePath,
     fileName,
@@ -64,98 +102,44 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
   let fd: number | null = null;
   try {
     fd = fs.openSync(filePath, 'r');
-    // Read first 1.5MB for GGUF metadata header
     const bufferSize = Math.min(1024 * 1024 * 1.5, fileSizeBytes);
     const buffer = Buffer.alloc(bufferSize);
     const bytesRead = fs.readSync(fd, buffer, 0, bufferSize, 0);
 
-    if (bytesRead < 12) {
-      return result;
-    }
+    if (bytesRead >= 12 && buffer.toString('ascii', 0, 4) === 'GGUF') {
+      result.magicValid = true;
+      result.version = buffer.readUInt32LE(4);
+      const kvCount = Number(buffer.readBigUInt64LE(12));
 
-    // Check GGUF magic (0x46554747) -> 'GGUF' ASCII
-    const magic = buffer.toString('ascii', 0, 4);
-    if (magic !== 'GGUF') {
-      return result;
-    }
+      result.rawKv = readGgufKvPairs(buffer, bytesRead, kvCount);
 
-    result.magicValid = true;
-    result.version = buffer.readUInt32LE(4);
-    const kvCount = Number(buffer.readBigUInt64LE(12));
-
-    let offset = 20;
-
-    for (let i = 0; i < kvCount && offset < bytesRead - 8; i++) {
-      try {
-        // Read key string length (uint64)
-        const keyLen = Number(buffer.readBigUInt64LE(offset));
-        offset += 8;
-        if (keyLen <= 0 || keyLen > 256 || offset + keyLen >= bytesRead) break;
-
-        const key = buffer.toString('utf-8', offset, offset + keyLen);
-        offset += keyLen;
-
-        // Read value type (uint32)
-        if (offset + 4 >= bytesRead) break;
-        const valType = buffer.readUInt32LE(offset) as GgufValueType;
-        offset += 4;
-
-        const { value, newOffset } = parseGgufValue(buffer, offset, valType);
-        offset = newOffset;
-
-        result.rawKv[key] = value;
-      } catch {
-        break; // Stop parsing gracefully on boundary edge
+      if (result.rawKv['general.architecture']) {
+        result.architecture = String(result.rawKv['general.architecture']);
+      }
+      if (result.rawKv['general.name']) {
+        result.modelName = String(result.rawKv['general.name']);
+      }
+      const arch = result.architecture !== 'unknown' ? result.architecture : 'llama';
+      if (result.rawKv[`${arch}.block_count`] !== undefined) {
+        result.blockCount = Number(result.rawKv[`${arch}.block_count`]);
+      } else if (result.rawKv['llama.block_count'] !== undefined) {
+        result.blockCount = Number(result.rawKv['llama.block_count']);
+      }
+      if (result.rawKv[`${arch}.context_length`] !== undefined) {
+        result.contextLength = Number(result.rawKv[`${arch}.context_length`]);
+      } else if (result.rawKv['llama.context_length'] !== undefined) {
+        result.contextLength = Number(result.rawKv['llama.context_length']);
+      }
+      if (result.rawKv[`${arch}.expert_count`] !== undefined) {
+        result.expertCount = Number(result.rawKv[`${arch}.expert_count`]);
+      }
+      if (result.rawKv['general.file_type'] !== undefined) {
+        const parsedQuant = fileTypeToQuantString(Number(result.rawKv['general.file_type']));
+        if (parsedQuant) result.quantization = parsedQuant;
       }
     }
-
-    // Process extracted KV pairs
-    if (result.rawKv['general.architecture']) {
-      result.architecture = String(result.rawKv['general.architecture']);
-    }
-
-    if (result.rawKv['general.name']) {
-      result.modelName = String(result.rawKv['general.name']);
-    }
-
-    const arch = result.architecture !== 'unknown' ? result.architecture : 'llama';
-
-    // Layer count
-    if (result.rawKv[`${arch}.block_count`] !== undefined) {
-      result.blockCount = Number(result.rawKv[`${arch}.block_count`]);
-    } else if (result.rawKv['llama.block_count'] !== undefined) {
-      result.blockCount = Number(result.rawKv['llama.block_count']);
-    }
-
-    // Context length
-    if (result.rawKv[`${arch}.context_length`] !== undefined) {
-      result.contextLength = Number(result.rawKv[`${arch}.context_length`]);
-    } else if (result.rawKv['llama.context_length'] !== undefined) {
-      result.contextLength = Number(result.rawKv['llama.context_length']);
-    }
-
-    // Expert count
-    if (result.rawKv[`${arch}.expert_count`] !== undefined) {
-      result.expertCount = Number(result.rawKv[`${arch}.expert_count`]);
-    }
-
-    // Vision mmproj detection
-    if (
-      result.rawKv['clip.projector_type'] !== undefined ||
-      result.architecture.includes('clip') ||
-      /mmproj|projector/i.test(fileName)
-    ) {
-      result.isMmproj = true;
-    }
-
-    // File type quantization enum
-    if (result.rawKv['general.file_type'] !== undefined) {
-      const fileType = Number(result.rawKv['general.file_type']);
-      const parsedQuant = fileTypeToQuantString(fileType);
-      if (parsedQuant) result.quantization = parsedQuant;
-    }
-  } catch (err) {
-    console.error(`Error parsing GGUF metadata for ${filePath}:`, err);
+  } catch (err: any) {
+    console.error(`Error reading GGUF header for ${fileName}:`, err.message);
   } finally {
     if (fd !== null) {
       try {
@@ -164,22 +148,9 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
     }
   }
 
-  // Calculate clean title, size in GB, and formatted display string
   const sizeGBNum = fileSizeBytes / (1024 * 1024 * 1024);
   const sizeGB = `${sizeGBNum.toFixed(2)} GB`;
-  
-  // Clean title from filename
-  let cleanTitle = result.modelName || fileName.replace(/\.gguf$/i, '');
-  // Strip quantization tags from title if present
-  cleanTitle = cleanTitle
-    .replace(/[-_.]?(Q\d_[A-Z0-9_]+|Q\d_K_[SML]|IQ\d_[A-Z0-9_]+|F16|F32|BF16)$/i, '')
-    .replace(/[-_.]?(Q\d_[A-Z0-9_]+|Q\d_K_[SML]|IQ\d_[A-Z0-9_]+|F16|F32|BF16)[-_.]/i, ' ')
-    .replace(/[-_]/g, ' ')
-    .trim();
-
-  if (!cleanTitle) {
-    cleanTitle = fileName.replace(/\.gguf$/i, '');
-  }
+  const cleanTitle = formatModelTitle(result.modelName, fileName);
 
   result.cleanTitle = cleanTitle;
   result.sizeGB = sizeGB;

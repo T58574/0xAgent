@@ -24,6 +24,46 @@ export interface OptimalLlamaConfig {
   reasoning: string;
 }
 
+function queryWindowsGpu(): { gpuName: string; vramMB?: number } {
+  let stdout = '';
+  try {
+    const command = `powershell -NoProfile -Command "Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM | ConvertTo-Json"`;
+    stdout = execSync(command, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    try {
+      stdout = execSync('wmic path win32_videocontroller get name', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    } catch {}
+  }
+
+  if (!stdout) {
+    return { gpuName: '' };
+  }
+
+  let gpuName = stdout;
+  let vramMB: number | undefined = undefined;
+
+  if (stdout.startsWith('{') || stdout.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(stdout);
+      const controllers = Array.isArray(parsed) ? parsed : [parsed];
+      const names = controllers.map((c: any) => c.Name).filter(Boolean);
+      gpuName = names.join(', ');
+
+      for (const c of controllers) {
+        if (c.AdapterRAM && typeof c.AdapterRAM === 'number' && c.AdapterRAM > 0) {
+          vramMB = Math.round(c.AdapterRAM / (1024 * 1024));
+          break;
+        }
+      }
+    } catch {}
+  } else {
+    const gpus = stdout.split(/\r?\n/).map((g) => g.trim()).filter((g) => g && g.toLowerCase() !== 'name');
+    gpuName = gpus.join(', ');
+  }
+
+  return { gpuName, vramMB };
+}
+
 export function detectGpuHardware(): HardwareInfo {
   const ramGB = Math.round(os.totalmem() / (1024 * 1024 * 1024));
   const cpuCores = os.cpus().length;
@@ -40,44 +80,13 @@ export function detectGpuHardware(): HardwareInfo {
 
   try {
     if (process.platform === 'win32') {
-      let stdout = '';
-
-      try {
-        const command = `powershell -NoProfile -Command "Get-CimInstance Win32_VideoController | Select-Object Name, AdapterRAM | ConvertTo-Json"`;
-        stdout = execSync(command, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-      } catch {
-        try {
-          stdout = execSync('wmic path win32_videocontroller get name', { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
-        } catch {}
-      }
-
-      if (stdout && stdout.length > 0) {
+      const { gpuName, vramMB } = queryWindowsGpu();
+      if (gpuName) {
         result.isAutoDetected = true;
+        result.gpuName = gpuName;
+        result.vramMB = vramMB;
 
-        if (stdout.startsWith('{') || stdout.startsWith('[')) {
-          try {
-            const parsed = JSON.parse(stdout);
-            const controllers = Array.isArray(parsed) ? parsed : [parsed];
-            const names = controllers.map((c: any) => c.Name).filter(Boolean);
-            result.gpuName = names.join(', ');
-
-            // Find primary GPU VRAM
-            for (const c of controllers) {
-              if (c.AdapterRAM && typeof c.AdapterRAM === 'number' && c.AdapterRAM > 0) {
-                result.vramMB = Math.round(c.AdapterRAM / (1024 * 1024));
-                break;
-              }
-            }
-          } catch {
-            result.gpuName = stdout;
-          }
-        } else {
-          const gpus = stdout.split(/\r?\n/).map((g) => g.trim()).filter((g) => g && g.toLowerCase() !== 'name');
-          result.gpuName = gpus.join(', ');
-        }
-
-        const combinedName = result.gpuName.toUpperCase();
-
+        const combinedName = gpuName.toUpperCase();
         if (combinedName.includes('NVIDIA') || combinedName.includes('GEFORCE') || combinedName.includes('QUADRO')) {
           result.vendor = 'NVIDIA';
           result.recommendedBuild = 'CUDA (bin-win-cuda)';

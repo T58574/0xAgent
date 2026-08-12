@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
-import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry } from './types';
+import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo } from './types';
 import { generateShortId } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -487,7 +487,7 @@ export default function App() {
     });
 
     const un3 = api.listen<string>('agent-status-changed', async (event) => {
-      setAgentStatus(event.payload as any);
+      setAgentStatus(event.payload as 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool');
       addLog(`Agent status changed: ${event.payload}`);
       if (event.payload === 'idle') {
         setLiveTelemetry(null);
@@ -538,7 +538,7 @@ export default function App() {
       });
     });
 
-    const un5 = api.listen<{ message_id: string; tool_id: string; status: string; output?: string }>(
+    const un5 = api.listen<{ message_id: string; tool_id: string; status: any; output?: string }>(
       'agent-tool-status-changed',
       (event) => {
         const sess = currentSessionRef.current;
@@ -550,7 +550,7 @@ export default function App() {
               if (t.id === event.payload.tool_id) {
                 return {
                   ...t,
-                  status: event.payload.status as any,
+                  status: event.payload.status as ToolCallInfo['status'],
                   output: event.payload.output !== undefined ? event.payload.output : t.output,
                 };
               }

@@ -392,8 +392,8 @@ export async function selectWorkspaceNative(): Promise<string | null> {
         `;
         const buf = Buffer.from(psScript, 'utf-16le');
         const base64 = buf.toString('base64');
-        const { exec } = require('node:child_process');
-        exec(`powershell -Sta -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' }, (err: any, stdout: string) => {
+        const { execFile } = require('node:child_process');
+        execFile('powershell', ['-Sta', '-NoProfile', '-EncodedCommand', base64], { encoding: 'utf-8' }, (err: any, stdout: string) => {
           if (err) {
             console.error('Failed to open native Windows folder dialog:', err);
             resolve(null);
@@ -428,8 +428,8 @@ export async function selectFileNative(filter?: string): Promise<string | null> 
         `;
         const buf = Buffer.from(psScript, 'utf-16le');
         const base64 = buf.toString('base64');
-        const { exec } = require('node:child_process');
-        exec(`powershell -Sta -NoProfile -EncodedCommand ${base64}`, { encoding: 'utf-8' }, (err: any, stdout: string) => {
+        const { execFile } = require('node:child_process');
+        execFile('powershell', ['-Sta', '-NoProfile', '-EncodedCommand', base64], { encoding: 'utf-8' }, (err: any, stdout: string) => {
           if (err) {
             console.error('Failed to open native Windows file dialog:', err);
             resolve(null);

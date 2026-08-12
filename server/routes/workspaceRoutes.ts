@@ -181,7 +181,8 @@ workspaceRouter.post('/transcribe-audio', async (req, res) => {
     formData.append('file', file);
     formData.append('model', 'whisper-large-v3');
 
-    const groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
+    const groqEndpoint = process.env.GROQ_STT_ENDPOINT || 'https://api.groq.com/openai/v1/audio/transcriptions';
+    const groqRes = await fetch(groqEndpoint, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey.trim()}`,

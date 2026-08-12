@@ -288,7 +288,6 @@ export function updatePersonaFile(id: string, filename: 'SOUL.md' | 'TOOLS.md' |
 
   fs.writeFileSync(path.join(pDir, filename), content, 'utf-8');
 
-  // Update metadata timestamp
   const metaPath = path.join(pDir, 'metadata.json');
   if (fs.existsSync(metaPath)) {
     try {

@@ -60,7 +60,8 @@ export function saveMemories(items: MemoryItem[]): void {
 
 export function addOrUpdateMemory(key: string, value: string, category?: string): MemoryItem {
   const memories = loadMemories();
-  const cat = (category as any) || 'fact';
+  const validCategories: MemoryItem['category'][] = ['user_preference', 'project_convention', 'architecture', 'fact', 'general'];
+  const cat: MemoryItem['category'] = validCategories.includes(category as any) ? (category as MemoryItem['category']) : 'fact';
   const existingIdx = memories.findIndex(m => m.key.toLowerCase() === key.toLowerCase());
 
   const now = Date.now();

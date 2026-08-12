@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { exec } from 'node:child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { AppConfig, ChatMessage, ToolCallInfo } from '../src/types';
 import { loadSession, saveSession, listSessions } from './session';
@@ -61,12 +60,11 @@ export function strip_ai_reasoning_fluff(text: string): string {
 }
 
 
-export interface ParsedToolCall {
-  id: string;
-  name: string;
-  arguments: any;
-  raw_content: string;
-}
+import { parseToolCalls, ParsedToolCall } from './agent/toolParser';
+import { pruneMessagesForContext, detectRepetitionLoop } from './agent/contextManager';
+
+export { parseToolCalls, pruneMessagesForContext, detectRepetitionLoop };
+export type { ParsedToolCall };
 
 export interface PendingConfirmation {
   sessionId: string;
@@ -78,6 +76,24 @@ export interface PendingConfirmation {
 const activeConfirmations = new Map<string, PendingConfirmation>();
 const activeCancelTokens = new Set<string>();
 const activeRunningLoops = new Set<string>();
+
+export function handleAgentError(
+  session: any,
+  sessionId: string,
+  broadcast: (event: string, payload: any) => void,
+  errMsg: string
+): void {
+  session.messages.push({
+    id: uuidv4(),
+    role: 'assistant',
+    content: errMsg,
+    timestamp: Date.now(),
+  });
+  session.updated_at = Date.now();
+  saveSession(session);
+  broadcast('agent-error', { sessionId, message: errMsg });
+  broadcast('agent-status-changed', 'idle');
+}
 
 export function respondToToolConfirmation(sessionId: string, toolCallId: string, approve: boolean | string): boolean {
   const key = `${sessionId}:${toolCallId}`;
@@ -115,342 +131,7 @@ export function cancelAgentSession(sessionId: string): void {
   }
 }
 
-export function parseToolCalls(text: string): ParsedToolCall[] {
-  const toolCalls: ParsedToolCall[] = [];
 
-  // 1. Read File
-  const reRead = /<read_file\s+path=["']([^"']+)["']\s*\/?>/gs;
-  let match: RegExpExecArray | null;
-  while ((match = reRead.exec(text)) !== null) {
-    toolCalls.push({
-      id: `read_${uuidv4().substring(0, 8)}`,
-      name: 'read_file',
-      arguments: { path: match[1] },
-      raw_content: match[0],
-    });
-  }
-
-  // 2. Write File
-  const reWrite = /<write_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)<\/write_file>/gs;
-  while ((match = reWrite.exec(text)) !== null) {
-    toolCalls.push({
-      id: `write_${uuidv4().substring(0, 8)}`,
-      name: 'write_file',
-      arguments: { path: match[1], content: match[2] },
-      raw_content: match[0],
-    });
-  }
-  // Fallback for unclosed write_file
-  const reWriteFallback = /<write_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)(?:<\/write_file>|(?=<write_file|<patch_file|<read_file|<execute_command|$))/gi;
-  let matchWF: RegExpExecArray | null;
-  while ((matchWF = reWriteFallback.exec(text)) !== null) {
-    const raw = matchWF[0];
-    if (!toolCalls.some((tc) => tc.raw_content === raw || (tc.name === 'write_file' && tc.arguments.path === matchWF![1]))) {
-      toolCalls.push({
-        id: `write_${uuidv4().substring(0, 8)}`,
-        name: 'write_file',
-        arguments: { path: matchWF[1], content: matchWF[2].trim() },
-        raw_content: raw,
-      });
-    }
-  }
-
-  // 3. Patch File
-  const rePatch = /<patch_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)<\/patch_file>/gs;
-  while ((match = rePatch.exec(text)) !== null) {
-    toolCalls.push({
-      id: `patch_${uuidv4().substring(0, 8)}`,
-      name: 'patch_file',
-      arguments: { path: match[1], content: match[2] },
-      raw_content: match[0],
-    });
-  }
-  // Fallback for unclosed or markdown-wrapped patch_file
-  const rePatchFallback = /<patch_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)(?:<\/patch_file>|(?=<patch_file|<write_file|<read_file|<execute_command|$))/gi;
-  let matchPF: RegExpExecArray | null;
-  while ((matchPF = rePatchFallback.exec(text)) !== null) {
-    const raw = matchPF[0];
-    if (!toolCalls.some((tc) => tc.raw_content === raw || (tc.name === 'patch_file' && tc.arguments.path === matchPF![1]))) {
-      let content = matchPF[2].trim();
-      content = content.replace(/^```[a-z]*\r?\n/i, '').replace(/\r?\n```$/i, '');
-      if (content.includes('<<<<<<< SEARCH')) {
-        toolCalls.push({
-          id: `patch_${uuidv4().substring(0, 8)}`,
-          name: 'patch_file',
-          arguments: { path: matchPF[1], content },
-          raw_content: raw,
-        });
-      }
-    }
-  }
-
-  // 4. List Dir
-  const reList = /<list_dir\s+path=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reList.exec(text)) !== null) {
-    toolCalls.push({
-      id: `list_${uuidv4().substring(0, 8)}`,
-      name: 'list_dir',
-      arguments: { path: match[1] },
-      raw_content: match[0],
-    });
-  }
-
-  // 5. Grep Search
-  const reGrep1 = /<grep_search\s+pattern=["']([^"']+)["']\s+path=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reGrep1.exec(text)) !== null) {
-    toolCalls.push({
-      id: `grep_${uuidv4().substring(0, 8)}`,
-      name: 'grep_search',
-      arguments: { pattern: match[1], path: match[2] },
-      raw_content: match[0],
-    });
-  }
-
-  const reGrep2 = /<grep_search\s+path=["']([^"']+)["']\s+pattern=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reGrep2.exec(text)) !== null) {
-    const raw = match[0];
-    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
-      toolCalls.push({
-        id: `grep_${uuidv4().substring(0, 8)}`,
-        name: 'grep_search',
-        arguments: { pattern: match[2], path: match[1] },
-        raw_content: raw,
-      });
-    }
-  }
-
-  // 6. Execute Command
-  const reExec = /<execute_command\s*>(.*?)<\/execute_command>/gs;
-  while ((match = reExec.exec(text)) !== null) {
-    toolCalls.push({
-      id: `exec_${uuidv4().substring(0, 8)}`,
-      name: 'execute_command',
-      arguments: { command: match[1].trim() },
-      raw_content: match[0],
-    });
-  }
-
-  // 7. Remember Fact
-  const reMemAdd = /<remember_fact\s+key=["']([^"']+)["']\s+value=["']([^"']+)["'](?:\s+category=["']([^"']+)["'])?\s*\/?>/gs;
-  while ((match = reMemAdd.exec(text)) !== null) {
-    toolCalls.push({
-      id: `mem_add_${uuidv4().substring(0, 8)}`,
-      name: 'remember_fact',
-      arguments: { key: match[1], value: match[2], category: match[3] || 'fact' },
-      raw_content: match[0],
-    });
-  }
-
-  // 8. Recall Memories
-  const reMemRecall = /<recall_memories\s+query=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reMemRecall.exec(text)) !== null) {
-    toolCalls.push({
-      id: `mem_recall_${uuidv4().substring(0, 8)}`,
-      name: 'recall_memories',
-      arguments: { query: match[1] },
-      raw_content: match[0],
-    });
-  }
-
-  // 9. List Skills
-  const reListSkills = /<list_skills\s*\/?>/gs;
-  while ((match = reListSkills.exec(text)) !== null) {
-    toolCalls.push({
-      id: `skills_list_${uuidv4().substring(0, 8)}`,
-      name: 'list_skills',
-      arguments: {},
-      raw_content: match[0],
-    });
-  }
-
-  // 10. Execute Skill
-  const reExecSkill = /<execute_skill\s+name=["']([^"']+)["'](?:\s+args=["']([^"']+)["'])?\s*\/?>/gs;
-  while ((match = reExecSkill.exec(text)) !== null) {
-    toolCalls.push({
-      id: `skill_exec_${uuidv4().substring(0, 8)}`,
-      name: 'execute_skill',
-      arguments: { name: match[1], args: match[2] || '' },
-      raw_content: match[0],
-    });
-  }
-
-  // 11. Search Sessions
-  const reSearchSessions = /<search_sessions\s+query=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reSearchSessions.exec(text)) !== null) {
-    toolCalls.push({
-      id: `search_sess_${uuidv4().substring(0, 8)}`,
-      name: 'search_sessions',
-      arguments: { query: match[1] },
-      raw_content: match[0],
-    });
-  }
-
-  // 12. Run Scratch Script
-  const reScratch = /<run_scratch_script\s+language=["']([^"']+)["']\s*>(.*?)<\/run_scratch_script>/gs;
-  while ((match = reScratch.exec(text)) !== null) {
-    toolCalls.push({
-      id: `scratch_${uuidv4().substring(0, 8)}`,
-      name: 'run_scratch_script',
-      arguments: { language: match[1], code: match[2] },
-      raw_content: match[0],
-    });
-  }
-
-  // 13. Ask User Clarification
-  const reAskUser = /<ask_user\s+question=["']([^"']+)["'](?:\s+options=["']([^"']+)["'])?\s*\/?>/gs;
-  while ((match = reAskUser.exec(text)) !== null) {
-    const rawOpts = match[2] || '';
-    const options = rawOpts ? rawOpts.split(',').map((s) => s.trim()).filter(Boolean) : [];
-    toolCalls.push({
-      id: `ask_${uuidv4().substring(0, 8)}`,
-      name: 'ask_user',
-      arguments: { question: match[1], options },
-      raw_content: match[0],
-    });
-  }
-
-  // 14. Spawn Sub-Agent
-  const reSpawnAgent = /<spawn_subagent\s+role=["']([^"']+)["']\s+goal=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reSpawnAgent.exec(text)) !== null) {
-    toolCalls.push({
-      id: `subagent_${uuidv4().substring(0, 8)}`,
-      name: 'spawn_subagent',
-      arguments: { role: match[1], goal: match[2] },
-      raw_content: match[0],
-    });
-  }
-
-  // 15. Create Directory
-  const reMkdir = /<create_directory\s+path=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reMkdir.exec(text)) !== null) {
-    toolCalls.push({
-      id: `mkdir_${uuidv4().substring(0, 8)}`,
-      name: 'create_directory',
-      arguments: { path: match[1] },
-      raw_content: match[0],
-    });
-  }
-
-  // 16. Get File Info
-  const reFileInfo = /<get_file_info\s+path=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reFileInfo.exec(text)) !== null) {
-    toolCalls.push({
-      id: `fileinfo_${uuidv4().substring(0, 8)}`,
-      name: 'get_file_info',
-      arguments: { path: match[1] },
-      raw_content: match[0],
-    });
-  }
-
-  return toolCalls;
-}
-
-export function pruneMessagesForContext(
-  messages: { role: string; content: string | any[] }[],
-  maxTokens: number
-): { role: string; content: string | any[] }[] {
-  // Safety context threshold (80% of contextMax)
-  const safeLimit = Math.floor(maxTokens * 0.8);
-  if (estimatePromptTokens(messages) <= safeLimit) {
-    return messages;
-  }
-
-  const systemMsg = messages[0];
-  // Preserve first user prompt (the core task goal) if available
-  const firstUserMsg = messages.length > 1 && messages[1].role === 'user' ? messages[1] : null;
-  const startIdx = firstUserMsg ? 2 : 1;
-
-  const tailCount = Math.min(8, messages.length - startIdx);
-  const tailMsgs = messages.slice(messages.length - tailCount);
-  const middleMsgs = messages.slice(startIdx, messages.length - tailCount);
-
-  // Truncate long tool/file outputs in middle messages (Software Context Shift)
-  const prunedMiddle = middleMsgs.map((m) => {
-    if (typeof m.content === 'string' && m.content.length > 500 && (m.role === 'user' || m.role === 'tool')) {
-      const head = m.content.substring(0, 200);
-      const tail = m.content.substring(m.content.length - 200);
-      return {
-        ...m,
-        content: `${head}\n\n[... [Слайдинг Контекста] Вывод инструмента сжат (${m.content.length} байт) ...]\n\n${tail}`,
-      };
-    }
-    return m;
-  });
-
-  const buildResult = (middle: typeof prunedMiddle) => {
-    const list = [systemMsg];
-    if (firstUserMsg) list.push(firstUserMsg);
-    return [...list, ...middle, ...tailMsgs];
-  };
-
-  let result = buildResult(prunedMiddle);
-
-  // Discard oldest middle messages until context falls below safety limit
-  while (estimatePromptTokens(result) > safeLimit && prunedMiddle.length > 0) {
-    prunedMiddle.shift();
-    result = buildResult(prunedMiddle);
-  }
-
-  return result;
-}
-
-export function detectRepetitionLoop(history: ChatMessage[], newContent: string): boolean {
-  const trimmedNew = newContent.trim().toLowerCase();
-  if (!trimmedNew) return false;
-
-  const loopTriggers = [
-    'скажи продолжи',
-    'напиши продолжи',
-    'ответь продолжи',
-    'скажите продолжи',
-    'say continue',
-    'reply continue',
-    'если ты хочешь что бы написал код',
-    'если вы хотите чтобы я продолжил',
-  ];
-
-  for (const trigger of loopTriggers) {
-    if (trimmedNew.includes(trigger)) {
-      const assistantMsgs = history.filter((m) => m.role === 'assistant');
-      const recentAssistants = assistantMsgs.slice(-3);
-      if (recentAssistants.some((m) => m.content.toLowerCase().includes(trigger))) {
-        return true;
-      }
-    }
-  }
-
-  const assistantMsgs = history.filter((m) => m.role === 'assistant');
-  if (assistantMsgs.length > 0) {
-    const prevAssistantContent = assistantMsgs[assistantMsgs.length - 1].content.trim().toLowerCase();
-    if (prevAssistantContent.length > 30 && trimmedNew === prevAssistantContent) {
-      return true;
-    }
-
-    if (prevAssistantContent.length > 50 && trimmedNew.length > 50) {
-      const minLen = Math.min(100, Math.floor(prevAssistantContent.length * 0.8));
-      if (trimmedNew.substring(0, minLen) === prevAssistantContent.substring(0, minLen)) {
-        return true;
-      }
-    }
-
-    // Check for exact duplicate tool calls repeated 3 times in a row
-    const newToolCalls = parseToolCalls(newContent);
-    if (newToolCalls.length > 0 && assistantMsgs.length >= 2) {
-      const newSignature = newToolCalls.map((t) => `${t.name}:${JSON.stringify(t.arguments)}`).join('|');
-      const prev1 = assistantMsgs[assistantMsgs.length - 1];
-      const prev2 = assistantMsgs[assistantMsgs.length - 2];
-
-      const sig1 = parseToolCalls(prev1.content).map((t) => `${t.name}:${JSON.stringify(t.arguments)}`).join('|');
-      const sig2 = parseToolCalls(prev2.content).map((t) => `${t.name}:${JSON.stringify(t.arguments)}`).join('|');
-
-      if (newSignature && newSignature === sig1 && newSignature === sig2) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
 
 export type EventBroadcaster = (event: string, payload: any) => void;
 
@@ -649,16 +330,7 @@ ${activePersona.user}`;
       
       if (!apiKey && !selectedModel.includes('localhost') && !selectedModel.includes('127.0.0.1')) {
         const errMsg = `⚠️ **Google AI Studio API Key не задан!**\nДля использования облачной модели \`${selectedModel}\` требуется API ключ Google AI Studio.\n\n👉 **Решение:** Укажите Ваш **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)** или в переменной окружения.`;
-        session.messages.push({
-          id: uuidv4(),
-          role: 'assistant',
-          content: errMsg,
-          timestamp: Date.now(),
-        });
-        session.updated_at = Date.now();
-        saveSession(session);
-        broadcast('agent-error', { sessionId, message: errMsg });
-        broadcast('agent-status-changed', 'idle');
+        handleAgentError(session, sessionId, broadcast, errMsg);
         return;
       }
 
@@ -725,31 +397,13 @@ ${activePersona.user}`;
     if (!response || !response.ok) {
       const errorText = response ? await response.text() : 'No response from LLM server / all fallback models exhausted';
       const errMsg = `⚠️ **LLM Сервер вернул ошибку (${response?.status || 500}):**\n\`\`\`\n${errorText}\n\`\`\``;
-      session.messages.push({
-        id: uuidv4(),
-        role: 'assistant',
-        content: errMsg,
-        timestamp: Date.now(),
-      });
-      session.updated_at = Date.now();
-      saveSession(session);
-      broadcast('agent-error', { sessionId, message: errMsg });
-      broadcast('agent-status-changed', 'idle');
+      handleAgentError(session, sessionId, broadcast, errMsg);
       return;
     }
 
     if (!response.body) {
       const errMsg = '⚠️ **LLM Сервер вернул пустой ответ (body is empty)**';
-      session.messages.push({
-        id: uuidv4(),
-        role: 'assistant',
-        content: errMsg,
-        timestamp: Date.now(),
-      });
-      session.updated_at = Date.now();
-      saveSession(session);
-      broadcast('agent-error', { sessionId, message: errMsg });
-      broadcast('agent-status-changed', 'idle');
+      handleAgentError(session, sessionId, broadcast, errMsg);
       return;
     }
 
@@ -1041,21 +695,23 @@ ${activePersona.user}`;
                 fs.mkdirSync(scratchDir, { recursive: true });
               }
 
-              let ext = 'js';
-              let cmd = 'node';
-              if (lang.includes('py')) {
-                ext = 'py';
-                cmd = 'python';
-              } else if (lang.includes('ps') || lang.includes('shell')) {
-                ext = 'ps1';
-                cmd = 'powershell -NoProfile -ExecutionPolicy Bypass -File';
-              }
-
+              const ext = lang.includes('py') ? 'py' : (lang.includes('ps') || lang.includes('shell')) ? 'ps1' : 'js';
               const scratchFile = path.join(scratchDir, `scratch_${Date.now()}.${ext}`);
               fs.writeFileSync(scratchFile, code, 'utf-8');
 
               output = await new Promise<string>((resolve) => {
-                exec(`${cmd} "${scratchFile}"`, { timeout: 15000 }, (err, stdout, stderr) => {
+                const { execFile } = require('node:child_process');
+                let executable = 'node';
+                let args = [scratchFile];
+                if (lang.includes('py')) {
+                  executable = 'python';
+                  args = [scratchFile];
+                } else if (lang.includes('ps') || lang.includes('shell')) {
+                  executable = 'powershell';
+                  args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scratchFile];
+                }
+
+                execFile(executable, args, { timeout: 15000 }, (err: any, stdout: string, stderr: string) => {
                   if (err) {
                     resolve(`Scratch Execution Error:\n${stdout || ''}\n${stderr || err.message}`);
                   } else {

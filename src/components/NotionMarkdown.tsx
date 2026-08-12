@@ -8,7 +8,6 @@ interface NotionMarkdownProps {
 export const NotionMarkdown: React.FC<NotionMarkdownProps> = ({ content }) => {
   if (!content) return null;
 
-  // Process math formulas before generic markdown parsing
   const renderMathBlocks = (text: string) => {
     // Replace block math $$ ... $$ or \[ ... \]
     const blockMathRegex = /\$\$\s*([\s\S]*?)\s*\$\$|\\\[\s*([\s\S]*?)\s*\\\]/g;

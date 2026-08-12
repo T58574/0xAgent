@@ -76,7 +76,7 @@ export function useSettingsState(
       if (config.sound_notifications !== undefined && config.sound_notifications !== null) setSoundNotifications(config.sound_notifications);
       if (config.compact_chat !== undefined && config.compact_chat !== null) setCompactChat(config.compact_chat);
 
-      const theme = (config.active_theme as any) || 'obsidian';
+      const theme = (config.active_theme as 'obsidian' | 'cyber' | 'graphite' | 'matrix') || 'obsidian';
       setActiveTheme(theme);
       document.documentElement.setAttribute('data-theme', theme);
 

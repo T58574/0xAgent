@@ -64,7 +64,6 @@ export const PersonasTab: React.FC = () => {
   const [newDesc, setNewDesc] = useState('');
   const [newIcon, setNewIcon] = useState('User');
 
-  // Load Personas
   const loadPersonas = async () => {
     try {
       const list = await get_personas();
@@ -81,7 +80,6 @@ export const PersonasTab: React.FC = () => {
     }
   };
 
-  // Load detail for selected persona
   const loadDetail = async (id: string) => {
     try {
       const detail = await get_persona_detail(id);
@@ -95,7 +93,6 @@ export const PersonasTab: React.FC = () => {
     }
   };
 
-  // Load Summarizer Prompt
   const loadSummarizer = async () => {
     try {
       const text = await get_summarizer_prompt();
@@ -105,7 +102,6 @@ export const PersonasTab: React.FC = () => {
     }
   };
 
-  // Load Tools Configuration & TOOLS.md
   const loadTools = async () => {
     try {
       const state = await get_tools_state();
