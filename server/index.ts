@@ -15,27 +15,17 @@ import { hardwareRouter } from './routes/hardwareRoutes';
 import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes';
 import { createAgentRouter } from './routes/agentRoutes';
 import knowledgeRouter from './routes/knowledge';
+import { julesRouter } from './routes/julesRoutes';
+import { julesService } from './julesService';
+import { jarvisSupervisor } from './agent/jarvisSupervisor';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '127.0.0.1';
 
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://127.0.0.1:5173',
-  'http://localhost:3001',
-  'http://127.0.0.1:3001',
-];
-
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-        callback(null, true);
-      } else {
-        callback(new Error('Blocked by CORS policy'));
-      }
-    },
+    origin: true,
     credentials: true,
   })
 );
@@ -94,6 +84,10 @@ function broadcast(event: string, payload: any): void {
   }
 }
 
+// Wire WS broadcaster to Jules & Jarvis
+julesService.setWsBroadcaster(broadcast);
+jarvisSupervisor.setWsBroadcaster(broadcast);
+
 // Mount Router Modules
 app.use('/api', authRouter);
 app.use('/api', configRouter);
@@ -104,10 +98,19 @@ app.use('/api', workspaceRouter);
 app.use('/api', hardwareRouter);
 app.use('/api', createLlamaRouter(broadcast));
 app.use('/api', createAgentRouter(broadcast));
+app.use('/api', julesRouter);
 app.use('/api/knowledge', knowledgeRouter);
+
+// Global JSON Error Handler
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[EXPRESS ERROR]', err);
+  res.status(err.status || 500).json({ error: err.message || String(err) });
+});
 
 // Graceful process exit handlers for 0xAgent backend node process
 const cleanupOnExit = () => {
+  julesService.stopPolling();
+  jarvisSupervisor.stopLoop();
   stopLlamaServerProcess(broadcast);
 };
 process.on('SIGINT', () => { cleanupOnExit(); process.exit(0); });

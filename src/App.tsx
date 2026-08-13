@@ -1,18 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
-import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo } from './types';
+import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo, JulesSessionInfo, JarvisState } from './types';
 import { generateShortId } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { ChatArea } from './components/ChatArea';
 import { SettingsPage } from './components/settings/SettingsPage';
-import { CodeEditor } from './components/CodeEditor';
+import { CodeEditor, EditorTabItem } from './components/CodeEditor';
+import { IdeStatusBar } from './components/ide/IdeStatusBar';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
 import { WorkspacePickerModal } from './components/WorkspacePickerModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { KnowledgeVault } from './components/KnowledgeVault';
 import { LockScreen } from './components/LockScreen';
+import { JarvisWidget } from './components/JarvisWidget';
 import { FolderTree, Code, Terminal, X } from 'lucide-react';
 
 export default function App() {
@@ -27,6 +29,32 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
   const [isWorkspacePickerOpen, setIsWorkspacePickerOpen] = useState<boolean>(false);
+  const [isJarvisOpen, setIsJarvisOpen] = useState<boolean>(false);
+  const [jarvisState, setJarvisState] = useState<JarvisState | null>(null);
+  const [julesSessions, setJulesSessions] = useState<JulesSessionInfo[]>([]);
+
+  const fetchJulesData = async () => {
+    try {
+      const s = await api.get_jules_sessions();
+      setJulesSessions(s);
+      const jState = await api.get_jarvis_state();
+      setJarvisState(jState);
+    } catch {}
+  };
+
+  useEffect(() => {
+    fetchJulesData();
+    const un1 = api.listen<JarvisState>('jarvis_state_update', (e) => {
+      setJarvisState(e.payload);
+    });
+    const un2 = api.listen('jules_session_updated', () => {
+      fetchJulesData();
+    });
+    const un3 = api.listen('jules_session_created', () => {
+      fetchJulesData();
+    });
+    return () => { un1(); un2(); un3(); };
+  }, []);
 
 
   
@@ -42,10 +70,11 @@ export default function App() {
   const [has0xAgentMd, setHas0xAgentMd] = useState<boolean>(false);
   const [splitLeftWidthPercent, setSplitLeftWidthPercent] = useState<number>(45);
   
-  // Navigation view & Sidebar state
+  // Navigation view, Mode & Sidebar state
   const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge'>('chat');
+  const [chatMode, setChatMode] = useState<'agent' | 'simple'>('agent');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
-  const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
+  const [openTabs, setOpenTabs] = useState<EditorTabItem[]>([]);
   const [isServerOffline, setIsServerOffline] = useState<boolean>(true);
 
   // Monitor llama server health
@@ -167,6 +196,16 @@ export default function App() {
         setSelectedFile(null);
       }
     }
+  };
+
+  const handleFileSaved = (filePath: string, newContent: string) => {
+    setOpenTabs((prev) =>
+      prev.map((t) => (t.path === filePath ? { ...t, content: newContent, isDirty: false } : t))
+    );
+    if (selectedFile && selectedFile.path === filePath) {
+      setSelectedFile({ ...selectedFile, content: newContent });
+    }
+    addLog(`File saved: ${filePath}`);
   };
 
   const activeSessionsMapRef = useRef<Map<string, ChatSession>>(new Map());
@@ -705,6 +744,8 @@ export default function App() {
       modelName={config?.model_name}
       config={config}
       onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
+      chatMode={chatMode}
+      onToggleChatMode={() => setChatMode(chatMode === 'agent' ? 'simple' : 'agent')}
     />
   );
 
@@ -724,6 +765,12 @@ export default function App() {
         isServerOffline={isServerOffline}
         onStartServer={handleStartServer}
         onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
+        onOpenJarvis={() => setIsJarvisOpen(true)}
+        activeJulesCount={
+          julesSessions.filter(
+            (s) => s.status === 'EXECUTING' || s.status === 'WAITING_PLAN_APPROVAL' || s.status === 'PLANNING'
+          ).length
+        }
       />
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}
@@ -817,6 +864,7 @@ export default function App() {
                       openTabs={openTabs}
                       onSelectTab={handleSelectTab}
                       onCloseTab={handleCloseTab}
+                      onFileSaved={handleFileSaved}
                     />
                   </div>
                 </div>
@@ -845,6 +893,19 @@ export default function App() {
 
         </div>
       </div>
+
+      {/* 3. PRO IDE STATUS BAR (BOTTOM) */}
+      <IdeStatusBar
+        workspaceDir={config?.workspace_dir}
+        selectedFileName={selectedFile?.name}
+        agentStatus={agentStatus}
+        liveTelemetry={liveTelemetry}
+        config={config}
+        isServerOffline={isServerOffline}
+        onToggleLogs={() => setShowLogsDrawer(!showLogsDrawer)}
+        chatMode={chatMode}
+        onToggleChatMode={() => setChatMode(chatMode === 'agent' ? 'simple' : 'agent')}
+      />
 
       {/* CONSOLE LOGS DRAWER OVERLAY */}
       {showLogsDrawer && (
@@ -885,6 +946,16 @@ export default function App() {
         onSelectWorkspaceDir={handleSelectWorkspaceDir}
         currentWorkspaceDir={config?.workspace_dir}
         recentWorkspaces={sessions.map((s) => s.workspace_dir).filter((d): d is string => Boolean(d))}
+      />
+
+      {/* JARVIS MULTI-AGENT ORCHESTRATOR WIDGET */}
+      <JarvisWidget
+        isOpen={isJarvisOpen}
+        onClose={() => setIsJarvisOpen(false)}
+        jarvisState={jarvisState}
+        julesSessions={julesSessions}
+        onRefresh={fetchJulesData}
+        config={config}
       />
 
       {(!isAuthenticated || !isPasswordSet) && (

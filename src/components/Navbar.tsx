@@ -34,6 +34,8 @@ interface NavbarProps {
   isServerOffline?: boolean;
   onStartServer?: () => Promise<void>;
   onModelChanged?: (newModelId: string) => void;
+  onOpenJarvis?: () => void;
+  activeJulesCount?: number;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -48,6 +50,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   isServerOffline: isServerOfflineProp,
   onStartServer: onStartServerProp,
   onModelChanged,
+  onOpenJarvis,
+  activeJulesCount,
 }) => {
   const { showToast } = useToast();
   const [internalIsServerOffline, setInternalIsServerOffline] = useState(true);
@@ -333,6 +337,23 @@ export const Navbar: React.FC<NavbarProps> = ({
             <BarChart2 size={13} />
             <span className="hidden sm:inline">Аналитика</span>
           </button>
+
+          {onOpenJarvis && (
+            <button
+              type="button"
+              onClick={onOpenJarvis}
+              className="px-2.5 py-1 rounded-md font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/25 hover:border-cyan-500/50 shadow-md shadow-cyan-500/10"
+              title="Jarvis Multi-Agent Orchestrator & Jules Cloud Tasks"
+            >
+              <span className="text-sm">🤖</span>
+              <span className="hidden sm:inline">Jarvis</span>
+              {activeJulesCount !== undefined && activeJulesCount > 0 && (
+                <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-cyan-400 text-slate-950 animate-pulse">
+                  {activeJulesCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* LAN Share Button & Dropdown */}

@@ -257,21 +257,46 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
           const rootExe = path.join(llamaDir, 'llama-server.exe');
           if (fs.existsSync(rootExe)) {
             targetExe = rootExe;
+          } else {
+            const subdirs = fs.readdirSync(llamaDir, { withFileTypes: true });
+            for (const d of subdirs) {
+              if (d.isDirectory()) {
+                const subExe = path.join(llamaDir, d.name, 'llama-server.exe');
+                if (fs.existsSync(subExe)) {
+                  targetExe = subExe;
+                  break;
+                }
+                const altExe = path.join(llamaDir, d.name, 'llama.exe');
+                if (fs.existsSync(altExe)) {
+                  targetExe = altExe;
+                  break;
+                }
+              }
+            }
           }
         }
       }
 
       if (!targetModel || !fs.existsSync(targetModel)) {
-        const modelsDir = path.join(os.homedir(), '.0xagent', 'models');
-        if (fs.existsSync(modelsDir)) {
-          const files = fs.readdirSync(modelsDir);
-          const gguf = files.find((f) => f.endsWith('.gguf'));
-          if (gguf) targetModel = path.join(modelsDir, gguf);
+        const searchDirs = [
+          path.join(process.cwd(), 'models'),
+          path.join(os.homedir(), '.0xagent', 'models'),
+          ...(cfg.workspace_dir ? [path.join(cfg.workspace_dir, 'models')] : []),
+        ];
+        for (const sDir of searchDirs) {
+          if (fs.existsSync(sDir)) {
+            const files = fs.readdirSync(sDir);
+            const gguf = files.find((f) => f.endsWith('.gguf'));
+            if (gguf) {
+              targetModel = path.join(sDir, gguf);
+              break;
+            }
+          }
         }
       }
 
       if (!targetExe || !targetModel || !fs.existsSync(targetExe) || !fs.existsSync(targetModel)) {
-        const errorMsg = 'Исполняемый файл llama-server.exe или модель GGUF не найдены.';
+        const errorMsg = `Исполняемый файл llama-server.exe (${targetExe || 'не указан'}) или модель GGUF (${targetModel || 'не указана'}) не найдены.`;
         appendServerLog(`[ERROR] ${errorMsg}`);
         broadcast('llama-server-status', { status: 'stopped', error: errorMsg });
         res.status(400).json({ success: false, error: errorMsg });
@@ -284,7 +309,44 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       cfg.local_server.model_path = targetModel;
       saveConfig(cfg);
 
+      const ls = cfg.local_server || {};
       const args: string[] = ['-m', targetModel, '--host', host, '--port', String(port)];
+
+      const ctxSize = body.ctxSize !== undefined ? body.ctxSize : ls.ctx_size;
+      if (ctxSize) args.push('-c', String(ctxSize));
+
+      const gpuLayers = body.gpuLayers !== undefined ? body.gpuLayers : ls.gpu_layers;
+      if (gpuLayers !== undefined && gpuLayers !== null) args.push('-ngl', String(gpuLayers));
+
+      const threads = body.threads !== undefined ? body.threads : ls.threads;
+      if (threads) args.push('-t', String(threads));
+
+      const batchSize = body.batchSize !== undefined ? body.batchSize : ls.batch_size;
+      if (batchSize) args.push('-b', String(batchSize));
+
+      const ubatchSize = body.ubatchSize !== undefined ? body.ubatchSize : ls.ubatch_size;
+      if (ubatchSize) args.push('-ub', String(ubatchSize));
+
+      const temp = body.temp !== undefined ? body.temp : ls.temp;
+      if (temp !== undefined && temp !== null) args.push('--temp', String(temp));
+
+      const repeatPenalty = body.repeatPenalty !== undefined ? body.repeatPenalty : ls.repeat_penalty;
+      if (repeatPenalty !== undefined && repeatPenalty !== null) args.push('--repeat-penalty', String(repeatPenalty));
+
+      const flashAttn = body.flashAttn !== undefined ? body.flashAttn : ls.flash_attn;
+      if (flashAttn) args.push('-fa');
+
+      const embedding = body.embedding !== undefined ? body.embedding : ls.embedding;
+      if (embedding) args.push('--embedding');
+
+      const parallelSlots = body.parallelSlots !== undefined ? body.parallelSlots : ls.parallel_slots;
+      if (parallelSlots && parallelSlots > 1) args.push('-np', String(parallelSlots));
+
+      const customArgs = body.customArgs !== undefined ? body.customArgs : ls.custom_args;
+      if (customArgs && typeof customArgs === 'string' && customArgs.trim()) {
+        const extra = customArgs.trim().split(/\s+/).filter(Boolean);
+        args.push(...extra);
+      }
 
       isIntentionalStop = false;
       lastLaunchParams = { targetExe, args, host, port };

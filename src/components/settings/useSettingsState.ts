@@ -12,6 +12,8 @@ export function useSettingsState(
   const [modelName, setModelName] = useState('');
   const [groqApiKey, setGroqApiKey] = useState('');
   const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [julesApiKey, setJulesApiKey] = useState('');
+  const [julesDefaultRepo, setJulesDefaultRepo] = useState('');
   const [modelsPath, setModelsPath] = useState('');
   const [reasoningEnabled, setReasoningEnabled] = useState(true);
   const [planningEnabled, setPlanningEnabled] = useState(true);
@@ -66,6 +68,8 @@ export function useSettingsState(
       setModelName(config.model_name || 'gemini-3.6-flash');
       setGroqApiKey(config.groq_api_key || '');
       setGeminiApiKey(config.gemini_api_key || '');
+      setJulesApiKey(config.jules_api_key || '');
+      setJulesDefaultRepo(config.jules_default_repo || '');
       setModelsPath(config.models_path || '');
       setReasoningEnabled(config.reasoning_enabled !== false);
       setPlanningEnabled(config.planning_mode !== false);
@@ -128,6 +132,8 @@ export function useSettingsState(
           model_name: modelName,
           groq_api_key: groqApiKey.trim() || null,
           gemini_api_key: geminiApiKey.trim() || null,
+          jules_api_key: julesApiKey.trim() || null,
+          jules_default_repo: julesDefaultRepo.trim() || null,
           models_path: modelsPath.trim() || null,
           reasoning_enabled: reasoningEnabled,
           planning_mode: planningEnabled,
@@ -230,6 +236,10 @@ export function useSettingsState(
     setGroqApiKey,
     geminiApiKey,
     setGeminiApiKey,
+    julesApiKey,
+    setJulesApiKey,
+    julesDefaultRepo,
+    setJulesDefaultRepo,
     modelsPath,
     setModelsPath,
     reasoningEnabled,

@@ -101,6 +101,9 @@ export interface AppConfig {
   compact_chat?: boolean | null;
   local_server?: LocalServerConfig | null;
   fallback_models?: string[] | null;
+  jules_api_key?: string | null;
+  jules_default_repo?: string | null;
+  jarvis_model?: string | null;
 }
 
 export interface CloudModelItem {
@@ -284,5 +287,70 @@ export interface KnowledgeQueryOptions {
   tag?: string;
   startDate?: number;
   endDate?: number;
+}
+
+export interface JulesSource {
+  name: string; // e.g. "sources/github/owner/repo"
+  id: string;   // e.g. "github/owner/repo"
+  githubRepo?: {
+    owner: string;
+    repo: string;
+  };
+}
+
+export interface JulesPullRequest {
+  url: string;
+  title: string;
+  description: string;
+}
+
+export interface JulesOutput {
+  pullRequest?: JulesPullRequest;
+}
+
+export interface JulesSessionInfo {
+  name: string; // e.g. "sessions/31415926..."
+  id: string;
+  title: string;
+  prompt: string;
+  status: 'PLANNING' | 'EXECUTING' | 'WAITING_PLAN_APPROVAL' | 'PR_CREATED' | 'COMPLETED' | 'FAILED';
+  sourceContext?: {
+    source: string;
+    githubRepoContext?: {
+      startingBranch: string;
+    };
+  };
+  outputs?: JulesOutput[];
+  requirePlanApproval?: boolean;
+  createdAt: number;
+  updatedAt: number;
+  lastMessage?: string;
+}
+
+export interface JarvisActivityLog {
+  id: string;
+  timestamp: number;
+  agent: 'Jarvis Supervisor' | 'Jules Cloud Worker' | 'Local Agent' | 'System';
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+}
+
+export interface JarvisWorkerStatus {
+  id: string;
+  name: string;
+  type: 'supervisor' | 'jules' | 'local_agent' | 'indexer';
+  status: 'idle' | 'running' | 'waiting_approval' | 'completed' | 'error';
+  currentTask?: string;
+  progressPercent?: number;
+  prUrl?: string;
+  updatedAt: number;
+}
+
+export interface JarvisState {
+  isActive: boolean;
+  supervisorStatus: 'active' | 'idle' | 'analyzing' | 'error';
+  activeWorkers: JarvisWorkerStatus[];
+  recentActivities: JarvisActivityLog[];
+  updatedAt: number;
 }
 

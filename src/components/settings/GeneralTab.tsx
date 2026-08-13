@@ -8,6 +8,10 @@ interface GeneralTabProps {
   setGroqApiKey: (val: string) => void;
   geminiApiKey?: string;
   setGeminiApiKey?: (val: string) => void;
+  julesApiKey?: string;
+  setJulesApiKey?: (val: string) => void;
+  julesDefaultRepo?: string;
+  setJulesDefaultRepo?: (val: string) => void;
   reasoningEnabled: boolean;
   setReasoningEnabled: (val: boolean) => void;
   autoSaveHistory: boolean;
@@ -25,6 +29,10 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   setGroqApiKey,
   geminiApiKey = '',
   setGeminiApiKey,
+  julesApiKey = '',
+  setJulesApiKey,
+  julesDefaultRepo = '',
+  setJulesDefaultRepo,
   reasoningEnabled,
   setReasoningEnabled,
   autoSaveHistory,
@@ -95,6 +103,36 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               value={groqApiKey}
               onChange={(e) => setGroqApiKey(e.target.value)}
               placeholder="gsk_..."
+              className="w-full px-3 py-2 rounded-md flat-input text-xs font-mono text-slate-100 focus:outline-none"
+            />
+          </div>
+
+          {/* Google Jules API Key */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
+              <Key size={12} className="text-cyan-400" />
+              <span>Google Jules API Key</span>
+            </label>
+            <input
+              type="password"
+              value={julesApiKey}
+              onChange={(e) => setJulesApiKey && setJulesApiKey(e.target.value)}
+              placeholder="jules_api_key..."
+              className="w-full px-3 py-2 rounded-md flat-input text-xs font-mono text-slate-100 focus:outline-none"
+            />
+          </div>
+
+          {/* Jules Default Repository */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
+              <Globe size={12} className="text-cyan-400" />
+              <span>Jules Default Repo (e.g. github/owner/repo)</span>
+            </label>
+            <input
+              type="text"
+              value={julesDefaultRepo}
+              onChange={(e) => setJulesDefaultRepo && setJulesDefaultRepo(e.target.value)}
+              placeholder="sources/github/owner/repo"
               className="w-full px-3 py-2 rounded-md flat-input text-xs font-mono text-slate-100 focus:outline-none"
             />
           </div>

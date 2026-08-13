@@ -13,12 +13,22 @@ import {
   Code,
   ShieldAlert,
   RefreshCw,
+  MessageSquare,
+  Code2,
+  Tv,
 } from 'lucide-react';
-import { AppConfig, ChatMessage, LiveTelemetry } from '../types';
+import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata } from '../types';
 import { cleanContent, getWorkspaceBaseName } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
 import { MaterialIcon } from './common/MaterialIcon';
+import { AsciiArt } from './common/AsciiArt';
+import { PersonaChatSelector } from './chat/PersonaChatSelector';
+import {
+  ASCII_HERO_LOGO,
+  THINKING_BRAIN_FRAMES,
+  TOOL_EXECUTION_FRAMES,
+} from '../utils/asciiAnimations';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -40,6 +50,8 @@ interface ChatAreaProps {
   modelName?: string;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
+  chatMode?: 'agent' | 'simple';
+  onToggleChatMode?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -60,11 +72,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   modelName,
   config,
   onModelChanged: _onModelChanged,
+  chatMode = 'agent',
+  onToggleChatMode,
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [showAsciiArtLogo, setShowAsciiArtLogo] = useState<boolean>(true);
   const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   const historyEndRef = useRef<HTMLDivElement>(null);
@@ -82,6 +97,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [summarizePhase, setSummarizePhase] = useState('Инициализация фоновой суммаризации...');
   const [summarizePercent, setSummarizePercent] = useState(0);
   const [summarizeMetrics, setSummarizeMetrics] = useState<{ oldTokens?: number; newTokens?: number }>({});
+
+  // Active persona in chat
+  const [activePersona, setActivePersona] = useState<PersonaMetadata | null>(null);
 
   const activeModelId = config?.model_name || modelName || 'gemini-3.6-flash';
   const isLocalModelActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
@@ -284,13 +302,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const renderStreamingBanner = () => {
-    if (!liveTelemetry || agentStatus !== 'thinking') return null;
+    if (!liveTelemetry || (agentStatus !== 'thinking' && agentStatus !== 'executing_tool')) return null;
     return (
-      <div className="p-3 rounded-xl bg-slate-900/90 border border-sky-500/30 text-xs font-mono text-slate-200 flex items-center justify-between gap-3 shadow-lg animate-pulse my-2">
+      <div className="p-3 rounded-xl bg-slate-900/90 border border-sky-500/30 text-xs font-mono text-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg my-2">
         <div className="flex items-center gap-2">
-          <RefreshCw size={14} className="animate-spin text-sky-400" />
-          <span className="text-theme-accent font-semibold">Генерация ответа ИИ...</span>
+          <RefreshCw size={14} className="animate-spin text-sky-400 shrink-0" />
+          <span className="text-sky-300 font-semibold">
+            {agentStatus === 'executing_tool' ? 'Выполнение действий агента...' : 'Генерация ответа ИИ...'}
+          </span>
         </div>
+
+        {/* ASCII Tool Pipeline Animation if executing */}
+        {agentStatus === 'executing_tool' && (
+          <div className="hidden sm:block">
+            <AsciiArt frames={TOOL_EXECUTION_FRAMES} fps={3} color="amber" />
+          </div>
+        )}
+
         <div className="flex items-center gap-3 text-[10px] text-theme-muted">
           {liveTelemetry.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
             <span className="text-emerald-400 font-bold flex items-center gap-1">
@@ -299,7 +327,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </span>
           )}
           {liveTelemetry.contextUsed !== undefined && (
-            <span className="text-theme-accent flex items-center gap-1">
+            <span className="text-sky-300 flex items-center gap-1">
               <MaterialIcon name="psychology" size={12} />
               <span>{liveTelemetry.contextUsed.toLocaleString()} tok</span>
             </span>
@@ -357,7 +385,86 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         onChange={(e) => e.target.files && processImageFiles(e.target.files)}
       />
 
-      {/* OFFLINE LOCAL SERVER WARNING BANNER (Only displayed if a LOCAL model is active AND server is offline) */}
+      {/* TOP HEADER CONTROLS BAR (MODE SWITCHER & PERSONA SELECTOR) */}
+      <div className="px-3 py-1.5 bg-theme-panel/80 border-b border-theme-border flex items-center justify-between select-none z-10 shrink-0 backdrop-blur-md">
+        
+        {/* Left: Mode Switcher (IDE Agent vs Simple Chat) */}
+        <div className="flex items-center gap-2">
+          {onToggleChatMode && (
+            <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-white/10">
+              <button
+                type="button"
+                onClick={() => chatMode !== 'agent' && onToggleChatMode()}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  chatMode === 'agent'
+                    ? 'bg-sky-500/20 text-sky-200 border border-sky-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+                title="Автономный агент разработки проектов с доступом к файлам и терминалу"
+              >
+                <Code2 size={13} className="text-sky-400" />
+                <span>IDE Agent</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => chatMode !== 'simple' && onToggleChatMode()}
+                className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  chatMode === 'simple'
+                    ? 'bg-purple-500/20 text-purple-200 border border-purple-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5'
+                }`}
+                title="Простой диалоговый чат с возможностью смены личности"
+              >
+                <MessageSquare size={13} className="text-purple-400" />
+                <span>Simple Chat</span>
+              </button>
+            </div>
+          )}
+
+          {/* Quick Persona Picker (Always available, highlighted in Simple Chat) */}
+          <PersonaChatSelector
+            activePersonaId={config?.active_persona_id}
+            onPersonaChanged={(p) => setActivePersona(p)}
+            compact={chatMode === 'agent'}
+          />
+        </div>
+
+        {/* Right: Workspace badge or ASCII toggle */}
+        <div className="flex items-center gap-2">
+          {chatMode === 'agent' && onSelectWorkspace && (
+            <button
+              type="button"
+              onClick={onSelectWorkspace}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 hover:border-white/20 text-[11px] text-slate-300 transition-colors cursor-pointer"
+              title={workspaceDir || 'Выбрать рабочую папку'}
+            >
+              <Folder size={12} className="text-emerald-400" />
+              <span className="font-mono text-[11px] truncate max-w-[120px]">
+                {getWorkspaceBaseName(workspaceDir)}
+              </span>
+            </button>
+          )}
+
+          {!hasMessages && (
+            <button
+              type="button"
+              onClick={() => setShowAsciiArtLogo(!showAsciiArtLogo)}
+              className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-all cursor-pointer ${
+                showAsciiArtLogo
+                  ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
+                  : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white'
+              }`}
+              title="Переключить анимацию ASCII-логотипа"
+            >
+              <Tv size={13} />
+              <span className="text-[10px] font-mono hidden md:inline">ASCII HUD</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* OFFLINE LOCAL SERVER WARNING BANNER */}
       {showOfflineBanner && (
         <div className="p-2.5 bg-rose-950/80 border-b border-rose-500/30 text-xs text-rose-200 flex items-center justify-between gap-3 shrink-0 z-20">
           <div className="flex items-center gap-2">
@@ -380,63 +487,101 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       {/* 1. EMPTY CHAT STATE */}
       {!hasMessages && (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto scrollbar-none">
-          <div className="w-full max-w-2xl space-y-6 text-center">
+          <div className="w-full max-w-2xl space-y-5 text-center">
             
-            {/* Hero Brand Icon & Title */}
-            <div className="space-y-3">
-              <div className="inline-flex items-center justify-center p-3.5 rounded-2xl bg-gradient-to-tr from-sky-500/20 to-purple-500/20 border border-white/15 shadow-xl backdrop-blur-xl">
-                <Sparkles size={28} className="text-sky-400 animate-pulse" />
+            {/* Dynamic ASCII Waves Hero Art or Standard Glass Icon */}
+            {showAsciiArtLogo ? (
+              <div className="flex flex-col items-center justify-center">
+                <div className="p-3 rounded-2xl glass-card border border-sky-500/30 shadow-2xl bg-black/60 overflow-x-auto max-w-full">
+                  <AsciiArt
+                    frames={ASCII_HERO_LOGO}
+                    fps={2}
+                    color="accent"
+                    interactive
+                    className="text-[10px] sm:text-xs font-bold leading-none select-none text-sky-400"
+                  />
+                </div>
               </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="inline-flex items-center justify-center p-3.5 rounded-2xl bg-gradient-to-tr from-sky-500/20 to-purple-500/20 border border-white/15 shadow-xl backdrop-blur-xl">
+                  <Sparkles size={28} className="text-sky-400 animate-pulse" />
+                </div>
+                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
+                  0xAgent <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400">Developer IDE</span>
+                </h1>
+              </div>
+            )}
 
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                0xAgent <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400">Autonomous Developer</span>
-              </h1>
+            <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
+              {chatMode === 'agent'
+                ? 'Автономный локальный ИИ-разработчик. Создание, рефакторинг и аудит проектов через локальные .gguf модели и API.'
+                : 'Диалоговый режим общения с ИИ. Выберите подходящую личность (Persona) и задавайте любые вопросы.'}
+            </p>
 
-              <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
-                Локальный автономный ИИ-ассистент. Поддержка вызова облачных моделей Google AI Studio и локальных .gguf файлов.
-              </p>
-            </div>
-
-            {/* Workspace Bar */}
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              {onSelectWorkspace && (
-                <button
-                  type="button"
-                  onClick={onSelectWorkspace}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/[0.04] border border-white/10 hover:border-white/20 text-xs text-slate-200 transition-colors cursor-pointer"
-                  title={workspaceDir || 'Выбрать папку проекта'}
-                >
-                  <Folder size={13} className="text-emerald-400" />
-                  <span className="font-mono text-xs">{getWorkspaceBaseName(workspaceDir)}</span>
-                </button>
-              )}
-            </div>
+            {/* Active Persona Badge in Simple Chat Mode */}
+            {chatMode === 'simple' && activePersona && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-xs text-purple-300 font-mono">
+                <Sparkles size={13} className="text-purple-400" />
+                <span>Активная личность: <strong className="text-white">{activePersona.name}</strong></span>
+              </div>
+            )}
 
             {/* Quick Action Prompt Suggestion Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left max-w-xl mx-auto pt-2">
-              <button
-                type="button"
-                onClick={() => setInputText('Создай новое веб-приложение React с современным стеклом и анимациями.')}
-                className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-sky-500/40 hover:bg-sky-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
-              >
-                <Code size={16} className="text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                <div>
-                  <div className="font-semibold text-slate-100">Создать веб-приложение</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Разработка интерфейса React с CSS-стилями</div>
-                </div>
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left max-w-xl mx-auto pt-1">
+              {chatMode === 'agent' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setInputText('Создай новое веб-приложение React с современным стеклом и анимациями.')}
+                    className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-sky-500/40 hover:bg-sky-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
+                  >
+                    <Code size={16} className="text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="font-semibold text-slate-100">Создать веб-приложение</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">Разработка React UI с компонентами и анимациями</div>
+                    </div>
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setInputText('Проведи аудит безопасности и найди баги в активном проекте.')}
-                className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
-              >
-                <ShieldAlert size={16} className="text-purple-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                <div>
-                  <div className="font-semibold text-slate-100">Поиск и исправление багов</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5">Анализ кода, типов и потенциальных уязвимостей</div>
-                </div>
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setInputText('Проведи аудит безопасности и найди баги в активном проекте.')}
+                    className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
+                  >
+                    <ShieldAlert size={16} className="text-purple-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="font-semibold text-slate-100">Поиск и исправление багов</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">Анализ кода, типов и архитектурных узких мест</div>
+                    </div>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setInputText('Привет! Расскажи о своем опыте и чем ты можешь мне помочь?')}
+                    className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
+                  >
+                    <Sparkles size={16} className="text-purple-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="font-semibold text-slate-100">Знакомство с Личностью</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">Диалог согласно характеру в SOUL.md</div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setInputText('Объясни сложную концепцию простыми словами с жизненными аналогиями.')}
+                    className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-sky-500/40 hover:bg-sky-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
+                  >
+                    <Zap size={16} className="text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                    <div>
+                      <div className="font-semibold text-slate-100">Глубокое объяснение</div>
+                      <div className="text-[10px] text-slate-400 mt-0.5">Разбор концепций, идей и алгоритмов</div>
+                    </div>
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Input Form Box */}
@@ -454,7 +599,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         handleSubmit(e);
                       }
                     }}
-                    placeholder="Спросите что угодно"
+                    placeholder={chatMode === 'agent' ? 'Опишите задачу для ИИ-разработчика...' : 'Напишите сообщение...'}
                     rows={2}
                     className="w-full p-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none leading-relaxed font-sans"
                   />
@@ -470,7 +615,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         <Plus size={18} />
                       </button>
 
-                      {onTogglePlanningMode && (
+                      {chatMode === 'agent' && onTogglePlanningMode && (
                         <button
                           type="button"
                           onClick={onTogglePlanningMode}
@@ -600,25 +745,43 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                     return (
                       <div className="self-start w-full text-slate-100 text-sm leading-relaxed my-2 select-text px-1">
+                        
+                        {/* REASONING ACCORDION WITH ANIMATED ASCII CYBER BRAIN */}
                         {reasoningEnabled && thinkText && (
                           <details
                             open={agentStatus === 'thinking'}
-                            className="mb-2.5 border border-theme-border rounded-md glass-panel overflow-hidden group"
+                            className="mb-2.5 border border-theme-border rounded-xl glass-panel overflow-hidden group shadow-md"
                           >
-                            <summary className="px-3 py-1.5 text-[11px] font-medium text-theme-muted select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
-                              <span className="flex items-center gap-1.5 text-theme-accent font-semibold">
-                                <MaterialIcon name="psychology" size={14} />
-                                Ход мыслей (Размышление)
+                            <summary className="px-3 py-2 text-[11px] font-medium text-theme-muted select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
+                              <span className="flex items-center gap-2 text-sky-400 font-semibold">
+                                <MaterialIcon name="psychology" size={15} />
+                                <span>Ход мыслей (Размышление)</span>
+                                {agentStatus === 'thinking' && (
+                                  <span className="text-[10px] font-mono text-cyan-300 animate-pulse hidden sm:inline">
+                                    [ 🧠 NEURAL CORE: EVALUATING ]
+                                  </span>
+                                )}
                               </span>
                               <span className="text-[10px] text-theme-muted group-open:rotate-180 transition-transform">▼</span>
                             </summary>
-                            <div className="p-2.5 border-t border-theme-border font-mono text-[11px] text-theme-text/90 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto bg-black/40">
-                              {thinkText}
+
+                            <div className="p-3 border-t border-theme-border bg-black/50 space-y-2">
+                              {/* ASCII Neural Brain Animation during active thinking */}
+                              {agentStatus === 'thinking' && (
+                                <div className="p-2 rounded bg-black/60 border border-sky-500/20 flex justify-center">
+                                  <AsciiArt frames={THINKING_BRAIN_FRAMES} fps={2} color="cyan" />
+                                </div>
+                              )}
+                              <div className="font-mono text-[11px] text-theme-text/90 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
+                                {thinkText}
+                              </div>
                             </div>
                           </details>
                         )}
+
                         <NotionMarkdown content={bodyText} />
 
+                        {/* MULTI-FILE CHANGES SUMMARY BADGE */}
                         {msg.tool_calls && msg.tool_calls.length > 1 && (() => {
                           let totalAdds = 0;
                           let totalDels = 0;
@@ -655,6 +818,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           );
                         })()}
 
+                        {/* TOOL EXECUTION CARDS */}
                         {msg.tool_calls && msg.tool_calls.map((tool) => (
                           <ToolCard 
                             key={tool.id} 
@@ -663,7 +827,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           />
                         ))}
 
-                        {/* COMPACT METRICS FOOTER PILL */}
+                        {/* METRICS FOOTER PILL */}
                         {msg.metrics && (
                           <div className="mt-2 pt-2 border-t border-white/5 flex flex-wrap items-center gap-3 text-[10px] font-mono text-theme-muted select-none">
                             {msg.metrics.tokensPerSec !== undefined && msg.metrics.tokensPerSec > 0 && (
@@ -702,7 +866,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* SUMMARIZING SCI-FI BANNER */}
           {renderSummarizingBanner()}
 
-          {/* INPUT FORM CONTAINER (OLED Minimal Aesthetic) */}
+          {/* INPUT FORM CONTAINER */}
           <div className="p-3 bg-theme-bg border-t border-theme-border select-none z-10 w-full flex flex-col gap-2">
             {renderAttachedImagesPreview()}
 
@@ -730,7 +894,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       }
                     }}
                     rows={1}
-                    placeholder="Спросите что угодно"
+                    placeholder={chatMode === 'agent' ? 'Опишите задачу для ИИ-разработчика...' : 'Напишите сообщение...'}
                     className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none resize-none min-h-[38px] max-h-[200px] py-1.5 leading-relaxed font-sans"
                   />
                 </div>
@@ -740,7 +904,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   
                   {/* Left Pill: Thinking / Planning Toggle */}
                   <div className="flex items-center gap-2">
-                    {onTogglePlanningMode && (
+                    {chatMode === 'agent' && onTogglePlanningMode && (
                       <button
                         type="button"
                         onClick={onTogglePlanningMode}

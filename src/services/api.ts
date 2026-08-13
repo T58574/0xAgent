@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse, KnowledgeEntry, KnowledgeQueryOptions } from '../types';
+import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse, KnowledgeEntry, KnowledgeQueryOptions, JulesSource, JulesSessionInfo, JarvisState } from '../types';
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
 export { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen };
@@ -168,6 +168,16 @@ export async function read_file_raw(path: string): Promise<string> {
   const data = await res.json();
   return data.content;
 }
+
+export async function write_file_raw(path: string, content: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/write-file-raw`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path, content }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 
 export async function send_message(sessionId: string): Promise<void> {
   const res = await authFetch(`${API_BASE}/send-message`, {
@@ -544,6 +554,62 @@ export async function delete_knowledge_entry(id: string): Promise<void> {
   });
   if (!res.ok) throw new Error(await res.text());
 }
+
+export async function get_jules_sources(): Promise<JulesSource[]> {
+  const res = await authFetch(`${API_BASE}/jules/sources`);
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.sources || [];
+}
+
+export async function get_jules_sessions(): Promise<JulesSessionInfo[]> {
+  const res = await authFetch(`${API_BASE}/jules/sessions`);
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.sessions || [];
+}
+
+export async function create_jules_session(payload: {
+  prompt: string;
+  source: string;
+  startingBranch?: string;
+  autoCreatePR?: boolean;
+  requirePlanApproval?: boolean;
+  title?: string;
+}): Promise<JulesSessionInfo> {
+  const res = await authFetch(`${API_BASE}/jules/sessions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.session;
+}
+
+export async function approve_jules_plan(sessionId: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/jules/sessions/${encodeURIComponent(sessionId)}/approve`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function send_jules_message(sessionId: string, prompt: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/jules/sessions/${encodeURIComponent(sessionId)}/message`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function get_jarvis_state(): Promise<JarvisState> {
+  const res = await authFetch(`${API_BASE}/jarvis/state`);
+  if (!res.ok) throw new Error(await res.text());
+  const data = await res.json();
+  return data.state;
+}
+
 
 
 

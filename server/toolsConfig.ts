@@ -246,6 +246,46 @@ export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
     xmlSpec: `19. <list_knowledge category="..." />
     - Список статей из архива знаний.`,
   },
+  {
+    id: 'jules_delegate_task',
+    name: 'jules_delegate_task',
+    description: 'Делегирование задачи (крупного обновления, рефакторинга) облачному ИИ-разработчику Google Jules.',
+    category: 'agents',
+    requiresApproval: true,
+    enabled: true,
+    xmlSpec: `20. <jules_delegate_task prompt="..." repo="..." startingBranch="main" />
+    - Отправляет задачу в облачный Jules API для автоматического создания GitHub Pull Request.`,
+  },
+  {
+    id: 'jules_list_sessions',
+    name: 'jules_list_sessions',
+    description: 'Получение списка активных и завершенных фоновых сессий Jules.',
+    category: 'agents',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `21. <jules_list_sessions />
+    - Возвращает список текущих фоновых сессий в облаке Jules.`,
+  },
+  {
+    id: 'jules_approve_plan',
+    name: 'jules_approve_plan',
+    description: 'Утверждение сгенерированного плана облачного агента Jules.',
+    category: 'agents',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `22. <jules_approve_plan session_id="..." />
+    - Утверждает план задачи для сессии Jules.`,
+  },
+  {
+    id: 'jules_send_feedback',
+    name: 'jules_send_feedback',
+    description: 'Отправка дополнительного сообщения или правки в открытую сессию Jules.',
+    category: 'agents',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `23. <jules_send_feedback session_id="..." prompt="..." />
+    - Отправляет доработку в фоновую сессию Jules.`,
+  },
 ];
 
 export function loadToolsToggles(): Record<string, boolean> {
