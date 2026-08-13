@@ -181,7 +181,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <aside className="w-64 md:w-72 h-full bg-[#0d0e12] border-r border-white/10 flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-xl text-slate-200">
+    <aside className="w-64 md:w-72 h-full bg-[#050507] border-r border-white/[0.07] flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-xl text-slate-200">
       
       {/* 1. TOP CREATION & QUICK NAV SECTION */}
       <div className="p-3 border-b border-white/10 space-y-2 shrink-0 bg-slate-950/40">

@@ -190,7 +190,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, [lanOpen]);
 
   return (
-    <header className="w-full bg-[#0b0c10] border-b border-white/10 px-3 py-1.5 flex items-center justify-between select-none z-30 shrink-0 font-sans text-xs text-slate-200 backdrop-blur-xl">
+    <header className="w-full bg-[#050507] border-b border-white/[0.07] px-3 py-1.5 flex items-center justify-between select-none z-30 shrink-0 font-sans text-xs text-slate-200 backdrop-blur-xl">
       
       {/* Left Section: App Brand & Workspace Badge */}
       <div className="flex items-center gap-2.5">

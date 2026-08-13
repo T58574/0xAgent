@@ -533,7 +533,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               return (
                 <div key={msg.id} className="flex flex-col space-y-1 w-full select-text">
                   {msg.role === 'user' && (
-                    <div className="self-end max-w-[85%] rounded-2xl glass-card border border-[var(--theme-accent)]/30 bg-[var(--theme-card-bg)] px-4 py-2.5 text-theme-text text-xs sm:text-sm leading-relaxed font-sans select-text shadow-md flex flex-col gap-2">
+                    <div className="self-end max-w-[80%] rounded-2xl bg-[#13141c] border border-white/10 px-4 py-2.5 text-slate-100 text-sm font-sans select-text shadow-sm flex flex-col gap-2">
                       {msg.images && msg.images.length > 0 && (
                         <div className="flex flex-wrap gap-2 my-1">
                           {msg.images.map((imgUrl, i) => (
@@ -551,8 +551,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   )}
 
                   {msg.role === 'tool' && (
-                    <div className="self-start max-w-[95%] w-full rounded-xl glass-card border border-[var(--theme-border)] p-3 bg-black/40 text-theme-muted font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1 select-text">
-                      <div className="text-[10px] text-theme-muted font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
+                    <div className="self-start max-w-[95%] w-full rounded-xl border border-white/10 p-3 bg-black/60 text-slate-300 font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1 select-text">
+                      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
                         <Terminal size={10} />
                         <span>Результат выполнения инструмента</span>
                       </div>
@@ -599,17 +599,17 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     }
 
                     return (
-                      <div className="self-start max-w-[95%] w-full rounded-xl glass-panel border border-white/10 p-4 text-slate-100 text-xs sm:text-sm leading-relaxed my-1.5 select-text">
+                      <div className="self-start w-full text-slate-100 text-sm leading-relaxed my-2 select-text px-1">
                         {reasoningEnabled && thinkText && (
-                          <details open className="mb-3 border border-white/10 rounded-lg bg-slate-950/40 overflow-hidden group">
-                            <summary className="px-3 py-1.5 text-[11px] font-medium text-slate-300 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
+                          <details open className="mb-3 border border-white/10 rounded-xl bg-black/40 overflow-hidden group">
+                            <summary className="px-3 py-1.5 text-[11px] font-medium text-slate-400 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
                               <span className="flex items-center gap-1.5 text-purple-300 font-semibold">
                                 <Sparkles size={12} className="text-purple-400" />
                                 Ход мыслей модели
                               </span>
                               <span className="text-[10px] text-slate-500 group-open:rotate-180 transition-transform">▼</span>
                             </summary>
-                            <div className="p-3 border-t border-white/5 font-mono text-xs text-purple-200/90 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto bg-slate-950/60">
+                            <div className="p-3 border-t border-white/5 font-mono text-xs text-purple-200/90 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto bg-black/60">
                               {thinkText}
                             </div>
                           </details>
@@ -635,7 +635,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           });
 
                           return (
-                            <div className="my-2 p-2.5 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-between text-xs font-mono">
+                            <div className="my-2 p-2.5 rounded-xl bg-[#0e0f14] border border-white/10 flex items-center justify-between text-xs font-mono">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-slate-200 flex items-center gap-1.5 font-sans">
                                   <Layers size={14} className="text-amber-400" />
@@ -662,7 +662,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                         {/* COMPACT METRICS FOOTER PILL */}
                         {msg.metrics && (
-                          <div className="mt-3 pt-2 border-t border-white/5 flex flex-wrap items-center gap-3 text-[10px] font-mono text-slate-400 select-none">
+                          <div className="mt-2 pt-2 border-t border-white/5 flex flex-wrap items-center gap-3 text-[10px] font-mono text-slate-500 select-none">
                             {msg.metrics.tokensPerSec !== undefined && msg.metrics.tokensPerSec > 0 && (
                               <span className="flex items-center gap-1 text-emerald-400 font-semibold">
                                 <Zap size={11} />
@@ -670,13 +670,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                               </span>
                             )}
                             {msg.metrics.contextUsed !== undefined && (
-                              <span className="flex items-center gap-1 text-blue-300">
+                              <span className="flex items-center gap-1 text-slate-400">
                                 <Brain size={11} />
                                 <span>Контекст: {msg.metrics.contextUsed.toLocaleString()} / {msg.metrics.contextMax?.toLocaleString()} tok</span>
                               </span>
                             )}
                             {msg.metrics.modelName && (
-                              <span className="flex items-center gap-1 text-purple-300">
+                              <span className="flex items-center gap-1 text-slate-400">
                                 <Cpu size={11} />
                                 <span>{msg.metrics.modelName}</span>
                               </span>
@@ -700,7 +700,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {renderSummarizingBanner()}
 
           {/* INPUT FORM CONTAINER (OLED Minimal Aesthetic) */}
-          <div className="p-3 bg-[#08090d]/90 border-t border-white/5 select-none z-10 w-full flex flex-col gap-2 backdrop-blur-xl">
+          <div className="p-3 bg-[#050507] border-t border-white/[0.07] select-none z-10 w-full flex flex-col gap-2">
             {renderAttachedImagesPreview()}
 
             <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto">

@@ -2,50 +2,50 @@
 
 @import "tailwindcss";
 
-/* 4 UNIFIED GLASSMORPHISM PRESET THEMES */
+/* 4 UNIFIED GLASSMORPHISM PRESET THEMES (TRUE MONOLITHIC OLED) */
 :root, [data-theme="obsidian"] {
   --theme-bg: #050507;
   --theme-text: #f8fafc;
   --theme-text-muted: #94a3b8;
-  --theme-border: rgba(255, 255, 255, 0.08);
-  --theme-panel: rgba(12, 13, 18, 0.95);
-  --theme-card-bg: rgba(18, 20, 28, 0.6);
+  --theme-border: rgba(255, 255, 255, 0.07);
+  --theme-panel: #07070a;
+  --theme-card-bg: rgba(20, 21, 28, 0.6);
   --theme-accent: #2563eb;
   --theme-accent-hover: #1d4ed8;
   --theme-accent-glow: rgba(37, 99, 235, 0.2);
 }
 
 [data-theme="cyber"] {
-  --theme-bg: #080e1a;
+  --theme-bg: #050507;
   --theme-text: #f1f5f9;
   --theme-text-muted: #94a3b8;
-  --theme-border: rgba(56, 189, 248, 0.14);
-  --theme-panel: rgba(15, 23, 42, 0.88);
-  --theme-card-bg: rgba(15, 23, 42, 0.55);
+  --theme-border: rgba(56, 189, 248, 0.12);
+  --theme-panel: #07070a;
+  --theme-card-bg: rgba(20, 21, 28, 0.6);
   --theme-accent: #06b6d4;
   --theme-accent-hover: #0891b2;
   --theme-accent-glow: rgba(6, 182, 212, 0.2);
 }
 
 [data-theme="graphite"] {
-  --theme-bg: #09090b;
+  --theme-bg: #050507;
   --theme-text: #fafafa;
   --theme-text-muted: #a1a1aa;
-  --theme-border: rgba(255, 255, 255, 0.12);
-  --theme-panel: rgba(24, 24, 27, 0.88);
-  --theme-card-bg: rgba(24, 24, 27, 0.55);
+  --theme-border: rgba(255, 255, 255, 0.1);
+  --theme-panel: #07070a;
+  --theme-card-bg: rgba(20, 21, 28, 0.6);
   --theme-accent: #e4e4e7;
   --theme-accent-hover: #ffffff;
   --theme-accent-glow: rgba(228, 228, 231, 0.18);
 }
 
 [data-theme="matrix"] {
-  --theme-bg: #06120e;
+  --theme-bg: #050507;
   --theme-text: #ecfdf5;
   --theme-text-muted: #6ee7b7;
-  --theme-border: rgba(52, 211, 153, 0.14);
-  --theme-panel: rgba(6, 32, 22, 0.88);
-  --theme-card-bg: rgba(6, 32, 22, 0.55);
+  --theme-border: rgba(52, 211, 153, 0.12);
+  --theme-panel: #07070a;
+  --theme-card-bg: rgba(20, 21, 28, 0.6);
   --theme-accent: #34d399;
   --theme-accent-hover: #059669;
   --theme-accent-glow: rgba(52, 211, 153, 0.2);
