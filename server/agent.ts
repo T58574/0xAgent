@@ -114,11 +114,12 @@ ${activePersona.soul}
 ## USER.md — USER PROFILE & OBSERVED TRAITS (${activePersona.metadata.user_id})
 ${activePersona.user}`;
 
-    const toolExecutionDirective = `\n\n# ⚠️ CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & USER COMMUNICATION
+    const toolExecutionDirective = `\n\n# ⚠️ CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & CODE MODIFICATIONS
 1. EXPLANATION FIRST: Always write a brief natural language explanation of your diagnosis and intended changes BEFORE emitting XML tool calls.
-2. NO RAW CODE PATCH LEAKS: NEVER output raw SEARCH/REPLACE blocks (<<<<<<< SEARCH / ======= / >>>>>>> REPLACE) as raw conversational text. All code modifications MUST be enclosed in valid XML tool tags (<patch_file path="...">...</patch_file> or <write_file path="...">...</write_file>).
-3. PROPER XML TAGS: Always close every XML tool call tag (<patch_file path="...">...</patch_file>). The system will render a dedicated approval card for the user.
-4. NO REPETITIVE PATCH FAILURES: If <patch_file> fails with a SEARCH block error or empty content, NEVER repeat the exact same <patch_file> call in a loop. Re-read the file with <read_file> or IMMEDIATELY use <write_file path="..."> to write the complete updated file content instead.`;
+2. MANDATORY PATCH FIRST POLICY: ALWAYS use <patch_file> for modifying existing codebase files. NEVER use <write_file> to rewrite an entire file (>50 lines) just to change a few components or lines!
+3. MULTI-BLOCK PATCHES: You can place MULTIPLE SEARCH/REPLACE blocks inside a single <patch_file path="..."> tag to modify multiple places at once. Keep SEARCH blocks concise and unique (3-8 lines).
+4. NO RAW CODE PATCH LEAKS: NEVER output raw SEARCH/REPLACE blocks outside of <patch_file path="..."> tags.
+5. PROPER XML TAGS: Always close every XML tool call tag (<patch_file path="...">...</patch_file>). Reserve <write_file> strictly for creating new files or tiny config files under 50 lines.`;
 
     // Detect Gemma 4 model for specialized prompting
     const modelNameLower = (config.model_name || '').toLowerCase();
