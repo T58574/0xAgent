@@ -593,15 +593,36 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     let bodyText = textOutput;
 
                     if (textOutput) {
+                      // 1. Standard <think>...</think> (closed)
                       const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
                       const match = textOutput.match(thinkRegex);
                       if (match) {
                         thinkText = match[1].trim();
                         bodyText = textOutput.replace(thinkRegex, '').trim();
-                      } else if (textOutput.includes('<think>')) {
-                        const startIdx = textOutput.indexOf('<think>');
-                        thinkText = textOutput.substring(startIdx + 7).trim();
-                        bodyText = textOutput.substring(0, startIdx).trim();
+                      }
+                      // 2. Gemma 4 <|channel>thought...<channel|> (closed)
+                      else {
+                        const gemmaThinkRegex = /<\|channel>thought([\s\S]*?)<channel\|>/i;
+                        const gemmaMatch = textOutput.match(gemmaThinkRegex);
+                        if (gemmaMatch) {
+                          thinkText = gemmaMatch[1].trim();
+                          bodyText = textOutput.replace(gemmaThinkRegex, '').trim();
+                        }
+                        // 3. Standard <think> (unclosed / streaming)
+                        else if (textOutput.includes('<think>')) {
+                          const startIdx = textOutput.indexOf('<think>');
+                          thinkText = textOutput.substring(startIdx + 7).trim();
+                          bodyText = textOutput.substring(0, startIdx).trim();
+                        }
+                        // 4. Gemma 4 <|channel>thought (unclosed / streaming)
+                        else {
+                          const gemmaOpenMatch = textOutput.match(/<\|channel>thought/i);
+                          if (gemmaOpenMatch && gemmaOpenMatch.index !== undefined) {
+                            const startIdx = gemmaOpenMatch.index;
+                            thinkText = textOutput.substring(startIdx + '<|channel>thought'.length).trim();
+                            bodyText = textOutput.substring(0, startIdx).trim();
+                          }
+                        }
                       }
                     }
 

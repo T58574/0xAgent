@@ -212,6 +212,7 @@ export interface ServerStatusInfo {
   pid?: number | null;
   exePath?: string | null;
   modelPath?: string | null;
+  modelName?: string | null;
   host: string;
   port: number;
 }

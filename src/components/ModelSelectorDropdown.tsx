@@ -10,29 +10,51 @@ import {
   Search,
   Volume2,
   Sliders,
+  Activity,
 } from 'lucide-react';
 import { AppConfig, AvailableModelsResponse } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
+interface ServerStatusData {
+  running: boolean;
+  host: string;
+  port: number;
+  modelPath?: string | null;
+  modelName?: string | null;
+}
+
 interface LocalModelOptionProps {
   model: any;
   isActive: boolean;
+  isRunning: boolean;
   onSelect: (id: string) => void;
 }
 
-const LocalModelOptionItem: React.FC<LocalModelOptionProps> = ({ model, isActive, onSelect }) => (
+const LocalModelOptionItem: React.FC<LocalModelOptionProps> = ({ model, isActive, isRunning, onSelect }) => (
   <button
     type="button"
     onClick={() => onSelect(model.id)}
     className={`w-full px-2.5 py-2 rounded-lg border transition-all text-left flex items-center justify-between gap-2 cursor-pointer ${
-      isActive
+      isRunning
+        ? 'bg-emerald-500/15 border-emerald-500/40 text-white font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]'
+        : isActive
         ? 'bg-purple-500/15 border-purple-500/40 text-white font-medium shadow-[0_0_10px_rgba(168,85,247,0.15)]'
         : 'bg-white/[0.02] border-transparent hover:bg-white/[0.06] hover:border-white/10 text-slate-300'
     }`}
   >
     <div className="flex items-center gap-2 min-w-0">
-      <HardDrive size={14} className={isActive ? 'text-purple-400' : 'text-slate-400'} />
+      {/* Status indicator dot */}
+      <div className="relative shrink-0">
+        <HardDrive size={14} className={isRunning ? 'text-emerald-400' : isActive ? 'text-purple-400' : 'text-slate-400'} />
+        <span
+          className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-950 ${
+            isRunning
+              ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]'
+              : 'bg-slate-600'
+          }`}
+        />
+      </div>
       <div className="truncate">
         <div className="text-xs font-semibold truncate">{model.title}</div>
         <div className="text-[10px] text-slate-400 font-mono truncate">{model.fileName}</div>
@@ -40,13 +62,19 @@ const LocalModelOptionItem: React.FC<LocalModelOptionProps> = ({ model, isActive
     </div>
 
     <div className="flex items-center gap-1.5 shrink-0">
+      {isRunning && (
+        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 animate-pulse">
+          <Activity size={9} />
+          ACTIVE
+        </span>
+      )}
       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
         {model.quantization}
       </span>
       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-white/10">
         {model.sizeGB}
       </span>
-      {isActive && <Check size={14} className="text-purple-400 ml-1" />}
+      {isActive && !isRunning && <Check size={14} className="text-purple-400 ml-1" />}
     </div>
   </button>
 );
@@ -64,6 +92,13 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [serverStatus, setServerStatus] = useState<ServerStatusData>({
+    running: false,
+    host: '127.0.0.1',
+    port: 11434,
+    modelPath: null,
+    modelName: null,
+  });
   const [modelsData, setModelsData] = useState<AvailableModelsResponse>({
     cloud: [
       { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', badge: 'Medium', speed: 'Medium >', provider: 'Google AI Studio' },
@@ -81,8 +116,12 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
   const fetchModels = async () => {
     setLoading(true);
     try {
-      const data = await api.get_available_models();
+      const [data, status] = await Promise.all([
+        api.get_available_models(),
+        api.get_server_status(),
+      ]);
       setModelsData(data);
+      setServerStatus(status as ServerStatusData);
     } catch (err) {
       console.error('Failed to fetch available models:', err);
     } finally {
@@ -106,6 +145,18 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
+
+  /** Check if a local model is currently loaded on the running llama.cpp server */
+  const isModelRunning = (model: any): boolean => {
+    if (!serverStatus.running || !serverStatus.modelPath) return false;
+    const serverModelPath = serverStatus.modelPath.toLowerCase().replace(/\\/g, '/');
+    const modelFilePath = (model.filePath || '').toLowerCase().replace(/\\/g, '/');
+    if (modelFilePath && serverModelPath === modelFilePath) return true;
+    // Also check by filename
+    const serverBasename = serverModelPath.split('/').pop() || '';
+    const modelBasename = (model.fileName || '').toLowerCase();
+    return serverBasename === modelBasename;
+  };
 
   const handleSelectModel = async (modelId: string) => {
     setIsOpen(false);
@@ -157,7 +208,14 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     return id;
   };
 
-
+  /** Get the display name for the trigger button */
+  const getTriggerDisplayName = (): string => {
+    // If local model is running, show its name from server status
+    if (serverStatus.running && serverStatus.modelName && activeModelId.startsWith('local:')) {
+      return serverStatus.modelName;
+    }
+    return getDisplayTitle(activeModelId);
+  };
 
   const isLocalActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
 
@@ -172,6 +230,15 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     m.fileName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.quantization.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Sort local models: running first, then active, then the rest
+  const sortedLocal = [...filteredLocal].sort((a, b) => {
+    const aRunning = isModelRunning(a) ? 2 : 0;
+    const bRunning = isModelRunning(b) ? 2 : 0;
+    const aActive = (activeModelId === a.id || activeModelId === a.fileName || activeModelId === `local:${a.fileName}`) ? 1 : 0;
+    const bActive = (activeModelId === b.id || activeModelId === b.fileName || activeModelId === `local:${b.fileName}`) ? 1 : 0;
+    return (bRunning + bActive) - (aRunning + aActive);
+  });
 
   return (
     <div className="relative font-sans select-none" ref={dropdownRef}>
@@ -190,13 +257,18 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
         title={`Текущая модель: ${activeModelId}`}
       >
         {isLocalActive ? (
-          <Cpu size={14} className="text-purple-400 shrink-0" />
+          <div className="relative shrink-0">
+            <Cpu size={14} className="text-purple-400" />
+            {serverStatus.running && (
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-slate-950 shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
+            )}
+          </div>
         ) : (
           <Sparkles size={14} className="text-sky-400 shrink-0" />
         )}
 
         <span className="font-semibold text-xs text-slate-100 truncate max-w-[150px] sm:max-w-[200px]">
-          {activeModelId}
+          {getTriggerDisplayName()}
         </span>
         <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -295,26 +367,36 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
                   <Cpu size={12} />
                   <span>Local llama.cpp (models/*.gguf)</span>
                 </div>
-                <span className="text-[9px] text-slate-500 font-mono font-normal">
-                  {modelsData.local.length} файлов
-                </span>
+                <div className="flex items-center gap-2">
+                  {serverStatus.running && (
+                    <span className="text-[9px] font-mono font-semibold text-emerald-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.6)] animate-pulse" />
+                      SERVER ON
+                    </span>
+                  )}
+                  <span className="text-[9px] text-slate-500 font-mono font-normal">
+                    {modelsData.local.length} файлов
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-1 mt-1">
-                {filteredLocal.length === 0 ? (
+                {sortedLocal.length === 0 ? (
                   <div className="px-3 py-3 text-center text-[11px] text-slate-500 italic bg-white/[0.01] rounded-lg border border-dashed border-white/10">
                     {modelsData.local.length === 0
                       ? 'Файлы .gguf не найдены в папке models/.'
                       : 'Совпадений по поиску не найдено.'}
                   </div>
                 ) : (
-                  filteredLocal.map((model) => {
+                  sortedLocal.map((model) => {
                     const isActive = activeModelId === model.id || activeModelId === model.fileName || activeModelId === `local:${model.fileName}`;
+                    const running = isModelRunning(model);
                     return (
                       <LocalModelOptionItem
                         key={model.id}
                         model={model}
                         isActive={isActive}
+                        isRunning={running}
                         onSelect={handleSelectModel}
                       />
                     );
@@ -326,7 +408,12 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
 
           {/* Footer */}
           <div className="px-3 py-2 bg-slate-900/80 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400">
-            <span className="truncate">Текущая: <span className="font-mono text-slate-200">{activeModelId}</span></span>
+            <span className="truncate flex items-center gap-1.5">
+              {serverStatus.running && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.6)]" />
+              )}
+              <span>Текущая: <span className="font-mono text-slate-200">{getTriggerDisplayName()}</span></span>
+            </span>
             <span className="text-slate-500 font-mono">Cloud + Local</span>
           </div>
         </div>

@@ -116,9 +116,24 @@ ${activePersona.user}`;
 2. NO RAW CODE PATCH LEAKS: NEVER output raw SEARCH/REPLACE blocks (<<<<<<< SEARCH / ======= / >>>>>>> REPLACE) as raw conversational text. All code modifications MUST be enclosed in valid XML tool tags (<patch_file path="...">...</patch_file> or <write_file path="...">...</write_file>).
 3. PROPER XML TAGS: Always close every XML tool call tag (<patch_file path="...">...</patch_file>). The system will render a dedicated approval card for the user.`;
 
+    // Detect Gemma 4 model for specialized prompting
+    const modelNameLower = (config.model_name || '').toLowerCase();
+    const modelPathLower = (config.local_server?.model_path || '').toLowerCase();
+    const isGemmaModel = modelNameLower.includes('gemma') || modelPathLower.includes('gemma');
+
+    const gemmaToolDirective = isGemmaModel ? `\n\n# 🔧 ALTERNATIVE TOOL CALL FORMAT (Gemma 4)
+You may also call tools using JSON format wrapped in <tool_call> tags:
+<tool_call>{"name": "read_file", "arguments": {"path": "src/main.ts"}}</tool_call>
+<tool_call>{"name": "write_file", "arguments": {"path": "src/main.ts", "content": "file contents here"}}</tool_call>
+<tool_call>{"name": "execute_command", "arguments": {"command": "npm run build"}}</tool_call>
+<tool_call>{"name": "list_dir", "arguments": {"path": "."}}</tool_call>
+<tool_call>{"name": "grep_search", "arguments": {"pattern": "TODO", "path": "src/"}}</tool_call>
+<tool_call>{"name": "patch_file", "arguments": {"path": "file.ts", "content": "<<<<<<< SEARCH\nold code\n=======\nnew code\n>>>>>>> REPLACE"}}</tool_call>
+Both XML and JSON tool call formats are accepted.` : '';
+
     const unifiedToolsContext = getUnifiedToolsContext();
     const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
-    const fullSystemPrompt = personaContext + unifiedToolsContext + toolExecutionDirective + envContext + planningContext + memoryContext + workspaceMdContext;
+    const fullSystemPrompt = personaContext + unifiedToolsContext + toolExecutionDirective + gemmaToolDirective + envContext + planningContext + memoryContext + workspaceMdContext;
 
     const formatMessageContent = (m: ChatMessage): string | any[] => {
       if (Array.isArray(m.images) && m.images.length > 0) {
@@ -205,7 +220,6 @@ ${activePersona.user}`;
         temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
         frequency_penalty: loopRetryCount > 0 ? 0.5 : (config.local_server?.frequency_penalty ?? 0.3),
         presence_penalty: config.local_server?.presence_penalty ?? 0.1,
-        repeat_penalty: config.local_server?.repeat_penalty ?? 1.1,
       };
 
       let attempts = 0;

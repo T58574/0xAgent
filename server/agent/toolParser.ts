@@ -186,10 +186,63 @@ function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCal
   }
 }
 
+/**
+ * Parse Gemma 4 style tool calls: <tool_call>{"name": "...", "arguments": {...}}</tool_call>
+ * Maps Gemma 4 function names to 0xAgent tool names.
+ */
+function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
+  const reToolCall = /<tool_call>([\s\S]*?)<\/tool_call>/gs;
+  let match: RegExpExecArray | null;
+
+  while ((match = reToolCall.exec(text)) !== null) {
+    try {
+      const raw = match[1].trim();
+      const parsed = JSON.parse(raw);
+      const name = parsed.name || parsed.function || '';
+      const args = parsed.arguments || parsed.parameters || {};
+
+      // Map Gemma 4 function names to 0xAgent tool names
+      const toolNameMap: Record<string, string> = {
+        'read_file': 'read_file',
+        'write_file': 'write_file',
+        'patch_file': 'patch_file',
+        'list_dir': 'list_dir',
+        'list_directory': 'list_dir',
+        'grep_search': 'grep_search',
+        'search': 'grep_search',
+        'execute_command': 'execute_command',
+        'run_command': 'execute_command',
+        'shell': 'execute_command',
+        'create_directory': 'create_directory',
+        'get_file_info': 'get_file_info',
+        'remember_fact': 'remember_fact',
+        'recall_memories': 'recall_memories',
+        'ask_user': 'ask_user',
+      };
+
+      const mappedName = toolNameMap[name] || name;
+      if (mappedName) {
+        // Don't add duplicate calls
+        if (!toolCalls.some((tc) => tc.raw_content === match![0])) {
+          toolCalls.push({
+            id: `gemma_${uuidv4().substring(0, 8)}`,
+            name: mappedName,
+            arguments: args,
+            raw_content: match[0],
+          });
+        }
+      }
+    } catch {
+      // Ignore malformed JSON in tool_call blocks
+    }
+  }
+}
+
 export function parseToolCalls(text: string): ParsedToolCall[] {
   const toolCalls: ParsedToolCall[] = [];
   parseFileToolCalls(text, toolCalls);
   parseSearchAndDirToolCalls(text, toolCalls);
   parseExecAndInteractiveToolCalls(text, toolCalls);
+  parseGemmaToolCalls(text, toolCalls);
   return toolCalls;
 }

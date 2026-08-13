@@ -228,7 +228,16 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
     const host = cfg.local_server?.host || '127.0.0.1';
     const port = cfg.local_server?.port || 11434;
     const isRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
-    res.json({ running: isRunning, host, port });
+    const modelPath = cfg.local_server?.model_path || null;
+    let modelName: string | null = null;
+    if (modelPath) {
+      const baseName = path.basename(modelPath).replace(/\.gguf$/i, '');
+      modelName = baseName
+        .replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
+    }
+    res.json({ running: isRunning, host, port, modelPath, modelName });
   });
 
   router.post('/start-local-server', (req, res) => {
