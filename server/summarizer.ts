@@ -201,6 +201,8 @@ export async function summarizeContext(
       });
 
       return summary;
+    } else {
+      console.warn(`[summarizer] Context summarizer returned HTTP ${res.status}. Falling back to basic pruning.`);
     }
   } catch (err: any) {
     console.error('Context summarization error:', err);

@@ -281,51 +281,80 @@ Both XML and JSON tool call formats are accepted.` : '';
           max_tokens: config.max_tokens ?? 8192,
         };
 
-        try {
-          let res = await fetch(cloudEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify(requestBody),
-          });
+        let rateLimitAttempts = 0;
+        const maxRateLimitRetries = 2;
 
-          // HTTP 400 Fallback (for models/endpoints not supporting systemInstruction)
-          if (res.status === 400) {
-            console.warn(`[agent] Model ${candidateModel} returned 400 (possible systemInstruction issue). Retrying without system instruction...`);
-            const strippedMessages = messages.filter((m) => m.role !== 'system');
-            const fallbackBody = { ...requestBody, messages: strippedMessages };
-            const retryRes = await fetch(cloudEndpoint, {
+        while (rateLimitAttempts <= maxRateLimitRetries) {
+          try {
+            let res = await fetch(cloudEndpoint, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${apiKey}`,
               },
-              body: JSON.stringify(fallbackBody),
+              body: JSON.stringify(requestBody),
             });
-            if (retryRes.ok) {
-              res = retryRes;
-            }
-          }
 
-          if (res.ok) {
-            response = res;
+            // Handle HTTP 429 Rate Limit with exponential backoff retry
+            if (res.status === 429 && rateLimitAttempts < maxRateLimitRetries) {
+              rateLimitAttempts++;
+              console.warn(`[agent] Cloud model ${candidateModel} hit 429 Rate Limit. Attempt ${rateLimitAttempts}/${maxRateLimitRetries}. Waiting 2.5s before retry...`);
+              await new Promise((r) => setTimeout(r, 2500 * rateLimitAttempts));
+              continue;
+            }
+
+            // HTTP 400 Fallback (for models/endpoints not supporting systemInstruction)
+            if (res.status === 400) {
+              console.warn(`[agent] Model ${candidateModel} returned 400 (possible systemInstruction issue). Retrying without system instruction...`);
+              const strippedMessages = messages.filter((m) => m.role !== 'system');
+              const fallbackBody = { ...requestBody, messages: strippedMessages };
+              const retryRes = await fetch(cloudEndpoint, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify(fallbackBody),
+              });
+              if (retryRes.ok) {
+                res = retryRes;
+              }
+            }
+
+            if (res.ok) {
+              response = res;
+              break;
+            } else {
+              lastStatusCode = res.status;
+              lastErrorText = await res.text().catch(() => '');
+              console.warn(`[agent] Cloud model ${candidateModel} failed (${res.status}): ${lastErrorText.substring(0, 200)}. Falling back to next model...`);
+              break; // Try next candidate in modelCandidates
+            }
+          } catch (fetchErr: any) {
+            lastErrorText = fetchErr.message;
+            console.warn(`[agent] Cloud model ${candidateModel} network error: ${fetchErr.message}. Falling back...`);
             break;
-          } else {
-            lastStatusCode = res.status;
-            lastErrorText = await res.text().catch(() => '');
-            console.warn(`[agent] Cloud model ${candidateModel} failed (${res.status}): ${lastErrorText.substring(0, 200)}. Falling back to next model...`);
           }
-        } catch (fetchErr: any) {
-          lastErrorText = fetchErr.message;
-          console.warn(`[agent] Cloud model ${candidateModel} network error: ${fetchErr.message}. Falling back...`);
         }
+
+        if (response && response.ok) break;
       }
     }
 
     if (!response || !response.ok) {
-      const errMsg = `⚠️ **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server / all fallback models exhausted'}\n\`\`\``;
+      let errMsg = `⚠️ **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server / all fallback models exhausted'}\n\`\`\``;
+      
+      if (lastStatusCode === 429) {
+        errMsg = `⏳ **Превышен лимит запросов / квота Google AI Studio (HTTP 429 Rate Limit Exceeded)!**\n\n` +
+          `Модель \`${activeModelName}\` вернула ошибку **429 Too Many Requests** (превышены ограничения RPM / TPM / RPD на бесплатном тарифе).\n\n` +
+          `👉 **Решения:**\n` +
+          `1. **Подождите 15-30 секунд** и повторите запрос (минутный лимит RPM восстановится).\n` +
+          `2. **Переключитесь на локальную модель** вверху чата (без каких-либо лимитов).\n` +
+          `3. **Выберите другую модель Google** (например, \`Gemini 3.5 Flash Lite\` или \`Gemini 2.5 Flash\`).\n` +
+          `4. Укажите новый **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)**.\n\n` +
+          `\`\`\`json\n${lastErrorText.substring(0, 400)}\n\`\`\``;
+      }
+
       handleAgentError(session, sessionId, broadcast, errMsg);
       return;
     }
