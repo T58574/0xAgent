@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { AppConfig } from '../../types';
+import { AppConfig, AppTheme } from '../../types';
 
 export function useSettingsState(
   config: AppConfig | null,
@@ -23,7 +23,7 @@ export function useSettingsState(
   const [compactChat, setCompactChat] = useState(false);
 
   // Active theme state
-  const [activeTheme, setActiveTheme] = useState<'obsidian' | 'cyber' | 'graphite' | 'matrix'>('obsidian');
+  const [activeTheme, setActiveTheme] = useState<AppTheme>('obsidian');
 
   // Local Server state
   const [exePath, setExePath] = useState('');
@@ -76,7 +76,7 @@ export function useSettingsState(
       if (config.sound_notifications !== undefined && config.sound_notifications !== null) setSoundNotifications(config.sound_notifications);
       if (config.compact_chat !== undefined && config.compact_chat !== null) setCompactChat(config.compact_chat);
 
-      const theme = (config.active_theme as 'obsidian' | 'cyber' | 'graphite' | 'matrix') || 'obsidian';
+      const theme = (config.active_theme as AppTheme) || 'obsidian';
       setActiveTheme(theme);
       document.documentElement.setAttribute('data-theme', theme);
 
@@ -214,7 +214,7 @@ export function useSettingsState(
     customArgs,
   ]);
 
-  const handleSelectTheme = (theme: 'obsidian' | 'cyber' | 'graphite' | 'matrix') => {
+  const handleSelectTheme = (theme: AppTheme) => {
     setActiveTheme(theme);
     document.documentElement.setAttribute('data-theme', theme);
   };

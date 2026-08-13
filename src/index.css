@@ -1,54 +1,177 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap');
 
 @import "tailwindcss";
 
-/* 4 UNIFIED GLASSMORPHISM PRESET THEMES (TRUE MONOLITHIC OLED) */
+/* ==========================================
+   12 DYNAMIC PRESET THEMES (CSS DESIGN TOKENS)
+   ========================================== */
+
+/* 1. Obsidian Glass (OLED Monolith) */
 :root, [data-theme="obsidian"] {
   --theme-bg: #050507;
   --theme-text: #f8fafc;
   --theme-text-muted: #94a3b8;
-  --theme-border: rgba(255, 255, 255, 0.07);
+  --theme-border: rgba(255, 255, 255, 0.08);
   --theme-panel: #07070a;
   --theme-card-bg: rgba(20, 21, 28, 0.6);
-  --theme-accent: #2563eb;
-  --theme-accent-hover: #1d4ed8;
-  --theme-accent-glow: rgba(37, 99, 235, 0.2);
+  --theme-accent: #10b981;
+  --theme-accent-hover: #059669;
+  --theme-accent-glow: rgba(16, 185, 129, 0.2);
+  --theme-accent-text: #022c22;
 }
 
+/* 2. Monochrome Studio Light */
+[data-theme="light"] {
+  --theme-bg: #fafafa;
+  --theme-text: #0f172a;
+  --theme-text-muted: #64748b;
+  --theme-border: rgba(15, 23, 42, 0.12);
+  --theme-panel: #ffffff;
+  --theme-card-bg: rgba(241, 245, 249, 0.75);
+  --theme-accent: #0f172a;
+  --theme-accent-hover: #334155;
+  --theme-accent-glow: rgba(15, 23, 42, 0.15);
+  --theme-accent-text: #ffffff;
+}
+
+/* 3. Cyber Midnight */
 [data-theme="cyber"] {
-  --theme-bg: #050507;
+  --theme-bg: #050814;
   --theme-text: #f1f5f9;
   --theme-text-muted: #94a3b8;
-  --theme-border: rgba(56, 189, 248, 0.12);
-  --theme-panel: #07070a;
-  --theme-card-bg: rgba(20, 21, 28, 0.6);
+  --theme-border: rgba(56, 189, 248, 0.15);
+  --theme-panel: #070c1a;
+  --theme-card-bg: rgba(15, 23, 42, 0.65);
   --theme-accent: #06b6d4;
   --theme-accent-hover: #0891b2;
-  --theme-accent-glow: rgba(6, 182, 212, 0.2);
+  --theme-accent-glow: rgba(6, 182, 212, 0.25);
+  --theme-accent-text: #083344;
 }
 
+/* 4. Graphite Brutal */
 [data-theme="graphite"] {
-  --theme-bg: #050507;
+  --theme-bg: #09090b;
   --theme-text: #fafafa;
   --theme-text-muted: #a1a1aa;
-  --theme-border: rgba(255, 255, 255, 0.1);
-  --theme-panel: #07070a;
-  --theme-card-bg: rgba(20, 21, 28, 0.6);
+  --theme-border: rgba(255, 255, 255, 0.12);
+  --theme-panel: #121215;
+  --theme-card-bg: rgba(24, 24, 27, 0.6);
   --theme-accent: #e4e4e7;
   --theme-accent-hover: #ffffff;
-  --theme-accent-glow: rgba(228, 228, 231, 0.18);
+  --theme-accent-glow: rgba(228, 228, 231, 0.2);
+  --theme-accent-text: #09090b;
 }
 
+/* 5. Emerald Matrix */
 [data-theme="matrix"] {
-  --theme-bg: #050507;
+  --theme-bg: #04120c;
   --theme-text: #ecfdf5;
   --theme-text-muted: #6ee7b7;
-  --theme-border: rgba(52, 211, 153, 0.12);
-  --theme-panel: #07070a;
-  --theme-card-bg: rgba(20, 21, 28, 0.6);
+  --theme-border: rgba(52, 211, 153, 0.15);
+  --theme-panel: #062016;
+  --theme-card-bg: rgba(6, 32, 22, 0.65);
   --theme-accent: #34d399;
   --theme-accent-hover: #059669;
-  --theme-accent-glow: rgba(52, 211, 153, 0.2);
+  --theme-accent-glow: rgba(52, 211, 153, 0.25);
+  --theme-accent-text: #022c22;
+}
+
+/* 6. Sunlit Saffron & Apricot (Tom Ford / Dries Van Noten) */
+[data-theme="saffron_apricot"] {
+  --theme-bg: #0c0a09;
+  --theme-text: #fffbeb;
+  --theme-text-muted: #d97706;
+  --theme-border: rgba(245, 158, 11, 0.2);
+  --theme-panel: #1c1917;
+  --theme-card-bg: rgba(44, 26, 14, 0.6);
+  --theme-accent: #f59e0b;
+  --theme-accent-hover: #d97706;
+  --theme-accent-glow: rgba(245, 158, 11, 0.3);
+  --theme-accent-text: #451a03;
+}
+
+/* 7. Butter Cream Luxury */
+[data-theme="butter_cream"] {
+  --theme-bg: #0f0e0a;
+  --theme-text: #fefce8;
+  --theme-text-muted: #ca8a04;
+  --theme-border: rgba(254, 240, 138, 0.18);
+  --theme-panel: #1a1912;
+  --theme-card-bg: rgba(41, 37, 24, 0.6);
+  --theme-accent: #fef08a;
+  --theme-accent-hover: #fde047;
+  --theme-accent-glow: rgba(254, 240, 138, 0.25);
+  --theme-accent-text: #422006;
+}
+
+/* 8. Cloud Dancer 2026 (Pantone Milk White Balance) */
+[data-theme="cloud_dancer"] {
+  --theme-bg: #f4f4f5;
+  --theme-text: #18181b;
+  --theme-text-muted: #52525b;
+  --theme-border: rgba(24, 24, 27, 0.12);
+  --theme-panel: #ffffff;
+  --theme-card-bg: rgba(228, 228, 231, 0.7);
+  --theme-accent: #3f3f46;
+  --theme-accent-hover: #18181b;
+  --theme-accent-glow: rgba(63, 63, 70, 0.15);
+  --theme-accent-text: #ffffff;
+}
+
+/* 9. Mint Glacier & Tiffany (Prada / Chanel Ice Mint) */
+[data-theme="mint_glacier"] {
+  --theme-bg: #041416;
+  --theme-text: #f0fdfa;
+  --theme-text-muted: #5eead4;
+  --theme-border: rgba(45, 212, 191, 0.18);
+  --theme-panel: #092327;
+  --theme-card-bg: rgba(13, 44, 48, 0.6);
+  --theme-accent: #2dd4bf;
+  --theme-accent-hover: #14b8a6;
+  --theme-accent-glow: rgba(45, 212, 191, 0.3);
+  --theme-accent-text: #042f2e;
+}
+
+/* 10. Sicilian Tomato (Loewe / Stella McCartney Vibrant Red) */
+[data-theme="sicilian_tomato"] {
+  --theme-bg: #140606;
+  --theme-text: #fef2f2;
+  --theme-text-muted: #f87171;
+  --theme-border: rgba(239, 68, 68, 0.2);
+  --theme-panel: #210a0a;
+  --theme-card-bg: rgba(45, 14, 14, 0.6);
+  --theme-accent: #ef4444;
+  --theme-accent-hover: #dc2626;
+  --theme-accent-glow: rgba(239, 68, 68, 0.3);
+  --theme-accent-text: #450a0a;
+}
+
+/* 11. Sky & Industrial (Sky Blue + Industrial Graphite) */
+[data-theme="sky_industrial"] {
+  --theme-bg: #080c14;
+  --theme-text: #f0f9ff;
+  --theme-text-muted: #7dd3fc;
+  --theme-border: rgba(56, 189, 248, 0.18);
+  --theme-panel: #0e1626;
+  --theme-card-bg: rgba(16, 28, 48, 0.6);
+  --theme-accent: #38bdf8;
+  --theme-accent-hover: #0284c7;
+  --theme-accent-glow: rgba(56, 189, 248, 0.3);
+  --theme-accent-text: #0c4a6e;
+}
+
+/* 12. Terracotta Dust (Warm Clay & Earthy Grounding) */
+[data-theme="terracotta_dust"] {
+  --theme-bg: #120b08;
+  --theme-text: #fff7ed;
+  --theme-text-muted: #fb923c;
+  --theme-border: rgba(224, 122, 95, 0.2);
+  --theme-panel: #1f140f;
+  --theme-card-bg: rgba(43, 26, 19, 0.6);
+  --theme-accent: #e07a5f;
+  --theme-accent-hover: #c85a3f;
+  --theme-accent-glow: rgba(224, 122, 95, 0.3);
+  --theme-accent-text: #431407;
 }
 
 /* Custom Sleek Scrollbar */
@@ -70,6 +193,7 @@
   background: rgba(255, 255, 255, 0.25);
 }
 
+/* Typography Base Rules */
 html, body {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 13.5px;
@@ -82,6 +206,26 @@ html, body {
   width: 100%;
   height: 100%;
   position: fixed;
+}
+
+/* Large Headings (>36px) use Cormorant Garamond serif */
+h1, .font-heading, .text-4xl, .text-5xl, .text-6xl {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+}
+
+/* Material Symbols Icon Base */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal;
+  font-style: normal;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'liga';
 }
 
 /* Subtle Grid Background Pattern */
@@ -112,7 +256,7 @@ html, body {
 /* Flat Glass Buttons & Inputs Design System */
 .btn-primary {
   background: var(--theme-accent);
-  color: #020617;
+  color: var(--theme-accent-text);
   font-weight: 600;
   border-radius: 8px;
   border: 1px solid var(--theme-accent);
@@ -138,8 +282,8 @@ html, body {
 
 .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
+  border-color: var(--theme-border);
+  color: var(--theme-text);
 }
 
 .btn-ghost {
@@ -166,7 +310,7 @@ html, body {
 
 .flat-btn:hover {
   background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
+  border-color: var(--theme-border);
 }
 
 .flat-btn:active {
@@ -216,6 +360,10 @@ html, body {
   color: var(--theme-accent);
 }
 
+@utility bg-theme-accent {
+  background-color: var(--theme-accent);
+}
+
 /* LAN Share dropdown animation */
 @keyframes fadeSlideDown {
   from {
@@ -227,4 +375,3 @@ html, body {
     transform: translateY(0);
   }
 }
-

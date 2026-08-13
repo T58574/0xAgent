@@ -160,7 +160,7 @@ export const KnowledgeVault: React.FC = () => {
   };
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#08090d] text-slate-200 overflow-hidden font-sans">
+    <div className="w-full h-full flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans">
       {/* Header */}
       <div className="px-6 py-4 border-b border-white/[0.08] bg-black/40 backdrop-blur-xl flex flex-wrap items-center justify-between gap-4 shrink-0">
         <div className="flex items-center gap-3">
@@ -301,7 +301,7 @@ export const KnowledgeVault: React.FC = () => {
         </div>
 
         {/* Right Pane: Reading & Content View */}
-        <div className="flex-1 bg-[#050507] overflow-y-auto p-6">
+        <div className="flex-1 bg-theme-bg overflow-y-auto p-6">
           {selectedEntry ? (
             <div className="max-w-4xl mx-auto space-y-6">
               {/* Header section */}
@@ -387,7 +387,7 @@ export const KnowledgeVault: React.FC = () => {
       {/* Modal: New Knowledge Entry */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl bg-[#12131a] border border-white/15 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+          <div className="w-full max-w-2xl glass-panel border border-white/15 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
               <div className="flex items-center gap-2">
@@ -423,7 +423,7 @@ export const KnowledgeVault: React.FC = () => {
                   <select
                     value={newCategory}
                     onChange={e => setNewCategory(e.target.value as KnowledgeCategory)}
-                    className="w-full px-3 py-2 rounded-lg bg-[#181922] border border-white/10 text-white focus:outline-none focus:border-violet-500"
+                    className="w-full px-3 py-2 rounded-lg flat-input text-theme-text focus:outline-none"
                   >
                     <option value="strategy">Strategy (Стратегия)</option>
                     <option value="architecture">Architecture (Архитектура)</option>

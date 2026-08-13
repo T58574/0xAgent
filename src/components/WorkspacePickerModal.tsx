@@ -71,7 +71,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 font-sans select-none animate-fadeIn">
-      <div className="w-full max-w-xl glass-panel rounded-2xl border border-white/15 shadow-2xl overflow-hidden text-slate-100 bg-[#12131b]">
+      <div className="w-full max-w-xl glass-panel rounded-2xl border border-theme-border shadow-2xl overflow-hidden text-theme-text">
         
         {/* Header */}
         <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between bg-slate-950/60">

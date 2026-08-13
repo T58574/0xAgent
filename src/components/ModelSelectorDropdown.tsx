@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  ChevronDown,
   Cloud,
   Cpu,
   Sparkles,
   HardDrive,
   Check,
-  RefreshCw,
-  Search,
   Volume2,
-  Sliders,
   Activity,
 } from 'lucide-react';
 import { AppConfig, AvailableModelsResponse } from '../types';
+import { MaterialIcon } from './common/MaterialIcon';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -258,43 +255,43 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
       >
         {isLocalActive ? (
           <div className="relative shrink-0">
-            <Cpu size={14} className="text-purple-400" />
+            <MaterialIcon name="developer_board" size={16} className="text-theme-accent" />
             {serverStatus.running && (
               <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-slate-950 shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
             )}
           </div>
         ) : (
-          <Sparkles size={14} className="text-sky-400 shrink-0" />
+          <MaterialIcon name="auto_awesome" size={16} className="text-theme-accent shrink-0" />
         )}
 
-        <span className="font-semibold text-xs text-slate-100 truncate max-w-[150px] sm:max-w-[200px]">
+        <span className="font-semibold text-xs text-theme-text truncate max-w-[150px] sm:max-w-[200px]">
           {getTriggerDisplayName()}
         </span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <MaterialIcon name={isOpen ? 'expand_less' : 'expand_more'} size={16} className="text-theme-muted" />
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 rounded-2xl bg-slate-950/95 border border-white/15 shadow-2xl backdrop-blur-xl z-50 overflow-hidden font-sans">
+        <div className="absolute right-0 mt-2 w-80 rounded-xl glass-panel shadow-2xl z-50 overflow-hidden font-sans">
           {/* Header */}
-          <div className="p-3 border-b border-white/10 bg-slate-900/40 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold text-white">
-              <Sliders size={14} className="text-sky-400" />
+          <div className="p-3 border-b border-theme-border flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-semibold text-theme-text">
+              <MaterialIcon name="tune" size={16} className="text-theme-accent" />
               <span>Выбор модели ИИ</span>
             </div>
             <button
               type="button"
               onClick={fetchModels}
               disabled={loading}
-              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+              className="p-1 rounded-lg hover:bg-white/10 text-theme-muted hover:text-theme-text transition-colors"
             >
-              <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
+              <MaterialIcon name="refresh" size={14} className={loading ? 'animate-spin' : ''} />
             </button>
           </div>
 
           {/* Search Bar */}
-          <div className="p-2 border-b border-white/10 bg-slate-900/20">
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl bg-slate-900/80 border border-white/10 text-xs">
-              <Search size={13} className="text-slate-400 shrink-0" />
+          <div className="p-2 border-b border-theme-border">
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg flat-input text-xs">
+              <MaterialIcon name="search" size={14} className="text-theme-muted shrink-0" />
               <input
                 type="text"
                 placeholder="Поиск модели..."

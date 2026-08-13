@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Activity, Zap, Brain, Database, CheckCircle2, RefreshCw, Layers, Search, Terminal } from 'lucide-react';
+import { Activity, Zap, Database, CheckCircle2, RefreshCw, Layers, Search, Terminal } from 'lucide-react';
+import { MaterialIcon } from '../common/MaterialIcon';
 import { ChatSession, ChatMessage } from '../../types';
 
 interface AnalyticsPageProps {
@@ -152,21 +153,21 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         </div>
 
         {/* KPI 3: Context Peak */}
-        <div className="glass-panel p-4 rounded-xl border border-blue-500/30 bg-slate-900/60 shadow-lg relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-400 mb-2 text-xs font-medium">
+        <div className="glass-panel p-4 rounded-xl border border-[var(--theme-accent)]/30 bg-theme-panel/60 shadow-lg relative overflow-hidden group">
+          <div className="flex items-center justify-between text-theme-muted mb-2 text-xs font-medium">
             <span>Пик Контекстного Окна</span>
-            <Brain size={16} className="text-blue-400" />
+            <MaterialIcon name="psychology" size={18} className="text-theme-accent" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-blue-300 tracking-tight">
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-theme-accent tracking-tight">
             {stats.maxContextPercent}%
           </div>
           <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden mt-3.5 border border-white/5">
             <div
-              className="bg-blue-400 h-full transition-all duration-500"
+              className="bg-theme-accent h-full transition-all duration-500"
               style={{ width: `${Math.min(100, Number(stats.maxContextPercent))}%` }}
             />
           </div>
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
+          <div className="absolute right-0 bottom-0 w-24 h-24 bg-theme-accent/5 rounded-full blur-xl pointer-events-none" />
         </div>
 
         {/* KPI 4: Reliability */}
@@ -308,7 +309,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
                         <div className="flex items-center gap-2">
                           <div className="w-16 bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5">
                             <div
-                              className="bg-blue-400 h-full"
+                              className="bg-theme-accent h-full"
                               style={{ width: `${Math.min(100, Number(ctxPercent))}%` }}
                             />
                           </div>

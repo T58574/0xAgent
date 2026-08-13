@@ -65,6 +65,20 @@ export interface PersonaDetail {
   user: string;
 }
 
+export type AppTheme =
+  | 'obsidian'
+  | 'light'
+  | 'cyber'
+  | 'graphite'
+  | 'matrix'
+  | 'saffron_apricot'
+  | 'butter_cream'
+  | 'cloud_dancer'
+  | 'mint_glacier'
+  | 'sicilian_tomato'
+  | 'sky_industrial'
+  | 'terracotta_dust';
+
 export interface AppConfig {
   api_url: string;
   model_name: string;
@@ -74,7 +88,7 @@ export interface AppConfig {
   workspace_dir?: string | null;
   groq_api_key?: string | null;
   gemini_api_key?: string | null;
-  active_theme?: 'obsidian' | 'cyber' | 'graphite' | 'matrix' | string | null;
+  active_theme?: AppTheme | string | null;
   theme_colors?: ThemeColors | null;
   models_path?: string | null;
   reasoning_enabled?: boolean | null;
@@ -149,6 +163,10 @@ export interface MessageMetrics {
   contextUsed?: number;
   contextMax?: number;
   evalDurationMs?: number;
+  ttftMs?: number;
+  vramUsedMB?: number;
+  vramTotalMB?: number;
+  promptCacheHit?: boolean;
   modelName?: string;
 }
 
@@ -158,6 +176,10 @@ export interface LiveTelemetry {
   tokenCount?: number;
   contextUsed?: number;
   contextMax?: number;
+  ttftMs?: number;
+  vramUsedMB?: number;
+  vramTotalMB?: number;
+  promptCacheHit?: boolean;
   modelName?: string;
 }
 

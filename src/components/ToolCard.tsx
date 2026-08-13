@@ -1,21 +1,11 @@
 import React, { useState } from 'react';
-import {
-  Check,
-  X,
-  Terminal,
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
-  Play,
-  ChevronDown,
-  ChevronUp,
-  RefreshCw,
-} from 'lucide-react';
 import { ToolCallInfo } from '../types';
+import { MaterialIcon } from './common/MaterialIcon';
 
 interface ToolCardProps {
   tool: ToolCallInfo;
   onRespond: (toolId: string, approve: boolean | string) => void;
+  onOpenFileInEditor?: (filePath: string) => void;
 }
 
 const DetailToggle: React.FC<{ isOpen: boolean; onToggle: () => void; labelOpen: string; labelClosed: string }> = ({
@@ -27,10 +17,10 @@ const DetailToggle: React.FC<{ isOpen: boolean; onToggle: () => void; labelOpen:
   <button
     type="button"
     onClick={onToggle}
-    className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
+    className="flex items-center gap-1.5 text-xs text-theme-muted hover:text-theme-text transition-colors cursor-pointer"
   >
     <span>{isOpen ? labelOpen : labelClosed}</span>
-    {isOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+    <MaterialIcon name={isOpen ? 'expand_less' : 'expand_more'} size={16} />
   </button>
 );
 
@@ -79,8 +69,9 @@ function getFileTypeBadge(filePath: string): { label: string; color: string } {
   }
 }
 
-export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
+export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileInEditor }) => {
   const [showDetails, setShowDetails] = useState(false);
+  const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified');
   const [customAnswer, setCustomAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -103,17 +94,17 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
   const getStatusInfo = () => {
     switch (tool.status) {
       case 'completed':
-        return { label: 'УСПЕШНО', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10', icon: <CheckCircle2 size={12} className="text-emerald-400" /> };
+        return { label: 'УСПЕШНО', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10', iconName: 'check_circle' };
       case 'error':
-        return { label: 'ОШИБКА', color: 'text-rose-400 border-rose-500/30 bg-rose-500/10', icon: <AlertTriangle size={12} className="text-rose-400" /> };
+        return { label: 'ОШИБКА', color: 'text-rose-400 border-rose-500/30 bg-rose-500/10', iconName: 'error' };
       case 'running':
-        return { label: 'ВЫПОЛНЕНИЕ', color: 'text-sky-400 border-sky-500/30 bg-sky-500/10 animate-pulse', icon: <Play size={12} className="text-sky-400 animate-spin" /> };
+        return { label: 'ВЫПОЛНЕНИЕ', color: 'text-theme-accent border-[var(--theme-accent)]/30 bg-[var(--theme-accent)]/10 animate-pulse', iconName: 'progress_activity' };
       case 'rejected':
-        return { label: 'ОТКЛОНЕНО', color: 'text-slate-400 border-slate-500/30 bg-slate-500/10', icon: <X size={12} className="text-slate-400" /> };
+        return { label: 'ОТКЛОНЕНО', color: 'text-theme-muted border-theme-border bg-white/5', iconName: 'cancel' };
       case 'pending':
-        return { label: 'ОЖИДАЕТ ПОДТВЕРЖДЕНИЯ', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10', icon: <AlertTriangle size={12} className="text-amber-400" /> };
+        return { label: 'ОЖИДАЕТ ПОДТВЕРЖДЕНИЯ', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10', iconName: 'warning' };
       default:
-        return { label: tool.status.toUpperCase(), color: 'text-slate-300 border-slate-500/30 bg-slate-500/10', icon: null };
+        return { label: tool.status.toUpperCase(), color: 'text-theme-muted border-theme-border bg-white/5', iconName: 'info' };
     }
   };
 
@@ -130,73 +121,151 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
 
     if (blocks.length === 0) {
       return (
-        <div className="text-slate-300 text-[11px] font-mono whitespace-pre-wrap p-2.5 bg-slate-950/80 rounded border border-white/10">
+        <div className="text-theme-text text-[11px] font-mono whitespace-pre-wrap p-2.5 bg-slate-950/80 rounded border border-theme-border">
           {patchText}
         </div>
       );
     }
 
     return (
-      <div className="space-y-2 font-mono text-[11px]">
-        {blocks.map((b, idx) => (
-          <div key={idx} className="rounded overflow-hidden border border-white/10 bg-slate-950/90">
-            {b.search && (
-              <div className="bg-rose-950/40 text-rose-300 p-2.5 border-b border-rose-500/20 whitespace-pre-wrap">
-                <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
-                  <span>- УДАЛЯЕМЫЕ СТРОКИ</span>
-                </div>
-                {b.search.split('\n').map((line, lIdx) => (
-                  <div key={lIdx} className="flex gap-2">
-                    <span className="text-rose-500/60 select-none">-</span>
-                    <span>{line}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-            {b.replace && (
-              <div className="bg-emerald-950/40 text-emerald-300 p-2.5 whitespace-pre-wrap">
-                <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
-                  <span>+ НОВЫЕ СТРОКИ</span>
-                </div>
-                {b.replace.split('\n').map((line, lIdx) => (
-                  <div key={lIdx} className="flex gap-2">
-                    <span className="text-emerald-500/60 select-none">+</span>
-                    <span>{line}</span>
-                  </div>
-                ))}
-              </div>
-            )}
+      <div className="space-y-3 font-mono text-[11px] mt-2">
+        {/* Toggle Mode Control Bar */}
+        <div className="flex items-center justify-between pb-1 border-b border-theme-border text-[10px]">
+          <span className="text-theme-muted font-sans font-medium">Просмотр изменений патча:</span>
+          <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded border border-theme-border">
+            <button
+              type="button"
+              onClick={() => setDiffViewMode('unified')}
+              className={`px-2 py-0.5 rounded font-sans font-semibold cursor-pointer transition-colors ${
+                diffViewMode === 'unified' ? 'bg-theme-accent text-slate-950' : 'text-theme-muted hover:text-theme-text'
+              }`}
+            >
+              Unified
+            </button>
+            <button
+              type="button"
+              onClick={() => setDiffViewMode('split')}
+              className={`px-2 py-0.5 rounded font-sans font-semibold cursor-pointer transition-colors ${
+                diffViewMode === 'split' ? 'bg-theme-accent text-slate-950' : 'text-theme-muted hover:text-theme-text'
+              }`}
+            >
+              Side-by-Side
+            </button>
           </div>
-        ))}
+        </div>
+
+        {blocks.map((b, idx) => {
+          const searchLines = b.search ? b.search.split('\n') : [];
+          const replaceLines = b.replace ? b.replace.split('\n') : [];
+          const maxLines = Math.max(searchLines.length, replaceLines.length);
+
+          if (diffViewMode === 'split') {
+            return (
+              <div key={idx} className="rounded-lg overflow-hidden border border-theme-border bg-slate-950/90">
+                <div className="grid grid-cols-2 divide-x divide-white/10 text-[11px]">
+                  {/* Left Column: SEARCH (Deletions) */}
+                  <div className="bg-rose-950/30 text-rose-300 p-2 overflow-x-auto">
+                    <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1 border-b border-rose-500/20 pb-1">
+                      <span>- УДАЛЯЕМЫЕ СТРОКИ</span>
+                    </div>
+                    {Array.from({ length: maxLines }).map((_, lIdx) => {
+                      const line = searchLines[lIdx];
+                      return (
+                        <div key={lIdx} className="flex gap-2 min-h-[1.35rem]">
+                          <span className="text-rose-500/60 select-none w-4 text-right shrink-0">{line !== undefined ? lIdx + 1 : ''}</span>
+                          <span className="truncate">{line !== undefined ? line : ''}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Right Column: REPLACE (Additions) */}
+                  <div className="bg-emerald-950/30 text-emerald-300 p-2 overflow-x-auto">
+                    <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1 border-b border-emerald-500/20 pb-1">
+                      <span>+ НОВЫЕ СТРОКИ</span>
+                    </div>
+                    {Array.from({ length: maxLines }).map((_, lIdx) => {
+                      const line = replaceLines[lIdx];
+                      return (
+                        <div key={lIdx} className="flex gap-2 min-h-[1.35rem]">
+                          <span className="text-emerald-500/60 select-none w-4 text-right shrink-0">{line !== undefined ? lIdx + 1 : ''}</span>
+                          <span className="truncate">{line !== undefined ? line : ''}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // Unified View Mode
+          return (
+            <div key={idx} className="rounded-lg overflow-hidden border border-theme-border bg-slate-950/90">
+              {b.search && (
+                <div className="bg-rose-950/40 text-rose-300 p-2.5 border-b border-rose-500/20 whitespace-pre-wrap">
+                  <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
+                    <span>- УДАЛЯЕМЫЕ СТРОКИ</span>
+                  </div>
+                  {searchLines.map((line, lIdx) => (
+                    <div key={lIdx} className="flex gap-2">
+                      <span className="text-rose-500/60 select-none">-</span>
+                      <span>{line}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {b.replace && (
+                <div className="bg-emerald-950/40 text-emerald-300 p-2.5 whitespace-pre-wrap">
+                  <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
+                    <span>+ НОВЫЕ СТРОКИ</span>
+                  </div>
+                  {replaceLines.map((line, lIdx) => (
+                    <div key={lIdx} className="flex gap-2">
+                      <span className="text-emerald-500/60 select-none">+</span>
+                      <span>{line}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     );
   };
 
   return (
-    <div className="rounded-xl p-3.5 my-2.5 bg-slate-900/90 border border-white/10 text-slate-100 font-sans shadow-lg backdrop-blur-md">
-      {/* Header Bar in Antigravity / Claude Code style */}
+    <div className="rounded-lg p-3 my-2 glass-panel border border-theme-border text-theme-text font-sans shadow-md">
+      {/* Header Bar */}
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
           {/* File Extension Badge */}
           {filePath ? (
             <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold border shrink-0 ${fileBadge.color}`}>
               {fileBadge.label}
             </span>
           ) : (
-            <div className="w-7 h-7 rounded bg-slate-800 border border-white/10 flex items-center justify-center shrink-0">
-              {tool.name === 'execute_command' ? <Terminal size={14} className="text-sky-400" /> : <FileText size={14} className="text-amber-400" />}
+            <div className="w-6 h-6 rounded bg-slate-800 border border-theme-border flex items-center justify-center shrink-0">
+              <MaterialIcon name={tool.name === 'execute_command' ? 'terminal' : 'description'} size={14} className="text-theme-accent" />
             </div>
           )}
 
           {/* File path or command description */}
           <div className="min-w-0">
             {filePath ? (
-              <div className="text-xs font-mono font-medium text-slate-200 truncate" title={filePath}>
+              <div
+                className={`text-xs font-mono font-medium truncate ${
+                  onOpenFileInEditor ? 'hover:underline cursor-pointer text-theme-accent' : 'text-theme-text'
+                }`}
+                title={filePath}
+                onClick={() => onOpenFileInEditor && onOpenFileInEditor(filePath)}
+              >
                 {filePath}
               </div>
             ) : (
-              <div className="text-xs font-mono font-medium text-slate-200 truncate">
-                {tool.name} <span className="text-[10px] text-slate-500">[{tool.id}]</span>
+              <div className="text-xs font-mono font-medium text-theme-text truncate">
+                {tool.name} <span className="text-[10px] text-theme-muted">[{tool.id}]</span>
               </div>
             )}
           </div>
@@ -205,25 +274,25 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
         {/* Diff line stats (+lines -lines) or status badge */}
         <div className="flex items-center gap-2 shrink-0">
           {(diffStats.additions > 0 || diffStats.deletions > 0) && (
-            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-950 border border-white/10">
+            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-950 border border-theme-border">
               {diffStats.additions > 0 && <span className="text-emerald-400">+{diffStats.additions}</span>}
               {diffStats.deletions > 0 && <span className="text-rose-400">-{diffStats.deletions}</span>}
             </div>
           )}
 
           <div className={`px-2 py-0.5 rounded text-[10px] border font-semibold flex items-center gap-1.5 ${statusInfo.color}`}>
-            {statusInfo.icon}
+            <MaterialIcon name={statusInfo.iconName} size={13} />
             <span>{statusInfo.label}</span>
           </div>
         </div>
       </div>
 
       {/* Action Content Preview */}
-      <div className="mt-3 font-mono text-xs text-slate-200">
+      <div className="mt-2.5 font-mono text-xs text-theme-text">
         {tool.name === 'execute_command' && (
-          <div className="flat-input rounded-lg p-2.5 bg-slate-950 border border-white/10 flex items-start gap-2">
+          <div className="flat-input rounded-md p-2.5 bg-slate-950 border border-theme-border flex items-start gap-2">
             <span className="text-emerald-400 font-bold select-none">PS &gt;</span>
-            <span className="text-slate-100 break-all">{parsedArgs.command}</span>
+            <span className="text-theme-text break-all">{parsedArgs.command}</span>
           </div>
         )}
 
@@ -236,7 +305,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
               labelClosed="Показать создаваемый файл"
             />
             {showDetails && (
-              <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-3 border border-white/10 rounded-lg text-slate-300">
+              <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-3 border border-theme-border rounded-md text-theme-text">
                 {parsedArgs.content}
               </div>
             )}
@@ -260,7 +329,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
             <div className="text-amber-300 font-semibold text-xs flex items-center gap-1.5">
               <span>Вопрос от Агента:</span>
             </div>
-            <div className="text-slate-100 text-xs font-medium bg-slate-950 p-3 rounded-lg border border-white/10">
+            <div className="text-theme-text text-xs font-medium bg-slate-950 p-3 rounded-md border border-theme-border">
               {parsedArgs.question}
             </div>
             {tool.status === 'pending' && (
@@ -272,7 +341,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
                         key={opt}
                         disabled={isSubmitting}
                         onClick={() => handleAction(opt)}
-                        className="flat-btn px-3 py-1 rounded-lg text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40"
+                        className="flat-btn px-3 py-1 rounded-md text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40"
                       >
                         {opt}
                       </button>
@@ -295,14 +364,14 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
                     disabled={isSubmitting}
                     onChange={(e) => setCustomAnswer(e.target.value)}
                     placeholder="Введите ваш ответ..."
-                    className="flex-1 px-3 py-1.5 rounded-lg flat-input text-xs text-slate-100 focus:outline-none"
+                    className="flex-1 px-3 py-1.5 rounded-md flat-input text-xs text-theme-text focus:outline-none"
                   />
                   <button
                     type="submit"
                     disabled={!customAnswer.trim() || isSubmitting}
-                    className="flat-btn px-3.5 py-1.5 rounded-lg text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                    className="flat-btn px-3.5 py-1.5 rounded-md text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
                   >
-                    {isSubmitting && <RefreshCw size={12} className="animate-spin text-emerald-400" />}
+                    {isSubmitting && <MaterialIcon name="progress_activity" size={13} className="animate-spin text-emerald-400" />}
                     <span>{isSubmitting ? 'Отправка...' : 'Отправить'}</span>
                   </button>
                 </form>
@@ -313,8 +382,8 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
 
         {tool.name === 'run_scratch_script' && (
           <div className="space-y-1.5">
-            <div className="text-slate-400 text-[11px]">Скрипт ({parsedArgs.language})</div>
-            <div className="text-[10px] whitespace-pre-wrap max-h-36 overflow-y-auto bg-slate-950 p-2.5 border border-white/10 rounded-lg text-slate-300">
+            <div className="text-theme-muted text-[11px]">Скрипт ({parsedArgs.language})</div>
+            <div className="text-[10px] whitespace-pre-wrap max-h-36 overflow-y-auto bg-slate-950 p-2.5 border border-theme-border rounded-md text-theme-text">
               {parsedArgs.code}
             </div>
           </div>
@@ -323,26 +392,26 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
 
       {/* Approve / Reject Controls */}
       {tool.status === 'pending' && (
-        <div className="mt-3 flex items-center justify-end gap-2 border-t border-white/10 pt-2.5">
+        <div className="mt-3 flex items-center justify-end gap-2 border-t border-theme-border pt-2.5">
           <button
             type="button"
             disabled={isSubmitting}
             onClick={() => handleAction(false)}
-            className="px-3.5 py-1.5 rounded-lg text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 border border-rose-500/30"
+            className="px-3.5 py-1.5 rounded-md text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 border border-rose-500/30"
           >
-            <X size={13} />
+            <MaterialIcon name="close" size={14} />
             <span>Отклонить</span>
           </button>
           <button
             type="button"
             disabled={isSubmitting}
             onClick={() => handleAction(true)}
-            className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-40"
+            className="px-4 py-1.5 rounded-md btn-primary text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-40"
           >
             {isSubmitting ? (
-              <RefreshCw size={13} className="animate-spin text-white" />
+              <MaterialIcon name="progress_activity" size={14} className="animate-spin" />
             ) : (
-              <Check size={13} />
+              <MaterialIcon name="check" size={14} />
             )}
             <span>{isSubmitting ? 'Выполняется...' : 'Подтвердить'}</span>
           </button>
@@ -351,18 +420,18 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond }) => {
 
       {/* Execution Output Drawer */}
       {tool.output && (
-        <div className="mt-2.5 border-t border-white/5 pt-2">
+        <div className="mt-2.5 border-t border-theme-border pt-2">
           <button
             type="button"
             onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center gap-1.5 text-[11px] text-slate-400 hover:text-white cursor-pointer transition-colors"
+            className="flex items-center gap-1.5 text-[11px] text-theme-muted hover:text-theme-text cursor-pointer transition-colors"
           >
             <span>{showDetails ? 'Скрыть лог выполнения' : 'Показать результат выполнения'}</span>
-            {showDetails ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+            <MaterialIcon name={showDetails ? 'expand_less' : 'expand_more'} size={14} />
           </button>
 
           {showDetails && (
-            <div className="mt-2 bg-slate-950 rounded-lg p-3 border border-white/10 text-[11px] font-mono text-slate-300 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+            <div className="mt-2 bg-slate-950 rounded-md p-2.5 border border-theme-border text-[11px] font-mono text-theme-text whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
               {tool.output}
             </div>
           )}

@@ -9,6 +9,7 @@ import {
   ChevronDown,
   FolderTree,
   PanelLeftClose,
+  PanelLeftOpen,
   History,
   Settings as SettingsIcon,
   Search,
@@ -123,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   if (!isOpen) {
     return (
-      <aside className="w-12 h-full bg-[#0b0c10] border-r border-white/10 flex flex-col items-center justify-between py-3 z-20 shrink-0 font-sans select-none">
+      <aside className="w-12 h-full bg-theme-panel border-r border-theme-border flex flex-col items-center justify-between py-3 z-20 shrink-0 font-sans select-none">
         <div className="flex flex-col items-center gap-3">
           <button
             type="button"
@@ -131,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             title="Развернуть боковую панель"
           >
-            <ChevronRight size={16} />
+            <PanelLeftOpen size={16} />
           </button>
 
           <button
@@ -181,7 +182,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <aside className="w-64 md:w-72 h-full bg-[#050507] border-r border-white/[0.07] flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-xl text-slate-200">
+    <aside className="w-64 md:w-72 h-full bg-theme-panel border-r border-theme-border flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-xl text-theme-text">
       
       {/* 1. TOP CREATION & QUICK NAV SECTION */}
       <div className="p-3 border-b border-white/10 space-y-2 shrink-0 bg-slate-950/40">
@@ -208,7 +209,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               workspaceDir || null
             )
           }
-          className="w-full bg-[#1b1c24] hover:bg-[#252632] border border-white/10 text-white py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-start gap-2.5 transition-all shadow-sm cursor-pointer"
+          className="w-full flat-btn py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-start gap-2.5 transition-all shadow-sm cursor-pointer"
         >
           <Plus size={15} className="text-slate-300" />
           <span>Новый чат</span>

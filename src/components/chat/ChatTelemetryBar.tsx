@@ -1,6 +1,6 @@
 import React from 'react';
 import { LiveTelemetry } from '../../types';
-import { Zap, Cpu, Compass } from 'lucide-react';
+import { MaterialIcon } from '../common/MaterialIcon';
 
 interface ChatTelemetryBarProps {
   liveTelemetry: LiveTelemetry | null;
@@ -14,34 +14,82 @@ export const ChatTelemetryBar: React.FC<ChatTelemetryBarProps> = ({
   onTogglePlanningMode,
 }) => {
   return (
-    <div className="px-4 py-2 bg-slate-900/60 border-b border-white/10 flex items-center justify-between text-xs text-slate-300">
-      <div className="flex items-center gap-4">
-        {liveTelemetry && (
+    <div className="px-3 py-1.5 glass-panel border-b border-theme-border flex flex-wrap items-center justify-between text-xs text-theme-text font-mono shrink-0">
+      <div className="flex items-center gap-3.5 flex-wrap">
+        {liveTelemetry ? (
           <>
-            <div className="flex items-center gap-1.5 text-emerald-400 font-mono">
-              <Zap size={13} />
+            {/* Speed t/s */}
+            <div className="flex items-center gap-1 text-emerald-400 font-semibold" title="Скорость генерации (токенов в секунду)">
+              <MaterialIcon name="bolt" size={14} />
               <span>{(liveTelemetry.tokensPerSec ?? 0).toFixed(1)} t/s</span>
             </div>
-            <div className="flex items-center gap-1.5 text-sky-400 font-mono">
-              <Cpu size={13} />
-              <span>{liveTelemetry.tokenCount ?? 0} токенов</span>
+
+            {/* Token count */}
+            <div className="flex items-center gap-1 text-theme-accent" title="Сгенерировано токенов">
+              <MaterialIcon name="memory" size={14} />
+              <span>{liveTelemetry.tokenCount ?? 0} tok</span>
             </div>
+
+            {/* Context Window */}
+            {liveTelemetry.contextUsed !== undefined && (
+              <div className="flex items-center gap-1 text-theme-muted" title="Использование контекстного окна">
+                <MaterialIcon name="psychology" size={14} />
+                <span>
+                  Context: {liveTelemetry.contextUsed.toLocaleString()}{liveTelemetry.contextMax ? ` / ${liveTelemetry.contextMax.toLocaleString()}` : ''}
+                </span>
+              </div>
+            )}
+
+            {/* TTFT (Time-to-first-token) */}
+            {liveTelemetry.ttftMs !== undefined && liveTelemetry.ttftMs > 0 && (
+              <div className="flex items-center gap-1 text-amber-400" title="Время до первого токена (TTFT)">
+                <MaterialIcon name="timer" size={14} />
+                <span>TTFT: {liveTelemetry.ttftMs}ms</span>
+              </div>
+            )}
+
+            {/* VRAM MB */}
+            {liveTelemetry.vramUsedMB !== undefined && liveTelemetry.vramUsedMB > 0 && (
+              <div className="flex items-center gap-1 text-purple-400" title="Занято VRAM">
+                <MaterialIcon name="developer_board" size={14} />
+                <span>VRAM: {liveTelemetry.vramUsedMB} MB{liveTelemetry.vramTotalMB ? ` / ${liveTelemetry.vramTotalMB} MB` : ''}</span>
+              </div>
+            )}
+
+            {/* Cache Status */}
+            {liveTelemetry.promptCacheHit !== undefined && (
+              <div
+                className={`flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-bold border ${
+                  liveTelemetry.promptCacheHit
+                    ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/30'
+                    : 'bg-white/5 text-theme-muted border-white/10'
+                }`}
+                title="Повторное использование кэша промпта llama.cpp"
+              >
+                <span>Cache {liveTelemetry.promptCacheHit ? 'HIT' : 'MISS'}</span>
+              </div>
+            )}
           </>
+        ) : (
+          <span className="text-theme-muted text-[11px]">Телеметрия готова к приему данных...</span>
         )}
       </div>
 
-      <button
-        type="button"
-        onClick={onTogglePlanningMode}
-        className={`px-2.5 py-1 rounded-lg border text-xs flex items-center gap-1.5 transition-all ${
-          planningMode
-            ? 'bg-purple-500/20 border-purple-500/40 text-purple-300'
-            : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-200'
-        }`}
-      >
-        <Compass size={13} />
-        <span>Планирование {planningMode ? 'ВКЛ' : 'ВЫКЛ'}</span>
-      </button>
+      {onTogglePlanningMode && (
+        <button
+          type="button"
+          onClick={onTogglePlanningMode}
+          className={`px-2 py-0.5 rounded border text-[11px] font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+            planningMode
+              ? 'bg-[var(--theme-accent)]/20 border-[var(--theme-accent)]/40 text-theme-accent'
+              : 'bg-white/5 border-theme-border text-theme-muted hover:text-theme-text'
+          }`}
+          title="Переключить режим планирования"
+        >
+          <MaterialIcon name="psychology" size={14} />
+          <span>Планирование {planningMode ? 'ON' : 'OFF'}</span>
+        </button>
+      )}
     </div>
   );
 };

@@ -191,7 +191,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, [lanOpen]);
 
   return (
-    <header className="w-full bg-[#050507] border-b border-white/[0.07] px-3 py-1.5 flex items-center justify-between select-none z-30 shrink-0 font-sans text-xs text-slate-200 backdrop-blur-xl">
+    <header className="w-full bg-theme-bg border-b border-theme-border px-3 py-1.5 flex items-center justify-between select-none z-30 shrink-0 font-sans text-xs text-theme-text backdrop-blur-xl">
       
       {/* Left Section: App Brand & Workspace Badge */}
       <div className="flex items-center gap-2.5">
@@ -354,7 +354,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* LAN Dropdown */}
           {lanOpen && (
             <div
-              className="absolute right-0 top-full mt-2 w-80 rounded-xl border border-white/15 bg-[#12131a]/95 backdrop-blur-2xl shadow-2xl shadow-black/50 z-50 overflow-hidden"
+              className="absolute right-0 top-full mt-2 w-80 rounded-xl glass-panel shadow-2xl shadow-black/50 z-50 overflow-hidden"
               style={{ animation: 'fadeSlideDown 0.2s ease-out' }}
             >
               {/* Header */}

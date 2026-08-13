@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Mic,
-  Square,
-  Send,
-  Brain,
   Terminal,
   Sparkles,
   Zap,
@@ -22,6 +18,7 @@ import { AppConfig, ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent, getWorkspaceBaseName } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
+import { MaterialIcon } from './common/MaterialIcon';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -292,9 +289,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       <div className="p-3 rounded-xl bg-slate-900/90 border border-sky-500/30 text-xs font-mono text-slate-200 flex items-center justify-between gap-3 shadow-lg animate-pulse my-2">
         <div className="flex items-center gap-2">
           <RefreshCw size={14} className="animate-spin text-sky-400" />
-          <span className="text-sky-300 font-semibold">Генерация ответа ИИ...</span>
+          <span className="text-theme-accent font-semibold">Генерация ответа ИИ...</span>
         </div>
-        <div className="flex items-center gap-3 text-[10px] text-slate-400">
+        <div className="flex items-center gap-3 text-[10px] text-theme-muted">
           {liveTelemetry.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
             <span className="text-emerald-400 font-bold flex items-center gap-1">
               <Zap size={11} />
@@ -302,8 +299,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </span>
           )}
           {liveTelemetry.contextUsed !== undefined && (
-            <span className="text-blue-300 flex items-center gap-1">
-              <Brain size={11} />
+            <span className="text-theme-accent flex items-center gap-1">
+              <MaterialIcon name="psychology" size={12} />
               <span>{liveTelemetry.contextUsed.toLocaleString()} tok</span>
             </span>
           )}
@@ -445,7 +442,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             {/* Input Form Box */}
             <div className="pt-2 w-full max-w-xl mx-auto">
               <form onSubmit={handleSubmit} className="w-full">
-                <div className="rounded-2xl bg-[#111319] border border-white/10 p-3 focus-within:border-white/25 transition-all flex flex-col gap-2 shadow-2xl">
+                <div className="rounded-2xl glass-card p-3 focus-within:border-[var(--theme-accent)]/50 transition-all flex flex-col gap-2 shadow-2xl">
                   {renderAttachedImagesPreview()}
 
                   <textarea
@@ -479,11 +476,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           onClick={onTogglePlanningMode}
                           className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                             planningMode
-                              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                              : 'bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent'
+                              ? 'bg-[var(--theme-accent)]/20 text-theme-accent border border-[var(--theme-accent)]/40'
+                              : 'bg-white/5 text-theme-muted hover:text-theme-text border border-transparent'
                           }`}
                         >
-                          <Brain size={14} />
+                          <MaterialIcon name="psychology" size={16} />
                           <span>Размышление</span>
                         </button>
                       )}
@@ -494,20 +491,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         type="button"
                         onClick={handleMicClick}
                         className={`p-2 rounded-full transition-colors cursor-pointer ${
-                          isRecording ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                          isRecording ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'text-theme-muted hover:text-theme-text hover:bg-white/5'
                         }`}
                         title="Голосовой ввод"
                       >
-                        {isRecording ? <Square size={16} /> : <Mic size={18} />}
+                        {isRecording ? <MaterialIcon name="stop" size={18} /> : <MaterialIcon name="mic" size={18} />}
                       </button>
 
                       <button
                         type="submit"
                         disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
-                        className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow cursor-pointer shrink-0"
+                        className="w-8 h-8 rounded-full btn-primary flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow cursor-pointer shrink-0"
                         title="Отправить"
                       >
-                        <Send size={14} className="translate-x-[0.5px]" />
+                        <MaterialIcon name="send" size={16} className="translate-x-[0.5px]" />
                       </button>
                     </div>
                   </div>
@@ -533,7 +530,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               return (
                 <div key={msg.id} className="flex flex-col space-y-1 w-full select-text">
                   {msg.role === 'user' && (
-                    <div className="self-end max-w-[80%] rounded-2xl bg-[#13141c] border border-white/10 px-4 py-2.5 text-slate-100 text-sm font-sans select-text shadow-sm flex flex-col gap-2">
+                    <div className="self-end max-w-[80%] rounded-2xl glass-card px-4 py-2.5 text-theme-text text-sm font-sans select-text shadow-sm flex flex-col gap-2">
                       {msg.images && msg.images.length > 0 && (
                         <div className="flex flex-wrap gap-2 my-1">
                           {msg.images.map((imgUrl, i) => (
@@ -604,15 +601,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     return (
                       <div className="self-start w-full text-slate-100 text-sm leading-relaxed my-2 select-text px-1">
                         {reasoningEnabled && thinkText && (
-                          <details open className="mb-3 border border-white/10 rounded-xl bg-black/40 overflow-hidden group">
-                            <summary className="px-3 py-1.5 text-[11px] font-medium text-slate-400 select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
-                              <span className="flex items-center gap-1.5 text-purple-300 font-semibold">
-                                <Sparkles size={12} className="text-purple-400" />
-                                Ход мыслей модели
+                          <details
+                            open={agentStatus === 'thinking'}
+                            className="mb-2.5 border border-theme-border rounded-md glass-panel overflow-hidden group"
+                          >
+                            <summary className="px-3 py-1.5 text-[11px] font-medium text-theme-muted select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
+                              <span className="flex items-center gap-1.5 text-theme-accent font-semibold">
+                                <MaterialIcon name="psychology" size={14} />
+                                Ход мыслей (Размышление)
                               </span>
-                              <span className="text-[10px] text-slate-500 group-open:rotate-180 transition-transform">▼</span>
+                              <span className="text-[10px] text-theme-muted group-open:rotate-180 transition-transform">▼</span>
                             </summary>
-                            <div className="p-3 border-t border-white/5 font-mono text-xs text-purple-200/90 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto bg-black/60">
+                            <div className="p-2.5 border-t border-theme-border font-mono text-[11px] text-theme-text/90 whitespace-pre-wrap leading-relaxed max-h-48 overflow-y-auto bg-black/40">
                               {thinkText}
                             </div>
                           </details>
@@ -638,9 +638,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           });
 
                           return (
-                            <div className="my-2 p-2.5 rounded-xl bg-[#0e0f14] border border-white/10 flex items-center justify-between text-xs font-mono">
+                            <div className="my-2 p-2.5 rounded-xl glass-panel flex items-center justify-between text-xs font-mono">
                               <div className="flex items-center gap-2">
-                                <span className="font-bold text-slate-200 flex items-center gap-1.5 font-sans">
+                                <span className="font-bold text-theme-text flex items-center gap-1.5 font-sans">
                                   <Layers size={14} className="text-amber-400" />
                                   <span>{msg.tool_calls.length} файлов изменено</span>
                                 </span>
@@ -665,7 +665,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
                         {/* COMPACT METRICS FOOTER PILL */}
                         {msg.metrics && (
-                          <div className="mt-2 pt-2 border-t border-white/5 flex flex-wrap items-center gap-3 text-[10px] font-mono text-slate-500 select-none">
+                          <div className="mt-2 pt-2 border-t border-white/5 flex flex-wrap items-center gap-3 text-[10px] font-mono text-theme-muted select-none">
                             {msg.metrics.tokensPerSec !== undefined && msg.metrics.tokensPerSec > 0 && (
                               <span className="flex items-center gap-1 text-emerald-400 font-semibold">
                                 <Zap size={11} />
@@ -673,13 +673,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                               </span>
                             )}
                             {msg.metrics.contextUsed !== undefined && (
-                              <span className="flex items-center gap-1 text-slate-400">
-                                <Brain size={11} />
+                              <span className="flex items-center gap-1 text-theme-muted">
+                                <MaterialIcon name="psychology" size={12} />
                                 <span>Контекст: {msg.metrics.contextUsed.toLocaleString()} / {msg.metrics.contextMax?.toLocaleString()} tok</span>
                               </span>
                             )}
                             {msg.metrics.modelName && (
-                              <span className="flex items-center gap-1 text-slate-400">
+                              <span className="flex items-center gap-1 text-theme-muted">
                                 <Cpu size={11} />
                                 <span>{msg.metrics.modelName}</span>
                               </span>
@@ -703,11 +703,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {renderSummarizingBanner()}
 
           {/* INPUT FORM CONTAINER (OLED Minimal Aesthetic) */}
-          <div className="p-3 bg-[#050507] border-t border-white/[0.07] select-none z-10 w-full flex flex-col gap-2">
+          <div className="p-3 bg-theme-bg border-t border-theme-border select-none z-10 w-full flex flex-col gap-2">
             {renderAttachedImagesPreview()}
 
             <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto">
-              <div className="rounded-2xl bg-[#111319] border border-white/10 p-3 focus-within:border-white/25 transition-all flex flex-col gap-2 shadow-2xl">
+              <div className="rounded-2xl glass-card p-3 focus-within:border-[var(--theme-accent)]/50 transition-all flex flex-col gap-2 shadow-2xl">
                 
                 {/* Top Input Area: Plus Button & Textarea */}
                 <div className="flex items-start gap-2">
@@ -746,12 +746,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         onClick={onTogglePlanningMode}
                         className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                           planningMode
-                            ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                            : 'bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent'
+                            ? 'bg-[var(--theme-accent)]/20 text-theme-accent border border-[var(--theme-accent)]/40'
+                            : 'bg-white/5 text-theme-muted hover:text-theme-text border border-transparent'
                         }`}
                         title="Переключить режим планирования/размышления"
                       >
-                        <Brain size={14} className={planningMode ? 'text-blue-400' : 'text-slate-400'} />
+                        <MaterialIcon name="psychology" size={16} className={planningMode ? 'text-theme-accent' : 'text-theme-muted'} />
                         <span>Размышление</span>
                       </button>
                     )}
@@ -763,11 +763,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                       type="button"
                       onClick={handleMicClick}
                       className={`p-2 rounded-full transition-colors cursor-pointer ${
-                        isRecording ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        isRecording ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'text-theme-muted hover:text-theme-text hover:bg-white/5'
                       }`}
                       title="Голосовой ввод"
                     >
-                      {isRecording ? <Square size={16} /> : <Mic size={18} />}
+                      {isRecording ? <MaterialIcon name="stop" size={18} /> : <MaterialIcon name="mic" size={18} />}
                     </button>
 
                     {agentStatus !== 'idle' && onCancelAgent ? (
@@ -777,16 +777,16 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         className="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-colors shadow cursor-pointer shrink-0"
                         title="Остановить генерацию"
                       >
-                        <Square size={14} />
+                        <MaterialIcon name="stop" size={16} />
                       </button>
                     ) : (
                       <button
                         type="submit"
                         disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
-                        className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow cursor-pointer shrink-0"
+                        className="w-8 h-8 rounded-full btn-primary flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow cursor-pointer shrink-0"
                         title="Отправить"
                       >
-                        <Send size={14} className="translate-x-[0.5px]" />
+                        <MaterialIcon name="send" size={16} className="translate-x-[0.5px]" />
                       </button>
                     )}
                   </div>

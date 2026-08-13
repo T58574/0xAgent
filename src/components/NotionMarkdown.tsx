@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Copy, Check, Info, AlertTriangle, Sparkles, CheckCircle2, ShieldAlert, ChevronRight } from 'lucide-react';
+import { Copy, Check, AlertTriangle, Sparkles, CheckCircle2, ShieldAlert, ChevronRight } from 'lucide-react';
+import { MaterialIcon } from './common/MaterialIcon';
 
 interface NotionMarkdownProps {
   content: string;
@@ -367,7 +368,7 @@ const RenderNotionCallout: React.FC<{ line: string }> = ({ line }) => {
   }
 
   const styles = {
-    note: { border: 'border-blue-500/40', bg: 'bg-blue-950/20', text: 'text-blue-200', icon: <Info size={14} className="text-blue-400" /> },
+    note: { border: 'border-[var(--theme-accent)]/40', bg: 'bg-[var(--theme-accent)]/10', text: 'text-theme-text', icon: <MaterialIcon name="info" size={14} className="text-theme-accent" /> },
     tip: { border: 'border-emerald-500/40', bg: 'bg-emerald-950/20', text: 'text-emerald-200', icon: <Sparkles size={14} className="text-emerald-400" /> },
     warning: { border: 'border-amber-500/40', bg: 'bg-amber-950/20', text: 'text-amber-200', icon: <AlertTriangle size={14} className="text-amber-400" /> },
     important: { border: 'border-purple-500/40', bg: 'bg-purple-950/20', text: 'text-purple-200', icon: <CheckCircle2 size={14} className="text-purple-400" /> },
