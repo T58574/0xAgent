@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync, spawn } from 'node:child_process';
+import { execSync, spawn, execFile } from 'node:child_process';
 import { FileNode } from '../src/types';
 import { fffService } from './fffService';
 import { searxngService } from './searxngService';
@@ -466,7 +466,6 @@ async function runPowerShellDialogScript(psScript: string): Promise<string | nul
     try {
       const buf = Buffer.from(psScript, 'utf-16le');
       const base64 = buf.toString('base64');
-      const { execFile } = require('node:child_process');
       execFile('powershell', ['-Sta', '-NoProfile', '-EncodedCommand', base64], { encoding: 'utf-8' }, (err: any, stdout: string) => {
         if (err) {
           console.error('Failed to open native Windows dialog:', err);

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { execFile } from 'node:child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { AppConfig, ChatMessage, ToolCallInfo } from '../src/types';
 import { loadSession, saveSession, listSessions } from './session';
@@ -644,7 +645,6 @@ Both XML and JSON tool call formats are accepted.` : '';
               fs.writeFileSync(scratchFile, code, 'utf-8');
 
               output = await new Promise<string>((resolve) => {
-                const { execFile } = require('node:child_process');
                 let executable = 'node';
                 let args = [scratchFile];
                 if (lang.includes('py')) {

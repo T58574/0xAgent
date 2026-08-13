@@ -20,7 +20,7 @@ export function strip_ai_reasoning_fluff(text: string): string {
 
 /**
  * Extracts thinking content from LLM response for display in UI.
- * Supports: <think>...</think>, <|channel>thought...<channel|>
+ * Supports: <think>...</think>, <thought>...</thought>, <|channel>thought...<channel|>
  * Returns { thinkText, bodyText } — the extracted thinking and the remaining content.
  */
 export function extractThinkingBlock(text: string): { thinkText: string; bodyText: string } {
@@ -29,8 +29,8 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
   let thinkText = '';
   let bodyText = text;
 
-  // 1. Standard <think>...</think> (closed)
-  const thinkRegex = /<think>([\s\S]*?)<\/think>/i;
+  // 1. Standard <think>...</think> or <thought>...</thought> (closed)
+  const thinkRegex = /<(?:think|thought)>([\s\S]*?)<\/(?:think|thought)>/i;
   const thinkMatch = text.match(thinkRegex);
   if (thinkMatch) {
     thinkText = thinkMatch[1].trim();
@@ -38,8 +38,8 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
     return { thinkText, bodyText };
   }
 
-  // 2. Gemma 4 format: <|channel>thought ... <channel|> (closed)
-  const gemmaThinkRegex = /<\|channel>thought([\s\S]*?)<channel\|>/i;
+  // 2. Gemma 4 / Channel format: <|channel>thought ... <channel|> or <channel|thought ... channel|> (closed)
+  const gemmaThinkRegex = /<\|?channel\|?thought([\s\S]*?)<\|?channel\|?>/i;
   const gemmaMatch = text.match(gemmaThinkRegex);
   if (gemmaMatch) {
     thinkText = gemmaMatch[1].trim();
@@ -47,19 +47,22 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
     return { thinkText, bodyText };
   }
 
-  // 3. Standard <think> (unclosed / streaming)
-  if (text.includes('<think>')) {
-    const startIdx = text.indexOf('<think>');
-    thinkText = text.substring(startIdx + 7).trim();
+  // 3. Standard <think> or <thought> (unclosed / streaming)
+  const openThinkMatch = text.match(/<(?:think|thought)>/i);
+  if (openThinkMatch && openThinkMatch.index !== undefined) {
+    const startIdx = openThinkMatch.index;
+    const tagLen = openThinkMatch[0].length;
+    thinkText = text.substring(startIdx + tagLen).trim();
     bodyText = text.substring(0, startIdx).trim();
     return { thinkText, bodyText };
   }
 
   // 4. Gemma 4 <|channel>thought (unclosed / streaming)
-  const gemmaOpenMatch = text.match(/<\|channel>thought/i);
+  const gemmaOpenMatch = text.match(/<\|?channel\|?thought/i);
   if (gemmaOpenMatch && gemmaOpenMatch.index !== undefined) {
     const startIdx = gemmaOpenMatch.index;
-    thinkText = text.substring(startIdx + '<|channel>thought'.length).trim();
+    const tagLen = gemmaOpenMatch[0].length;
+    thinkText = text.substring(startIdx + tagLen).trim();
     bodyText = text.substring(0, startIdx).trim();
     return { thinkText, bodyText };
   }
@@ -75,9 +78,12 @@ export function stripToolCallTags(text: string): string {
   if (!text) return text;
   let cleaned = text;
 
-  // Remove XML tool blocks (<patch_file>...</patch_file>, <write_file>...</write_file>, etc.)
+  // Remove XML tool blocks (<patch_file>...</patch_file>, <write_file>...</write_file>, <read_file.../>, etc.)
   cleaned = cleaned.replace(/<patch_file[\s\S]*?(?:<\/patch_file>|$)/gi, '');
   cleaned = cleaned.replace(/<write_file[\s\S]*?(?:<\/write_file>|$)/gi, '');
+  cleaned = cleaned.replace(/<read_file[\s\S]*?(?:<\/read_file>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<list_dir[\s\S]*?(?:<\/list_dir>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<grep_search[\s\S]*?(?:<\/grep_search>|\/>|$)/gi, '');
   cleaned = cleaned.replace(/<tool_?call[\s\S]*?(?:<\/tool_?call>|$)/gi, '');
   cleaned = cleaned.replace(/<execute_command[\s\S]*?(?:<\/execute_command>|$)/gi, '');
 

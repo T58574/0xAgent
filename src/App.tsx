@@ -498,15 +498,30 @@ export default function App() {
         });
       }
 
+      const msgId = event.payload.message_id;
+      const token = event.payload.token || '';
+      let hasMsg = false;
+
       const updatedMessages = sess.messages.map((m) => {
-        if (m.id === event.payload.message_id) {
+        if (m.id === msgId) {
+          hasMsg = true;
           return {
             ...m,
-            content: m.content + event.payload.token,
+            content: m.content + token,
           };
         }
         return m;
       });
+
+      if (!hasMsg) {
+        updatedMessages.push({
+          id: msgId,
+          role: 'assistant',
+          content: token,
+          timestamp: Date.now(),
+          tool_calls: [],
+        });
+      }
 
       updateSessionState({
         ...sess,
