@@ -212,6 +212,8 @@ Both XML and JSON tool call formats are accepted.` : '';
 
     let response: Response | null = null;
     let activeModelName = selectedModel;
+    let lastErrorText = '';
+    let lastStatusCode = 500;
 
     if (isLocalModel && (selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf'))) {
       // Route local model to llama.cpp local server
@@ -310,21 +312,23 @@ Both XML and JSON tool call formats are accepted.` : '';
             response = res;
             break;
           } else {
-            const errText = await res.text().catch(() => '');
-            console.warn(`[agent] Cloud model ${candidateModel} failed (${res.status}): ${errText.substring(0, 200)}. Falling back to next model...`);
+            lastStatusCode = res.status;
+            lastErrorText = await res.text().catch(() => '');
+            console.warn(`[agent] Cloud model ${candidateModel} failed (${res.status}): ${lastErrorText.substring(0, 200)}. Falling back to next model...`);
           }
         } catch (fetchErr: any) {
+          lastErrorText = fetchErr.message;
           console.warn(`[agent] Cloud model ${candidateModel} network error: ${fetchErr.message}. Falling back...`);
         }
       }
     }
 
     if (!response || !response.ok) {
-      const errorText = response ? await response.text() : 'No response from LLM server / all fallback models exhausted';
-      const errMsg = `⚠️ **LLM Сервер вернул ошибку (${response?.status || 500}):**\n\`\`\`\n${errorText}\n\`\`\``;
+      const errMsg = `⚠️ **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server / all fallback models exhausted'}\n\`\`\``;
       handleAgentError(session, sessionId, broadcast, errMsg);
       return;
     }
+
 
     if (!response.body) {
       const errMsg = '⚠️ **LLM Сервер вернул пустой ответ (body is empty)**';

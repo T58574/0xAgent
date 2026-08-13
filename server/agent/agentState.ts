@@ -26,7 +26,7 @@ export function handleAgentError(
   session.updated_at = Date.now();
   saveSession(session);
   broadcast('agent-error', { sessionId, message: errMsg });
-  broadcast('agent-status-changed', 'idle');
+  broadcast('agent-status-changed', { sessionId, status: 'idle' });
 }
 
 export function respondToToolConfirmation(sessionId: string, toolCallId: string, approve: boolean | string): boolean {
