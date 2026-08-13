@@ -307,6 +307,14 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
       cleanCmd = match[1];
     }
 
+    // System Safety Protection Guard
+    const dangerousPatterns = [/system32/i, /windows\\system/i, /rmdir\s+\/[sS]\s+\/[qQ]\s+c:\\/i, /remove-item\s+.*-[rR]ecurse\s+[cC]:\\/i, /format\s+[cC]:/i];
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(cleanCmd)) {
+        return Promise.resolve(`[SECURITY BLOCK]: Выполнение команды остановлено защитной системой 0xAgent. Обнаружен потенциально опасный системный паттерн: "${cleanCmd}".`);
+      }
+    }
+
     const isWindows = process.platform === 'win32';
     const shell = isWindows ? 'powershell.exe' : 'sh';
     const args = isWindows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', cleanCmd] : ['-c', cleanCmd];

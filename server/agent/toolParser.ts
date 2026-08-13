@@ -220,61 +220,92 @@ function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCal
 }
 
 /**
- * Parse Gemma 4 style tool calls: <tool_call>{"name": "...", "arguments": {...}}</tool_call>
- * Maps Gemma 4 function names to 0xAgent tool names.
+ * Parse Gemma 4 / Local LLM style tool calls: <tool_call>{"name": "...", "arguments": {...}}</tool_call>
+ * Handles malformed JSON, mixed XML attributes (e.g. {"name": "readfile" path="..."}), and variations in tag names (<toolcall>).
  */
 function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
-  const reToolCall = /<tool_call>([\s\S]*?)<\/tool_call>/gs;
+  const reToolCall = /<tool_?call>([\s\S]*?)<\/tool_?call>/gi;
   let match: RegExpExecArray | null;
 
+  const toolNameMap: Record<string, string> = {
+    'read_file': 'read_file',
+    'readfile': 'read_file',
+    'write_file': 'write_file',
+    'writefile': 'write_file',
+    'patch_file': 'patch_file',
+    'patchfile': 'patch_file',
+    'list_dir': 'list_dir',
+    'listdir': 'list_dir',
+    'list_directory': 'list_dir',
+    'grep_search': 'grep_search',
+    'grepsearch': 'grep_search',
+    'search': 'grep_search',
+    'execute_command': 'execute_command',
+    'executecommand': 'execute_command',
+    'run_command': 'execute_command',
+    'runcommand': 'execute_command',
+    'shell': 'execute_command',
+    'create_directory': 'create_directory',
+    'createdirectory': 'create_directory',
+    'get_file_info': 'get_file_info',
+    'getfileinfo': 'get_file_info',
+    'remember_fact': 'remember_fact',
+    'recall_memories': 'recall_memories',
+    'ask_user': 'ask_user',
+    'fff_search': 'fff_search',
+    'fffsearch': 'fff_search',
+    'fff': 'fff_search',
+    'file_finder': 'fff_search',
+    'web_search': 'web_search',
+    'websearch': 'web_search',
+    'google_search': 'web_search',
+    'read_web_page': 'read_web_page',
+    'readwebpage': 'read_web_page',
+    'browse_url': 'read_web_page',
+    'read_url': 'read_web_page',
+  };
+
   while ((match = reToolCall.exec(text)) !== null) {
+    const raw = match[1].trim();
+    let name = '';
+    let args: any = {};
+
+    // 1. Try standard JSON parse first
     try {
-      const raw = match[1].trim();
       const parsed = JSON.parse(raw);
-      const name = parsed.name || parsed.function || '';
-      const args = parsed.arguments || parsed.parameters || {};
-
-      // Map Gemma 4 function names to 0xAgent tool names
-      const toolNameMap: Record<string, string> = {
-        'read_file': 'read_file',
-        'write_file': 'write_file',
-        'patch_file': 'patch_file',
-        'list_dir': 'list_dir',
-        'list_directory': 'list_dir',
-        'grep_search': 'grep_search',
-        'search': 'grep_search',
-        'execute_command': 'execute_command',
-        'run_command': 'execute_command',
-        'shell': 'execute_command',
-        'create_directory': 'create_directory',
-        'get_file_info': 'get_file_info',
-        'remember_fact': 'remember_fact',
-        'recall_memories': 'recall_memories',
-        'ask_user': 'ask_user',
-        'fff_search': 'fff_search',
-        'fff': 'fff_search',
-        'file_finder': 'fff_search',
-        'web_search': 'web_search',
-        'google_search': 'web_search',
-        'read_web_page': 'read_web_page',
-        'browse_url': 'read_web_page',
-        'read_url': 'read_web_page',
-      };
-
-      const mappedName = toolNameMap[name] || name;
-      if (mappedName) {
-        // Don't add duplicate calls
-        if (!toolCalls.some((tc) => tc.raw_content === match![0])) {
-          toolCalls.push({
-            id: `gemma_${uuidv4().substring(0, 8)}`,
-            name: mappedName,
-            arguments: args,
-            raw_content: match[0],
-          });
-        }
-      }
+      name = parsed.name || parsed.function || '';
+      args = parsed.arguments || parsed.parameters || {};
     } catch {
-      // Ignore malformed JSON in tool_call blocks
+      // 2. Fallback: Parse malformed JSON mixed with XML attributes (e.g. {"name": "readfile" path="src/ChatArea.tsx"})
+      const nameMatch = /["']?name["']?\s*[:=]\s*["']([^"']+)["']/i.exec(raw);
+      if (nameMatch) {
+        name = nameMatch[1];
+      }
+
+      // Extract attributes: path="...", query="...", command="...", url="..."
+      const pathMatch = /path=["']([^"']+)["']/i.exec(raw);
+      const queryMatch = /query=["']([^"']+)["']/i.exec(raw);
+      const urlMatch = /url=["']([^"']+)["']/i.exec(raw);
+      const commandMatch = /command=["']([^"']+)["']/i.exec(raw);
+      const contentMatch = /content=["']([^"']+)["']/i.exec(raw);
+
+      if (pathMatch) args.path = pathMatch[1];
+      if (queryMatch) args.query = queryMatch[1];
+      if (urlMatch) args.url = urlMatch[1];
+      if (commandMatch) args.command = commandMatch[1];
+      if (contentMatch) args.content = contentMatch[1];
+    }
+
+    const mappedName = toolNameMap[name.toLowerCase()] || toolNameMap[name] || name;
+    if (mappedName) {
+      if (!toolCalls.some((tc) => tc.raw_content === match![0])) {
+        toolCalls.push({
+          id: `gemma_${uuidv4().substring(0, 8)}`,
+          name: mappedName,
+          arguments: args,
+          raw_content: match[0],
+        });
+      }
     }
   }
 }

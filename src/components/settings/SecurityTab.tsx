@@ -99,6 +99,55 @@ export const SecurityTab: React.FC = () => {
         </div>
       </div>
 
+      {/* AGENT CAPABILITIES & SAFETY SWITCHES */}
+      <div className="p-5 rounded-xl glass-panel border border-[var(--theme-border)] flex flex-col gap-4">
+        <div className="flex items-center gap-2 border-b border-white/10 pb-3">
+          <Shield size={16} className="text-sky-400" />
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Управление Ограничениями и Режимами Агента</h4>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+          {/* 1. System Protection Switch */}
+          <div className="p-3 rounded-lg bg-slate-900/60 border border-emerald-500/30 flex items-center justify-between">
+            <div>
+              <div className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
+                <CheckCircle2 size={14} className="text-emerald-400" />
+                Защита System32 & Команд
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Автоблокировка System32 и деструктивных команд</div>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">АКТИВНА</span>
+          </div>
+
+          {/* 2. Web Search Switch */}
+          <div className="p-3 rounded-lg bg-slate-900/60 border border-white/10 flex items-center justify-between">
+            <div>
+              <div className="text-xs font-semibold text-slate-200">Интернет-Поиск (SearXNG/DDG)</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Разрешить агенту искать инфу в сети</div>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40">РАЗРЕШЁН</span>
+          </div>
+
+          {/* 3. Reasoning Switch */}
+          <div className="p-3 rounded-lg bg-slate-900/60 border border-white/10 flex items-center justify-between">
+            <div>
+              <div className="text-xs font-semibold text-slate-200">Режим Размышления (&lt;think&gt;)</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Выводить цепочку рассуждений модели</div>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/40">ВКЛЮЧЁН</span>
+          </div>
+
+          {/* 4. Tools Execution Switch */}
+          <div className="p-3 rounded-lg bg-slate-900/60 border border-white/10 flex items-center justify-between">
+            <div>
+              <div className="text-xs font-semibold text-slate-200">Модификация Файлов (Tools)</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">Разрешить вызов write/patch/execute</div>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">РАЗРЕШЁН</span>
+          </div>
+        </div>
+      </div>
+
       {/* Status Alert Notification */}
       {statusMsg && (
         <div
