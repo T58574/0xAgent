@@ -11,12 +11,12 @@ export const activeConfirmations = new Map<string, PendingConfirmation>();
 export const activeCancelTokens = new Set<string>();
 export const activeRunningLoops = new Set<string>();
 
-export function handleAgentError(
+export async function handleAgentError(
   session: any,
   sessionId: string,
   broadcast: (event: string, payload: any) => void,
   errMsg: string
-): void {
+): Promise<void> {
   session.messages.push({
     id: uuidv4(),
     role: 'assistant',
@@ -24,7 +24,7 @@ export function handleAgentError(
     timestamp: Date.now(),
   });
   session.updated_at = Date.now();
-  saveSession(session);
+  await saveSession(session);
   broadcast('agent-error', { sessionId, message: errMsg });
   broadcast('agent-status-changed', { sessionId, status: 'idle' });
 }

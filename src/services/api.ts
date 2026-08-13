@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse } from '../types';
+import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse, KnowledgeEntry, KnowledgeQueryOptions } from '../types';
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
 export { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen };
@@ -499,6 +499,52 @@ export async function set_active_model(modelId: string): Promise<{ success: bool
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function get_knowledge_entries(options?: KnowledgeQueryOptions): Promise<KnowledgeEntry[]> {
+  const params = new URLSearchParams();
+  if (options?.query) params.append('query', options.query);
+  if (options?.category) params.append('category', options.category);
+  if (options?.tag) params.append('tag', options.tag);
+  if (options?.startDate) params.append('startDate', String(options.startDate));
+  if (options?.endDate) params.append('endDate', String(options.endDate));
+
+  const queryStr = params.toString() ? `?${params.toString()}` : '';
+  const res = await authFetch(`${API_BASE}/knowledge${queryStr}`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function get_knowledge_categories(): Promise<{ category: string; count: number }[]> {
+  const res = await authFetch(`${API_BASE}/knowledge/categories`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function save_knowledge_entry(entry: {
+  title: string;
+  category: string;
+  content: string;
+  summary?: string;
+  tags?: string[];
+  source?: string;
+  id?: string;
+}): Promise<KnowledgeEntry> {
+  const res = await authFetch(`${API_BASE}/knowledge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function delete_knowledge_entry(id: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/knowledge/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 
 
 

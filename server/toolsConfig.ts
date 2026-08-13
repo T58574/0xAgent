@@ -216,6 +216,36 @@ export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
     xmlSpec: `16. <spawn_subagent role="..." goal="..." />
     - Делегирует задачу узкоспециализированному субагенту.`,
   },
+  {
+    id: 'save_knowledge',
+    name: 'save_knowledge',
+    description: 'Сохранение структурированной статьи, инсайта или стратегического анализа в Архив Знаний (Knowledge Vault).',
+    category: 'memory',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `17. <save_knowledge title="..." category="..." tags="..." summary="...">content</save_knowledge>
+    - Сохранение важной статьи, инсайта или стратегии в Архив Знаний.`,
+  },
+  {
+    id: 'search_knowledge',
+    name: 'search_knowledge',
+    description: 'Поиск по Архиву Знаний с фильтрацией по теме, тегам и ключевым словам.',
+    category: 'memory',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `18. <search_knowledge query="..." category="..." tag="..." />
+    - Поиск по хранилищу знаний.`,
+  },
+  {
+    id: 'list_knowledge',
+    name: 'list_knowledge',
+    description: 'Просмотр списка всех сохраненных статей и категорий в Архиве Знаний.',
+    category: 'memory',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `19. <list_knowledge category="..." />
+    - Список статей из архива знаний.`,
+  },
 ];
 
 export function loadToolsToggles(): Record<string, boolean> {

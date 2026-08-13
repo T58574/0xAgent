@@ -86,6 +86,7 @@ export interface AppConfig {
   sound_notifications?: boolean | null;
   compact_chat?: boolean | null;
   local_server?: LocalServerConfig | null;
+  fallback_models?: string[] | null;
 }
 
 export interface CloudModelItem {
@@ -240,3 +241,26 @@ export interface FileNode {
   is_dir: boolean;
   children?: FileNode[] | null;
 }
+
+export type KnowledgeCategory = 'strategy' | 'architecture' | 'research' | 'user_directive' | 'market_insight' | 'general';
+
+export interface KnowledgeEntry {
+  id: string;
+  title: string;
+  category: KnowledgeCategory | string;
+  content: string;
+  summary: string;
+  tags: string[];
+  source?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface KnowledgeQueryOptions {
+  query?: string;
+  category?: string;
+  tag?: string;
+  startDate?: number;
+  endDate?: number;
+}
+

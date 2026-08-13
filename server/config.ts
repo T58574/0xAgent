@@ -97,6 +97,12 @@ export function getDefaultConfig(): AppConfig {
     sound_notifications: true,
     compact_chat: false,
     local_server: null,
+    fallback_models: [
+      'gemini-3.6-flash',
+      'gemma-4-31b-it',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+    ],
   };
 }
 

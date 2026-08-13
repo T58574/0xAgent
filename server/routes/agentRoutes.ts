@@ -13,7 +13,7 @@ type BroadcastFn = (event: string, payload: any) => void;
 export function createAgentRouter(broadcast: BroadcastFn): Router {
   const router = Router();
 
-  router.post('/send-message', (req, res) => {
+  router.post('/send-message', async (req, res) => {
     const { sessionId } = req.body;
     if (!sessionId) {
       res.status(400).json({ error: 'sessionId is required' });
@@ -21,10 +21,10 @@ export function createAgentRouter(broadcast: BroadcastFn): Router {
     }
 
     const config = loadConfig();
-    runAgentLoop(sessionId, config, broadcast).catch((err) => {
+    runAgentLoop(sessionId, config, broadcast).catch(async (err) => {
       console.error('Agent loop error:', err);
       try {
-        const session = loadSession(sessionId);
+        const session = await loadSession(sessionId);
         const errMsg = `⚠️ **Системная ошибка выполнения Агента:**\n\`\`\`\n${err.message || err}\n\`\`\``;
         session.messages.push({
           id: uuidv4(),
@@ -33,7 +33,7 @@ export function createAgentRouter(broadcast: BroadcastFn): Router {
           timestamp: Date.now(),
         });
         session.updated_at = Date.now();
-        saveSession(session);
+        await saveSession(session);
         broadcast('agent-error', { sessionId, message: errMsg });
       } catch {}
       broadcast('agent-status-changed', 'idle');

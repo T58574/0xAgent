@@ -14,11 +14,31 @@ import { workspaceRouter } from './routes/workspaceRoutes';
 import { hardwareRouter } from './routes/hardwareRoutes';
 import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes';
 import { createAgentRouter } from './routes/agentRoutes';
+import knowledgeRouter from './routes/knowledge';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '127.0.0.1';
 
-app.use(cors());
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin) || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        callback(null, true);
+      } else {
+        callback(new Error('Blocked by CORS policy'));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '50mb' }));
 
 // Auth verification middleware for API requests
@@ -84,6 +104,7 @@ app.use('/api', workspaceRouter);
 app.use('/api', hardwareRouter);
 app.use('/api', createLlamaRouter(broadcast));
 app.use('/api', createAgentRouter(broadcast));
+app.use('/api/knowledge', knowledgeRouter);
 
 // Graceful process exit handlers for 0xAgent backend node process
 const cleanupOnExit = () => {
@@ -98,7 +119,7 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-server.listen(Number(PORT), '0.0.0.0', () => {
-  process.stdout.write(`🚀 0xAgent Local Server running at http://0.0.0.0:${PORT}\n`);
-  process.stdout.write(`🔌 WebSocket server listening on ws://0.0.0.0:${PORT}/ws\n`);
+server.listen(Number(PORT), HOST, () => {
+  process.stdout.write(`🚀 0xAgent Local Server running at http://${HOST}:${PORT}\n`);
+  process.stdout.write(`🔌 WebSocket server listening on ws://${HOST}:${PORT}/ws\n`);
 });

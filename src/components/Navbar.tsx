@@ -6,6 +6,7 @@ import {
   Code,
   Settings as SettingsIcon,
   BarChart2,
+  BookOpen,
   Play,
   RefreshCw,
   FileText,
@@ -24,8 +25,8 @@ import { ModelSelectorDropdown } from './ModelSelectorDropdown';
 interface NavbarProps {
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
-  activeView: 'chat' | 'workspace' | 'settings' | 'analytics';
-  onChangeView: (view: 'chat' | 'workspace' | 'settings' | 'analytics') => void;
+  activeView: 'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge';
+  onChangeView: (view: 'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge') => void;
   config: AppConfig | null;
   onSelectWorkspace: () => void;
   has0xAgentMd?: boolean;
@@ -305,6 +306,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             <SettingsIcon size={13} />
             <span className="hidden sm:inline">Настройки</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onChangeView('knowledge')}
+            className={`px-2.5 py-1 rounded-md font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+              activeView === 'knowledge'
+                ? 'bg-violet-500/20 text-violet-200 border border-violet-500/40 shadow-md'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <BookOpen size={13} className="text-violet-400" />
+            <span className="hidden sm:inline">Знания</span>
           </button>
 
           <button

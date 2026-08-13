@@ -48,46 +48,46 @@ workspaceRouter.get('/get-local-ips', (_req, res) => {
 });
 
 // Session endpoints
-workspaceRouter.get('/sessions', (_req, res) => {
+workspaceRouter.get('/sessions', async (_req, res) => {
   try {
-    const sessions = listSessions();
+    const sessions = await listSessions();
     res.json(sessions);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-workspaceRouter.get('/sessions/:id', (req, res) => {
+workspaceRouter.get('/sessions/:id', async (req, res) => {
   try {
-    const session = loadSession(req.params.id);
+    const session = await loadSession(req.params.id);
     res.json(session);
   } catch (err: any) {
     res.status(404).json({ error: err.message });
   }
 });
 
-workspaceRouter.post('/sessions', (req, res) => {
+workspaceRouter.post('/sessions', async (req, res) => {
   try {
     const { title, workspace_dir } = req.body || {};
-    const newSession = createNewSession(title, workspace_dir);
+    const newSession = await createNewSession(title, workspace_dir);
     res.json(newSession);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-workspaceRouter.post('/sessions/:id/save', (req, res) => {
+workspaceRouter.post('/sessions/:id/save', async (req, res) => {
   try {
-    saveSession(req.body);
+    await saveSession(req.body);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-workspaceRouter.delete('/sessions/:id', (req, res) => {
+workspaceRouter.delete('/sessions/:id', async (req, res) => {
   try {
-    deleteSession(req.params.id);
+    await deleteSession(req.params.id);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

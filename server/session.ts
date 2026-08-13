@@ -4,53 +4,57 @@ import { v4 as uuidv4 } from 'uuid';
 import { ChatSession } from '../src/types';
 import { getAppDir } from './config';
 
-function getSessionsDir(): string {
+async function ensureSessionsDir(): Promise<string> {
   const dir = path.join(getAppDir(), 'sessions');
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+  try {
+    await fs.promises.mkdir(dir, { recursive: true });
+  } catch {}
   return dir;
 }
 
-export function listSessions(): ChatSession[] {
-  const dir = getSessionsDir();
-  const files = fs.readdirSync(dir);
-  const sessions: ChatSession[] = [];
+export async function listSessions(): Promise<ChatSession[]> {
+  const dir = await ensureSessionsDir();
+  try {
+    const files = await fs.promises.readdir(dir);
+    const sessions: ChatSession[] = [];
 
-  for (const file of files) {
-    if (file.endsWith('.json')) {
-      try {
-        const fullPath = path.join(dir, file);
-        const data = fs.readFileSync(fullPath, 'utf-8');
-        const session: ChatSession = JSON.parse(data);
-        sessions.push(session);
-      } catch (err) {
-        console.error(`Failed to read session file ${file}:`, err);
-      }
-    }
+    await Promise.all(
+      files.map(async (file) => {
+        if (file.endsWith('.json')) {
+          try {
+            const fullPath = path.join(dir, file);
+            const data = await fs.promises.readFile(fullPath, 'utf-8');
+            const session: ChatSession = JSON.parse(data);
+            sessions.push(session);
+          } catch (err) {
+            console.error(`Failed to read session file ${file}:`, err);
+          }
+        }
+      })
+    );
+
+    sessions.sort((a, b) => b.updated_at - a.updated_at);
+    return sessions;
+  } catch (err) {
+    console.error('Failed to list sessions:', err);
+    return [];
   }
-
-  sessions.sort((a, b) => b.updated_at - a.updated_at);
-  return sessions;
 }
 
-export function loadSession(id: string): ChatSession {
-  const dir = getSessionsDir();
+export async function loadSession(id: string): Promise<ChatSession> {
+  const dir = await ensureSessionsDir();
   const filePath = path.join(dir, `${id}.json`);
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Session with ID ${id} not found.`);
-  }
-  const data = fs.readFileSync(filePath, 'utf-8');
+  const data = await fs.promises.readFile(filePath, 'utf-8');
   return JSON.parse(data) as ChatSession;
 }
 
-export function saveSession(session: ChatSession): void {
-  const dir = getSessionsDir();
+export async function saveSession(session: ChatSession): Promise<void> {
+  const dir = await ensureSessionsDir();
   const filePath = path.join(dir, `${session.id}.json`);
-  fs.writeFileSync(filePath, JSON.stringify(session, null, 2), 'utf-8');
+  await fs.promises.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');
 }
 
-export function createNewSession(title?: string, workspace_dir?: string | null): ChatSession {
+export async function createNewSession(title?: string, workspace_dir?: string | null): Promise<ChatSession> {
   const now = Date.now();
   const session: ChatSession = {
     id: uuidv4(),
@@ -60,14 +64,16 @@ export function createNewSession(title?: string, workspace_dir?: string | null):
     created_at: now,
     updated_at: now,
   };
-  saveSession(session);
+  await saveSession(session);
   return session;
 }
 
-export function deleteSession(id: string): void {
-  const dir = getSessionsDir();
+export async function deleteSession(id: string): Promise<void> {
+  const dir = await ensureSessionsDir();
   const filePath = path.join(dir, `${id}.json`);
-  if (fs.existsSync(filePath)) {
-    fs.unlinkSync(filePath);
+  try {
+    await fs.promises.unlink(filePath);
+  } catch {
+    // ignore if missing
   }
 }

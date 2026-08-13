@@ -2,7 +2,7 @@ import { Router } from 'express';
 import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
-import { execSync, spawn, ChildProcess } from 'node:child_process';
+import { execSync, spawn, execFile, ChildProcess } from 'node:child_process';
 import { loadConfig, saveConfig } from '../config';
 
 export type BroadcastFn = (event: string, payload: any) => void;
@@ -416,13 +416,22 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       }
 
       const arrayBuf = await downloadRes.arrayBuffer();
-      fs.writeFileSync(zipPath, Buffer.from(arrayBuf));
+      await fs.promises.writeFile(zipPath, Buffer.from(arrayBuf));
 
       broadcast('agent-error', `Распаковка файла llama.cpp...`);
-      execSync(`powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${versionDir}' -Force"`);
+      await new Promise<void>((resolve, reject) => {
+        execFile(
+          'powershell',
+          ['-NoProfile', '-Command', `Expand-Archive -Path '${zipPath}' -DestinationPath '${versionDir}' -Force`],
+          (err: any) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
 
       if (fs.existsSync(zipPath)) {
-        fs.unlinkSync(zipPath);
+        await fs.promises.unlink(zipPath);
       }
 
       if (!fs.existsSync(exePath)) {

@@ -11,6 +11,7 @@ import { CodeEditor } from './components/CodeEditor';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
 import { WorkspacePickerModal } from './components/WorkspacePickerModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
+import { KnowledgeVault } from './components/KnowledgeVault';
 import { LockScreen } from './components/LockScreen';
 import { FolderTree, Code, Terminal, X } from 'lucide-react';
 
@@ -42,7 +43,7 @@ export default function App() {
   const [splitLeftWidthPercent, setSplitLeftWidthPercent] = useState<number>(45);
   
   // Navigation view & Sidebar state
-  const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings' | 'analytics'>('chat');
+  const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge'>('chat');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [openTabs, setOpenTabs] = useState<{ path: string; name: string; content: string }[]>([]);
   const [isServerOffline, setIsServerOffline] = useState<boolean>(true);
@@ -170,6 +171,8 @@ export default function App() {
 
   const activeSessionsMapRef = useRef<Map<string, ChatSession>>(new Map());
   const currentSessionIdRef = useRef<string | null>(null);
+  const pendingTokensRef = useRef<Map<string, { sessionId: string; messageId: string; tokens: string[]; telemetry?: any }>>(new Map());
+  const streamThrottleTimerRef = useRef<any>(null);
 
   const currentSessionRef = useRef<ChatSession | null>(null);
   useEffect(() => {
@@ -482,51 +485,83 @@ export default function App() {
       }
     });
 
+    const flushPendingTokens = () => {
+      if (pendingTokensRef.current.size === 0) return;
+
+      pendingTokensRef.current.forEach((val) => {
+        const { sessionId, messageId, tokens, telemetry } = val;
+        const chunk = tokens.join('');
+        val.tokens = [];
+
+        if (telemetry && sessionId === currentSessionIdRef.current) {
+          setLiveTelemetry(telemetry);
+        }
+
+        if (!chunk) return;
+
+        const targetSession = activeSessionsMapRef.current.get(sessionId) || (currentSessionRef.current?.id === sessionId ? currentSessionRef.current : null);
+        if (!targetSession) return;
+
+        let hasMsg = false;
+        const updatedMessages = targetSession.messages.map((m) => {
+          if (m.id === messageId) {
+            hasMsg = true;
+            return { ...m, content: m.content + chunk };
+          }
+          return m;
+        });
+
+        if (!hasMsg) {
+          updatedMessages.push({
+            id: messageId,
+            role: 'assistant',
+            content: chunk,
+            timestamp: Date.now(),
+            tool_calls: [],
+          });
+        }
+
+        updateSessionState({
+          ...targetSession,
+          messages: updatedMessages,
+        });
+      });
+
+      pendingTokensRef.current.clear();
+    };
+
     const un2 = api.listen<any>('agent-token-stream', (event) => {
       const sess = getTargetSessionForEvent(event.payload);
       if (!sess) return;
 
-      const sid = event.payload.sessionId || currentSessionIdRef.current;
+      const sid = event.payload.sessionId || currentSessionIdRef.current || sess.id;
+      const msgId = event.payload.message_id;
+      const token = event.payload.token || '';
+
+      let entry = pendingTokensRef.current.get(msgId);
+      if (!entry) {
+        entry = { sessionId: sid, messageId: msgId, tokens: [] };
+        pendingTokensRef.current.set(msgId, entry);
+      }
+      entry.tokens.push(token);
+
       if (sid === currentSessionIdRef.current && (event.payload.tokensPerSec || event.payload.contextUsed)) {
-        setLiveTelemetry({
+        entry.telemetry = {
           messageId: event.payload.message_id,
           tokensPerSec: event.payload.tokensPerSec,
           tokenCount: event.payload.tokenCount,
           contextUsed: event.payload.contextUsed,
           contextMax: event.payload.contextMax,
           modelName: event.payload.modelName,
-        });
+        };
       }
 
-      const msgId = event.payload.message_id;
-      const token = event.payload.token || '';
-      let hasMsg = false;
-
-      const updatedMessages = sess.messages.map((m) => {
-        if (m.id === msgId) {
-          hasMsg = true;
-          return {
-            ...m,
-            content: m.content + token,
-          };
-        }
-        return m;
-      });
-
-      if (!hasMsg) {
-        updatedMessages.push({
-          id: msgId,
-          role: 'assistant',
-          content: token,
-          timestamp: Date.now(),
-          tool_calls: [],
-        });
+      if (!streamThrottleTimerRef.current) {
+        streamThrottleTimerRef.current = setTimeout(() => {
+          streamThrottleTimerRef.current = null;
+          flushPendingTokens();
+        }, 50);
       }
-
-      updateSessionState({
-        ...sess,
-        messages: updatedMessages,
-      });
     });
 
     const un3 = api.listen<any>('agent-status-changed', async (event) => {
@@ -733,6 +768,13 @@ export default function App() {
                 serverLogs={logs}
                 onRefresh={() => window.location.reload()}
               />
+            </div>
+          )}
+
+          {/* KNOWLEDGE VAULT VIEW */}
+          {activeView === 'knowledge' && (
+            <div className="w-full h-full overflow-hidden bg-theme-bg">
+              <KnowledgeVault />
             </div>
           )}
 

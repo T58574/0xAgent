@@ -155,6 +155,51 @@ function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): 
       raw_content: match[0],
     });
   }
+
+  // Save Knowledge
+  const reSaveKb = /<save_knowledge\s+title=["']([^"']+)["'](?:\s+category=["']([^"']+)["'])?(?:\s+tags=["']([^"']+)["'])?(?:\s+summary=["']([^"']+)["'])?\s*>([\s\S]*?)<\/save_knowledge>/gs;
+  while ((match = reSaveKb.exec(text)) !== null) {
+    toolCalls.push({
+      id: `savekb_${uuidv4().substring(0, 8)}`,
+      name: 'save_knowledge',
+      arguments: {
+        title: match[1],
+        category: match[2] || 'general',
+        tags: match[3] ? match[3].split(',').map(t => t.trim()) : [],
+        summary: match[4] || '',
+        content: match[5].trim(),
+      },
+      raw_content: match[0],
+    });
+  }
+
+  // Search Knowledge
+  const reSearchKb = /<search_knowledge(?:\s+query=["']([^"']+)["'])?(?:\s+category=["']([^"']+)["'])?(?:\s+tag=["']([^"']+)["'])?\s*\/?>/gs;
+  while ((match = reSearchKb.exec(text)) !== null) {
+    toolCalls.push({
+      id: `searchkb_${uuidv4().substring(0, 8)}`,
+      name: 'search_knowledge',
+      arguments: {
+        query: match[1] || '*',
+        category: match[2] || undefined,
+        tag: match[3] || undefined,
+      },
+      raw_content: match[0],
+    });
+  }
+
+  // List Knowledge
+  const reListKb = /<list_knowledge(?:\s+category=["']([^"']+)["'])?\s*\/?>/gs;
+  while ((match = reListKb.exec(text)) !== null) {
+    toolCalls.push({
+      id: `listkb_${uuidv4().substring(0, 8)}`,
+      name: 'list_knowledge',
+      arguments: {
+        category: match[1] || undefined,
+      },
+      raw_content: match[0],
+    });
+  }
 }
 
 function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
@@ -263,6 +308,12 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
     'readwebpage': 'read_web_page',
     'browse_url': 'read_web_page',
     'read_url': 'read_web_page',
+    'save_knowledge': 'save_knowledge',
+    'saveknowledge': 'save_knowledge',
+    'search_knowledge': 'search_knowledge',
+    'searchknowledge': 'search_knowledge',
+    'list_knowledge': 'list_knowledge',
+    'listknowledge': 'list_knowledge',
   };
 
   while ((match = reToolCall.exec(text)) !== null) {

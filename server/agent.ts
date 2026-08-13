@@ -1,30 +1,6 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import os from 'node:os';
-import { execFile } from 'node:child_process';
 import { v4 as uuidv4 } from 'uuid';
 import { AppConfig, ChatMessage, ToolCallInfo } from '../src/types';
-import { loadSession, saveSession, listSessions } from './session';
-import {
-  executeReadFile,
-  executeWriteFile,
-  executePatchFile,
-  executeListDir,
-  executeGrepSearch,
-  executeShellCommand,
-  executeCreateDirectory,
-  executeGetFileInfo,
-  executeFffSearch,
-  executeWebSearch,
-  executeReadWebPage,
-  executeSaveKnowledge,
-  executeSearchKnowledge,
-  executeListKnowledge,
-  getWorkspace0xAgentMdContext,
-} from './tools';
-import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
-import { listSkills, readSkill } from './skills';
-import { getActivePersona, appendSilentUserTrait, getUnifiedToolsContext } from './personas';
+import { loadSession, saveSession } from './session';
 import { summarizeContext, estimatePromptTokens } from './summarizer';
 
 // 0xVoice2Text Model Configuration Stack & Fallback Chain
@@ -33,7 +9,7 @@ export const GEMMA_MODEL = 'gemma-4-31b-it';
 export const FAST_LITE_MODEL = 'gemini-3.5-flash-lite';
 export const NATIVE_AUDIO_MODEL = 'gemini-2.5-flash-preview-tts';
 
-export const FALLBACK_CHAIN: string[] = [
+export const DEFAULT_FALLBACK_CHAIN: string[] = [
   'gemini-3.6-flash',
   'gemma-4-31b-it',
   'gemini-3.5-flash',
@@ -42,6 +18,8 @@ export const FALLBACK_CHAIN: string[] = [
 
 import { strip_ai_reasoning_fluff, stripToolCallTags } from './agent/fluffSanitizer';
 import { pruneMessagesForContext, detectRepetitionLoop } from './agent/contextManager';
+import { buildFullSystemPrompt, formatMessageContent } from './agent/promptBuilder';
+import { dispatchToolExecution } from './agent/toolDispatcher';
 import { parseToolCalls } from './agent/toolParser';
 import {
   PendingConfirmation,
@@ -72,7 +50,7 @@ export async function runAgentLoop(
   activeRunningLoops.add(sessionId);
 
   try {
-    let session = loadSession(sessionId);
+    let session = await loadSession(sessionId);
     activeCancelTokens.delete(sessionId);
 
     broadcast('agent-status-changed', { sessionId, status: 'thinking' });
@@ -85,83 +63,7 @@ export async function runAgentLoop(
       break;
     }
 
-    const memoryContext = getSystemPromptMemoryContext();
-    const envContext = `\n\n# OPERATING SYSTEM & SHELL ENVIRONMENT
-- OS: Windows (${process.platform})
-- Shell: PowerShell (powershell.exe)
-- Active Working Directory: ${config.workspace_dir || process.cwd()}
-
-CRITICAL RULES FOR <execute_command>:
-1. You are running on Windows inside PowerShell. Write standard PowerShell commands.
-2. Do NOT wrap commands in "powershell -Command ...", "powershell -Command cd ...", or explicit "cd <path>". The command is ALREADY executed inside PowerShell in the workspace root directory! Write direct commands like: \`npm run build\`, \`npx tsc --noEmit\`, \`Get-ChildItem\`, \`git status\`.
-3. NEVER execute long-running blocking background dev-servers (e.g., 'npm run dev', 'vite', 'npm start') inside <execute_command> as they will run indefinitely and time out. Execute one-off build or test commands instead.`;
-
-    const isPlanningMode = config.planning_mode !== false;
-    const planningContext = isPlanningMode
-      ? `\n\n# 📋 PLANNING MODE IS ACTIVE
-You are operating in Planning Mode.
-Before executing modifying tool calls (<write_file>, <patch_file>, <execute_command>), follow this mandatory workflow:
-1. RESEARCH & DIAGNOSE: Use read-only tools (<read_file>, <list_dir>, <grep_search>) to inspect existing codebase, imports, types, and find the exact root cause.
-2. FORMULATE IMPLEMENTATION PLAN: Clearly present your analysis and proposed solution in your response before or alongside executing actions:
-   - Root Cause Analysis
-   - Proposed Changes (files to create/modify)
-   - Verification Plan
-3. Explain your technical rationale concisely.`
-      : '';
-
-    const activePersona = getActivePersona();
-    const personaContext = `\n\n# 🎭 ACTIVE AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
-
-## SOUL.md — CHARACTER & BEHAVIOR
-${activePersona.soul}
-
-## USER.md — USER PROFILE & OBSERVED TRAITS (${activePersona.metadata.user_id})
-${activePersona.user}`;
-
-    const toolExecutionDirective = `\n\n# ⚠️ CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & CODE MODIFICATIONS
-1. EXPLANATION FIRST: Always write a brief natural language explanation of your diagnosis and intended changes BEFORE emitting XML tool calls.
-2. MANDATORY PATCH FIRST POLICY: ALWAYS use <patch_file> for modifying existing codebase files. NEVER use <write_file> to rewrite an entire file (>50 lines) just to change a few components or lines!
-3. MULTI-BLOCK PATCHES: You can place MULTIPLE SEARCH/REPLACE blocks inside a single <patch_file path="..."> tag to modify multiple places at once. Keep SEARCH blocks concise and unique (3-8 lines).
-4. NO RAW CODE PATCH LEAKS: NEVER output raw SEARCH/REPLACE blocks outside of <patch_file path="..."> tags.
-5. PROPER XML TAGS: Always close every XML tool call tag (<patch_file path="...">...</patch_file>). Reserve <write_file> strictly for creating new files or tiny config files under 50 lines.`;
-
-    // Detect Gemma 4 model for specialized prompting
-    const modelNameLower = (config.model_name || '').toLowerCase();
-    const modelPathLower = (config.local_server?.model_path || '').toLowerCase();
-    const isGemmaModel = modelNameLower.includes('gemma') || modelPathLower.includes('gemma');
-
-    const gemmaToolDirective = isGemmaModel ? `\n\n# 🔧 ALTERNATIVE TOOL CALL FORMAT (Gemma 4)
-You may also call tools using JSON format wrapped in <tool_call> tags:
-<tool_call>{"name": "read_file", "arguments": {"path": "src/main.ts"}}</tool_call>
-<tool_call>{"name": "write_file", "arguments": {"path": "src/main.ts", "content": "file contents here"}}</tool_call>
-<tool_call>{"name": "execute_command", "arguments": {"command": "npm run build"}}</tool_call>
-<tool_call>{"name": "list_dir", "arguments": {"path": "."}}</tool_call>
-<tool_call>{"name": "grep_search", "arguments": {"pattern": "TODO", "path": "src/"}}</tool_call>
-<tool_call>{"name": "patch_file", "arguments": {"path": "file.ts", "content": "<<<<<<< SEARCH\nold code\n=======\nnew code\n>>>>>>> REPLACE"}}</tool_call>
-Both XML and JSON tool call formats are accepted.` : '';
-
-    const unifiedToolsContext = getUnifiedToolsContext();
-    const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
-    const fullSystemPrompt = personaContext + unifiedToolsContext + toolExecutionDirective + gemmaToolDirective + envContext + planningContext + memoryContext + workspaceMdContext;
-
-    const formatMessageContent = (m: ChatMessage): string | any[] => {
-      if (Array.isArray(m.images) && m.images.length > 0) {
-        const parts: any[] = [];
-        if (m.content) {
-          parts.push({ type: 'text', text: m.content });
-        } else {
-          parts.push({ type: 'text', text: 'Посмотри на изображение и проанализируй его.' });
-        }
-        for (const imgUrl of m.images) {
-          parts.push({
-            type: 'image_url',
-            image_url: { url: imgUrl },
-          });
-        }
-        return parts;
-      }
-      return m.content;
-    };
+    const fullSystemPrompt = buildFullSystemPrompt(config);
 
     const rawMessages: { role: string; content: string | any[] }[] = [
       { role: 'system', content: fullSystemPrompt },
@@ -194,7 +96,7 @@ Both XML and JSON tool call formats are accepted.` : '';
           ...tailMsgs,
         ];
         session.updated_at = Date.now();
-        saveSession(session);
+        await saveSession(session);
 
         messages = [
           { role: 'system', content: fullSystemPrompt },
@@ -268,7 +170,8 @@ Both XML and JSON tool call formats are accepted.` : '';
       }
 
       const modelCandidates = [selectedModel];
-      for (const m of FALLBACK_CHAIN) {
+      const fallbackList = config.fallback_models && config.fallback_models.length > 0 ? config.fallback_models : DEFAULT_FALLBACK_CHAIN;
+      for (const m of fallbackList) {
         if (!modelCandidates.includes(m)) modelCandidates.push(m);
       }
 
@@ -510,7 +413,7 @@ Both XML and JSON tool call formats are accepted.` : '';
     // Save assistant message to session
     session.messages.push(assistantMessage);
     session.updated_at = Date.now();
-    saveSession(session);
+    await saveSession(session);
 
     // Check if generated assistant response triggered a repetition loop
     if (detectRepetitionLoop(session.messages.slice(0, -1), assistantMessage.content)) {
@@ -525,7 +428,7 @@ Both XML and JSON tool call formats are accepted.` : '';
           timestamp: Date.now(),
         });
         session.updated_at = Date.now();
-        saveSession(session);
+        await saveSession(session);
 
         broadcast('agent-error', {
           sessionId,
@@ -556,7 +459,7 @@ Both XML and JSON tool call formats are accepted.` : '';
       lastMsg.tool_calls = toolCallsInfo;
       lastMsg.content = stripToolCallTags(lastMsg.content);
     }
-    saveSession(session);
+    await saveSession(session);
 
     broadcast('agent-tools-updated', {
       sessionId,
@@ -608,175 +511,7 @@ Both XML and JSON tool call formats are accepted.` : '';
       let output = '';
       if (approved) {
         try {
-          switch (tc.name) {
-            case 'read_file':
-              output = executeReadFile(config.workspace_dir, tc.arguments.path);
-              break;
-            case 'write_file':
-              output = executeWriteFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
-              break;
-            case 'patch_file':
-              output = executePatchFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
-              break;
-            case 'create_directory':
-              output = executeCreateDirectory(config.workspace_dir, tc.arguments.path);
-              break;
-            case 'get_file_info':
-              output = executeGetFileInfo(config.workspace_dir, tc.arguments.path);
-              break;
-            case 'list_dir':
-              output = executeListDir(config.workspace_dir, tc.arguments.path);
-              break;
-            case 'grep_search':
-              output = executeGrepSearch(config.workspace_dir, tc.arguments.pattern, tc.arguments.path);
-              break;
-            case 'fff_search':
-              output = await executeFffSearch(config.workspace_dir, tc.arguments.query || tc.arguments.pattern || '');
-              break;
-            case 'web_search':
-              output = await executeWebSearch(tc.arguments.query || tc.arguments.pattern || '');
-              break;
-            case 'read_web_page':
-              output = await executeReadWebPage(tc.arguments.url || tc.arguments.path || '');
-              break;
-            case 'execute_command':
-              output = await executeShellCommand(config.workspace_dir, tc.arguments.command);
-              break;
-            case 'remember_fact': {
-              const saved = addOrUpdateMemory(tc.arguments.key, tc.arguments.value, tc.arguments.category);
-              appendSilentUserTrait(activePersona.metadata.id, `[${saved.category}] ${saved.key} = ${saved.value}`);
-              output = `Successfully stored fact in long-term memory & persona profile USER.md: [${saved.category}] ${saved.key} = ${saved.value}`;
-              break;
-            }
-            case 'save_knowledge': {
-              output = await executeSaveKnowledge({
-                title: tc.arguments.title,
-                category: tc.arguments.category,
-                content: tc.arguments.content,
-                summary: tc.arguments.summary,
-                tags: tc.arguments.tags,
-                source: tc.arguments.source || '0xAgent LLM',
-              });
-              break;
-            }
-            case 'search_knowledge': {
-              output = await executeSearchKnowledge(tc.arguments.query, tc.arguments.category, tc.arguments.tag);
-              break;
-            }
-            case 'list_knowledge': {
-              output = await executeListKnowledge(tc.arguments.category);
-              break;
-            }
-            case 'recall_memories': {
-              const found = queryMemories(tc.arguments.query);
-              output = found.length > 0 ? JSON.stringify(found, null, 2) : 'No matching long-term memories found.';
-              break;
-            }
-            case 'list_skills': {
-              const skills = listSkills();
-              output = JSON.stringify(skills, null, 2);
-              break;
-            }
-            case 'execute_skill': {
-              const skillContent = readSkill(tc.arguments.name);
-              output = `Loaded skill instructions [${tc.arguments.name}]:\n${skillContent}`;
-              break;
-            }
-            case 'search_sessions': {
-              const sessionSummaries = listSessions();
-              const query = (tc.arguments.query || '').toLowerCase();
-              const results: any[] = [];
-              for (const s of sessionSummaries) {
-                const full = loadSession(s.id);
-                if (full) {
-                  const matches = full.messages.filter((m) => m.content.toLowerCase().includes(query));
-                  if (matches.length > 0) {
-                    results.push({
-                      session_id: s.id,
-                      session_title: s.title,
-                      matches_count: matches.length,
-                      snippets: matches.slice(0, 3).map((m) => m.content.substring(0, 150)),
-                    });
-                  }
-                }
-              }
-              output = results.length > 0 ? JSON.stringify(results, null, 2) : 'No matching text found across past session logs.';
-              break;
-            }
-            case 'run_scratch_script': {
-              const lang = (tc.arguments.language || 'js').toLowerCase();
-              const code = tc.arguments.code || '';
-              const scratchDir = path.join(os.homedir(), '.0xagent', 'scratch');
-              if (!fs.existsSync(scratchDir)) {
-                fs.mkdirSync(scratchDir, { recursive: true });
-              }
-
-              const ext = lang.includes('py') ? 'py' : (lang.includes('ps') || lang.includes('shell')) ? 'ps1' : 'js';
-              const scratchFile = path.join(scratchDir, `scratch_${Date.now()}.${ext}`);
-              fs.writeFileSync(scratchFile, code, 'utf-8');
-
-              output = await new Promise<string>((resolve) => {
-                let executable = 'node';
-                let args = [scratchFile];
-                if (lang.includes('py')) {
-                  executable = 'python';
-                  args = [scratchFile];
-                } else if (lang.includes('ps') || lang.includes('shell')) {
-                  executable = 'powershell';
-                  args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scratchFile];
-                }
-
-                execFile(executable, args, { timeout: 15000 }, (err: any, stdout: string, stderr: string) => {
-                  if (err) {
-                    resolve(`Scratch Execution Error:\n${stdout || ''}\n${stderr || err.message}`);
-                  } else {
-                    resolve(`Scratch Execution Output:\n${(stdout || 'Executed cleanly with no output.').trim()}`);
-                  }
-                });
-              });
-              break;
-            }
-            case 'ask_user': {
-              if (typeof userResponseOrApproved === 'string') {
-                output = `User provided clarification: "${userResponseOrApproved}"`;
-              } else {
-                output = `User responded to question: "${tc.arguments.question}"`;
-              }
-              break;
-            }
-            case 'spawn_subagent': {
-              const role = tc.arguments.role || 'Assistant Sub-Agent';
-              const goal = tc.arguments.goal || 'Complete delegated task';
-              try {
-                const subApiEndpoint = `${config.api_url.replace(/\/$/, '')}/chat/completions`;
-                const subRes = await fetch(subApiEndpoint, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    model: config.model_name,
-                    messages: [
-                      { role: 'system', content: `You are a specialized sub-agent with role: "${role}". Focus strictly on achieving your designated goal.` },
-                      { role: 'user', content: `Goal: ${goal}\nProvide your solution and synthesis.` }
-                    ],
-                    temperature: 0.2,
-                    max_tokens: 2048,
-                  }),
-                });
-                if (subRes.ok) {
-                  const data: any = await subRes.json();
-                  const resText = data.choices?.[0]?.message?.content || 'Sub-agent finished execution.';
-                  output = `[Sub-Agent (${role}) Synthesis]:\n${resText}`;
-                } else {
-                  output = `[Sub-Agent (${role}) Error]: HTTP ${subRes.status} ${subRes.statusText}`;
-                }
-              } catch (subErr: any) {
-                output = `[Sub-Agent (${role}) Error]: Не удалось выполнить под-агент: ${subErr.message}`;
-              }
-              break;
-            }
-            default:
-              output = `Unknown tool: ${tc.name}`;
-          }
+          output = await dispatchToolExecution(tc, config, userResponseOrApproved);
 
           broadcast('agent-tool-status-changed', {
             sessionId,
@@ -821,7 +556,7 @@ Both XML and JSON tool call formats are accepted.` : '';
       session.messages.push(resMsg);
     }
     session.updated_at = Date.now();
-    saveSession(session);
+    await saveSession(session);
 
     if (!hasNewExecutions) {
       broadcast('agent-status-changed', { sessionId, status: 'idle' });
