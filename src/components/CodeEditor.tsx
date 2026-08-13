@@ -79,6 +79,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               <button
                 onClick={(e) => onCloseTab(tab.path, e)}
                 className="p-0.5 rounded hover:bg-rose-500/20 text-slate-500 hover:text-rose-400 transition-colors cursor-pointer"
+                title="Закрыть вкладку"
+                aria-label="Закрыть вкладку"
               >
                 <X size={11} />
               </button>

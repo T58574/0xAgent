@@ -277,6 +277,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               type="button"
               onClick={() => handleRemoveImage(idx)}
               className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-rose-500 text-white shadow hover:bg-rose-600 cursor-pointer"
+              title="Удалить изображение"
+              aria-label="Удалить изображение"
             >
               <X size={10} />
             </button>
