@@ -285,25 +285,17 @@ export function saveCustomToolsMd(content: string): { tools: ToolDefinition[]; c
 }
 
 export function loadUnifiedToolsMdContent(): string {
-  if (fs.existsSync(UNIFIED_TOOLS_MD_PATH)) {
-    try {
-      const content = fs.readFileSync(UNIFIED_TOOLS_MD_PATH, 'utf-8');
-      if (content.trim().length > 0) {
-        return content;
-      }
-    } catch (err) {
-      console.error('Failed to load UNIFIED_TOOLS_MD_PATH:', err);
-    }
-  }
-
-  // If not exists, generate initial content and write it
   const toggles = loadToolsToggles();
   const generated = generateToolsMdContent(toggles);
+
   try {
     const dir = path.dirname(UNIFIED_TOOLS_MD_PATH);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(UNIFIED_TOOLS_MD_PATH, generated, 'utf-8');
-  } catch {}
+  } catch (err) {
+    console.error('Failed to sync UNIFIED_TOOLS_MD_PATH:', err);
+  }
+
   return generated;
 }
 
