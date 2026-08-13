@@ -117,9 +117,30 @@ const FormattedMarkdownSection: React.FC<{ rawText: string }> = ({ rawText }) =>
   }
 
   if (lastIdx < rawText.length) {
-    elements.push(
-      <RenderTextParagraphs key={`text-${lastIdx}`} text={rawText.substring(lastIdx)} />
-    );
+    const tail = rawText.substring(lastIdx);
+    const unclosedMatch = /^```([a-zA-Z0-9_-]*)\n([\s\S]*)$/.exec(tail);
+    if (unclosedMatch) {
+      const lang = unclosedMatch[1].trim() || 'code';
+      const codeContent = unclosedMatch[2];
+      const codeId = `code-block-${blockCount++}`;
+      elements.push(
+        <div key={codeId} className="my-3 rounded-lg border border-purple-500/30 bg-slate-950/90 overflow-hidden font-mono shadow-md">
+          <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-900/90 border-b border-white/5 text-[11px] text-slate-400 select-none">
+            <span className="text-purple-300 font-medium lowercase flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse inline-block" />
+              {lang} (генерация...)
+            </span>
+          </div>
+          <pre className="p-3.5 text-xs text-slate-200 overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
+            <code>{codeContent}</code>
+          </pre>
+        </div>
+      );
+    } else {
+      elements.push(
+        <RenderTextParagraphs key={`text-${lastIdx}`} text={tail} />
+      );
+    }
   }
 
   return <>{elements}</>;

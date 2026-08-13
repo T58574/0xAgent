@@ -20,10 +20,15 @@ interface AuthStorageData {
   secret: string;
 }
 
-// In-memory active tokens and brute force state
-const activeTokens = new Set<string>();
+// In-memory auth cache, active tokens with TTL, and brute force state
+interface TokenRecord {
+  createdAt: number;
+}
+const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days TTL
+const activeTokens = new Map<string, TokenRecord>();
 let failedAttemptsCount = 0;
 let lockoutUntilTimestamp = 0;
+let cachedAuthData: AuthStorageData | null = null;
 
 function ensureAppDir(): void {
   if (!fs.existsSync(APP_DIR)) {
@@ -32,6 +37,10 @@ function ensureAppDir(): void {
 }
 
 function loadAuthData(): AuthStorageData {
+  if (cachedAuthData !== null) {
+    return cachedAuthData;
+  }
+
   ensureAppDir();
   if (!fs.existsSync(AUTH_FILE)) {
     const initialData: AuthStorageData = {
@@ -47,25 +56,28 @@ function loadAuthData(): AuthStorageData {
   try {
     const raw = fs.readFileSync(AUTH_FILE, 'utf-8');
     const parsed = JSON.parse(raw);
-    return {
+    cachedAuthData = {
       passwordHash: parsed.passwordHash || null,
       salt: parsed.salt || null,
       isPasswordSet: Boolean(parsed.isPasswordSet && parsed.passwordHash),
       secret: parsed.secret || crypto.randomBytes(32).toString('hex'),
     };
+    return cachedAuthData;
   } catch (err) {
     console.error('Failed to parse auth.json:', err);
-    return {
+    cachedAuthData = {
       passwordHash: null,
       salt: null,
       isPasswordSet: false,
       secret: crypto.randomBytes(32).toString('hex'),
     };
+    return cachedAuthData;
   }
 }
 
 function saveAuthData(data: AuthStorageData): void {
   ensureAppDir();
+  cachedAuthData = { ...data };
   fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2), 'utf-8');
 }
 
@@ -117,7 +129,7 @@ export function resetFailedAttempts(): void {
 
 export function createSessionToken(): string {
   const token = `0xagt_${crypto.randomBytes(32).toString('hex')}`;
-  activeTokens.add(token);
+  activeTokens.set(token, { createdAt: Date.now() });
   return token;
 }
 
@@ -127,7 +139,14 @@ export function verifySessionToken(token: string | undefined | null): boolean {
 
   if (!token) return false;
   const cleanToken = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
-  return activeTokens.has(cleanToken);
+  const record = activeTokens.get(cleanToken);
+  if (!record) return false;
+
+  if (Date.now() - record.createdAt > TOKEN_TTL_MS) {
+    activeTokens.delete(cleanToken);
+    return false;
+  }
+  return true;
 }
 
 export function revokeSessionToken(token: string | undefined | null): void {

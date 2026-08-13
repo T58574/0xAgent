@@ -690,7 +690,7 @@ Both XML and JSON tool call formats are accepted.` : '';
                   output = `[Sub-Agent (${role}) Error]: HTTP ${subRes.status} ${subRes.statusText}`;
                 }
               } catch (subErr: any) {
-                output = `[Sub-Agent (${role}) Delegation Completed]: Goal: "${goal}" processed.`;
+                output = `[Sub-Agent (${role}) Error]: Не удалось выполнить под-агент: ${subErr.message}`;
               }
               break;
             }

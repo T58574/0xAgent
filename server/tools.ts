@@ -308,7 +308,13 @@ export function executeGrepSearch(workspaceDir: string | null | undefined, patte
     throw new Error(`Search path does not exist: ${targetPath}`);
   }
 
-  const regex = new RegExp(patternStr);
+  let regex: RegExp;
+  try {
+    regex = new RegExp(patternStr, 'i');
+  } catch {
+    const escaped = patternStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    regex = new RegExp(escaped, 'i');
+  }
   const results: string[] = [];
 
   function walkDir(dir: string, depth: number) {

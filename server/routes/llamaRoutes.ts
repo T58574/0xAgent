@@ -119,9 +119,7 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
 
     broadcast('llama-server-log', formatted);
 
-    try {
-      fs.appendFileSync(LLAMA_LOG_FILE, `${formatted}\n`, 'utf-8');
-    } catch {}
+    fs.appendFile(LLAMA_LOG_FILE, `${formatted}\n`, 'utf-8', () => {});
   }
 
   router.get('/server-logs', (_req, res) => {

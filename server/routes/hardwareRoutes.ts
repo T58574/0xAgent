@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import fs from 'node:fs';
 import { parseGgufMetadata, GgufMetadata } from '../ggufParser';
-import { detectGpuHardware } from '../hardware';
+import { detectGpuHardwareAsync } from '../hardware';
 
 export const hardwareRouter = Router();
 
@@ -58,9 +58,9 @@ hardwareRouter.get('/scan-models-dir', async (req, res) => {
 });
 
 // GPU Hardware Auto-Detector
-hardwareRouter.get('/detect-hardware', (_req, res) => {
+hardwareRouter.get('/detect-hardware', async (_req, res) => {
   try {
-    const hw = detectGpuHardware();
+    const hw = await detectGpuHardwareAsync();
     res.json(hw);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
