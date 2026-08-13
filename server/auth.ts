@@ -128,7 +128,10 @@ export function resetFailedAttempts(): void {
 }
 
 export function createSessionToken(): string {
-  const token = `0xagt_${crypto.randomBytes(32).toString('hex')}`;
+  const authData = loadAuthData();
+  const payload = Buffer.from(`${Date.now()}:${crypto.randomBytes(16).toString('hex')}`).toString('base64url');
+  const hmac = crypto.createHmac('sha256', authData.secret).update(payload).digest('hex');
+  const token = `0xagt_${payload}.${hmac}`;
   activeTokens.set(token, { createdAt: Date.now() });
   return token;
 }
@@ -139,13 +142,35 @@ export function verifySessionToken(token: string | undefined | null): boolean {
 
   if (!token) return false;
   const cleanToken = token.startsWith('Bearer ') ? token.slice(7).trim() : token.trim();
-  const record = activeTokens.get(cleanToken);
-  if (!record) return false;
+  if (!cleanToken.startsWith('0xagt_')) return false;
 
-  if (Date.now() - record.createdAt > TOKEN_TTL_MS) {
-    activeTokens.delete(cleanToken);
+  const raw = cleanToken.slice(6);
+  const parts = raw.split('.');
+  if (parts.length !== 2) return false;
+
+  const [payload, hmac] = parts;
+  const authData = loadAuthData();
+  const expectedHmac = crypto.createHmac('sha256', authData.secret).update(payload).digest('hex');
+
+  if (hmac.length !== expectedHmac.length) return false;
+  try {
+    if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expectedHmac))) {
+      return false;
+    }
+  } catch {
     return false;
   }
+
+  try {
+    const decoded = Buffer.from(payload, 'base64url').toString('utf-8');
+    const timestamp = parseInt(decoded.split(':')[0], 10);
+    if (isNaN(timestamp) || Date.now() - timestamp > TOKEN_TTL_MS) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
   return true;
 }
 
@@ -247,6 +272,7 @@ export function changeMasterPassword(currentPassword: string, newPassword: strin
 
   authData.salt = newSalt;
   authData.passwordHash = newHash;
+  authData.secret = crypto.randomBytes(32).toString('hex');
   saveAuthData(authData);
 
   // Clear existing active tokens and issue fresh token

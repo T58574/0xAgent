@@ -56,8 +56,14 @@ export function initWebSocket() {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       ws = null;
+      if (event.code === 4001) {
+        console.warn('[WebSocket] Connection closed due to invalid auth token (4001).');
+        clearStoredToken();
+        window.dispatchEvent(new CustomEvent('0xagent-unauthorized'));
+        return;
+      }
       if (!reconnectTimer) {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
