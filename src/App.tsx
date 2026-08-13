@@ -168,9 +168,15 @@ export default function App() {
     }
   };
 
+  const activeSessionsMapRef = useRef<Map<string, ChatSession>>(new Map());
+  const currentSessionIdRef = useRef<string | null>(null);
+
   const currentSessionRef = useRef<ChatSession | null>(null);
   useEffect(() => {
     currentSessionRef.current = currentSession;
+    if (currentSession) {
+      activeSessionsMapRef.current.set(currentSession.id, currentSession);
+    }
   }, [currentSession]);
 
   const checkAuth = async (): Promise<boolean> => {
@@ -202,8 +208,9 @@ export default function App() {
       if (sessionList.length > 0) {
         const firstSession = sessionList[0];
         setCurrentSessionId(firstSession.id);
+        currentSessionIdRef.current = firstSession.id;
         const fullSession = await api.load_session(firstSession.id);
-        setCurrentSession(fullSession);
+        updateSessionState(fullSession);
         addLog(`Restored session: "${fullSession.title}"`);
       } else {
         await handleCreateSession('Default Session', cfg.workspace_dir || null);
@@ -247,8 +254,19 @@ export default function App() {
   const handleSelectSession = async (id: string) => {
     try {
       setCurrentSessionId(id);
+      currentSessionIdRef.current = id;
+      const cached = activeSessionsMapRef.current.get(id);
+      if (cached) {
+        currentSessionRef.current = cached;
+        setCurrentSession(cached);
+      }
       const full = await api.load_session(id);
-      setCurrentSession(full);
+      const activeCached = activeSessionsMapRef.current.get(id);
+      if (activeCached && activeCached.messages.length >= full.messages.length) {
+        updateSessionState(activeCached);
+      } else {
+        updateSessionState(full);
+      }
       addLog(`Switched session to "${full.title}"`);
     } catch (err: any) {
       addLog(`Failed to load session ${id}: ${err.message || err}`);
@@ -428,14 +446,23 @@ export default function App() {
   };
 
   const updateSessionState = (newSession: ChatSession) => {
-    currentSessionRef.current = newSession;
-    setCurrentSession(newSession);
+    activeSessionsMapRef.current.set(newSession.id, newSession);
+    if (currentSessionIdRef.current === newSession.id || !currentSessionRef.current) {
+      currentSessionRef.current = newSession;
+      setCurrentSession(newSession);
+    }
+  };
+
+  const getTargetSessionForEvent = (payload: any): ChatSession | null => {
+    const sid = payload?.sessionId || currentSessionIdRef.current;
+    if (!sid) return null;
+    return activeSessionsMapRef.current.get(sid) || (currentSessionRef.current?.id === sid ? currentSessionRef.current : null);
   };
 
   // 8. Listen to SSE completions events streamed from Node.js Backend
   useEffect(() => {
-    const un1 = api.listen<{ id: string; role: string }>('agent-message-start', (event) => {
-      const sess = currentSessionRef.current;
+    const un1 = api.listen<any>('agent-message-start', (event) => {
+      const sess = getTargetSessionForEvent(event.payload);
       if (!sess) return;
       
       const hasMsg = sess.messages.some((m) => m.id === event.payload.id);
@@ -456,10 +483,11 @@ export default function App() {
     });
 
     const un2 = api.listen<any>('agent-token-stream', (event) => {
-      const sess = currentSessionRef.current;
+      const sess = getTargetSessionForEvent(event.payload);
       if (!sess) return;
 
-      if (event.payload.tokensPerSec || event.payload.contextUsed) {
+      const sid = event.payload.sessionId || currentSessionIdRef.current;
+      if (sid === currentSessionIdRef.current && (event.payload.tokensPerSec || event.payload.contextUsed)) {
         setLiveTelemetry({
           messageId: event.payload.message_id,
           tokensPerSec: event.payload.tokensPerSec,
@@ -486,15 +514,25 @@ export default function App() {
       });
     });
 
-    const un3 = api.listen<string>('agent-status-changed', async (event) => {
-      setAgentStatus(event.payload as 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool');
-      addLog(`Agent status changed: ${event.payload}`);
-      if (event.payload === 'idle') {
-        setLiveTelemetry(null);
-        if (currentSessionRef.current) {
+    const un3 = api.listen<any>('agent-status-changed', async (event) => {
+      const payload = event.payload;
+      const statusStr = typeof payload === 'string' ? payload : payload?.status;
+      const sid = typeof payload === 'object' ? payload?.sessionId : currentSessionIdRef.current;
+      
+      if (sid === currentSessionIdRef.current) {
+        setAgentStatus(statusStr as any);
+      }
+      addLog(`Agent status changed [${sid || 'system'}]: ${statusStr}`);
+      
+      if (statusStr === 'idle') {
+        if (sid === currentSessionIdRef.current) {
+          setLiveTelemetry(null);
+        }
+        if (sid) {
           try {
-            const fresh = await api.load_session(currentSessionRef.current.id);
-            if (currentSessionRef.current && currentSessionRef.current.id === fresh.id) {
+            const fresh = await api.load_session(sid);
+            const activeCached = activeSessionsMapRef.current.get(sid);
+            if (!activeCached || fresh.messages.length >= activeCached.messages.length) {
               updateSessionState(fresh);
             }
           } catch {}
@@ -505,21 +543,22 @@ export default function App() {
     const unErr = api.listen<any>('agent-error', async (event) => {
       const payload = event.payload;
       const msgText = typeof payload === 'string' ? payload : payload?.message || JSON.stringify(payload);
-      addLog(`Agent error: ${msgText}`);
+      const sid = typeof payload === 'object' && payload?.sessionId ? payload.sessionId : currentSessionIdRef.current;
+      addLog(`Agent error [${sid || 'system'}]: ${msgText}`);
       
-      if (currentSessionRef.current) {
-        const targetId = typeof payload === 'object' && payload?.sessionId ? payload.sessionId : currentSessionRef.current.id;
+      if (sid) {
         try {
-          const fresh = await api.load_session(targetId);
-          if (currentSessionRef.current && currentSessionRef.current.id === targetId) {
+          const fresh = await api.load_session(sid);
+          const activeCached = activeSessionsMapRef.current.get(sid);
+          if (!activeCached || fresh.messages.length >= activeCached.messages.length) {
             updateSessionState(fresh);
           }
         } catch {}
       }
     });
 
-    const un4 = api.listen<{ message_id: string; tools: any[] }>('agent-tools-updated', (event) => {
-      const sess = currentSessionRef.current;
+    const un4 = api.listen<any>('agent-tools-updated', (event) => {
+      const sess = getTargetSessionForEvent(event.payload);
       if (!sess) return;
 
       const updatedMessages = sess.messages.map((m) => {
@@ -538,42 +577,39 @@ export default function App() {
       });
     });
 
-    const un5 = api.listen<{ message_id: string; tool_id: string; status: any; output?: string }>(
-      'agent-tool-status-changed',
-      (event) => {
-        const sess = currentSessionRef.current;
-        if (!sess) return;
+    const un5 = api.listen<any>('agent-tool-status-changed', (event) => {
+      const sess = getTargetSessionForEvent(event.payload);
+      if (!sess) return;
 
-        const updatedMessages = sess.messages.map((m) => {
-          if (m.id === event.payload.message_id && m.tool_calls) {
-            const updatedTools = m.tool_calls.map((t) => {
-              if (t.id === event.payload.tool_id) {
-                return {
-                  ...t,
-                  status: event.payload.status as ToolCallInfo['status'],
-                  output: event.payload.output !== undefined ? event.payload.output : t.output,
-                };
-              }
-              return t;
-            });
-            return {
-              ...m,
-              tool_calls: updatedTools,
-            };
-          }
-          return m;
-        });
-
-        updateSessionState({
-          ...sess,
-          messages: updatedMessages,
-        });
-
-        if (event.payload.status === 'completed' && config?.workspace_dir) {
-          loadWorkspaceTree(config.workspace_dir);
+      const updatedMessages = sess.messages.map((m) => {
+        if (m.id === event.payload.message_id && m.tool_calls) {
+          const updatedTools = m.tool_calls.map((t) => {
+            if (t.id === event.payload.tool_id) {
+              return {
+                ...t,
+                status: event.payload.status as ToolCallInfo['status'],
+                output: event.payload.output !== undefined ? event.payload.output : t.output,
+              };
+            }
+            return t;
+          });
+          return {
+            ...m,
+            tool_calls: updatedTools,
+          };
         }
+        return m;
+      });
+
+      updateSessionState({
+        ...sess,
+        messages: updatedMessages,
+      });
+
+      if (event.payload.status === 'completed' && config?.workspace_dir) {
+        loadWorkspaceTree(config.workspace_dir);
       }
-    );
+    });
 
     return () => {
       un1();
@@ -685,72 +721,70 @@ export default function App() {
             </div>
           )}
 
-          {/* SPLIT-SCREEN VIEW MODE (Editor on Left + Chat on Right) */}
-          {isSplitMode && (
-            <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
-              
-              {/* Left Pane: Code Editor / Workspace Tree */}
-              <div
-                className="h-full overflow-hidden flex flex-col border-r border-white/10"
-                style={{ width: `${splitLeftWidthPercent}%` }}
-              >
-                {/* Mobile Tab Switcher */}
-                <div className="flex md:hidden glass-panel p-1 border-b border-white/10 shrink-0 select-none">
-                  <button
-                    type="button"
-                    onClick={() => setMobileWorkspaceTab('files')}
-                    className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
-                      mobileWorkspaceTab === 'files' ? 'bg-slate-800 text-white' : 'text-slate-400'
-                    }`}
-                  >
-                    <FolderTree size={13} />
-                    <span>Файлы</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMobileWorkspaceTab('editor')}
-                    className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
-                      mobileWorkspaceTab === 'editor' ? 'bg-slate-800 text-white' : 'text-slate-400'
-                    }`}
-                  >
-                    <Code size={13} />
-                    <span>Редактор ({openTabs.length})</span>
-                  </button>
+          {/* MAIN CHAT & SPLIT VIEW (Preserved in DOM to maintain stream state & scroll position) */}
+          <div className={`w-full h-full ${activeView === 'chat' || activeView === 'workspace' ? 'flex flex-col overflow-hidden' : 'hidden'}`}>
+            {isSplitMode ? (
+              <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
+                {/* Left Pane: Code Editor / Workspace Tree */}
+                <div
+                  className="h-full overflow-hidden flex flex-col border-r border-white/10"
+                  style={{ width: `${splitLeftWidthPercent}%` }}
+                >
+                  {/* Mobile Tab Switcher */}
+                  <div className="flex md:hidden glass-panel p-1 border-b border-white/10 shrink-0 select-none">
+                    <button
+                      type="button"
+                      onClick={() => setMobileWorkspaceTab('files')}
+                      className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
+                        mobileWorkspaceTab === 'files' ? 'bg-slate-800 text-white' : 'text-slate-400'
+                      }`}
+                    >
+                      <FolderTree size={13} />
+                      <span>Файлы</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMobileWorkspaceTab('editor')}
+                      className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
+                        mobileWorkspaceTab === 'editor' ? 'bg-slate-800 text-white' : 'text-slate-400'
+                      }`}
+                    >
+                      <Code size={13} />
+                      <span>Редактор ({openTabs.length})</span>
+                    </button>
+                  </div>
+
+                  <div className="flex-1 w-full h-full overflow-hidden">
+                    <CodeEditor
+                      selectedFile={selectedFile}
+                      openTabs={openTabs}
+                      onSelectTab={handleSelectTab}
+                      onCloseTab={handleCloseTab}
+                    />
+                  </div>
                 </div>
 
-                <div className="flex-1 w-full h-full overflow-hidden">
-                  <CodeEditor
-                    selectedFile={selectedFile}
-                    openTabs={openTabs}
-                    onSelectTab={handleSelectTab}
-                    onCloseTab={handleCloseTab}
-                  />
+                {/* Draggable Divider Handle */}
+                <ResizableSplitter
+                  onResize={(pct) => setSplitLeftWidthPercent(pct)}
+                  minPercent={20}
+                  maxPercent={80}
+                />
+
+                {/* Right Pane: Chat Window */}
+                <div
+                  className="h-full overflow-hidden flex flex-col flex-1"
+                  style={{ width: `${100 - splitLeftWidthPercent}%` }}
+                >
+                  {renderChatComponent()}
                 </div>
               </div>
-
-              {/* Draggable Divider Handle */}
-              <ResizableSplitter
-                onResize={(pct) => setSplitLeftWidthPercent(pct)}
-                minPercent={20}
-                maxPercent={80}
-              />
-
-              {/* Right Pane: Chat Window */}
-              <div
-                className="h-full overflow-hidden flex flex-col flex-1"
-                style={{ width: `${100 - splitLeftWidthPercent}%` }}
-              >
+            ) : (
+              <div className="w-full h-full flex flex-col overflow-hidden">
                 {renderChatComponent()}
               </div>
-            </div>
-          )}
-
-          {/* FULL SCREEN CHAT MODE (When no split view active) */}
-          {!isSplitMode && activeView === 'chat' && (
-            <div className="w-full h-full flex flex-col overflow-hidden">
-              {renderChatComponent()}
-            </div>
-          )}
+            )}
+          </div>
 
         </div>
       </div>

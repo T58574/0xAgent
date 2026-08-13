@@ -71,13 +71,13 @@ export async function runAgentLoop(
     let session = loadSession(sessionId);
     activeCancelTokens.delete(sessionId);
 
-    broadcast('agent-status-changed', 'thinking');
+    broadcast('agent-status-changed', { sessionId, status: 'thinking' });
     let loopRetryCount = 0;
 
   while (true) {
     if (activeCancelTokens.has(sessionId)) {
       activeCancelTokens.delete(sessionId);
-      broadcast('agent-status-changed', 'idle');
+      broadcast('agent-status-changed', { sessionId, status: 'idle' });
       break;
     }
 
@@ -344,6 +344,7 @@ Both XML and JSON tool call formats are accepted.` : '';
     broadcast('agent-message-start', {
       id: assistantMessageId,
       role: 'assistant',
+      sessionId,
     });
 
     const genStartTime = Date.now();
@@ -359,6 +360,7 @@ Both XML and JSON tool call formats are accepted.` : '';
       const contextUsed = estimatedPromptTokens + tokenCount;
 
       broadcast('agent-token-stream', {
+        sessionId,
         message_id: assistantMessageId,
         token: content,
         tokensPerSec,
@@ -376,7 +378,7 @@ Both XML and JSON tool call formats are accepted.` : '';
 
     while (!isStreamDone) {
       if (activeCancelTokens.has(sessionId)) {
-        broadcast('agent-status-changed', 'idle');
+        broadcast('agent-status-changed', { sessionId, status: 'idle' });
         return;
       }
 
@@ -479,7 +481,7 @@ Both XML and JSON tool call formats are accepted.` : '';
     // Parse tools from assistant response content
     const parsedCalls = parseToolCalls(assistantMessage.content);
     if (parsedCalls.length === 0) {
-      broadcast('agent-status-changed', 'idle');
+      broadcast('agent-status-changed', { sessionId, status: 'idle' });
       break;
     }
 
@@ -500,6 +502,7 @@ Both XML and JSON tool call formats are accepted.` : '';
     saveSession(session);
 
     broadcast('agent-tools-updated', {
+      sessionId,
       message_id: assistantMessageId,
       tools: toolCallsInfo,
     });
@@ -509,7 +512,7 @@ Both XML and JSON tool call formats are accepted.` : '';
 
     for (const tc of parsedCalls) {
       if (activeCancelTokens.has(sessionId)) {
-        broadcast('agent-status-changed', 'idle');
+        broadcast('agent-status-changed', { sessionId, status: 'idle' });
         return;
       }
 
@@ -517,8 +520,9 @@ Both XML and JSON tool call formats are accepted.` : '';
       let userResponseOrApproved: boolean | string = true;
 
       if (isInteractive) {
-        broadcast('agent-status-changed', 'waiting_approval');
+        broadcast('agent-status-changed', { sessionId, status: 'waiting_approval' });
         broadcast('agent-tool-status-changed', {
+          sessionId,
           message_id: assistantMessageId,
           tool_id: tc.id,
           status: 'pending',
@@ -536,8 +540,9 @@ Both XML and JSON tool call formats are accepted.` : '';
 
       const approved = userResponseOrApproved !== false && userResponseOrApproved !== 'false';
       const status = approved ? 'running' : 'rejected';
-      broadcast('agent-status-changed', approved ? 'executing_tool' : 'thinking');
+      broadcast('agent-status-changed', { sessionId, status: approved ? 'executing_tool' : 'thinking' });
       broadcast('agent-tool-status-changed', {
+        sessionId,
         message_id: assistantMessageId,
         tool_id: tc.id,
         status,
@@ -699,6 +704,7 @@ Both XML and JSON tool call formats are accepted.` : '';
           }
 
           broadcast('agent-tool-status-changed', {
+            sessionId,
             message_id: assistantMessageId,
             tool_id: tc.id,
             status: 'completed',
@@ -707,6 +713,7 @@ Both XML and JSON tool call formats are accepted.` : '';
         } catch (err: any) {
           output = `Error: ${err.message}\n\n[SYSTEM HINT TO AGENT]: The tool call returned an error. Analyze the error message above, use <read_file> if needed to inspect exact file lines, and try a corrected approach.`;
           broadcast('agent-tool-status-changed', {
+            sessionId,
             message_id: assistantMessageId,
             tool_id: tc.id,
             status: 'error',
@@ -742,11 +749,11 @@ Both XML and JSON tool call formats are accepted.` : '';
     saveSession(session);
 
     if (!hasNewExecutions) {
-      broadcast('agent-status-changed', 'idle');
+      broadcast('agent-status-changed', { sessionId, status: 'idle' });
       break;
     }
 
-    broadcast('agent-status-changed', 'thinking');
+    broadcast('agent-status-changed', { sessionId, status: 'thinking' });
   }
   } finally {
     activeRunningLoops.delete(sessionId);
