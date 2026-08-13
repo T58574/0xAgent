@@ -330,9 +330,12 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
 
 export function parseToolCalls(text: string): ParsedToolCall[] {
   const toolCalls: ParsedToolCall[] = [];
-  parseFileToolCalls(text, toolCalls);
-  parseSearchAndDirToolCalls(text, toolCalls);
-  parseExecAndInteractiveToolCalls(text, toolCalls);
-  parseGemmaToolCalls(text, toolCalls);
+  // Strip markdown code fences around tool calls (e.g. ```xml <patch_file> ... ```)
+  const sanitizedText = (text || '').replace(/```(?:xml|html|json|tsx|ts)?/gi, '').replace(/```$/gm, '');
+
+  parseFileToolCalls(sanitizedText, toolCalls);
+  parseSearchAndDirToolCalls(sanitizedText, toolCalls);
+  parseExecAndInteractiveToolCalls(sanitizedText, toolCalls);
+  parseGemmaToolCalls(sanitizedText, toolCalls);
   return toolCalls;
 }

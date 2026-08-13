@@ -161,6 +161,31 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
         continue;
       }
 
+      // 4. Try Core Lines Anchoring (ignoring loose closing brackets on edges)
+      const coreLines = searchBlockClean.split('\n').map((l) => l.trim()).filter((l) => l.length > 8 && !/^<\/(?:div|span|p|section|header|footer|aside)>$/i.test(l) && !/^[}\]);,]+$/.test(l));
+      if (coreLines.length > 0) {
+        const coreSearch = coreLines.join('\n');
+        let coreMatchIdx = -1;
+        let matchCount = 0;
+
+        for (let i = 0; i <= currentLines.length - coreLines.length; i++) {
+          const sliceCore = currentLines.slice(i, i + coreLines.length).map((l) => l.trim()).join('\n');
+          if (sliceCore === coreSearch) {
+            matchCount++;
+            coreMatchIdx = i;
+          }
+        }
+
+        // If core is unique in file, perform replace on core range
+        if (matchCount === 1 && coreMatchIdx !== -1) {
+          currentLines.splice(coreMatchIdx, coreLines.length, replaceBlock);
+          currentContent = currentLines.join('\n');
+          remaining = afterDiv.substring(endIdx + replaceMarker.length);
+          appliedCount++;
+          continue;
+        }
+      }
+
       throw new Error(
         `Could not find the SEARCH block in file: \n\`\`\`\n${searchBlock}\n\`\`\`\n\n` +
         `[SYSTEM DIRECTIVE FOR MODEL]: The exact SEARCH block was not found. Do NOT repeat the identical <patch_file> call!\n` +

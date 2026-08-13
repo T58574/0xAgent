@@ -51,6 +51,11 @@ export function detectRepetitionLoop(history: ChatMessage[], newContent: string)
   const trimmedNew = newContent.trim().toLowerCase();
   if (!trimmedNew) return false;
 
+  // Catch orphaned ```xml code block fences without content
+  if (/^```(?:xml|html|json)?\s*$/i.test(trimmedNew) || trimmedNew === '```xml' || trimmedNew === '```') {
+    return true;
+  }
+
   const loopTriggers = [
     'скажи продолжи',
     'напиши продолжи',

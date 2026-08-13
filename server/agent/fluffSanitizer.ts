@@ -84,5 +84,9 @@ export function stripToolCallTags(text: string): string {
   // Remove leaked standalone SEARCH/REPLACE markers
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, '');
 
+  // Clean orphaned ```xml, ```html, ```json fences
+  cleaned = cleaned.replace(/```(?:xml|html|json|tsx|ts|bash|sh)?\s*$/gim, '');
+  cleaned = cleaned.replace(/```(?:xml|html|json)\s*```/gim, '');
+
   return cleaned.trim();
 }
