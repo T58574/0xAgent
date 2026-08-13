@@ -1,0 +1,21 @@
+version: '3.7'
+
+services:
+  searxng:
+    container_name: 0xagent_searxng
+    image: searxng/searxng:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      - SEARXNG_BASE_URL=http://localhost:8080/
+      - UWSGI_WORKERS=2
+      - UWSGI_THREADS=2
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID

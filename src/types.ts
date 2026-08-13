@@ -129,7 +129,7 @@ export interface ToolDefinition {
   id: string;
   name: string;
   description: string;
-  category: 'files' | 'terminal' | 'memory' | 'skills' | 'sessions' | 'agents' | 'interactive';
+  category: 'files' | 'terminal' | 'memory' | 'skills' | 'sessions' | 'agents' | 'interactive' | 'web';
   requiresApproval: boolean;
   enabled: boolean;
   xmlSpec: string;

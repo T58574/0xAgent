@@ -13,6 +13,9 @@ import {
   executeShellCommand,
   executeCreateDirectory,
   executeGetFileInfo,
+  executeFffSearch,
+  executeWebSearch,
+  executeReadWebPage,
   getWorkspace0xAgentMdContext,
 } from './tools';
 import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
@@ -114,7 +117,8 @@ ${activePersona.user}`;
     const toolExecutionDirective = `\n\n# ⚠️ CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & USER COMMUNICATION
 1. EXPLANATION FIRST: Always write a brief natural language explanation of your diagnosis and intended changes BEFORE emitting XML tool calls.
 2. NO RAW CODE PATCH LEAKS: NEVER output raw SEARCH/REPLACE blocks (<<<<<<< SEARCH / ======= / >>>>>>> REPLACE) as raw conversational text. All code modifications MUST be enclosed in valid XML tool tags (<patch_file path="...">...</patch_file> or <write_file path="...">...</write_file>).
-3. PROPER XML TAGS: Always close every XML tool call tag (<patch_file path="...">...</patch_file>). The system will render a dedicated approval card for the user.`;
+3. PROPER XML TAGS: Always close every XML tool call tag (<patch_file path="...">...</patch_file>). The system will render a dedicated approval card for the user.
+4. NO REPETITIVE PATCH FAILURES: If <patch_file> fails with a SEARCH block error or empty content, NEVER repeat the exact same <patch_file> call in a loop. Re-read the file with <read_file> or IMMEDIATELY use <write_file path="..."> to write the complete updated file content instead.`;
 
     // Detect Gemma 4 model for specialized prompting
     const modelNameLower = (config.model_name || '').toLowerCase();
@@ -561,6 +565,15 @@ Both XML and JSON tool call formats are accepted.` : '';
               break;
             case 'grep_search':
               output = executeGrepSearch(config.workspace_dir, tc.arguments.pattern, tc.arguments.path);
+              break;
+            case 'fff_search':
+              output = await executeFffSearch(config.workspace_dir, tc.arguments.query || tc.arguments.pattern || '');
+              break;
+            case 'web_search':
+              output = await executeWebSearch(tc.arguments.query || tc.arguments.pattern || '');
+              break;
+            case 'read_web_page':
+              output = await executeReadWebPage(tc.arguments.url || tc.arguments.path || '');
               break;
             case 'execute_command':
               output = await executeShellCommand(config.workspace_dir, tc.arguments.command);

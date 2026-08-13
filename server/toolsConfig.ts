@@ -91,6 +91,36 @@ export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
    - Выполняет поиск по регулярному выражению в файлах.`,
   },
   {
+    id: 'fff_search',
+    name: 'fff_search',
+    description: 'Сверхбыстрый нечеткий поиск файлов (Fuzzy File Finder) с учётом Git-статуса и частоты вызовов.',
+    category: 'files',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `7b. <fff_search query="..." />
+   - Выполняет мгновенный нечеткий поиск файлов (FFF) в проекте.`,
+  },
+  {
+    id: 'web_search',
+    name: 'web_search',
+    description: 'Поиск информации в интернете через локальный SearXNG / DuckDuckGo с минимальным расходом токенов.',
+    category: 'web',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `7c. <web_search query="..." />
+   - Выполняет интернет-поиск и возвращает список релевантных заголовков и ссылок.`,
+  },
+  {
+    id: 'read_web_page',
+    name: 'read_web_page',
+    description: 'Загрузка и очистка веб-страницы по URL в токеново-оптимизированный Markdown.',
+    category: 'web',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `7d. <read_web_page url="..." />
+   - Читает веб-страницу по URL, удаляя рекламу и сжимая контент.`,
+  },
+  {
     id: 'execute_command',
     name: 'execute_command',
     description: 'Запуск одноразовых PowerShell команд в корне рабочей области (сборка, тесты, проверка типов).',

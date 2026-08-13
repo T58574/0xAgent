@@ -122,6 +122,39 @@ function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): 
       raw_content: match[0],
     });
   }
+
+  // FFF Fast File Search
+  const reFff = /<fff_search\s+query=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reFff.exec(text)) !== null) {
+    toolCalls.push({
+      id: `fff_${uuidv4().substring(0, 8)}`,
+      name: 'fff_search',
+      arguments: { query: match[1] },
+      raw_content: match[0],
+    });
+  }
+
+  // Web Search
+  const reWeb = /<web_search\s+query=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reWeb.exec(text)) !== null) {
+    toolCalls.push({
+      id: `web_${uuidv4().substring(0, 8)}`,
+      name: 'web_search',
+      arguments: { query: match[1] },
+      raw_content: match[0],
+    });
+  }
+
+  // Read Web Page
+  const reReadWeb = /<read_web_page\s+url=["']([^"']+)["']\s*\/?>/gs;
+  while ((match = reReadWeb.exec(text)) !== null) {
+    toolCalls.push({
+      id: `readweb_${uuidv4().substring(0, 8)}`,
+      name: 'read_web_page',
+      arguments: { url: match[1] },
+      raw_content: match[0],
+    });
+  }
 }
 
 function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
@@ -218,6 +251,14 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
         'remember_fact': 'remember_fact',
         'recall_memories': 'recall_memories',
         'ask_user': 'ask_user',
+        'fff_search': 'fff_search',
+        'fff': 'fff_search',
+        'file_finder': 'fff_search',
+        'web_search': 'web_search',
+        'google_search': 'web_search',
+        'read_web_page': 'read_web_page',
+        'browse_url': 'read_web_page',
+        'read_url': 'read_web_page',
       };
 
       const mappedName = toolNameMap[name] || name;

@@ -2,6 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync, spawn } from 'node:child_process';
 import { FileNode } from '../src/types';
+import { fffService } from './fffService';
+import { searxngService } from './searxngService';
+import { webReaderService } from './webReaderService';
 
 export function resolvePath(workspaceDir: string | null | undefined, pathStr: string): string {
   if (!pathStr) return workspaceDir || process.cwd();
@@ -96,7 +99,15 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
     const searchBlockClean = searchBlock.replace(/\r\n/g, '\n');
     const currentContentClean = currentContent.replace(/\r\n/g, '\n');
 
+    if (!searchBlockClean.trim()) {
+      throw new Error(
+        `[SYSTEM ERROR]: SEARCH block is empty or contains only whitespace!\n` +
+        `[SYSTEM DIRECTIVE]: Provide exact non-empty lines in SEARCH block, or use <write_file path="${pathStr}"> to rewrite the file.`
+      );
+    }
+
     if (!currentContentClean.includes(searchBlockClean)) {
+      // 1. Try trailing whitespace normalization
       const normSearch = searchBlockClean.split('\n').map((l) => l.trimEnd()).join('\n');
       const normCurrent = currentContentClean.split('\n').map((l) => l.trimEnd()).join('\n');
 
@@ -107,6 +118,7 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
         continue;
       }
 
+      // 2. Try trimmed line comparison
       const trimSearch = searchBlockClean.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
       const currentLines = currentContentClean.split('\n');
       let foundIndex = -1;
@@ -128,9 +140,31 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
         continue;
       }
 
+      // 3. Try flexible whitespace-collapse matching
+      const collapseSpaces = (s: string) => s.split('\n').map((l) => l.trim().replace(/\s+/g, ' ')).filter(Boolean).join('\n');
+      const collapsedSearch = collapseSpaces(searchBlockClean);
+      
+      for (let i = 0; i <= currentLines.length - searchBlockClean.split('\n').length; i++) {
+        const sliceCollapsed = collapseSpaces(currentLines.slice(i, i + searchBlockClean.split('\n').length).join('\n'));
+        if (sliceCollapsed === collapsedSearch) {
+          foundIndex = i;
+          break;
+        }
+      }
+
+      if (foundIndex !== -1) {
+        const searchLinesCount = searchBlockClean.split('\n').length;
+        currentLines.splice(foundIndex, searchLinesCount, replaceBlock);
+        currentContent = currentLines.join('\n');
+        remaining = afterDiv.substring(endIdx + replaceMarker.length);
+        appliedCount++;
+        continue;
+      }
+
       throw new Error(
         `Could not find the SEARCH block in file: \n\`\`\`\n${searchBlock}\n\`\`\`\n\n` +
-        `[SYSTEM HINT]: The exact SEARCH block was not found. Use <read_file path="${pathStr}" /> to inspect current content before patching.`
+        `[SYSTEM DIRECTIVE FOR MODEL]: The exact SEARCH block was not found. Do NOT repeat the identical <patch_file> call!\n` +
+        `First use <read_file path="${pathStr}" /> to inspect line numbers and content. If patch_file continues to fail, IMMEDIATELY use <write_file path="${pathStr}"> to write the updated file content directly.`
       );
     }
 
@@ -417,4 +451,47 @@ export async function selectFileNative(filter?: string): Promise<string | null> 
   `;
   return runPowerShellDialogScript(psScript);
 }
+
+export async function executeFffSearch(workspaceDir: string | null | undefined, query: string): Promise<string> {
+  const rootDir = workspaceDir && fs.existsSync(workspaceDir) ? workspaceDir : process.cwd();
+  const results = await fffService.searchFiles(rootDir, query, 30);
+
+  if (results.length === 0) {
+    return `[FFF Search] No matching files found for query: "${query}"`;
+  }
+
+  const lines = results.map((r, i) => `${i + 1}. ${r.relativePath}`);
+  return `[FFF Search Results for "${query}"] (Found ${results.length} files):\n${lines.join('\n')}`;
+}
+
+export async function executeWebSearch(query: string): Promise<string> {
+  if (!query || !query.trim()) {
+    return '[Web Search Error]: Query string is empty.';
+  }
+
+  const results = await searxngService.search(query, 5);
+  if (results.length === 0) {
+    return `[Web Search]: No results found online for "${query}".`;
+  }
+
+  const formatted = results.map((r, i) => {
+    return `[${i + 1}] ${r.title}\nURL: ${r.url}\nSnippet: ${r.snippet}\n`;
+  });
+
+  return `[Web Search Results for "${query}"]:\n\n${formatted.join('\n')}`;
+}
+
+export async function executeReadWebPage(urlStr: string): Promise<string> {
+  if (!urlStr || !urlStr.trim()) {
+    return '[Read Web Page Error]: URL string is empty.';
+  }
+
+  try {
+    return await webReaderService.readPage(urlStr, 6000);
+  } catch (err: any) {
+    return `[Read Web Page Error]: Failed to read page ${urlStr}: ${err?.message || err}`;
+  }
+}
+
+
 

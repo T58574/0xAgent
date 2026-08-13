@@ -12,6 +12,7 @@
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1"
   },
   "dependencies": {
+    "@ff-labs/fff-node": "^0.10.3",
     "@tailwindcss/vite": "^4.3.3",
     "@types/marked": "^5.0.2",
     "cors": "^2.8.5",
