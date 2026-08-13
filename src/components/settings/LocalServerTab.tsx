@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Cpu, Play, Square, Folder, AlertTriangle, Zap, Activity } from 'lucide-react';
-import { GgufMetadata, HardwareInfo } from '../../types';
+import { Cpu, Play, Square, Folder, AlertTriangle, Zap, Activity, RefreshCw, HardDrive } from 'lucide-react';
+import { GgufMetadata, HardwareInfo, LocalModelItem } from '../../types';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { LlamaInstallerSection } from './localServer/LlamaInstallerSection';
@@ -147,29 +147,45 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   const [isCleaningOld, setIsCleaningOld] = useState(false);
   const [deletingTag, setDeletingTag] = useState<string | null>(null);
 
-  // Metadata, Hardware, Slots, Modal, Adviser
+  // Metadata, Hardware, Slots, Modal, Adviser, Scanned Models
   const [modelMeta, setModelMeta] = useState<GgufMetadata | null>(null);
   const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | null>(null);
   const [healthStatus, setHealthStatus] = useState<'ok' | 'loading' | 'stopped'>('stopped');
   const [slotMetrics, setSlotMetrics] = useState<{ totalSlots: number; activeSlots: number }>({ totalSlots: 0, activeSlots: 0 });
   const [crashAdvice, setCrashAdvice] = useState<string | null>(null);
+  const [scannedLocalModels, setScannedLocalModels] = useState<LocalModelItem[]>([]);
+
+  const refreshScannedModels = async () => {
+    try {
+      const res = await api.get_available_models();
+      if (res && res.local) {
+        setScannedLocalModels(res.local);
+      }
+    } catch (err) {
+      console.error('Failed to scan local models:', err);
+    }
+  };
 
   // 1. Initial Load: Hardware, Releases, Server Logs & Initial Server Status
   useEffect(() => {
     async function loadData() {
       try {
         setIsLoadingReleases(true);
-        const [releases, installed, hw, statusInfo, serverLogsInfo] = await Promise.all([
+        const [releases, installed, hw, statusInfo, serverLogsInfo, availableModels] = await Promise.all([
           api.get_llama_releases().catch(() => []),
           api.get_installed_llama_versions().catch(() => []),
           api.detect_hardware().catch(() => null),
           api.get_server_status().catch(() => null),
           api.get_server_logs().catch(() => null),
+          api.get_available_models().catch(() => null),
         ]);
 
         setGithubReleases(releases);
         setInstalledVersions(installed);
         setHardwareInfo(hw);
+        if (availableModels && availableModels.local) {
+          setScannedLocalModels(availableModels.local);
+        }
 
         if (serverLogsInfo) {
           if (serverLogsInfo.logs && serverLogsInfo.logs.length > 0) {
@@ -608,26 +624,67 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
               />
             </div>
 
-            <div className="space-y-1 pt-1">
+            <div className="space-y-2 pt-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-200">
-                  Файл GGUF Модели (.gguf)
+                <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                  <HardDrive size={13} className="text-purple-400" />
+                  <span>Файл GGUF Модели (.gguf)</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={handleSelectModel}
-                  className="text-[11px] text-sky-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer font-normal"
-                >
-                  <Folder size={12} />
-                  <span>Обзор...</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={refreshScannedModels}
+                    className="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer font-normal"
+                    title="Пересканировать папку models/"
+                  >
+                    <RefreshCw size={11} />
+                    <span>Сканировать</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSelectModel}
+                    className="text-[11px] text-sky-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer font-normal"
+                    title="Выбрать файл через проводник"
+                  >
+                    <Folder size={12} />
+                    <span>Обзор...</span>
+                  </button>
+                </div>
               </div>
+
+              {/* Local GGUF Scanned Dropdown */}
+              <select
+                value={
+                  scannedLocalModels.find(
+                    (m) => m.filePath.toLowerCase() === modelPath.toLowerCase() || m.fileName.toLowerCase() === modelPath.toLowerCase()
+                  )?.filePath || (modelPath ? 'custom' : '')
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val && val !== 'custom') {
+                    setModelPath(val);
+                  }
+                }}
+                className="w-full px-3 py-2 rounded flat-input text-xs font-mono text-slate-100 bg-slate-900 border border-white/15 focus:outline-none focus:border-purple-500/50 cursor-pointer"
+              >
+                <option value="">-- Выберите локальную GGUF модель из ~/.0xagent/models/ --</option>
+                {scannedLocalModels.map((m) => (
+                  <option key={m.id || m.filePath} value={m.filePath}>
+                    {m.title || m.fileName} ({m.quantization} • {m.sizeGB})
+                  </option>
+                ))}
+                {modelPath && !scannedLocalModels.some((m) => m.filePath.toLowerCase() === modelPath.toLowerCase()) && (
+                  <option value="custom">Пользовательский путь: {modelPath}</option>
+                )}
+              </select>
+
+              {/* Full Absolute Path Details Input */}
               <input
                 type="text"
                 value={modelPath}
                 onChange={(e) => setModelPath(e.target.value)}
                 placeholder="C:\Users\user\.0xagent\models\model.gguf"
-                className="w-full px-3 py-2 rounded flat-input text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none"
+                className="w-full px-3 py-1.5 rounded flat-input text-[11px] font-mono text-slate-400 bg-black/40 border border-white/5 focus:outline-none focus:text-slate-200"
               />
             </div>
 
