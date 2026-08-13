@@ -17,6 +17,9 @@ import {
   executeFffSearch,
   executeWebSearch,
   executeReadWebPage,
+  executeSaveKnowledge,
+  executeSearchKnowledge,
+  executeListKnowledge,
   getWorkspace0xAgentMdContext,
 } from './tools';
 import { addOrUpdateMemory, queryMemories, getSystemPromptMemoryContext } from './memory';
@@ -343,8 +346,16 @@ Both XML and JSON tool call formats are accepted.` : '';
 
     if (!response || !response.ok) {
       let errMsg = `⚠️ **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server / all fallback models exhausted'}\n\`\`\``;
-      
-      if (lastStatusCode === 429) {
+
+      if (lastStatusCode === 401 || lastStatusCode === 403) {
+        errMsg = `🔑 **Ошибка авторизации или регионального доступа Google API (HTTP ${lastStatusCode} Unauthorized/Forbidden)!**\n\n` +
+          `Модель \`${activeModelName}\` отвергла запрос из-за недействительного API-ключа или региональных ограничений.\n\n` +
+          `👉 **Решения:**\n` +
+          `1. Проверьте **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)**.\n` +
+          `2. Если Вы подключаетесь из региона с ограничениями Google Cloud, включите VPN / прокси.\n` +
+          `3. Переключитесь на локальную модель ИИ вверху чата.\n\n` +
+          `\`\`\`json\n${lastErrorText.substring(0, 400)}\n\`\`\``;
+      } else if (lastStatusCode === 429) {
         errMsg = `⏳ **Превышен лимит запросов / квота Google AI Studio (HTTP 429 Rate Limit Exceeded)!**\n\n` +
           `Модель \`${activeModelName}\` вернула ошибку **429 Too Many Requests** (превышены ограничения RPM / TPM / RPD на бесплатном тарифе).\n\n` +
           `👉 **Решения:**\n` +
@@ -353,6 +364,18 @@ Both XML and JSON tool call formats are accepted.` : '';
           `3. **Выберите другую модель Google** (например, \`Gemini 3.5 Flash Lite\` или \`Gemini 2.5 Flash\`).\n` +
           `4. Укажите новый **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)**.\n\n` +
           `\`\`\`json\n${lastErrorText.substring(0, 400)}\n\`\`\``;
+      } else if (lastStatusCode === 404) {
+        errMsg = `🔍 **Модель не найдена в API эндпоинте Google (HTTP 404 Not Found)!**\n\n` +
+          `Модель \`${activeModelName}\` недоступна по эндпоинту Google AI Studio.\n\n` +
+          `👉 **Решение:** Выберите актуальную модель (\`Gemini 3.6 Flash\`, \`Gemini 3.5 Flash Lite\`, \`Gemini 2.5 Flash\`, \`Gemma 4 31B\`) из выпадающего списка.\n\n` +
+          `\`\`\`json\n${lastErrorText.substring(0, 300)}\n\`\`\``;
+      } else if (lastStatusCode >= 500) {
+        errMsg = `🌐 **Сбой инфраструктуры ИИ / Сервер недоступен (HTTP ${lastStatusCode} Server Error)!**\n\n` +
+          `Удаленный сервер моделей верунул ошибку инфраструктуры.\n\n` +
+          `👉 **Решения:**\n` +
+          `1. Повторите запрос через 5-10 секунд.\n` +
+          `2. Переключитесь на локальную модель \`llama.cpp\`.\n\n` +
+          `\`\`\`json\n${lastErrorText.substring(0, 300)}\n\`\`\``;
       }
 
       handleAgentError(session, sessionId, broadcast, errMsg);
@@ -623,6 +646,25 @@ Both XML and JSON tool call formats are accepted.` : '';
               const saved = addOrUpdateMemory(tc.arguments.key, tc.arguments.value, tc.arguments.category);
               appendSilentUserTrait(activePersona.metadata.id, `[${saved.category}] ${saved.key} = ${saved.value}`);
               output = `Successfully stored fact in long-term memory & persona profile USER.md: [${saved.category}] ${saved.key} = ${saved.value}`;
+              break;
+            }
+            case 'save_knowledge': {
+              output = await executeSaveKnowledge({
+                title: tc.arguments.title,
+                category: tc.arguments.category,
+                content: tc.arguments.content,
+                summary: tc.arguments.summary,
+                tags: tc.arguments.tags,
+                source: tc.arguments.source || '0xAgent LLM',
+              });
+              break;
+            }
+            case 'search_knowledge': {
+              output = await executeSearchKnowledge(tc.arguments.query, tc.arguments.category, tc.arguments.tag);
+              break;
+            }
+            case 'list_knowledge': {
+              output = await executeListKnowledge(tc.arguments.category);
               break;
             }
             case 'recall_memories': {
