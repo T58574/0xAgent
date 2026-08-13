@@ -173,6 +173,27 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
     appliedCount++;
   }
 
+  // Clean up accidental duplicate adjacent declaration lines (e.g. repeated useState/useRef lines created by fuzzy patch)
+  const lines = currentContent.split(/\r?\n/);
+  const cleanedLines: string[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+    const prevTrimmed = i > 0 ? lines[i - 1].trim() : '';
+
+    if (
+      trimmed &&
+      trimmed.length > 12 &&
+      trimmed === prevTrimmed &&
+      (trimmed.startsWith('const ') || trimmed.startsWith('let ') || trimmed.startsWith('var ') || trimmed.startsWith('import '))
+    ) {
+      // Skip accidental duplicate declaration line created by small model patch
+      continue;
+    }
+    cleanedLines.push(line);
+  }
+  currentContent = cleanedLines.join('\n');
+
   fs.writeFileSync(targetPath, currentContent, 'utf-8');
   return `Successfully applied ${appliedCount} patch block(s) to ${targetPath}`;
 }

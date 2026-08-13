@@ -66,3 +66,23 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
 
   return { thinkText, bodyText };
 }
+
+/**
+ * Removes raw XML tool tags and leaked SEARCH/REPLACE patch blocks from body text
+ * so the chat UI only displays the model's natural explanation text.
+ */
+export function stripToolCallTags(text: string): string {
+  if (!text) return text;
+  let cleaned = text;
+
+  // Remove XML tool blocks (<patch_file>...</patch_file>, <write_file>...</write_file>, etc.)
+  cleaned = cleaned.replace(/<patch_file[\s\S]*?(?:<\/patch_file>|$)/gi, '');
+  cleaned = cleaned.replace(/<write_file[\s\S]*?(?:<\/write_file>|$)/gi, '');
+  cleaned = cleaned.replace(/<tool_?call[\s\S]*?(?:<\/tool_?call>|$)/gi, '');
+  cleaned = cleaned.replace(/<execute_command[\s\S]*?(?:<\/execute_command>|$)/gi, '');
+
+  // Remove leaked standalone SEARCH/REPLACE markers
+  cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, '');
+
+  return cleaned.trim();
+}

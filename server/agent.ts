@@ -36,7 +36,7 @@ export const FALLBACK_CHAIN: string[] = [
   'gemini-3.5-flash-lite',
 ];
 
-import { strip_ai_reasoning_fluff } from './agent/fluffSanitizer';
+import { strip_ai_reasoning_fluff, stripToolCallTags } from './agent/fluffSanitizer';
 import { pruneMessagesForContext, detectRepetitionLoop } from './agent/contextManager';
 import { parseToolCalls } from './agent/toolParser';
 import {
@@ -495,6 +495,7 @@ Both XML and JSON tool call formats are accepted.` : '';
     const lastMsg = session.messages[session.messages.length - 1];
     if (lastMsg) {
       lastMsg.tool_calls = toolCallsInfo;
+      lastMsg.content = stripToolCallTags(lastMsg.content);
     }
     saveSession(session);
 
