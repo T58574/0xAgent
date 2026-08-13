@@ -13,18 +13,15 @@ import {
   Plus,
   Folder,
   Layers,
-  Image as ImageIcon,
   X,
   Code,
   ShieldAlert,
   RefreshCw,
-  Compass,
 } from 'lucide-react';
 import { AppConfig, ChatMessage, LiveTelemetry } from '../types';
 import { cleanContent, getWorkspaceBaseName } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
-import { ModelSelectorDropdown } from './ModelSelectorDropdown';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -65,7 +62,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onSelectWorkspace,
   modelName,
   config,
-  onModelChanged,
+  onModelChanged: _onModelChanged,
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
@@ -289,32 +286,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     );
   };
 
-  const renderPlanningToggle = () => (
-    <div className="flex items-center justify-between px-2 pt-1 border-t border-white/5 text-[11px] text-slate-400 select-none">
-      <div className="flex items-center gap-2">
-        {onTogglePlanningMode && (
-          <button
-            type="button"
-            onClick={onTogglePlanningMode}
-            className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[10px] font-mono transition-colors cursor-pointer ${
-              planningMode
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300 font-semibold'
-                : 'bg-white/[0.02] border-white/10 text-slate-500 hover:text-slate-300'
-            }`}
-            title="Режим планирования: агент анализирует код и строит план перед внесением изменений"
-          >
-            <Compass size={11} className={planningMode ? 'text-emerald-400' : 'text-slate-500'} />
-            <span>{planningMode ? 'Планирование: ВКЛ' : 'Планирование: ВЫКЛ'}</span>
-          </button>
-        )}
-      </div>
-
-      <div className="flex items-center gap-2">
-        <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">Ctrl+Enter или Enter для отправки</span>
-      </div>
-    </div>
-  );
-
   const renderStreamingBanner = () => {
     if (!liveTelemetry || agentStatus !== 'thinking') return null;
     return (
@@ -429,7 +400,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </p>
             </div>
 
-            {/* Workspace & Model Selector Bar */}
+            {/* Workspace Bar */}
             <div className="flex items-center justify-center gap-2 flex-wrap">
               {onSelectWorkspace && (
                 <button
@@ -442,9 +413,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <span className="font-mono text-xs">{getWorkspaceBaseName(workspaceDir)}</span>
                 </button>
               )}
-
-              {/* IDE Glassmorphism Model Selector Dropdown */}
-              <ModelSelectorDropdown config={config || null} onModelChanged={onModelChanged} />
             </div>
 
             {/* Quick Action Prompt Suggestion Cards */}
@@ -475,69 +443,73 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
 
             {/* Input Form Box */}
-            <div className="pt-2">
-              <form onSubmit={handleSubmit} className="w-full max-w-xl mx-auto flex flex-col gap-2 p-3 rounded-2xl glass-panel border border-white/15 shadow-2xl bg-[#0d0f17]/90 backdrop-blur-2xl">
-                {renderAttachedImagesPreview()}
+            <div className="pt-2 w-full max-w-xl mx-auto">
+              <form onSubmit={handleSubmit} className="w-full">
+                <div className="rounded-2xl bg-[#111319] border border-white/10 p-3 focus-within:border-white/25 transition-all flex flex-col gap-2 shadow-2xl">
+                  {renderAttachedImagesPreview()}
 
-                <textarea
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit(e);
-                    }
-                  }}
-                  placeholder="Задайте вопрос, опишите задачу, вставьте картинку (Ctrl+V) или перетащите файл..."
-                  rows={3}
-                  className="w-full p-2 bg-transparent text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none"
-                />
+                  <textarea
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
+                    placeholder="Спросите что угодно"
+                    rows={2}
+                    className="w-full p-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none leading-relaxed font-sans"
+                  />
 
-                <div className="flex items-center justify-between gap-2 border-t border-white/10 pt-2">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => imageFileInputRef.current?.click()}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-sky-400 hover:bg-white/10 transition-colors cursor-pointer"
-                      title="Прикрепить изображение"
-                    >
-                      <ImageIcon size={15} />
-                    </button>
+                  <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => imageFileInputRef.current?.click()}
+                        className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                        title="Прикрепить изображение"
+                      >
+                        <Plus size={18} />
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={onSelectWorkspace}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-400 hover:bg-white/10 transition-colors cursor-pointer"
-                      title="Выбрать рабочий каталог"
-                    >
-                      <Plus size={15} />
-                    </button>
+                      {onTogglePlanningMode && (
+                        <button
+                          type="button"
+                          onClick={onTogglePlanningMode}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                            planningMode
+                              ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                              : 'bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent'
+                          }`}
+                        >
+                          <Brain size={14} />
+                          <span>Размышление</span>
+                        </button>
+                      )}
+                    </div>
 
-                    <ModelSelectorDropdown config={config || null} onModelChanged={onModelChanged} />
-                  </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleMicClick}
+                        className={`p-2 rounded-full transition-colors cursor-pointer ${
+                          isRecording ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                        }`}
+                        title="Голосовой ввод"
+                      >
+                        {isRecording ? <Square size={16} /> : <Mic size={18} />}
+                      </button>
 
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleMicClick}
-                      className={`p-2 rounded-xl transition-colors cursor-pointer ${
-                        isRecording
-                          ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse'
-                          : 'text-slate-400 hover:text-white hover:bg-white/10'
-                      }`}
-                      title="Голосовой ввод"
-                    >
-                      {isRecording ? <Square size={15} /> : <Mic size={15} />}
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
-                      className="flat-btn rounded-xl px-4 py-2 text-xs font-bold text-slate-950 bg-gradient-to-r from-sky-400 to-emerald-400 hover:from-sky-300 hover:to-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer shadow-md"
-                    >
-                      <Send size={13} />
-                      <span>Отправить</span>
-                    </button>
+                      <button
+                        type="submit"
+                        disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
+                        className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow cursor-pointer shrink-0"
+                        title="Отправить"
+                      >
+                        <Send size={14} className="translate-x-[0.5px]" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </form>
@@ -727,66 +699,99 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* SUMMARIZING SCI-FI BANNER */}
           {renderSummarizingBanner()}
 
-          {/* INPUT FORM CONTAINER */}
-          <div className="p-3 border-t border-white/10 glass-panel select-none z-10 w-full flex flex-col gap-2">
+          {/* INPUT FORM CONTAINER (OLED Minimal Aesthetic) */}
+          <div className="p-3 bg-[#08090d]/90 border-t border-white/5 select-none z-10 w-full flex flex-col gap-2 backdrop-blur-xl">
             {renderAttachedImagesPreview()}
 
-            <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto flex items-center justify-center gap-2">
-              <div className="relative flex-1 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Задайте вопрос, вставьте картинку (Ctrl+V) или перетащите файл..."
-                  className="w-full pl-4 pr-24 py-2.5 rounded-xl flat-input text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none"
-                />
-
-                <div className="absolute right-2.5 flex items-center gap-1.5">
+            <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto">
+              <div className="rounded-2xl bg-[#111319] border border-white/10 p-3 focus-within:border-white/25 transition-all flex flex-col gap-2 shadow-2xl">
+                
+                {/* Top Input Area: Plus Button & Textarea */}
+                <div className="flex items-start gap-2">
                   <button
                     type="button"
                     onClick={() => imageFileInputRef.current?.click()}
-                    className="p-1 rounded text-slate-400 hover:text-sky-400 transition-colors cursor-pointer"
-                    title="Прикрепить изображение"
+                    className="p-1.5 mt-0.5 rounded-full text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                    title="Прикрепить файл или изображение"
                   >
-                    <ImageIcon size={16} />
+                    <Plus size={18} />
                   </button>
 
-                  <button
-                    type="button"
-                    onClick={handleMicClick}
-                    className={`p-1 rounded transition-colors ${
-                      isRecording ? 'text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white'
-                    }`}
-                    title="Голосовой ввод"
-                  >
-                    {isRecording ? <Square size={16} /> : <Mic size={16} />}
-                  </button>
-
-                  <ModelSelectorDropdown config={config || null} onModelChanged={onModelChanged} />
+                  <textarea
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit(e);
+                      }
+                    }}
+                    rows={1}
+                    placeholder="Спросите что угодно"
+                    className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none resize-none min-h-[38px] max-h-[200px] py-1.5 leading-relaxed font-sans"
+                  />
                 </div>
+
+                {/* Bottom Input Controls Bar */}
+                <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                  
+                  {/* Left Pill: Thinking / Planning Toggle */}
+                  <div className="flex items-center gap-2">
+                    {onTogglePlanningMode && (
+                      <button
+                        type="button"
+                        onClick={onTogglePlanningMode}
+                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                          planningMode
+                            ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                            : 'bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent'
+                        }`}
+                        title="Переключить режим планирования/размышления"
+                      >
+                        <Brain size={14} className={planningMode ? 'text-blue-400' : 'text-slate-400'} />
+                        <span>Размышление</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Right Actions: Mic & Submit / Stop */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleMicClick}
+                      className={`p-2 rounded-full transition-colors cursor-pointer ${
+                        isRecording ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'text-slate-400 hover:text-white hover:bg-white/5'
+                      }`}
+                      title="Голосовой ввод"
+                    >
+                      {isRecording ? <Square size={16} /> : <Mic size={18} />}
+                    </button>
+
+                    {agentStatus !== 'idle' && onCancelAgent ? (
+                      <button
+                        type="button"
+                        onClick={onCancelAgent}
+                        className="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-colors shadow cursor-pointer shrink-0"
+                        title="Остановить генерацию"
+                      >
+                        <Square size={14} />
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
+                        className="w-8 h-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors shadow cursor-pointer shrink-0"
+                        title="Отправить"
+                      >
+                        <Send size={14} className="translate-x-[0.5px]" />
+                      </button>
+                    )}
+                  </div>
+
+                </div>
+
               </div>
-
-              {agentStatus !== 'idle' && onCancelAgent ? (
-                <button
-                  type="button"
-                  onClick={onCancelAgent}
-                  className="flat-btn rounded-xl px-3.5 py-2.5 text-xs font-semibold text-rose-400 border-rose-500/30 hover:bg-rose-500/10 cursor-pointer flex items-center gap-1.5 shrink-0"
-                >
-                  <Square size={13} />
-                  <span>Стоп</span>
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
-                  className="flat-btn rounded-xl px-4 py-2.5 text-xs font-bold text-slate-950 bg-gradient-to-r from-sky-400 to-emerald-400 hover:from-sky-300 hover:to-emerald-300 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 flex items-center gap-1.5 cursor-pointer shadow-md"
-                >
-                  <Send size={14} />
-                </button>
-              )}
             </form>
-
-            {renderPlanningToggle()}
           </div>
         </div>
       )}

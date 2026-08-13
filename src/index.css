@@ -4,15 +4,15 @@
 
 /* 4 UNIFIED GLASSMORPHISM PRESET THEMES */
 :root, [data-theme="obsidian"] {
-  --theme-bg: #090d16;
+  --theme-bg: #050507;
   --theme-text: #f8fafc;
   --theme-text-muted: #94a3b8;
   --theme-border: rgba(255, 255, 255, 0.08);
-  --theme-panel: rgba(15, 23, 42, 0.85);
-  --theme-card-bg: rgba(15, 23, 42, 0.5);
-  --theme-accent: #10b981;
-  --theme-accent-hover: #059669;
-  --theme-accent-glow: rgba(16, 185, 129, 0.2);
+  --theme-panel: rgba(12, 13, 18, 0.95);
+  --theme-card-bg: rgba(18, 20, 28, 0.6);
+  --theme-accent: #2563eb;
+  --theme-accent-hover: #1d4ed8;
+  --theme-accent-glow: rgba(37, 99, 235, 0.2);
 }
 
 [data-theme="cyber"] {
