@@ -276,10 +276,18 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
       name = parsed.name || parsed.function || '';
       args = parsed.arguments || parsed.parameters || {};
     } catch {
-      // 2. Fallback: Parse malformed JSON mixed with XML attributes (e.g. {"name": "readfile" path="src/ChatArea.tsx"})
+      // 2. Fallback: Parse malformed JSON mixed with XML attributes (e.g. {"name": "readfile" path="src/ChatArea.tsx"} or {"readfile path="..."})
       const nameMatch = /["']?name["']?\s*[:=]\s*["']([^"']+)["']/i.exec(raw);
       if (nameMatch) {
         name = nameMatch[1];
+      } else {
+        // Scan raw string for known tool names (e.g. readfile, patchfile, writefile, fffsearch, etc.)
+        for (const candidateKey of Object.keys(toolNameMap)) {
+          if (new RegExp(`\\b${candidateKey}\\b`, 'i').test(raw)) {
+            name = candidateKey;
+            break;
+          }
+        }
       }
 
       // Extract attributes: path="...", query="...", command="...", url="..."
@@ -294,6 +302,16 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
       if (urlMatch) args.url = urlMatch[1];
       if (commandMatch) args.command = commandMatch[1];
       if (contentMatch) args.content = contentMatch[1];
+    }
+
+    // Secondary fallback: if name is still empty after JSON parse, check toolNameMap against raw string
+    if (!name) {
+      for (const candidateKey of Object.keys(toolNameMap)) {
+        if (new RegExp(`\\b${candidateKey}\\b`, 'i').test(raw)) {
+          name = candidateKey;
+          break;
+        }
+      }
     }
 
     const mappedName = toolNameMap[name.toLowerCase()] || toolNameMap[name] || name;
