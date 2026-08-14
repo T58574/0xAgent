@@ -7,7 +7,6 @@ import {
   Terminal,
   Bot,
   Globe,
-  Brain,
   Code,
   User,
   Cloud,
@@ -29,7 +28,7 @@ interface FloatingCommandBarProps {
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
   onCancelAgent?: () => void;
   chatMode?: 'agent' | 'simple';
-  planningMode: boolean;
+  planningMode?: boolean;
   onTogglePlanningMode?: () => void;
   personas?: PersonaMetadata[];
   activePersonaId?: string;
@@ -52,7 +51,6 @@ interface SlashCommandItem {
 const SLASH_COMMANDS: SlashCommandItem[] = [
   { cmd: '/goal', label: 'Автономная цель (/goal)', description: 'Глубокое решение задачи до полного результата', icon: <Bot size={14} className="text-[var(--theme-text-muted)]" /> },
   { cmd: '/search', label: 'Поиск в сети (/search)', description: 'Быстрый поиск через SearXNG без затрат токенов', icon: <Globe size={14} className="text-[var(--theme-text-muted)]" /> },
-  { cmd: '/think', label: 'Режим рассуждений (/think)', description: 'Пошаговая цепочка рассуждений CoT', icon: <Brain size={14} className="text-[var(--theme-text-muted)]" /> },
   { cmd: '/patch', label: 'Аудит и рефакторинг (/patch)', description: 'Создание безопасных diff-патчей в проекте', icon: <Code size={14} className="text-[var(--theme-text-muted)]" /> },
   { cmd: '/clear', label: 'Очистить контекст (/clear)', description: 'Сбросить текущий буфер сообщений', icon: <Terminal size={14} className="text-[var(--theme-text-muted)]" /> },
 ];
@@ -64,8 +62,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   agentStatus,
   onCancelAgent,
   chatMode: _chatMode,
-  planningMode,
-  onTogglePlanningMode,
+  planningMode: _planningMode,
+  onTogglePlanningMode: _onTogglePlanningMode,
   personas = [],
   activePersonaId = 'default',
   onSelectPersona,
@@ -108,7 +106,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(180, Math.max(38, textareaRef.current.scrollHeight))}px`;
+      textareaRef.current.style.height = `${Math.min(160, Math.max(36, textareaRef.current.scrollHeight))}px`;
     }
   }, [inputText]);
 
@@ -206,9 +204,9 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         className="hidden"
       />
 
-      {/* 1. Slash Commands Dropdown */}
+      {/* 1. Slash Commands Popover */}
       {openMenu === 'slash' && filteredSlashCommands.length > 0 && (
-        <div className="absolute bottom-full mb-2 left-0 w-full bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
+        <div className="absolute bottom-full mb-3 left-0 w-full bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
           <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider flex items-center justify-between border-b border-[var(--theme-border)]/50 mb-1">
             <span>Команды</span>
             <span>Tab / ↵ для выбора</span>
@@ -241,7 +239,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
       {/* 2. Persona Selector Popover */}
       {openMenu === 'persona' && personas.length > 0 && (
-        <div className="absolute bottom-full mb-2 left-3 w-60 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
+        <div className="absolute bottom-full mb-3 left-2 w-60 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
           <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1">
             Персона
           </div>
@@ -270,7 +268,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
       {/* 3. Model Selector Popover */}
       {openMenu === 'model' && (
-        <div className="absolute bottom-full mb-2 left-10 sm:left-24 w-68 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
+        <div className="absolute bottom-full mb-3 left-24 sm:left-32 w-68 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
           {/* Cloud API Models */}
           <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
             <span>Облачные API</span>
@@ -383,144 +381,127 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
-      {/* Main Floating Bento Container */}
+      {/* 1. Seamless ChatGPT-Style Capsule Input */}
       <form onSubmit={onSubmit}>
-        <div className="bento-card p-3 rounded-2xl bg-[var(--theme-panel)]/95 backdrop-blur-xl border border-[var(--theme-border)] focus-within:border-[var(--theme-border)] transition-all flex flex-col gap-2 shadow-2xl">
+        <div className="bento-card rounded-3xl p-2 px-3.5 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-white/25 transition-all flex items-center gap-2.5 shadow-2xl">
           
-          {/* Top: Full-Width Message Textarea */}
-          <div className="w-full">
-            <textarea
-              ref={textareaRef}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={1}
-              placeholder="Опишите задачу или введите / для спец-команд..."
-              className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-xs focus:outline-none resize-none min-h-[38px] max-h-[160px] py-1 px-1 leading-relaxed font-sans"
-            />
-          </div>
+          {/* Plus Attach File Button */}
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="p-1.5 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            title="Прикрепить изображение"
+          >
+            <Plus size={18} />
+          </button>
 
-          {/* Bottom Toolbar: Perfectly Symmetrical 1-Line Row */}
-          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--theme-border)]/50 text-xs">
-            
-            {/* Left Controls */}
-            <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar">
-              
-              {/* Attach File Button */}
+          {/* Clean Message Textarea */}
+          <textarea
+            ref={textareaRef}
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            rows={1}
+            placeholder="Спросите что угодно или введите / для команд..."
+            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-xs focus:outline-none resize-none min-h-[30px] max-h-[140px] py-1.5 leading-relaxed font-sans"
+          />
+
+          {/* Right Action Controls: Slash Commands trigger + Circular Send */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setInputText('/');
+                setOpenMenu('slash');
+                textareaRef.current?.focus();
+              }}
+              className="text-[11px] font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 px-2 py-1 rounded-lg transition-colors cursor-pointer hidden sm:inline"
+              title="Открыть список команд"
+            >
+              / Команды
+            </button>
+
+            {isBusy && onCancelAgent ? (
               <button
                 type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="p-1 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-                title="Прикрепить изображение"
+                onClick={onCancelAgent}
+                className="w-8 h-8 rounded-full bg-white/15 hover:bg-red-500/25 text-white hover:text-red-400 border border-white/10 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+                title="Остановить выполнение"
               >
-                <Plus size={16} />
+                <Square size={12} fill="currentColor" />
               </button>
-
-              {/* Persona Selector Chip */}
-              {personas.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')}
-                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border ${
-                    openMenu === 'persona'
-                      ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)] shadow-sm'
-                      : 'bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
-                  }`}
-                  title="Сменить персону"
-                >
-                  <User size={12} />
-                  <span className="max-w-[80px] truncate">{currentPersona.name}</span>
-                </button>
-              )}
-
-              {/* Model Selector Chip */}
+            ) : (
               <button
-                type="button"
-                onClick={() => {
-                  fetchModelsAndStatus();
-                  setOpenMenu(openMenu === 'model' ? 'none' : 'model');
-                }}
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border ${
-                  openMenu === 'model' || isLocalActive
-                    ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)] shadow-sm'
-                    : 'bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
+                type="submit"
+                disabled={!canSubmit}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm ${
+                  canSubmit
+                    ? 'bg-white text-black hover:bg-white/90 shadow-md hover:scale-105 active:scale-95 cursor-pointer'
+                    : 'bg-white/5 text-[var(--theme-text-muted)] opacity-35 cursor-not-allowed border border-transparent'
                 }`}
-                title={`Текущая модель: ${activeModelId}`}
+                title="Отправить сообщение (Enter)"
               >
-                <div className="relative shrink-0 flex items-center">
-                  {isLocalActive ? <Cpu size={12} /> : <Cloud size={12} />}
-                  {isLocalActive && serverStatus.running && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-white absolute -top-0.5 -right-0.5 animate-pulse" />
-                  )}
-                </div>
-                <span className="max-w-[110px] truncate">{getDisplayTitle(activeModelId)}</span>
-                <Sliders size={10} className="text-[var(--theme-text-muted)] opacity-60 shrink-0" />
+                <ArrowUp size={16} strokeWidth={2.5} />
               </button>
-
-              {/* Planning Mode Toggle */}
-              {onTogglePlanningMode && (
-                <button
-                  type="button"
-                  onClick={onTogglePlanningMode}
-                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border ${
-                    planningMode
-                      ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)]'
-                      : 'bg-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
-                  }`}
-                  title="Включить режим рассуждений / планирования"
-                >
-                  <Brain size={12} />
-                  <span>Размышление</span>
-                </button>
-              )}
-
-              {/* Slash Commands Trigger */}
-              <button
-                type="button"
-                onClick={() => {
-                  setInputText('/');
-                  setOpenMenu('slash');
-                  textareaRef.current?.focus();
-                }}
-                className="inline-flex items-center gap-0.5 px-1.5 py-1 rounded-lg text-[11px] font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-                title="Открыть меню команд"
-              >
-                <span>/</span>
-                <span>Команды</span>
-              </button>
-            </div>
-
-            {/* Right Controls: High-End Circular Send / Stop Button */}
-            <div className="flex items-center shrink-0">
-              {isBusy && onCancelAgent ? (
-                <button
-                  type="button"
-                  onClick={onCancelAgent}
-                  className="w-8 h-8 rounded-full bg-white/15 hover:bg-red-500/25 text-white hover:text-red-400 border border-white/10 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
-                  title="Остановить выполнение"
-                >
-                  <Square size={12} fill="currentColor" />
-                </button>
-              ) : (
-                <button
-                  type="submit"
-                  disabled={!canSubmit}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm ${
-                    canSubmit
-                      ? 'bg-white text-black hover:bg-white/90 shadow-md hover:scale-105 active:scale-95 cursor-pointer'
-                      : 'bg-white/5 text-[var(--theme-text-muted)] opacity-35 cursor-not-allowed border border-transparent'
-                  }`}
-                  title="Отправить сообщение (Enter)"
-                >
-                  <ArrowUp size={16} strokeWidth={2.5} />
-                </button>
-              )}
-            </div>
-
+            )}
           </div>
 
         </div>
       </form>
+
+      {/* 2. Below Input Capsule: Discreet Persona & Model Selectors (Zero horizontal dividing line) */}
+      <div className="flex items-center justify-between px-3 pt-2 text-[11px] text-[var(--theme-text-muted)] font-mono">
+        
+        <div className="flex items-center gap-2">
+          {/* Persona Selector below input */}
+          {personas.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all cursor-pointer border ${
+                openMenu === 'persona'
+                  ? 'text-[var(--theme-text)] bg-white/15 border-[var(--theme-border)] shadow-sm font-semibold'
+                  : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+              }`}
+              title="Сменить персону"
+            >
+              <User size={12} />
+              <span className="truncate max-w-[95px]">{currentPersona.name}</span>
+            </button>
+          )}
+
+          {/* Model Selector below input */}
+          <button
+            type="button"
+            onClick={() => {
+              fetchModelsAndStatus();
+              setOpenMenu(openMenu === 'model' ? 'none' : 'model');
+            }}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all cursor-pointer border ${
+              openMenu === 'model'
+                ? 'text-[var(--theme-text)] bg-white/15 border-[var(--theme-border)] shadow-sm font-semibold'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+            }`}
+            title={`Текущая модель: ${activeModelId}`}
+          >
+            <div className="relative shrink-0 flex items-center">
+              {isLocalActive ? <Cpu size={12} /> : <Cloud size={12} />}
+              {isLocalActive && serverStatus.running && (
+                <span className="w-1.5 h-1.5 rounded-full bg-white absolute -top-0.5 -right-0.5 animate-pulse" />
+              )}
+            </div>
+            <span className="truncate max-w-[140px]">{getDisplayTitle(activeModelId)}</span>
+            <Sliders size={10} className="opacity-50" />
+          </button>
+        </div>
+
+        {/* Discreet Platform Label */}
+        <span className="text-[10px] opacity-35 hidden sm:inline select-none">
+          0xAgent Local & Cloud
+        </span>
+
+      </div>
+
     </div>
   );
 };

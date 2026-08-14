@@ -47,8 +47,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   reasoningEnabled = true,
   groqApiKey: _groqApiKey,
   liveTelemetry,
-  planningMode = true,
-  onTogglePlanningMode,
+  planningMode: _planningMode = true,
+  onTogglePlanningMode: _onTogglePlanningMode,
   isServerOffline: _isServerOffline = false,
   onStartServer: _onStartServer,
   workspaceDir: _workspaceDir,
@@ -273,8 +273,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 onSubmit={handleSubmit}
                 agentStatus={agentStatus}
                 onCancelAgent={onCancelAgent}
-                planningMode={planningMode}
-                onTogglePlanningMode={onTogglePlanningMode}
                 personas={personas}
                 activePersonaId={activePersona?.id || 'default'}
                 onSelectPersona={handleSelectPersona}
@@ -462,8 +460,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onSubmit={handleSubmit}
               agentStatus={agentStatus}
               onCancelAgent={onCancelAgent}
-              planningMode={planningMode}
-              onTogglePlanningMode={onTogglePlanningMode}
               personas={personas}
               activePersonaId={activePersona?.id || 'default'}
               onSelectPersona={handleSelectPersona}
