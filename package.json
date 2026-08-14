@@ -1,8 +1,26 @@
 {
-  "name": "oxagent",
-  "private": true,
+  "name": "0xagent",
   "version": "0.1.0",
+  "description": "Autonomous AI Coding Agent & Web-IDE platform powered by local llama.cpp and hybrid cloud LLMs",
   "type": "module",
+  "license": "MIT",
+  "author": "T58574",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/T58574/0xAgent.git"
+  },
+  "keywords": [
+    "ai-agent",
+    "llama-cpp",
+    "react-19",
+    "typescript",
+    "autonomous-agent",
+    "web-ide",
+    "local-llm",
+    "gemma-4",
+    "searxng",
+    "privacy-first"
+  ],
   "scripts": {
     "dev": "concurrently -k -p \"[{name}]\" -c \"blue,green\" -n \"SERVER,CLIENT\" \"tsx watch server/index.ts\" \"vite --host 0.0.0.0\"",
     "dev:server": "tsx watch server/index.ts",
@@ -10,7 +28,8 @@
     "build": "tsc && vite build",
     "build:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-launcher.ps1",
     "preview": "vite preview",
-    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1"
+    "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1",
+    "audit:security": "node ./scripts/security_audit.cjs"
   },
   "dependencies": {
     "@ff-labs/fff-node": "^0.10.3",

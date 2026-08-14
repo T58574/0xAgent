@@ -385,7 +385,7 @@ Transcribes audio via the Groq Whisper API.
 ### `GET /api/get-local-ips`
 Returns all local IPv4 network addresses for LAN access to the UI.
 
-**Response:** `{ urls: string[] }` — e.g. `["http://192.168.1.100:5173"]`
+**Response:** `{ urls: string[] }` — e.g. `["http://192.168.1.50:5173"]`
 
 ---
 

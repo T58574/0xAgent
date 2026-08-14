@@ -1,5 +1,5 @@
-# Logs
-logs
+# Logs & Process Dumps
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,20 +7,52 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
+# Dependencies & Package Managers
+node_modules/
+.pnp
+.pnp.js
+
+# Build Outputs & Compilation Artifacts
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+vite.config.d.ts
+vite.config.js
+*.exe
+!launcher/*.cs
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
 *.local
 
-# Editor directories and files
-.vscode
-.idea
+# AI Models & Large Binaries
+models/
+*.gguf
+*.bin
+*.safetensors
+*.mmproj
+*.onnx
+
+# Application Runtime Data & Local Cache
+.0xagent/
+data/
+sessions/
+knowledge_base/
+audio_cache/
+.cache/
+tmp/
+temp/
+
+# IDE & OS Files
+.vscode/
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
-
-models/
-*.gguf

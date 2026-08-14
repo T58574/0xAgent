@@ -333,7 +333,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           type="text"
           value={slotSavePath}
           onChange={(e) => setSlotSavePath(e.target.value)}
-          placeholder="C:\Users\user\.0xagent\slots"
+          placeholder="~/.0xagent/slots or C:\path\to\slots"
           className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
         />
       </div>

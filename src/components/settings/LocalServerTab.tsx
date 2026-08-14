@@ -564,7 +564,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 type="text"
                 value={exePath}
                 onChange={(e) => setExePath(e.target.value)}
-                placeholder="C:\Users\user\.0xagent\llama\llama-server.exe"
+                placeholder="~/.0xagent/llama/llama-server.exe"
                 className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
               />
             </div>
@@ -628,7 +628,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 type="text"
                 value={modelPath}
                 onChange={(e) => setModelPath(e.target.value)}
-                placeholder="C:\Users\user\.0xagent\models\model.gguf"
+                placeholder="~/.0xagent/models/model.gguf"
                 className="w-full px-3 py-1.5 rounded-lg bento-card text-[11px] font-mono text-[var(--theme-text-muted)] bg-black/40 focus:outline-none focus:text-[var(--theme-text)]"
               />
             </div>

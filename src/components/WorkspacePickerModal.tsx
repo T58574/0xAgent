@@ -109,7 +109,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                 type="text"
                 value={inputPath}
                 onChange={(e) => setInputPath(e.target.value)}
-                placeholder="C:\Users\user\Documents\projects\my-app"
+                placeholder="C:\Projects\my-app or ~/projects/my-app"
                 className="flex-1 px-3.5 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
                 autoFocus
               />
