@@ -16,7 +16,6 @@ import {
   Volume2,
   Play,
   RefreshCw,
-  Sliders,
 } from 'lucide-react';
 import { AppConfig, PersonaMetadata } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
@@ -389,13 +388,13 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-1.5 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            className="p-1.5 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 transition-colors cursor-pointer shrink-0 self-center"
             title="Прикрепить изображение"
           >
             <Plus size={18} />
           </button>
 
-          {/* Clean Message Textarea */}
+          {/* Centered Message Textarea with 15px font size */}
           <textarea
             ref={textareaRef}
             value={inputText}
@@ -403,24 +402,11 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Спросите что угодно или введите / для команд..."
-            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-xs focus:outline-none resize-none min-h-[30px] max-h-[140px] py-1.5 leading-relaxed font-sans"
+            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[15px] focus:outline-none resize-none min-h-[36px] max-h-[140px] py-1.5 px-1 leading-normal font-sans self-center"
           />
 
-          {/* Right Action Controls: Slash Commands trigger + Circular Send */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                setInputText('/');
-                setOpenMenu('slash');
-                textareaRef.current?.focus();
-              }}
-              className="text-[11px] font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 px-2 py-1 rounded-lg transition-colors cursor-pointer hidden sm:inline"
-              title="Открыть список команд"
-            >
-              / Команды
-            </button>
-
+          {/* Right Action Controls: Circular Send / Stop Button */}
+          <div className="flex items-center shrink-0 self-center">
             {isBusy && onCancelAgent ? (
               <button
                 type="button"
@@ -449,9 +435,10 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       </form>
 
-      {/* 2. Below Input Capsule: Discreet Persona & Model Selectors (Zero horizontal dividing line) */}
-      <div className="flex items-center justify-between px-3 pt-2 text-[11px] text-[var(--theme-text-muted)] font-mono">
+      {/* 2. Below Input Capsule: Persona, Model on Left, / Commands on Right */}
+      <div className="flex items-center justify-between px-3 pt-2 text-xs text-[var(--theme-text-muted)] font-mono">
         
+        {/* Left: Persona & Model Selectors (without duplicate slider icons) */}
         <div className="flex items-center gap-2">
           {/* Persona Selector below input */}
           {personas.length > 0 && (
@@ -465,12 +452,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               }`}
               title="Сменить персону"
             >
-              <User size={12} />
+              <User size={13} />
               <span className="truncate max-w-[95px]">{currentPersona.name}</span>
             </button>
           )}
 
-          {/* Model Selector below input */}
+          {/* Model Selector below input (Single clean icon) */}
           <button
             type="button"
             onClick={() => {
@@ -485,20 +472,29 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             title={`Текущая модель: ${activeModelId}`}
           >
             <div className="relative shrink-0 flex items-center">
-              {isLocalActive ? <Cpu size={12} /> : <Cloud size={12} />}
+              {isLocalActive ? <Cpu size={13} /> : <Cloud size={13} />}
               {isLocalActive && serverStatus.running && (
                 <span className="w-1.5 h-1.5 rounded-full bg-white absolute -top-0.5 -right-0.5 animate-pulse" />
               )}
             </div>
-            <span className="truncate max-w-[140px]">{getDisplayTitle(activeModelId)}</span>
-            <Sliders size={10} className="opacity-50" />
+            <span className="truncate max-w-[150px]">{getDisplayTitle(activeModelId)}</span>
           </button>
         </div>
 
-        {/* Discreet Platform Label */}
-        <span className="text-[10px] opacity-35 hidden sm:inline select-none">
-          0xAgent Local & Cloud
-        </span>
+        {/* Right: / Commands helper */}
+        <button
+          type="button"
+          onClick={() => {
+            setInputText('/');
+            setOpenMenu('slash');
+            textareaRef.current?.focus();
+          }}
+          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer border border-transparent"
+          title="Открыть список команд"
+        >
+          <span>/</span>
+          <span>Команды</span>
+        </button>
 
       </div>
 
