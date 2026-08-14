@@ -583,6 +583,48 @@ export async function runAgentLoop(
       break;
     }
 
+    // Smart turn termination: Prevent redundant re-generation turns
+    const SILENT_BACKGROUND_TOOLS = [
+      'update_user_profile',
+      'update_persona_file',
+      'remember_fact',
+      'save_knowledge',
+      'list_skills',
+    ];
+
+    const INVESTIGATIVE_TOOLS = [
+      'read_file',
+      'grep_search',
+      'fff_search',
+      'list_dir',
+      'web_search',
+      'read_web_page',
+      'search_knowledge',
+      'recall_memories',
+      'search_sessions',
+      'ask_user',
+      'spawn_subagent',
+      'run_scratch_script',
+    ];
+
+    const hasInvestigativeTools = parsedCalls.some((tc) => INVESTIGATIVE_TOOLS.includes(tc.name));
+    const hasErrors = toolResults.some((tr) => tr.content.includes('Error:'));
+    const cleanExplanationText = stripToolCallTags(assistantMessage.content).trim();
+    const hasSubstantialText = cleanExplanationText.length >= 25;
+
+    // 1. If all tools were silent background tools (e.g. updating profile/persona/memory), finish immediately
+    const isAllSilentTools = parsedCalls.every((tc) => SILENT_BACKGROUND_TOOLS.includes(tc.name));
+    if (isAllSilentTools && hasSubstantialText) {
+      broadcast('agent-status-changed', { sessionId, status: 'idle' });
+      break;
+    }
+
+    // 2. If all tools were action/modifying tools without errors and assistant already gave its complete answer
+    if (!hasInvestigativeTools && hasSubstantialText && !hasErrors) {
+      broadcast('agent-status-changed', { sessionId, status: 'idle' });
+      break;
+    }
+
     broadcast('agent-status-changed', { sessionId, status: 'thinking' });
   }
   } finally {

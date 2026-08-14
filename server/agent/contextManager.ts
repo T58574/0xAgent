@@ -80,17 +80,12 @@ export function detectRepetitionLoop(history: ChatMessage[], newContent: string)
   const assistantMsgs = history.filter((m) => m.role === 'assistant');
   if (assistantMsgs.length > 0) {
     const prevAssistantContent = assistantMsgs[assistantMsgs.length - 1].content.trim().toLowerCase();
-    if (prevAssistantContent.length > 30 && trimmedNew === prevAssistantContent) {
+    // Only flag identical full duplicate content (>= 40 chars)
+    if (prevAssistantContent.length >= 40 && trimmedNew === prevAssistantContent) {
       return true;
     }
 
-    if (prevAssistantContent.length > 50 && trimmedNew.length > 50) {
-      const minLen = Math.min(100, Math.floor(prevAssistantContent.length * 0.8));
-      if (trimmedNew.substring(0, minLen) === prevAssistantContent.substring(0, minLen)) {
-        return true;
-      }
-    }
-
+    // Repeated identical tool calls 3 times consecutively without progress
     const newToolCalls = parseToolCalls(newContent);
     if (newToolCalls.length > 0 && assistantMsgs.length >= 2) {
       const newSignature = newToolCalls.map((t) => `${t.name}:${JSON.stringify(t.arguments)}`).join('|');
