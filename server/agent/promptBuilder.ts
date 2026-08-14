@@ -4,6 +4,11 @@ import { getActivePersona, getUnifiedToolsContext } from '../personas';
 import { getWorkspace0xAgentMdContext } from '../tools';
 
 export function buildFullSystemPrompt(config: AppConfig): string {
+  // Google DeepMind Gemma 4 Trigger Token:
+  // Thinking is enabled by including the <|think|> token at the start of the system prompt.
+  const isReasoningEnabled = config.reasoning_enabled !== false;
+  const thinkTrigger = isReasoningEnabled ? '<|think|>\n' : '';
+
   const memoryContext = getSystemPromptMemoryContext();
   const envContext = `\n\n# OPERATING SYSTEM & SHELL ENVIRONMENT
 - OS: Windows (${process.platform})
@@ -44,8 +49,10 @@ ${activePersona.user}
 - To update persona character or behavior: use <update_persona_file file="SOUL.md">new soul content</update_persona_file>.`;
 
   const reasoningDirective = `\n\n# REASONING & CHAIN-OF-THOUGHT INSTRUCTIONS:
-- You should output your step-by-step reasoning and plan inside <think>...</think> tags before providing your answer or executing tools.
-- Everything inside <think>...</think> is processed as internal reasoning and rendered cleanly in the reasoning viewer for the user.`;
+- When thinking is enabled, output your internal reasoning and step-by-step plan before answering or executing tools.
+- Gemma 4 format: <|channel>thought\\n[Internal reasoning]<channel|>
+- Alternative format: <think>[Internal reasoning]</think>
+- Everything inside the thought block is rendered in the reasoning HUD.`;
 
   const toolExecutionDirective = `\n\n# CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & CODE MODIFICATIONS
 1. EXPLANATION FIRST: Always write a brief natural language explanation of your diagnosis and intended changes BEFORE emitting XML tool calls.
@@ -67,7 +74,7 @@ You may also call tools using JSON format wrapped in <tool_call> tags:
 <tool_call>{"name": "update_user_profile", "arguments": {"trait": "User preferred theme is matrix", "category": "preferences"}}</tool_call>
 <tool_call>{"name": "list_dir", "arguments": {"path": "."}}</tool_call>
 <tool_call>{"name": "grep_search", "arguments": {"pattern": "TODO", "path": "src/"}}</tool_call>
-<tool_call>{"name": "patch_file", "arguments": {"path": "file.ts", "content": "<<<<<<< SEARCH\nold code\n=======\nnew code\n>>>>>>> REPLACE"}}</tool_call>
+<tool_call>{"name": "patch_file", "arguments": {"path": "file.ts", "content": "<<<<<<< SEARCH\\nold code\\n=======\\nnew code\\n>>>>>>> REPLACE"}}</tool_call>
 Both XML and JSON tool call formats are accepted.`
     : '';
 
@@ -75,6 +82,7 @@ Both XML and JSON tool call formats are accepted.`
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
 
   return (
+    thinkTrigger +
     personaContext +
     reasoningDirective +
     unifiedToolsContext +
@@ -87,11 +95,25 @@ Both XML and JSON tool call formats are accepted.`
   );
 }
 
-export function formatMessageContent(m: ChatMessage): string | any[] {
+export function formatMessageContent(m: ChatMessage, isHistoryAssistant: boolean = false): string | any[] {
+  let content = m.content || '';
+
+  // Google DeepMind Gemma 4 Multi-Turn Conversation Rule:
+  // "In multi-turn conversations, the historical model output should only include the final response.
+  // Thoughts from previous model turns must not be added before the next user turn begins,
+  // with the exception of tool call turns where thinking content should be preserved."
+  if (isHistoryAssistant && (!m.tool_calls || m.tool_calls.length === 0)) {
+    content = content
+      .replace(/<(?:think|thought|\|thought\||\|start_thought\|)>[\s\S]*?<\/(?:think|thought|\|thought\||\|end_thought\|)>/gi, '')
+      .replace(/<\|?channel\|?>?thought[\s\S]*?<\|?(?:\/channel|channel\|?)>/gi, '')
+      .replace(/\[(?:think|thinking)\][\s\S]*?\[\/(?:think|thinking)\]/gi, '')
+      .trim();
+  }
+
   if (Array.isArray(m.images) && m.images.length > 0) {
     const parts: any[] = [];
-    if (m.content) {
-      parts.push({ type: 'text', text: m.content });
+    if (content) {
+      parts.push({ type: 'text', text: content });
     }
     for (const imgUrl of m.images) {
       parts.push({
@@ -101,5 +123,5 @@ export function formatMessageContent(m: ChatMessage): string | any[] {
     }
     return parts;
   }
-  return m.content || '';
+  return content;
 }

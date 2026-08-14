@@ -185,12 +185,12 @@ export function extractThinkingFromContent(raw: string): { thinking: string; tex
     };
   }
 
-  // 2. Gemma 4 / Channel format: <|channel>thought ... <channel|> / <|channel|> / </channel>
-  const gemmaClosedMatch = raw.match(/<\|?channel\|?>?thought([\s\S]*?)<\|?(?:\/channel|channel\|?)>/i);
+  // 2. Gemma 4 / Channel format: <|channel>thought\n...<channel|> / <|channel|> / </channel>
+  const gemmaClosedMatch = raw.match(/<\|?channel\|?>?thought([\s\S]*?)(?:<\|?channel\|?>|<\/channel>|<channel\|>)/i);
   if (gemmaClosedMatch) {
     return {
       thinking: gemmaClosedMatch[1].trim(),
-      text: raw.replace(/<\|?channel\|?>?thought[\s\S]*?<\|?(?:\/channel|channel\|?)>/i, '').trim(),
+      text: raw.replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?channel\|?>|<\/channel>|<channel\|>)/i, '').trim(),
       isStreamingThink: false,
     };
   }
@@ -219,8 +219,8 @@ export function extractThinkingFromContent(raw: string): { thinking: string; tex
     };
   }
 
-  // 4. Unclosed streaming Gemma 4 channel format
-  const gemmaOpenMatch = raw.match(/<\|?channel\|?>?thought/i);
+  // 4. Unclosed streaming Gemma 4 channel format: <|channel>thought...
+  const gemmaOpenMatch = raw.match(/<\|?channel\|?>?thought\s*/i);
   if (gemmaOpenMatch && gemmaOpenMatch.index !== undefined) {
     const startIdx = gemmaOpenMatch.index;
     const tagLen = gemmaOpenMatch[0].length;

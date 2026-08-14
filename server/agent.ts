@@ -69,7 +69,7 @@ export async function runAgentLoop(
       { role: 'system', content: fullSystemPrompt },
       ...session.messages.map((m) => ({
         role: m.role === 'tool' ? 'user' : m.role,
-        content: formatMessageContent(m),
+        content: formatMessageContent(m, m.role === 'assistant'),
       })),
     ];
 
@@ -102,7 +102,7 @@ export async function runAgentLoop(
           { role: 'system', content: fullSystemPrompt },
           ...session.messages.map((m) => ({
             role: m.role === 'tool' ? 'user' : m.role,
-            content: formatMessageContent(m),
+            content: formatMessageContent(m, m.role === 'assistant'),
           })),
         ];
       } catch (sumErr) {
