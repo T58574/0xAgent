@@ -45,7 +45,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onRespondToTool,
   onCancelAgent,
   reasoningEnabled = true,
-  groqApiKey,
+  groqApiKey: _groqApiKey,
   liveTelemetry,
   planningMode = true,
   onTogglePlanningMode,
@@ -65,12 +65,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const historyEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUpRef = useRef<boolean>(false);
-
-  // Microphone recording state
-  const [isRecording, setIsRecording] = useState(false);
-  const [isTranscribing, setIsTranscribing] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   // Summarization state
   const [isSummarizing, setIsSummarizing] = useState(false);
@@ -225,69 +219,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-  const handleMicToggle = async () => {
-    if (isRecording) {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
-      setIsRecording(false);
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream);
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-
-        if (audioBlob.size < 2000) {
-          showToast('Аудиозапись слишком короткая', 'info');
-          return;
-        }
-
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-          const base64Audio = (reader.result as string).split(',')[1];
-          if (!base64Audio) return;
-
-          const keyToUse = groqApiKey || '';
-          if (!keyToUse) {
-            showToast('Укажите Groq API Key в Настройках для распознавания речи', 'error');
-            return;
-          }
-
-          setIsTranscribing(true);
-          try {
-            const transcribedText = await api.transcribe_audio(base64Audio, keyToUse);
-            if (transcribedText.trim()) {
-              setInputText((prev) => (prev ? `${prev} ${transcribedText}` : transcribedText));
-              showToast('Речь распознана', 'success');
-            }
-          } catch (err: any) {
-            showToast(`Ошибка распознавания речи: ${err.message || err}`, 'error');
-          } finally {
-            setIsTranscribing(false);
-          }
-        };
-        reader.readAsDataURL(audioBlob);
-      };
-
-      mediaRecorder.start();
-      setIsRecording(true);
-    } catch (err) {
-      showToast('Не удалось получить доступ к микрофону', 'error');
-    }
-  };
 
   const extractThinkingFromContent = (raw: string) => {
     const match = raw.match(/<think>([\s\S]*?)<\/think>/i);
@@ -350,9 +281,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 attachedImages={attachedImages}
                 onAttachImages={(imgs) => setAttachedImages(imgs)}
                 onRemoveImage={handleRemoveImage}
-                isRecording={isRecording}
-                onToggleRecording={handleMicToggle}
-                isTranscribing={isTranscribing}
                 config={config}
                 onModelChanged={onModelChanged}
               />
@@ -542,9 +470,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               attachedImages={attachedImages}
               onAttachImages={(imgs) => setAttachedImages(imgs)}
               onRemoveImage={handleRemoveImage}
-              isRecording={isRecording}
-              onToggleRecording={handleMicToggle}
-              isTranscribing={isTranscribing}
               config={config}
               onModelChanged={onModelChanged}
             />

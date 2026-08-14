@@ -2,10 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Plus,
   X,
-  Send,
+  ArrowUp,
   Square,
-  Mic,
-  MicOff,
   Terminal,
   Bot,
   Globe,
@@ -48,9 +46,6 @@ interface FloatingCommandBarProps {
   attachedImages: string[];
   onAttachImages: (images: string[]) => void;
   onRemoveImage: (index: number) => void;
-  isRecording?: boolean;
-  onToggleRecording?: () => void;
-  isTranscribing?: boolean;
   onTriggerSlashCommand?: (command: string) => void;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
@@ -86,9 +81,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   attachedImages,
   onAttachImages,
   onRemoveImage,
-  isRecording = false,
-  onToggleRecording,
-  isTranscribing: _isTranscribing = false,
   onTriggerSlashCommand,
   config,
   onModelChanged,
@@ -384,9 +376,10 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   };
 
   const isBusy = agentStatus === 'thinking' || agentStatus === 'executing_tool';
+  const canSubmit = inputText.trim().length > 0 || attachedImages.length > 0;
 
   return (
-    <div className="relative w-full max-w-3xl mx-auto select-none" ref={menuRef}>
+    <div className="relative w-full max-w-3xl mx-auto select-none font-sans" ref={menuRef}>
       <input
         type="file"
         ref={fileInputRef}
@@ -429,9 +422,9 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
-      {/* 2. Persona Selector Popover (Unified Persona Card Style) */}
+      {/* 2. Persona Selector Popover */}
       {openMenu === 'persona' && personas.length > 0 && (
-        <div className="absolute bottom-full mb-2 left-4 w-60 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
+        <div className="absolute bottom-full mb-2 left-3 w-60 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
           <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1">
             Персона
           </div>
@@ -458,9 +451,9 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
-      {/* 3. Model Selector Popover (EXACT SAME Container & Styling as Persona Popover) */}
+      {/* 3. Model Selector Popover */}
       {openMenu === 'model' && (
-        <div className="absolute bottom-full mb-2 left-24 sm:left-28 w-68 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
+        <div className="absolute bottom-full mb-2 left-10 sm:left-24 w-68 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
           {/* Cloud API Models */}
           <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
             <span>Облачные API</span>
@@ -567,21 +560,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
-      {/* Main Floating Glass Container */}
+      {/* Main Floating Bento Container */}
       <form onSubmit={onSubmit}>
-        <div className="bento-card p-2.5 bg-[var(--theme-panel)]/95 backdrop-blur-xl border border-[var(--theme-border)] focus-within:border-[var(--theme-border)] focus-within:ring-1 focus-within:ring-[var(--theme-border)] transition-all flex flex-col gap-1.5">
+        <div className="bento-card p-3 rounded-2xl bg-[var(--theme-panel)]/95 backdrop-blur-xl border border-[var(--theme-border)] focus-within:border-[var(--theme-border)] transition-all flex flex-col gap-2 shadow-2xl">
           
-          {/* Top Row: Attachment + Full-width Textarea */}
-          <div className="flex items-start gap-2">
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 mt-0.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-              title="Прикрепить файл"
-            >
-              <Plus size={16} />
-            </button>
-
+          {/* Top: Full-Width Message Textarea */}
+          <div className="w-full">
             <textarea
               ref={textareaRef}
               value={inputText}
@@ -589,20 +573,32 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               onKeyDown={handleKeyDown}
               rows={1}
               placeholder="Опишите задачу или введите / для спец-команд..."
-              className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-xs focus:outline-none resize-none min-h-[36px] max-h-[160px] py-1 leading-relaxed font-sans"
+              className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-xs focus:outline-none resize-none min-h-[38px] max-h-[160px] py-1 px-1 leading-relaxed font-sans"
             />
           </div>
 
-          {/* Bottom Action Controls: Chips, Toggles & Send */}
-          <div className="flex items-center justify-between pt-1.5 border-t border-[var(--theme-border)] text-xs">
+          {/* Bottom Toolbar: Perfectly Symmetrical 1-Line Row */}
+          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--theme-border)]/50 text-xs">
             
-            <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Left Controls */}
+            <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto no-scrollbar">
+              
+              {/* Attach File Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-1 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                title="Прикрепить изображение"
+              >
+                <Plus size={16} />
+              </button>
+
               {/* Persona Selector Chip */}
               {personas.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')}
-                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-mono transition-all cursor-pointer shrink-0 border ${
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border ${
                     openMenu === 'persona'
                       ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)] shadow-sm'
                       : 'bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
@@ -610,7 +606,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                   title="Сменить персону"
                 >
                   <User size={12} />
-                  <span className="max-w-[85px] truncate">{currentPersona.name}</span>
+                  <span className="max-w-[80px] truncate">{currentPersona.name}</span>
                 </button>
               )}
 
@@ -621,7 +617,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                   fetchModelsAndStatus();
                   setOpenMenu(openMenu === 'model' ? 'none' : 'model');
                 }}
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-mono transition-all cursor-pointer shrink-0 border ${
+                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border ${
                   openMenu === 'model' || isLocalActive
                     ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)] shadow-sm'
                     : 'bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
@@ -634,18 +630,19 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                     <span className="w-1.5 h-1.5 rounded-full bg-white absolute -top-0.5 -right-0.5 animate-pulse" />
                   )}
                 </div>
-                <span className="max-w-[120px] truncate">{getDisplayTitle(activeModelId)}</span>
+                <span className="max-w-[110px] truncate">{getDisplayTitle(activeModelId)}</span>
                 <Sliders size={10} className="text-[var(--theme-text-muted)] opacity-60 shrink-0" />
               </button>
 
+              {/* Planning Mode Toggle */}
               {onTogglePlanningMode && (
                 <button
                   type="button"
                   onClick={onTogglePlanningMode}
-                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-mono transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer shrink-0 border ${
                     planningMode
-                      ? 'bg-white/15 text-[var(--theme-text)] border border-[var(--theme-border)]'
-                      : 'bg-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border border-transparent'
+                      ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)]'
+                      : 'bg-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
                   }`}
                   title="Включить режим рассуждений / планирования"
                 >
@@ -654,6 +651,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 </button>
               )}
 
+              {/* Slash Commands Trigger */}
               <button
                 type="button"
                 onClick={() => {
@@ -661,7 +659,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                   setOpenMenu('slash');
                   textareaRef.current?.focus();
                 }}
-                className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-0.5 px-1.5 py-1 rounded-lg text-[11px] font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
                 title="Открыть меню команд"
               >
                 <span>/</span>
@@ -669,42 +667,33 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               </button>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              {onToggleRecording && (
-                <button
-                  type="button"
-                  onClick={onToggleRecording}
-                  className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                    isRecording
-                      ? 'bg-white/20 text-[var(--theme-text)] animate-pulse'
-                      : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
-                  }`}
-                  title="Голосовой ввод"
-                >
-                  {isRecording ? <MicOff size={15} /> : <Mic size={15} />}
-                </button>
-              )}
-
+            {/* Right Controls: High-End Circular Send / Stop Button */}
+            <div className="flex items-center shrink-0">
               {isBusy && onCancelAgent ? (
                 <button
                   type="button"
                   onClick={onCancelAgent}
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[var(--theme-text)] transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-white/15 hover:bg-red-500/25 text-white hover:text-red-400 border border-white/10 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
                   title="Остановить выполнение"
                 >
-                  <Square size={14} fill="currentColor" />
+                  <Square size={12} fill="currentColor" />
                 </button>
               ) : (
                 <button
                   type="submit"
-                  disabled={!inputText.trim() && attachedImages.length === 0}
-                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent text-[var(--theme-text)] transition-colors cursor-pointer"
-                  title="Отправить"
+                  disabled={!canSubmit}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm ${
+                    canSubmit
+                      ? 'bg-white text-black hover:bg-white/90 shadow-md hover:scale-105 active:scale-95 cursor-pointer'
+                      : 'bg-white/5 text-[var(--theme-text-muted)] opacity-35 cursor-not-allowed border border-transparent'
+                  }`}
+                  title="Отправить сообщение (Enter)"
                 >
-                  <Send size={14} />
+                  <ArrowUp size={16} strokeWidth={2.5} />
                 </button>
               )}
             </div>
+
           </div>
 
         </div>
