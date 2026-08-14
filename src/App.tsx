@@ -320,7 +320,8 @@ export default function App() {
       const newSess = await api.create_session(name, targetWs);
       setSessions((prev) => [newSess, ...prev]);
       setCurrentSessionId(newSess.id);
-      setCurrentSession(newSess);
+      currentSessionIdRef.current = newSess.id;
+      updateSessionState(newSess);
       addLog(`Created new session: "${name}"`);
     } catch (err: any) {
       addLog(`Failed to create session: ${err.message || err}`);
@@ -445,8 +446,7 @@ export default function App() {
       updated_at: Date.now(),
     };
 
-    setCurrentSession(updatedSession);
-    currentSessionRef.current = updatedSession;
+    updateSessionState(updatedSession);
     setSessions((prev) =>
       prev.map((s) => (s.id === currentSession.id ? { ...s, title, updated_at: updatedSession.updated_at } : s))
     );
@@ -472,7 +472,7 @@ export default function App() {
         ],
         updated_at: Date.now(),
       };
-      setCurrentSession(sessWithErr);
+      updateSessionState(sessWithErr);
       api.save_session(sessWithErr).catch(() => {});
     }
   };
@@ -510,7 +510,8 @@ export default function App() {
   const getTargetSessionForEvent = (payload: any): ChatSession | null => {
     const sid = payload?.sessionId || currentSessionIdRef.current;
     if (!sid) return null;
-    return activeSessionsMapRef.current.get(sid) || (currentSessionRef.current?.id === sid ? currentSessionRef.current : null);
+    if (currentSessionRef.current?.id === sid) return currentSessionRef.current;
+    return activeSessionsMapRef.current.get(sid) || null;
   };
 
   // 8. Listen to SSE completions events streamed from Node.js Backend
@@ -550,7 +551,7 @@ export default function App() {
 
         if (!chunk) return;
 
-        const targetSession = activeSessionsMapRef.current.get(sessionId) || (currentSessionRef.current?.id === sessionId ? currentSessionRef.current : null);
+        const targetSession = (currentSessionRef.current?.id === sessionId ? currentSessionRef.current : null) || activeSessionsMapRef.current.get(sessionId);
         if (!targetSession) return;
 
         let hasMsg = false;
@@ -632,11 +633,12 @@ export default function App() {
         if (sid) {
           try {
             const fresh = await api.load_session(sid);
-            const activeCached = activeSessionsMapRef.current.get(sid);
-            if (!activeCached || fresh.messages.length >= activeCached.messages.length) {
+            if (fresh && fresh.messages) {
               updateSessionState(fresh);
             }
-          } catch {}
+          } catch (err) {
+            console.error('Failed to sync session on idle:', err);
+          }
         }
       }
     });
@@ -650,13 +652,25 @@ export default function App() {
       if (sid) {
         try {
           const fresh = await api.load_session(sid);
-          const activeCached = activeSessionsMapRef.current.get(sid);
-          if (!activeCached || fresh.messages.length >= activeCached.messages.length) {
+          if (fresh && fresh.messages) {
             updateSessionState(fresh);
           }
         } catch {}
       }
     });
+
+    const onWsReconnected = async () => {
+      const sid = currentSessionIdRef.current;
+      if (sid) {
+        try {
+          const fresh = await api.load_session(sid);
+          if (fresh && fresh.messages) {
+            updateSessionState(fresh);
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('0xagent-ws-reconnected', onWsReconnected);
 
     const un4 = api.listen<any>('agent-tools-updated', (event) => {
       const sess = getTargetSessionForEvent(event.payload);
@@ -719,6 +733,7 @@ export default function App() {
       unErr();
       un4();
       un5();
+      window.removeEventListener('0xagent-ws-reconnected', onWsReconnected);
     };
   }, []);
 

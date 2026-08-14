@@ -44,6 +44,10 @@ export function initWebSocket() {
   try {
     ws = new WebSocket(getWsUrl());
 
+    ws.onopen = () => {
+      window.dispatchEvent(new CustomEvent('0xagent-ws-reconnected'));
+    };
+
     ws.onmessage = (messageEvent) => {
       try {
         const { event, payload } = JSON.parse(messageEvent.data);
@@ -68,7 +72,7 @@ export function initWebSocket() {
         reconnectTimer = setTimeout(() => {
           reconnectTimer = null;
           initWebSocket();
-        }, 2000);
+        }, 1000);
       }
     };
 
