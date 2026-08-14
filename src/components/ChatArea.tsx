@@ -426,8 +426,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     ) : (
                       /* Assistant Bubble (Telegram Incoming Style with Bento Glass Theme) */
                       <div className="relative w-fit max-w-[85%] bento-card text-[var(--theme-text)] border border-[var(--theme-border)] rounded-2xl rounded-tl-[4px] px-4.5 py-3 shadow-md text-[13.5px] leading-relaxed select-text space-y-2.5 transition-all">
-                        {/* Thinking / Reasoning Block (Active when thinking exists OR while actively generating before text begins) */}
-                        {reasoningEnabled && (hasThinking || (isActivelyGenerating && !hasText)) && (
+                        {/* Thinking / Reasoning Block (Active while generating OR when thinking content exists) */}
+                        {reasoningEnabled && (hasThinking || isActivelyGenerating) && (
                           <div className="mb-2 w-full">
                             <ReasoningViewer
                               thinking={thinking}
