@@ -2,14 +2,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Cloud,
   Cpu,
-  Sparkles,
   HardDrive,
   Check,
   Volume2,
-  Activity,
+  Play,
+  Square,
+  RefreshCw,
+  Search,
+  Sliders,
 } from 'lucide-react';
 import { AppConfig, AvailableModelsResponse } from '../types';
-import { MaterialIcon } from './common/MaterialIcon';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -21,74 +23,23 @@ interface ServerStatusData {
   modelName?: string | null;
 }
 
-interface LocalModelOptionProps {
-  model: any;
-  isActive: boolean;
-  isRunning: boolean;
-  onSelect: (id: string) => void;
-}
-
-const LocalModelOptionItem: React.FC<LocalModelOptionProps> = ({ model, isActive, isRunning, onSelect }) => (
-  <button
-    type="button"
-    onClick={() => onSelect(model.id)}
-    className={`w-full px-2.5 py-2 rounded-lg border transition-all text-left flex items-center justify-between gap-2 cursor-pointer ${
-      isRunning
-        ? 'bg-emerald-500/15 border-emerald-500/40 text-white font-medium shadow-[0_0_10px_rgba(16,185,129,0.15)]'
-        : isActive
-        ? 'bg-purple-500/15 border-purple-500/40 text-white font-medium shadow-[0_0_10px_rgba(168,85,247,0.15)]'
-        : 'bg-white/[0.02] border-transparent hover:bg-white/[0.06] hover:border-white/10 text-slate-300'
-    }`}
-  >
-    <div className="flex items-center gap-2 min-w-0">
-      {/* Status indicator dot */}
-      <div className="relative shrink-0">
-        <HardDrive size={14} className={isRunning ? 'text-emerald-400' : isActive ? 'text-purple-400' : 'text-slate-400'} />
-        <span
-          className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border border-slate-950 ${
-            isRunning
-              ? 'bg-emerald-400 shadow-[0_0_6px_rgba(16,185,129,0.6)]'
-              : 'bg-slate-600'
-          }`}
-        />
-      </div>
-      <div className="truncate">
-        <div className="text-xs font-semibold truncate">{model.title}</div>
-        <div className="text-[10px] text-slate-400 font-mono truncate">{model.fileName}</div>
-      </div>
-    </div>
-
-    <div className="flex items-center gap-1.5 shrink-0">
-      {isRunning && (
-        <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 animate-pulse">
-          <Activity size={9} />
-          ACTIVE
-        </span>
-      )}
-      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 font-semibold">
-        {model.quantization}
-      </span>
-      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-white/10">
-        {model.sizeGB}
-      </span>
-      {isActive && !isRunning && <Check size={14} className="text-purple-400 ml-1" />}
-    </div>
-  </button>
-);
-
 interface ModelSelectorDropdownProps {
   config: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
+  direction?: 'up' | 'down';
+  compact?: boolean;
 }
 
 export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
   config,
   onModelChanged,
+  direction = 'up',
+  compact = true,
 }) => {
   const { showToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isStartingServer, setIsStartingServer] = useState(false);
   const [serverStatus, setServerStatus] = useState<ServerStatusData>({
     running: false,
     host: '127.0.0.1',
@@ -98,20 +49,20 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
   });
   const [modelsData, setModelsData] = useState<AvailableModelsResponse>({
     cloud: [
-      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', badge: 'Medium', speed: 'Medium >', provider: 'Google AI Studio' },
-      { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT', badge: 'Fast', speed: 'Fast >', provider: 'Google AI Studio' },
-      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', badge: 'Ultra Fast', speed: 'Ultra Fast >', provider: 'Google AI Studio' },
-      { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash Preview TTS', badge: 'Fast', speed: 'Fast >', provider: 'Google AI Studio', isAudio: true },
+      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', badge: 'Medium', speed: 'Medium', provider: 'Google AI Studio' },
+      { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT', badge: 'Fast', speed: 'Fast', provider: 'Google AI Studio' },
+      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', badge: 'Ultra Fast', speed: 'Ultra Fast', provider: 'Google AI Studio' },
+      { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash Preview TTS', badge: 'Fast', speed: 'TTS Audio', provider: 'Google AI Studio', isAudio: true },
     ],
     local: [],
     activeModelId: config?.model_name || 'gemini-3.6-flash',
   });
 
   const activeModelId = config?.model_name || modelsData.activeModelId || 'gemini-3.6-flash';
+  const isLocalActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const fetchModels = async () => {
-    setLoading(true);
+  const fetchModelsAndStatus = async () => {
     try {
       const [data, status] = await Promise.all([
         api.get_available_models(),
@@ -120,14 +71,14 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
       setModelsData(data);
       setServerStatus(status as ServerStatusData);
     } catch (err) {
-      console.error('Failed to fetch available models:', err);
-    } finally {
-      setLoading(false);
+      console.error('Failed to fetch available models / status:', err);
     }
   };
 
   useEffect(() => {
-    fetchModels();
+    fetchModelsAndStatus();
+    const interval = setInterval(fetchModelsAndStatus, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   // Close dropdown on click outside
@@ -143,53 +94,140 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  /** Check if a local model is currently loaded on the running llama.cpp server */
   const isModelRunning = (model: any): boolean => {
     if (!serverStatus.running || !serverStatus.modelPath) return false;
     const serverModelPath = serverStatus.modelPath.toLowerCase().replace(/\\/g, '/');
     const modelFilePath = (model.filePath || '').toLowerCase().replace(/\\/g, '/');
     if (modelFilePath && serverModelPath === modelFilePath) return true;
-    // Also check by filename
     const serverBasename = serverModelPath.split('/').pop() || '';
     const modelBasename = (model.fileName || '').toLowerCase();
     return serverBasename === modelBasename;
   };
 
-  const handleSelectModel = async (modelId: string) => {
+  // Switch to an API Model and STOP local server if running
+  const handleSelectCloudModel = async (modelId: string) => {
     setIsOpen(false);
     try {
       let currentCfg = config;
-      if (!currentCfg) {
-        currentCfg = await api.get_config();
-      }
-      const updatedCfg: AppConfig = {
-        ...currentCfg,
-        model_name: modelId,
-      };
-
-      // If local model is selected, sync local_server model_path if available
-      if (modelId.startsWith('local:')) {
-        const localItem = modelsData.local.find((m) => m.id === modelId);
-        if (localItem) {
-          if (!updatedCfg.local_server) updatedCfg.local_server = {};
-          updatedCfg.local_server.model_path = localItem.filePath;
-        }
-      }
-
+      if (!currentCfg) currentCfg = await api.get_config();
+      const updatedCfg: AppConfig = { ...currentCfg, model_name: modelId };
       await api.save_config(updatedCfg);
-      setModelsData((prev) => ({ ...prev, activeModelId: modelId }));
-      showToast(`Модель изменена: ${getDisplayTitle(modelId)}`, 'info');
 
-      if (onModelChanged) {
-        onModelChanged(modelId);
+      setModelsData((prev) => ({ ...prev, activeModelId: modelId }));
+      if (onModelChanged) onModelChanged(modelId);
+
+      // Auto-stop local server if running to save resources
+      if (serverStatus.running) {
+        try {
+          await api.stop_local_server();
+          setServerStatus((prev) => ({ ...prev, running: false }));
+          showToast(`Модель: ${modelId}. Локальный сервер остановлен.`, 'info');
+        } catch {
+          showToast(`Модель: ${modelId}`, 'success');
+        }
+      } else {
+        showToast(`Модель: ${modelId}`, 'success');
       }
     } catch (err: any) {
-      console.error('Failed to save selected model:', err);
+      console.error('Failed to select cloud model:', err);
       showToast(`Ошибка смены модели: ${err.message || err}`, 'error');
     }
   };
 
-  // Helper to resolve display label for current active model
+  // Switch to a Local GGUF Model and start/switch local server
+  const handleSelectLocalModel = async (model: any) => {
+    setIsOpen(false);
+    try {
+      let currentCfg = config;
+      if (!currentCfg) currentCfg = await api.get_config();
+      const updatedCfg: AppConfig = {
+        ...currentCfg,
+        model_name: model.id,
+        local_server: {
+          ...(currentCfg?.local_server || {}),
+          model_path: model.filePath,
+        },
+      };
+      await api.save_config(updatedCfg);
+      setModelsData((prev) => ({ ...prev, activeModelId: model.id }));
+      if (onModelChanged) onModelChanged(model.id);
+
+      // Auto-start or restart server with this model
+      if (!serverStatus.running || !isModelRunning(model)) {
+        setIsStartingServer(true);
+        showToast(`Запуск llama.cpp (${model.title || model.fileName})...`, 'info');
+        try {
+          const ls = updatedCfg.local_server;
+          await api.start_local_server({
+            modelPath: model.filePath,
+            exePath: ls?.exe_path,
+            host: ls?.host || '127.0.0.1',
+            port: ls?.port || 11434,
+            ctxSize: ls?.ctx_size,
+            gpuLayers: ls?.gpu_layers,
+            threads: ls?.threads,
+            flashAttn: ls?.flash_attn,
+          });
+          setServerStatus((prev) => ({
+            ...prev,
+            running: true,
+            modelPath: model.filePath,
+            modelName: model.title || model.fileName,
+          }));
+          showToast('Локальный сервер готов!', 'success');
+        } catch (serverErr: any) {
+          showToast(`Ошибка старта сервера: ${serverErr.message || serverErr}`, 'error');
+        } finally {
+          setIsStartingServer(false);
+        }
+      } else {
+        showToast(`Локальная модель: ${model.title || model.fileName}`, 'success');
+      }
+    } catch (err: any) {
+      console.error('Failed to select local model:', err);
+      showToast(`Ошибка смены модели: ${err.message || err}`, 'error');
+    }
+  };
+
+  // Manual Toggle Server Run/Stop
+  const handleToggleServer = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (serverStatus.running) {
+      try {
+        await api.stop_local_server();
+        setServerStatus((prev) => ({ ...prev, running: false }));
+        showToast('Сервер llama.cpp остановлен', 'info');
+      } catch (err: any) {
+        showToast(`Ошибка остановки: ${err.message || err}`, 'error');
+      }
+    } else {
+      setIsStartingServer(true);
+      try {
+        let currentCfg = config;
+        if (!currentCfg) currentCfg = await api.get_config();
+        const ls = currentCfg?.local_server;
+        const res = await api.start_local_server({
+          modelPath: ls?.model_path,
+          exePath: ls?.exe_path,
+          host: ls?.host || '127.0.0.1',
+          port: ls?.port || 11434,
+          ctxSize: ls?.ctx_size,
+          gpuLayers: ls?.gpu_layers,
+          threads: ls?.threads,
+          flashAttn: ls?.flash_attn,
+        });
+        if (res?.success) {
+          setServerStatus((prev) => ({ ...prev, running: true }));
+          showToast('Сервер llama.cpp запущен!', 'success');
+        }
+      } catch (err: any) {
+        showToast(`Ошибка запуска: ${err.message || err}`, 'error');
+      } finally {
+        setIsStartingServer(false);
+      }
+    }
+  };
+
   const getDisplayTitle = (id: string): string => {
     const cloudMatch = modelsData.cloud.find((m) => m.id === id);
     if (cloudMatch) return cloudMatch.name;
@@ -201,22 +239,9 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
       const fn = id.replace(/^local:/, '');
       return fn.replace(/\.gguf$/i, '');
     }
-
     return id;
   };
 
-  /** Get the display name for the trigger button */
-  const getTriggerDisplayName = (): string => {
-    // If local model is running, show its name from server status
-    if (serverStatus.running && serverStatus.modelName && activeModelId.startsWith('local:')) {
-      return serverStatus.modelName;
-    }
-    return getDisplayTitle(activeModelId);
-  };
-
-  const isLocalActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
-
-  // Filtering lists
   const filteredCloud = modelsData.cloud.filter((m) =>
     m.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -228,191 +253,193 @@ export const ModelSelectorDropdown: React.FC<ModelSelectorDropdownProps> = ({
     m.quantization.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Sort local models: running first, then active, then the rest
-  const sortedLocal = [...filteredLocal].sort((a, b) => {
-    const aRunning = isModelRunning(a) ? 2 : 0;
-    const bRunning = isModelRunning(b) ? 2 : 0;
-    const aActive = (activeModelId === a.id || activeModelId === a.fileName || activeModelId === `local:${a.fileName}`) ? 1 : 0;
-    const bActive = (activeModelId === b.id || activeModelId === b.fileName || activeModelId === `local:${b.fileName}`) ? 1 : 0;
-    return (bRunning + bActive) - (aRunning + aActive);
-  });
-
   return (
     <div className="relative font-sans select-none" ref={dropdownRef}>
       {/* Dropdown Trigger Button */}
-      <button
-        type="button"
-        onClick={() => {
-          if (!isOpen) fetchModels();
-          setIsOpen(!isOpen);
-        }}
-        className={`flex items-center gap-2 px-3 py-1 rounded-lg border transition-all cursor-pointer ${
-          isOpen
-            ? 'bg-sky-500/15 border-sky-500/40 text-white shadow-[0_0_15px_rgba(56,189,248,0.25)]'
-            : 'bg-white/[0.04] border-white/10 hover:border-white/20 text-slate-200 hover:bg-white/[0.08]'
-        }`}
-        title={`Текущая модель: ${activeModelId}`}
-      >
-        {isLocalActive ? (
-          <div className="relative shrink-0">
-            <MaterialIcon name="developer_board" size={16} className="text-theme-accent" />
-            {serverStatus.running && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400 border border-slate-950 shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => {
+            if (!isOpen) fetchModelsAndStatus();
+            setIsOpen(!isOpen);
+          }}
+          className={`inline-flex items-center gap-1.5 px-2 py-1 mt-0.5 rounded-md text-xs font-mono transition-all cursor-pointer shrink-0 border ${
+            isOpen || isLocalActive
+              ? 'bg-white/10 text-[var(--theme-text)] border-[var(--theme-border)] shadow-sm'
+              : 'bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
+          }`}
+          title={`Текущая модель: ${activeModelId}`}
+        >
+          <div className="relative shrink-0 flex items-center">
+            {isLocalActive ? <Cpu size={12} /> : <Cloud size={12} />}
+            {isLocalActive && serverStatus.running && (
+              <span className="w-1.5 h-1.5 rounded-full bg-white absolute -top-0.5 -right-0.5 animate-pulse" />
             )}
           </div>
-        ) : (
-          <MaterialIcon name="auto_awesome" size={16} className="text-theme-accent shrink-0" />
-        )}
+          <span className="max-w-[120px] truncate">{getDisplayTitle(activeModelId)}</span>
+          <Sliders size={10} className="text-[var(--theme-text-muted)] opacity-60 shrink-0" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => {
+            if (!isOpen) fetchModelsAndStatus();
+            setIsOpen(!isOpen);
+          }}
+          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer text-xs ${
+            isOpen
+              ? 'bg-white/15 border-[var(--theme-border)] text-[var(--theme-text)] shadow-sm'
+              : 'bento-card text-[var(--theme-text)] hover:border-[var(--theme-border)]'
+          }`}
+          title={`Текущая модель: ${activeModelId}`}
+        >
+          <div className="relative shrink-0 flex items-center">
+            {isLocalActive ? (
+              <Cpu size={14} className="text-[var(--theme-text-muted)]" />
+            ) : (
+              <Cloud size={14} className="text-[var(--theme-text-muted)]" />
+            )}
+            {isLocalActive && serverStatus.running && (
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-text)] absolute -top-0.5 -right-0.5 animate-pulse" />
+            )}
+          </div>
 
-        <span className="font-semibold text-xs text-theme-text truncate max-w-[150px] sm:max-w-[200px]">
-          {getTriggerDisplayName()}
-        </span>
-        <MaterialIcon name={isOpen ? 'expand_less' : 'expand_more'} size={16} className="text-theme-muted" />
-      </button>
+          <span className="font-medium text-xs text-[var(--theme-text)] truncate max-w-[140px] sm:max-w-[180px]">
+            {getDisplayTitle(activeModelId)}
+          </span>
+          <Sliders size={12} className="text-[var(--theme-text-muted)] shrink-0" />
+        </button>
+      )}
 
+      {/* Unified Minimalist Persona-Style Dropdown Popover */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 rounded-xl glass-panel shadow-2xl z-50 overflow-hidden font-sans">
-          {/* Header */}
-          <div className="p-3 border-b border-theme-border flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold text-theme-text">
-              <MaterialIcon name="tune" size={16} className="text-theme-accent" />
-              <span>Выбор модели ИИ</span>
-            </div>
-            <button
-              type="button"
-              onClick={fetchModels}
-              disabled={loading}
-              className="p-1 rounded-lg hover:bg-white/10 text-theme-muted hover:text-theme-text transition-colors"
-            >
-              <MaterialIcon name="refresh" size={14} className={loading ? 'animate-spin' : ''} />
-            </button>
+        <div
+          className={`absolute left-0 ${
+            direction === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'
+          } w-72 rounded-2xl bento-card p-2 shadow-2xl z-50 border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl animate-fadeIn space-y-1`}
+        >
+          
+          {/* Quick Search */}
+          <div className="relative mb-1.5">
+            <input
+              type="text"
+              placeholder="Поиск модели..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none font-sans"
+              autoFocus
+            />
+            <Search size={12} className="absolute left-2.5 top-2.5 text-[var(--theme-text-muted)]" />
           </div>
 
-          {/* Search Bar */}
-          <div className="p-2 border-b border-theme-border">
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg flat-input text-xs">
-              <MaterialIcon name="search" size={14} className="text-theme-muted shrink-0" />
-              <input
-                type="text"
-                placeholder="Поиск модели..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent text-white placeholder-slate-500 focus:outline-none text-xs"
-              />
-            </div>
-          </div>
-
-          {/* Model Lists */}
-          <div className="max-h-[360px] overflow-y-auto p-2 space-y-3 scrollbar-none">
-            {/* Section 1: Cloud AI */}
+          <div
+            className="max-h-72 overflow-y-auto space-y-2 pr-0.5"
+            style={{
+              scrollbarWidth: 'thin',
+              scrollbarColor: 'rgba(255, 255, 255, 0.15) transparent',
+            }}
+          >
+            {/* Section 1: Cloud API */}
             <div>
-              <div className="flex items-center gap-1.5 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-sky-400/90">
-                <Cloud size={12} />
-                <span>Cloud AI (Google AI Studio)</span>
+              <div className="px-2 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
+                <span>Облачные API</span>
+                <span className="opacity-60 text-[9px]">Google AI</span>
               </div>
 
-              <div className="space-y-1 mt-1">
+              <div className="space-y-0.5">
                 {filteredCloud.map((model) => {
                   const isActive = activeModelId === model.id;
                   return (
                     <button
                       key={model.id}
                       type="button"
-                      onClick={() => handleSelectModel(model.id)}
-                      className={`w-full px-2.5 py-2 rounded-lg border transition-all text-left flex items-center justify-between gap-2 cursor-pointer ${
+                      onClick={() => handleSelectCloudModel(model.id)}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer border ${
                         isActive
-                          ? 'bg-sky-500/15 border-sky-500/40 text-white font-medium shadow-[0_0_10px_rgba(56,189,248,0.15)]'
-                          : 'bg-white/[0.02] border-transparent hover:bg-white/[0.06] hover:border-white/10 text-slate-300'
+                          ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                          : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         {model.isAudio ? (
-                          <Volume2 size={14} className="text-amber-400 shrink-0" />
+                          <Volume2 size={13} className="text-[var(--theme-text-muted)] shrink-0" />
                         ) : (
-                          <Sparkles size={14} className={isActive ? 'text-sky-400' : 'text-slate-400'} />
+                          <Cloud size={13} className="text-[var(--theme-text-muted)] shrink-0" />
                         )}
-                        <div className="truncate">
-                          <div className="text-xs font-semibold truncate">{model.name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">{model.provider}</div>
-                        </div>
+                        <span className="truncate">{model.name}</span>
                       </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span
-                          className={`text-[10px] font-mono font-medium px-1.5 py-0.5 rounded border ${
-                            model.badge === 'Ultra Fast'
-                              ? 'text-amber-300 border-amber-500/30 bg-amber-500/10'
-                              : model.badge === 'Fast'
-                              ? 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10'
-                              : 'text-sky-300 border-sky-500/30 bg-sky-500/10'
-                          }`}
-                        >
-                          {model.speed}
-                        </span>
-                        {isActive && <Check size={14} className="text-sky-400" />}
-                      </div>
+                      {isActive && <Check size={13} className="text-[var(--theme-text)] shrink-0" />}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Section 2: Local llama.cpp */}
+            {/* Section 2: Local GGUF */}
             <div>
-              <div className="flex items-center justify-between px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-purple-400/90">
+              <div className="px-2 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
-                  <Cpu size={12} />
-                  <span>Local llama.cpp (models/*.gguf)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {serverStatus.running && (
-                    <span className="text-[9px] font-mono font-semibold text-emerald-400 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.6)] animate-pulse" />
-                      SERVER ON
-                    </span>
-                  )}
-                  <span className="text-[9px] text-slate-500 font-mono font-normal">
-                    {modelsData.local.length} файлов
+                  <span>Локальные GGUF</span>
+                  <span className="text-[9px] font-mono opacity-60">
+                    ({serverStatus.running ? 'online' : 'offline'})
                   </span>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleToggleServer}
+                  disabled={isStartingServer}
+                  className="px-1.5 py-0.5 rounded-md bg-white/10 hover:bg-white/20 text-[var(--theme-text)] border border-[var(--theme-border)] text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  {isStartingServer ? (
+                    <RefreshCw size={9} className="animate-spin" />
+                  ) : serverStatus.running ? (
+                    <Square size={8} fill="currentColor" />
+                  ) : (
+                    <Play size={8} fill="currentColor" />
+                  )}
+                  <span>{serverStatus.running ? 'Стоп' : 'Старт'}</span>
+                </button>
               </div>
 
-              <div className="space-y-1 mt-1">
-                {sortedLocal.length === 0 ? (
-                  <div className="px-3 py-3 text-center text-[11px] text-slate-500 italic bg-white/[0.01] rounded-lg border border-dashed border-white/10">
-                    {modelsData.local.length === 0
-                      ? 'Файлы .gguf не найдены в папке models/.'
-                      : 'Совпадений по поиску не найдено.'}
+              <div className="space-y-0.5">
+                {filteredLocal.length === 0 ? (
+                  <div className="text-[10px] text-[var(--theme-text-muted)] italic py-1.5 px-2 font-mono text-center">
+                    нет файлов в models/
                   </div>
                 ) : (
-                  sortedLocal.map((model) => {
+                  filteredLocal.map((model) => {
                     const isActive = activeModelId === model.id || activeModelId === model.fileName || activeModelId === `local:${model.fileName}`;
-                    const running = isModelRunning(model);
+                    const isRunning = isModelRunning(model);
                     return (
-                      <LocalModelOptionItem
+                      <button
                         key={model.id}
-                        model={model}
-                        isActive={isActive}
-                        isRunning={running}
-                        onSelect={handleSelectModel}
-                      />
+                        type="button"
+                        onClick={() => handleSelectLocalModel(model)}
+                        className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer border ${
+                          isActive
+                            ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                            : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="relative shrink-0">
+                            <HardDrive size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                            {isRunning && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-white absolute -top-0.5 -right-0.5 animate-pulse" />
+                            )}
+                          </div>
+                          <span className="truncate">{model.title || model.fileName}</span>
+                        </div>
+                        <span className="text-[10px] font-mono opacity-60 shrink-0">{model.sizeGB}</span>
+                      </button>
                     );
                   })
                 )}
               </div>
             </div>
+
           </div>
 
-          {/* Footer */}
-          <div className="px-3 py-2 bg-slate-900/80 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400">
-            <span className="truncate flex items-center gap-1.5">
-              {serverStatus.running && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_4px_rgba(16,185,129,0.6)]" />
-              )}
-              <span>Текущая: <span className="font-mono text-slate-200">{getTriggerDisplayName()}</span></span>
-            </span>
-            <span className="text-slate-500 font-mono">Cloud + Local</span>
-          </div>
         </div>
       )}
     </div>

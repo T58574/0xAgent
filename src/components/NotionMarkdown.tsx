@@ -39,11 +39,11 @@ export const NotionMarkdown: React.FC<NotionMarkdownProps> = ({ content }) => {
           return (
             <div
               key={idx}
-              className="my-3 p-3.5 rounded-lg border border-purple-500/30 bg-purple-950/20 text-purple-200 font-serif italic text-sm sm:text-base tracking-wide flex items-center justify-center shadow-inner overflow-x-auto"
+              className="my-3 p-3 rounded-lg border border-[var(--theme-border)] bg-black/40 text-[var(--theme-text)] font-mono text-xs sm:text-sm flex items-center justify-center overflow-x-auto"
             >
               <div className="flex items-center gap-2">
-                <span className="text-purple-400 font-mono text-xs not-italic select-none opacity-60">∑ math</span>
-                <span className="select-all font-semibold">{part.value}</span>
+                <span className="text-[var(--theme-text-muted)] font-mono text-xs select-none">∑ math</span>
+                <span className="select-all font-medium">{part.value}</span>
               </div>
             </div>
           );
@@ -279,7 +279,7 @@ const InlineFormattedText: React.FC<{ text: string }> = ({ text }) => {
           return (
             <span
               key={idx}
-              className="px-1.5 py-0.5 mx-0.5 rounded bg-purple-950/40 text-purple-300 font-serif italic text-xs border border-purple-500/20"
+              className="px-1.5 py-0.5 mx-0.5 rounded-md bg-white/10 text-[var(--theme-text)] font-mono text-xs border border-[var(--theme-border)]"
             >
               {part.substring(1, part.length - 1)}
             </span>

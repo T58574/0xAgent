@@ -8,14 +8,13 @@ import { ResizableSplitter } from './components/ResizableSplitter';
 import { ChatArea } from './components/ChatArea';
 import { SettingsPage } from './components/settings/SettingsPage';
 import { CodeEditor, EditorTabItem } from './components/CodeEditor';
-import { IdeStatusBar } from './components/ide/IdeStatusBar';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
 import { WorkspacePickerModal } from './components/WorkspacePickerModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { KnowledgeVault } from './components/KnowledgeVault';
 import { LockScreen } from './components/LockScreen';
 import { JarvisWidget } from './components/JarvisWidget';
-import { FolderTree, Code, Terminal, X } from 'lucide-react';
+import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
 
 export default function App() {
   // Authentication & Security state
@@ -72,7 +71,6 @@ export default function App() {
   
   // Navigation view, Mode & Sidebar state
   const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge'>('chat');
-  const [chatMode, setChatMode] = useState<'agent' | 'simple'>('agent');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
   const [openTabs, setOpenTabs] = useState<EditorTabItem[]>([]);
   const [isServerOffline, setIsServerOffline] = useState<boolean>(true);
@@ -427,8 +425,22 @@ export default function App() {
       timestamp: Date.now(),
     };
 
+    let title = currentSession.title;
+    if (
+      currentSession.messages.length === 0 ||
+      title.startsWith('Чат (') ||
+      title === 'Новый чат' ||
+      title === 'Default Session'
+    ) {
+      const cleanPrompt = text.replace(/\n+/g, ' ').trim();
+      if (cleanPrompt) {
+        title = cleanPrompt.length > 32 ? cleanPrompt.substring(0, 30) + '...' : cleanPrompt;
+      }
+    }
+
     const updatedSession = {
       ...currentSession,
+      title,
       messages: [...currentSession.messages, userMsg],
       updated_at: Date.now(),
     };
@@ -436,7 +448,7 @@ export default function App() {
     setCurrentSession(updatedSession);
     currentSessionRef.current = updatedSession;
     setSessions((prev) =>
-      prev.map((s) => (s.id === currentSession.id ? { ...s, updated_at: updatedSession.updated_at } : s))
+      prev.map((s) => (s.id === currentSession.id ? { ...s, title, updated_at: updatedSession.updated_at } : s))
     );
 
     try {
@@ -744,8 +756,6 @@ export default function App() {
       modelName={config?.model_name}
       config={config}
       onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
-      chatMode={chatMode}
-      onToggleChatMode={() => setChatMode(chatMode === 'agent' ? 'simple' : 'agent')}
     />
   );
 
@@ -771,6 +781,8 @@ export default function App() {
             (s) => s.status === 'EXECUTING' || s.status === 'WAITING_PLAN_APPROVAL' || s.status === 'PLANNING'
           ).length
         }
+        onNewChat={() => handleCreateSession('Новый чат', config?.workspace_dir || null)}
+        onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
       />
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}
@@ -789,9 +801,19 @@ export default function App() {
           onSelectWorkspace={handleSelectWorkspace}
           workspaceTreeNodes={workspaceTree}
           onFileClick={handleFileClick}
-          onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
-          onOpenSettings={() => setActiveView('settings')}
         />
+
+        {/* Collapsed Sidebar Outer Edge Expand Button */}
+        {!sidebarOpen && (
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            className="fixed left-0 top-1/2 -translate-y-1/2 z-40 w-5 h-10 rounded-r-xl bg-[var(--theme-panel-solid,#0a0c12)] border-r border-y border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/15 flex items-center justify-center shadow-2xl transition-all cursor-pointer backdrop-blur-2xl group hover:w-6.5"
+            title="Развернуть боковое меню"
+          >
+            <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+          </button>
+        )}
 
         {/* CONTENT VIEWPORT */}
         <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">
@@ -894,40 +916,27 @@ export default function App() {
         </div>
       </div>
 
-      {/* 3. PRO IDE STATUS BAR (BOTTOM) */}
-      <IdeStatusBar
-        workspaceDir={config?.workspace_dir}
-        selectedFileName={selectedFile?.name}
-        agentStatus={agentStatus}
-        liveTelemetry={liveTelemetry}
-        config={config}
-        isServerOffline={isServerOffline}
-        onToggleLogs={() => setShowLogsDrawer(!showLogsDrawer)}
-        chatMode={chatMode}
-        onToggleChatMode={() => setChatMode(chatMode === 'agent' ? 'simple' : 'agent')}
-      />
-
       {/* CONSOLE LOGS DRAWER OVERLAY */}
       {showLogsDrawer && (
-        <div className="fixed bottom-0 left-0 right-0 h-48 bg-slate-950/95 border-t border-white/10 z-40 flex flex-col font-mono text-xs shadow-2xl backdrop-blur-md">
-          <div className="px-3 py-1.5 bg-slate-900 border-b border-white/10 flex items-center justify-between text-slate-300">
-            <span className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-              <Terminal size={13} />
+        <div className="fixed bottom-0 left-0 right-0 h-48 bg-[var(--theme-panel)]/95 border-t border-[var(--theme-border)] z-40 flex flex-col font-mono text-xs shadow-2xl backdrop-blur-md">
+          <div className="px-3 py-1.5 bg-black/40 border-b border-[var(--theme-border)] flex items-center justify-between text-[var(--theme-text)]">
+            <span className="flex items-center gap-1.5 text-[var(--theme-text)] font-medium">
+              <Terminal size={13} className="text-[var(--theme-text-muted)]" />
               <span>Логи системной консоли</span>
             </span>
             <button
               type="button"
               onClick={() => setShowLogsDrawer(false)}
-              className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10"
+              className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
             >
               <X size={14} />
             </button>
           </div>
-          <div ref={drawerLogsRef} className="p-3 flex-1 overflow-y-auto space-y-1 text-emerald-400 text-[11px] leading-tight font-mono select-text scrollbar-thin">
+          <div ref={drawerLogsRef} className="p-3 flex-1 overflow-y-auto space-y-1 text-[var(--theme-text)] text-[11px] leading-tight font-mono select-text scrollbar-thin">
             {logs.length > 0 ? (
               logs.map((log, idx) => <div key={idx}>{log}</div>)
             ) : (
-              <div className="text-slate-500 italic">Логов пока нет.</div>
+              <div className="text-[var(--theme-text-muted)] italic">Логов пока нет.</div>
             )}
           </div>
         </div>

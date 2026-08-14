@@ -5,7 +5,7 @@ export function useSettingsState(
   config: AppConfig | null,
   onSaveConfig: (updated: AppConfig) => Promise<void>
 ) {
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'themes' | 'local_server' | 'security'>('general');
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'themes' | 'local_server'>('general');
 
   // General state
   const [apiUrl, setApiUrl] = useState('');
@@ -86,16 +86,16 @@ export function useSettingsState(
 
       if (config.local_server) {
         const ls = config.local_server;
-        if (ls.exe_path) setExePath(ls.exe_path);
-        if (ls.model_path) setModelPath(ls.model_path);
+        if (ls.exe_path !== undefined && ls.exe_path !== null) setExePath(ls.exe_path);
+        if (ls.model_path !== undefined && ls.model_path !== null) setModelPath(ls.model_path);
         if (ls.host) setHost(ls.host);
-        if (ls.port) setPort(ls.port);
-        if (ls.ctx_size) setCtxSize(ls.ctx_size);
-        if (ls.threads) setThreads(ls.threads);
+        if (ls.port !== undefined && ls.port !== null) setPort(ls.port);
+        if (ls.ctx_size !== undefined && ls.ctx_size !== null) setCtxSize(ls.ctx_size);
+        if (ls.threads !== undefined && ls.threads !== null) setThreads(ls.threads);
         if (ls.gpu_layers !== undefined && ls.gpu_layers !== null) setGpuLayers(ls.gpu_layers);
         if (ls.temp !== undefined && ls.temp !== null) setTemp(ls.temp);
-        if (ls.batch_size) setBatchSize(ls.batch_size);
-        if (ls.ubatch_size) setUbatchSize(ls.ubatch_size);
+        if (ls.batch_size !== undefined && ls.batch_size !== null) setBatchSize(ls.batch_size);
+        if (ls.ubatch_size !== undefined && ls.ubatch_size !== null) setUbatchSize(ls.ubatch_size);
         if (ls.min_p !== undefined && ls.min_p !== null) setMinP(ls.min_p);
         if (ls.top_k !== undefined && ls.top_k !== null) setTopK(ls.top_k);
         if (ls.top_p !== undefined && ls.top_p !== null) setTopP(ls.top_p);
@@ -109,8 +109,8 @@ export function useSettingsState(
         if (ls.mmap !== undefined && ls.mmap !== null) setMmap(ls.mmap);
         if (ls.parallel_slots !== undefined && ls.parallel_slots !== null) setParallelSlots(ls.parallel_slots);
         if (ls.cache_reuse !== undefined && ls.cache_reuse !== null) setCacheReuse(ls.cache_reuse);
-        if (ls.slot_save_path) setSlotSavePath(ls.slot_save_path);
-        if (ls.custom_args) setCustomArgs(ls.custom_args);
+        if (ls.slot_save_path !== undefined && ls.slot_save_path !== null) setSlotSavePath(ls.slot_save_path);
+        if (ls.custom_args !== undefined && ls.custom_args !== null) setCustomArgs(ls.custom_args);
       }
     }
   }, [config]);

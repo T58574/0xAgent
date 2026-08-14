@@ -15,7 +15,6 @@ export const ASCII_HERO_LOGO: string[] = [
  ████╔╝██║ ██╔██╗ ██╔══██║██║   ██║██╔══╝  ██║╚██╗██║   ██║   
  ╚██████╔╝██╔╝ ██╗██║  ██║╚██████╔╝███████╗██║ ╚████║   ██║   
   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   
-              [ AUTONOMOUS DEVELOPER IDE ]
 `,
   `
   ▒██████▒ ▒██▒  ██▒ ▒█████▒  ▒██████▒ ▒███████▒▒███▒   ██▒▒████████▒
@@ -24,7 +23,6 @@ export const ASCII_HERO_LOGO: string[] = [
  ████▒╝██▒ ██▒██▒ ██▒══██▒██▒   ██▒██▒══▒  ██▒╚██▒██▒   ██▒   
  ╚██████▒╝██▒╝ ██▒██▒  ██▒╚██████▒╝███████▒██▒ ╚████▒   ██▒   
   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   
-              < LOCAL & CLOUD AI SYSTEM >
 `,
   `
   ░██████░ ░██░  ██░ ░█████░  ░██████░ ░███████░░███░   ██░░████████░
@@ -33,7 +31,6 @@ export const ASCII_HERO_LOGO: string[] = [
  ████░╝██░ ██░██░ ██░══██░██░   ██░██░══░  ██░╚██░██░   ██░   
  ╚██████░╝██░╝ ██░██░  ██░╚██████░╝███████░██░ ╚████░   ██░   
   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝░═╝  ╚═══╝   ╚═╝   
-              ⚡ FAST REASONING ENGINE ⚡
 `,
   `
   ▓██████▓ ▓██▓  ██▓ ▓█████▓  ▓██████▓ ▓███████▓▓███▓   ██▓▓████████▓
@@ -42,7 +39,6 @@ export const ASCII_HERO_LOGO: string[] = [
  ████▓╝██▓ ██▓██▓ ██▓══██▓██▓   ██▓██▓══▓  ██▓╚██▓██▓   ██▓   
  ╚██████▓╝██▓╝ ██▓██▓  ██▓╚██████▓╝███████▓██▓ ╚████▓   ██▓   
   ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝   ╚═╝   
-              [ AUTONOMOUS DEVELOPER IDE ]
 `
 ];
 
@@ -80,36 +76,36 @@ export const THINKING_BRAIN_FRAMES: string[] = [
 
 // 3. Compact Neural Spinner for <think> header
 export const ASCII_THINK_SPINNER: string[] = [
-  "⠋ [ 🧠 NEURAL CORE: COMPUTING ]",
-  "⠙ [ ⚡ SYNAPSE PULSE: EVALUATING ]",
-  "⠹ [ 🔍 CONTEXT SEARCH: DEEP DIVE ]",
-  "⠸ [ 💡 LOGIC FORMULATION: ACTIVE ]",
-  "⠼ [ ✨ HEURISTIC SYNTHESIS: IN PROGRESS ]",
-  "⠴ [ 🧬 CODE GENERATION MATRIX ]",
-  "⠦ [ ⚙️ REASONING VALIDATION ]",
-  "⠧ [ 📊 TOKENS VECTOR MAPPING ]",
-  "⠇ [ 🔮 SOLUTION CONVERGENCE ]",
-  "⠏ [ 💎 FINALIZING RESPONSE ]"
+  "⠋ [ NEURAL CORE: COMPUTING ]",
+  "⠙ [ SYNAPSE PULSE: EVALUATING ]",
+  "⠹ [ CONTEXT SEARCH: DEEP DIVE ]",
+  "⠸ [ LOGIC FORMULATION: ACTIVE ]",
+  "⠼ [ HEURISTIC SYNTHESIS: IN PROGRESS ]",
+  "⠴ [ CODE GENERATION MATRIX ]",
+  "⠦ [ REASONING VALIDATION ]",
+  "⠧ [ TOKENS VECTOR MAPPING ]",
+  "⠇ [ SOLUTION CONVERGENCE ]",
+  "⠏ [ FINALIZING RESPONSE ]"
 ];
 
 // 4. Tool Execution Gears & Data Pipeline Frames
 export const TOOL_EXECUTION_FRAMES: string[] = [
   `
-   [⚙️ TOOL RUN]  ──▶ [ 01010011 ] ──▶ [ DISK I/O ]
+   [ TOOL RUN ]   ──▶ [ 01010011 ] ──▶ [ DISK I/O ]
    ┌─────────┐    ┌─────────────┐    ┌───────────┐
    │  INPUT  │ ─> │ TRANSFORM   │ ─> │  PATCH/FS │
    └─────────┘    └─────────────┘    └───────────┘
    [ · · · · · · · · · · · · · · · · · · · · · · ]
   `,
   `
-   [⚙️ TOOL RUN]  ──▶ [ 11010110 ] ──▶ [ EXEC RUN ]
+   [ TOOL RUN ]   ──▶ [ 11010110 ] ──▶ [ EXEC RUN ]
    ┌─────────┐    ┌─────────────┐    ┌───────────┐
    │  AGENT  │ ─> │  PIPELINE   │ ─> │ TERMINAL  │
    └─────────┘    └─────────────┘    └───────────┘
    [ ▓ ▓ ▓ ▓ ▓ ▓ ▓ ▓ ▓ ▓ · · · · · · · · · · · · ]
   `,
   `
-   [⚙️ TOOL RUN]  ──▶ [ 00111100 ] ──▶ [ VERIFY ]
+   [ TOOL RUN ]   ──▶ [ 00111100 ] ──▶ [ VERIFY ]
    ┌─────────┐    ┌─────────────┐    ┌───────────┐
    │ VERIFY  │ ─> │  SYNTAX CHK │ ─> │ COMPLETE  │
    └─────────┘    └─────────────┘    └───────────┘
@@ -160,25 +156,25 @@ export const PERSONA_ASCII_GLYPHS: Record<string, string> = {
   architect: `
   ╭─────────╮
   │  [■_■]  │  [ ARCHITECT ]
-  │  /|█|\\  │  Clean System Design
+  │  /| |\\  │  System Designer
   ╰─────────╯
   `,
-  hacker: `
+  nastya: `
   ╭─────────╮
-  │  {ಠ_ಠ}  │  [ CYBER HACKER ]
-  │  <|#|>  │  Security & Low-level
+  │  (◠‿◠)  │  [ NASTYA ]
+  │  <| |>  │  Empathetic Companion
   ╰─────────╯
   `,
-  reviewer: `
+  auditor: `
   ╭─────────╮
-  │  (¬_¬)  │  [ CODE REVIEWER ]
-  │  /|⚖|\\  │  Strict & Zero-Defects
+  │  {o_o}  │  [ AUDITOR ]
+  │  /| |\\  │  Security & Clean Code
   ╰─────────╯
   `,
-  writer: `
+  teacher: `
   ╭─────────╮
-  │  (✿◠‿◠) │  [ CREATIVE MUSE ]
-  │  /|✧|\\  │  Ideas, Docs & Prose
+  │  (◕‿◕)  │  [ MENTOR ]
+  │  /| |\\  │  Deep Concept Explainer
   ╰─────────╯
-  `,
+  `
 };

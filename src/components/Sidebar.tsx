@@ -1,19 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-  Plus,
   FolderPlus,
   Folder,
   Trash2,
-  Brain,
+  ChevronLeft,
   ChevronRight,
   ChevronDown,
   FolderTree,
-  PanelLeftClose,
-  PanelLeftOpen,
   History,
-  Settings as SettingsIcon,
   Search,
-  Sparkles,
+  MessageSquare,
+  GitBranch,
+  Plus,
 } from 'lucide-react';
 import { ChatSession, FileNode } from '../types';
 import { WorkspaceTree } from './WorkspaceTree';
@@ -31,8 +29,6 @@ interface SidebarProps {
   onSelectWorkspace: () => void;
   workspaceTreeNodes?: FileNode[];
   onFileClick?: (path: string, name: string) => void;
-  onOpenMemorySkills?: () => void;
-  onOpenSettings?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -47,245 +43,73 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectWorkspace,
   workspaceTreeNodes = [],
   onFileClick,
-  onOpenMemorySkills,
-  onOpenSettings,
 }) => {
   const [showFileExplorer, setShowFileExplorer] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [searchFilter, setSearchFilter] = useState('');
-  const [showSearchInput, setShowSearchInput] = useState(false);
+  const [isHoveringHistory, setIsHoveringHistory] = useState(false);
 
   const toggleGroup = (key: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // Collect unique project directories
+  // Collect unique workspace folders
   const allWorkspaceDirsSet = new Set<string>();
-  if (workspaceDir) {
-    allWorkspaceDirsSet.add(workspaceDir);
-  }
+  if (workspaceDir) allWorkspaceDirsSet.add(workspaceDir);
   sessions.forEach((s) => {
-    if (s.workspace_dir) {
-      allWorkspaceDirsSet.add(s.workspace_dir);
-    }
+    if (s.workspace_dir) allWorkspaceDirsSet.add(s.workspace_dir);
   });
-
   const workspaceDirs = Array.from(allWorkspaceDirsSet);
 
-  // Filter sessions by search query if search filter active
+  // Filter sessions
   const filteredSessions = searchFilter.trim()
     ? sessions.filter((s) => s.title.toLowerCase().includes(searchFilter.toLowerCase()))
     : sessions;
 
   const standaloneSessions = filteredSessions.filter((s) => !s.workspace_dir);
 
-  const renderSessionItem = (session: ChatSession, isStandalone: boolean = false) => {
-    const isActive = session.id === currentSessionId;
-    const relTime = formatRelativeTime(session.updated_at);
-    return (
-      <div
-        key={session.id}
-        onClick={() => onSelectSession(session.id)}
-        className={`group p-2 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
-          isActive
-            ? 'bg-white/15 text-white font-medium shadow-sm border border-white/20'
-            : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
-        }`}
-      >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {isActive && (
-            <span
-              className={`w-1.5 h-1.5 rounded-full animate-pulse shrink-0 ${
-                isStandalone ? 'bg-cyan-400' : 'bg-emerald-400'
-              }`}
-            />
-          )}
-          <span className="truncate text-xs font-sans">{session.title}</span>
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          {relTime && (
-            <span className="text-[10px] text-slate-500 font-mono group-hover:hidden">
-              {relTime}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={(e) => onDeleteSession(session.id, e)}
-            className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-500/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-            title="Удалить сессию"
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  if (!isOpen) {
-    return (
-      <aside className="w-12 h-full bg-theme-panel border-r border-theme-border flex flex-col items-center justify-between py-3 z-20 shrink-0 font-sans select-none">
-        <div className="flex flex-col items-center gap-3">
-          <button
-            type="button"
-            onClick={onToggleOpen}
-            className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Развернуть боковую панель"
-          >
-            <PanelLeftOpen size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onCreateSession('Новый чат', workspaceDir || null)}
-            className="p-2 rounded-lg bg-white/10 text-white border border-white/10 hover:bg-white/20 cursor-pointer shadow-sm"
-            title="Новый чат"
-          >
-            <Plus size={16} />
-          </button>
-
-          <button
-            type="button"
-            onClick={onSelectWorkspace}
-            className="p-2 rounded-lg text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 cursor-pointer"
-            title="Открыть / выбрать воркспейс"
-          >
-            <FolderPlus size={16} />
-          </button>
-
-          {onOpenMemorySkills && (
-            <button
-              type="button"
-              onClick={onOpenMemorySkills}
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
-              title="Память & Скиллы ИИ"
-            >
-              <Brain size={16} />
-            </button>
-          )}
-        </div>
-
-        <div className="flex flex-col items-center gap-2">
-          {onOpenSettings && (
-            <button
-              type="button"
-              onClick={onOpenSettings}
-              className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
-              title="Настройки"
-            >
-              <SettingsIcon size={16} />
-            </button>
-          )}
-        </div>
-      </aside>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
-    <aside className="w-64 md:w-72 h-full bg-theme-panel border-r border-theme-border flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-xl text-theme-text">
+    <aside className="relative w-64 md:w-68 h-full bg-[var(--theme-panel)]/95 border-r border-[var(--theme-border)] flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-2xl text-[var(--theme-text)]">
       
-      {/* 1. TOP CREATION & QUICK NAV SECTION */}
-      <div className="p-3 border-b border-white/10 space-y-2 shrink-0 bg-slate-950/40">
-        
-        <div className="flex items-center justify-between">
-          <span className="font-bold text-[13px] tracking-wide text-white">0xAgent</span>
+      {/* Outer Edge Middle Collapse Arrow Button */}
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        className="absolute -right-3 top-1/2 -translate-y-1/2 z-40 w-6 h-10 rounded-full bg-[var(--theme-panel-solid,#0a0c12)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/15 flex items-center justify-center shadow-2xl transition-all cursor-pointer backdrop-blur-2xl group hover:scale-110"
+        title="Свернуть боковое меню"
+      >
+        <ChevronLeft size={13} className="transition-transform group-hover:-translate-x-0.5" />
+      </button>
 
-          <button
-            type="button"
-            onClick={onToggleOpen}
-            className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Свернуть боковое меню"
-          >
-            <PanelLeftClose size={16} />
-          </button>
+      {/* 1. TOP QUICK SEARCH BAR & WORKSPACE PICKER */}
+      <div className="p-2.5 border-b border-[var(--theme-border)] shrink-0 bg-black/20 flex items-center gap-1.5">
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={searchFilter}
+            onChange={(e) => setSearchFilter(e.target.value)}
+            placeholder="Поиск по диалогам..."
+            className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-black/30 border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-white/20 transition-all font-sans"
+          />
+          <Search size={12} className="absolute left-2.5 top-2.5 text-[var(--theme-text-muted)]" />
         </div>
 
-        {/* Primary "+ Новый чат" Capsule Button */}
         <button
           type="button"
-          onClick={() =>
-            onCreateSession(
-              workspaceDir ? `Чат (${getWorkspaceBaseName(workspaceDir)})` : 'Новый чат',
-              workspaceDir || null
-            )
-          }
-          className="w-full flat-btn py-2 px-3 rounded-lg text-xs font-semibold flex items-center justify-start gap-2.5 transition-all shadow-sm cursor-pointer"
+          onClick={onSelectWorkspace}
+          className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-border)] transition-colors cursor-pointer shrink-0"
+          title="Открыть рабочую папку"
         >
-          <Plus size={15} className="text-slate-300" />
-          <span>Новый чат</span>
+          <FolderPlus size={14} />
         </button>
-
-        {/* Quick Links Menu */}
-        <div className="space-y-0.5 pt-1">
-          {/* Conversation History Toggle */}
-          <button
-            type="button"
-            onClick={() => setShowSearchInput(!showSearchInput)}
-            className="w-full px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition-colors cursor-pointer text-xs font-medium"
-            title="Поиск по истории сессий"
-          >
-            <History size={14} className="text-slate-400" />
-            <span>История сессий</span>
-          </button>
-
-          {/* Memory & Skills Link */}
-          {onOpenMemorySkills && (
-            <button
-              type="button"
-              onClick={onOpenMemorySkills}
-              className="w-full px-2.5 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-white/5 flex items-center gap-2.5 transition-colors cursor-pointer text-xs font-medium"
-              title="Долгосрочная память и реестр скиллов ИИ"
-            >
-              <Brain size={14} className="text-purple-400" />
-              <span>Память & Скиллы</span>
-            </button>
-          )}
-        </div>
-
-        {/* Search Filter Input */}
-        {showSearchInput && (
-          <div className="pt-1 relative animate-fadeIn">
-            <input
-              type="text"
-              value={searchFilter}
-              onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Поиск по чатам..."
-              className="w-full pl-7 pr-2 py-1 rounded flat-input text-[11px] text-white focus:outline-none"
-              autoFocus
-            />
-            <Search size={12} className="absolute left-2 top-2.5 text-slate-400" />
-          </div>
-        )}
       </div>
 
-      {/* 2. PROJECTS SECTION (SCROLLABLE LIST) */}
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0 scrollbar-thin">
+      {/* 2. CHATS TREE WITH VECTOR CONNECTORS */}
+      <div className="flex-1 overflow-y-auto p-2.5 space-y-3 min-h-0 scrollbar-thin">
         
-        {/* PROJECTS SECTION HEADER */}
-        <div className="flex items-center justify-between text-slate-400 font-semibold text-[11px] tracking-wider uppercase px-1">
-          <span>Проекты (Воркспейсы)</span>
-
-          <div className="flex items-center gap-1 text-slate-400">
-            <button
-              type="button"
-              onClick={() => setShowSearchInput(!showSearchInput)}
-              className="p-1 rounded hover:text-white hover:bg-white/10 cursor-pointer"
-              title="Фильтр диалогов"
-            >
-              <Search size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={onSelectWorkspace}
-              className="p-1 rounded text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 cursor-pointer"
-              title="Добавить / открыть воркспейс"
-            >
-              <FolderPlus size={14} />
-            </button>
-          </div>
-        </div>
-
-        {/* WORKSPACE PROJECT FOLDERS HIERARCHY */}
+        {/* WORKSPACE PROJECT FOLDERS */}
         {workspaceDirs.map((dir) => {
           const isCurrentActiveWs = workspaceDir && dir.toLowerCase() === workspaceDir.toLowerCase();
           const projSessions = filteredSessions.filter(
@@ -297,41 +121,90 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return (
             <div key={dir} className="space-y-1">
               
-              {/* Folder Accordion Header */}
+              {/* Folder Node Header */}
               <div
                 onClick={() => toggleGroup(dir)}
-                className={`flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer transition-colors text-xs font-semibold ${
+                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors text-xs font-medium ${
                   isCurrentActiveWs
-                    ? 'bg-white/[0.08] text-white'
-                    : 'text-slate-300 hover:bg-white/5'
+                    ? 'bg-white/10 border border-[var(--theme-border)] text-[var(--theme-text)]'
+                    : 'bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  {isCollapsed ? <ChevronRight size={13} className="text-slate-500 shrink-0" /> : <ChevronDown size={13} className="text-slate-400 shrink-0" />}
-                  <Folder size={14} className={isCurrentActiveWs ? 'text-emerald-400 shrink-0' : 'text-slate-400 shrink-0'} />
-                  <span className="truncate">{folderName}</span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {isCollapsed ? (
+                    <ChevronRight size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
+                  ) : (
+                    <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
+                  )}
+                  <Folder size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
+                  <span className="truncate font-semibold">{folderName}</span>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCreateSession(`Чат (${folderName})`, dir);
-                  }}
-                  className="p-1 rounded text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-                  title="Создать чат в этом проекте"
-                >
-                  <Plus size={12} />
-                </button>
+                <div className="flex items-center gap-1">
+                  {isCurrentActiveWs && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono bg-white/10 text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
+                      <GitBranch size={9} />
+                      <span>main</span>
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onCreateSession(`Чат (${folderName})`, dir);
+                    }}
+                    className="p-1 rounded-md hover:text-[var(--theme-text)] hover:bg-white/10 transition-colors cursor-pointer text-[var(--theme-text-muted)]"
+                    title="Новый диалог в этой папке"
+                  >
+                    <Plus size={12} />
+                  </button>
+                </div>
               </div>
 
-              {/* Folder Sessions List */}
+              {/* Sessions Branch Tree */}
               {!isCollapsed && (
-                <div className="pl-3 space-y-0.5 border-l border-white/10 ml-3">
+                <div className="relative pl-3 ml-3 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1">
                   {projSessions.length > 0 ? (
-                    projSessions.map((session) => renderSessionItem(session, false))
+                    projSessions.map((session) => {
+                      const isActive = session.id === currentSessionId;
+                      const relTime = formatRelativeTime(session.updated_at);
+                      return (
+                        <div
+                          key={session.id}
+                          onClick={() => onSelectSession(session.id)}
+                          className={`relative group px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                            isActive
+                              ? 'bg-white/15 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <MessageSquare size={12} className="shrink-0 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)]" />
+                            <span className="truncate">{session.title}</span>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {relTime && (
+                              <span className="text-[10px] text-[var(--theme-text-muted)] font-mono group-hover:hidden opacity-75">
+                                {relTime}
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => onDeleteSession(session.id, e)}
+                              className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              title="Удалить"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })
                   ) : (
-                    <div className="text-[11px] text-slate-500 italic py-1 px-2">Нет чатов в этом проекте</div>
+                    <div className="text-[10px] text-[var(--theme-text-muted)] italic py-1 px-2 font-mono">
+                      нет диалогов
+                    </div>
                   )}
                 </div>
               )}
@@ -339,45 +212,84 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
 
-        {/* STANDALONE GENERAL CHATS (WITHOUT WORKSPACE) */}
+        {/* STANDALONE GENERAL CHATS */}
         {standaloneSessions.length > 0 && (
-          <div className="space-y-1 pt-1">
+          <div className="space-y-1">
             <div
               onClick={() => toggleGroup('standalone')}
-              className="flex items-center justify-between px-2 py-1 rounded-lg hover:bg-white/5 cursor-pointer text-slate-300 font-semibold text-xs"
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer font-medium text-xs"
             >
-              <div className="flex items-center gap-2 min-w-0">
-                {collapsedGroups['standalone'] ? <ChevronRight size={13} className="text-slate-500 shrink-0" /> : <ChevronDown size={13} className="text-slate-400 shrink-0" />}
-                <Sparkles size={13} className="text-cyan-400 shrink-0" />
-                <span>Общие чаты (без проекта)</span>
+              <div className="flex items-center gap-1.5 min-w-0">
+                {collapsedGroups['standalone'] ? (
+                  <ChevronRight size={13} className="shrink-0" />
+                ) : (
+                  <ChevronDown size={13} className="shrink-0" />
+                )}
+                <span className="font-semibold">Общие диалоги</span>
               </div>
+              <span className="text-[10px] font-mono opacity-60">({standaloneSessions.length})</span>
             </div>
 
             {!collapsedGroups['standalone'] && (
-              <div className="pl-3 space-y-0.5 border-l border-white/10 ml-3">
-                {standaloneSessions.map((session) => renderSessionItem(session, true))}
+              <div className="relative pl-3 ml-3 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1">
+                {standaloneSessions.map((session) => {
+                  const isActive = session.id === currentSessionId;
+                  const relTime = formatRelativeTime(session.updated_at);
+                  return (
+                    <div
+                      key={session.id}
+                      onClick={() => onSelectSession(session.id)}
+                      className={`relative group px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                        isActive
+                          ? 'bg-white/15 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                          : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <MessageSquare size={12} className="shrink-0 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)]" />
+                        <span className="truncate">{session.title}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {relTime && (
+                          <span className="text-[10px] text-[var(--theme-text-muted)] font-mono group-hover:hidden opacity-75">
+                            {relTime}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => onDeleteSession(session.id, e)}
+                          className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          title="Удалить"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {/* WORKSPACE FILE EXPLORER SECTION */}
+        {/* WORKSPACE FILE EXPLORER */}
         {workspaceDir && workspaceTreeNodes.length > 0 && (
-          <div className="pt-2 border-t border-white/10">
+          <div className="pt-2 border-t border-[var(--theme-border)]">
             <button
               type="button"
               onClick={() => setShowFileExplorer(!showFileExplorer)}
-              className="w-full py-1.5 px-2 rounded-lg hover:bg-white/5 text-slate-300 font-semibold text-[11px] flex items-center justify-between cursor-pointer"
+              className="w-full py-1.5 px-2 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] font-medium text-[11px] flex items-center justify-between cursor-pointer"
             >
               <div className="flex items-center gap-2">
-                <FolderTree size={13} className="text-emerald-400" />
-                <span>Дерево файлов Workspace</span>
+                <FolderTree size={13} className="text-[var(--theme-text-muted)]" />
+                <span>Дерево файлов проекта</span>
               </div>
               {showFileExplorer ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </button>
 
             {showFileExplorer && (
-              <div className="mt-1.5 max-h-56 overflow-y-auto border border-white/10 rounded-lg p-1.5 bg-black/40">
+              <div className="mt-1.5 max-h-52 overflow-y-auto border border-[var(--theme-border)] rounded-lg p-1.5 bg-black/40">
                 <WorkspaceTree
                   workspaceDir={workspaceDir}
                   treeNodes={workspaceTreeNodes}
@@ -390,18 +302,102 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
       </div>
 
-      {/* 3. BOTTOM SIDEBAR FOOTER (SETTINGS BUTTON ANCHORED AT BOTTOM LEFT) */}
-      <div className="p-3 border-t border-white/10 shrink-0 bg-slate-950/60 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          className="w-full px-2.5 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 flex items-center gap-2.5 transition-colors cursor-pointer text-xs font-semibold"
-        >
-          <SettingsIcon size={16} className="text-slate-400" />
-          <span>Настройки</span>
-        </button>
+      {/* 3. BOTTOM FOOTER: SESSION HISTORY & ASCII RISING PARTICLES ON HOVER */}
+      <div
+        onMouseEnter={() => setIsHoveringHistory(true)}
+        onMouseLeave={() => setIsHoveringHistory(false)}
+        className="p-2.5 border-t border-[var(--theme-border)] shrink-0 bg-black/30 relative overflow-hidden group transition-all"
+      >
+        {/* Interactive ASCII Particle Canvas (starts on hover, flows bottom to top) */}
+        <AsciiParticleFlow isActive={isHoveringHistory} />
+
+        <div className="relative z-10 flex items-center justify-between text-[11px] font-mono text-[var(--theme-text-muted)]">
+          <div className="flex items-center gap-2">
+            <History size={13} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors" />
+            <span className="group-hover:text-[var(--theme-text)] transition-colors">История сессий</span>
+          </div>
+          <span className="px-1.5 py-0.5 rounded-md bg-white/10 text-[var(--theme-text)] font-semibold text-[10px] border border-[var(--theme-border)]">
+            {sessions.length}
+          </span>
+        </div>
       </div>
 
     </aside>
+  );
+};
+
+// Interactive Rising ASCII Particle Flow Canvas Component
+const AsciiParticleFlow: React.FC<{ isActive: boolean }> = ({ isActive }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId: number;
+    const chars = ['·', '°', '⁺', '*', '‧', '•', '∘'];
+    const particles: Array<{ x: number; y: number; char: string; speed: number; opacity: number }> = [];
+
+    const resize = () => {
+      canvas.width = canvas.parentElement?.clientWidth || 200;
+      canvas.height = canvas.parentElement?.clientHeight || 40;
+    };
+    resize();
+
+    const spawn = () => {
+      if (particles.length < 18) {
+        particles.push({
+          x: Math.random() * canvas.width,
+          y: canvas.height + 5,
+          char: chars[Math.floor(Math.random() * chars.length)],
+          speed: 0.6 + Math.random() * 0.9,
+          opacity: 0.15 + Math.random() * 0.5,
+        });
+      }
+    };
+
+    const render = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (isActive) {
+        spawn();
+        spawn();
+      }
+
+      ctx.font = '10px monospace';
+
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.y -= p.speed;
+        p.opacity -= 0.012;
+
+        if (p.y < -5 || p.opacity <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, p.opacity)})`;
+        ctx.fillText(p.char, p.x, p.y);
+      }
+
+      animId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [isActive]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
+        isActive ? 'opacity-90' : 'opacity-0'
+      }`}
+    />
   );
 };

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   User,
-  Sparkles,
   Check,
   ChevronDown,
   RefreshCw,
@@ -14,7 +13,6 @@ import {
 import { PersonaMetadata } from '../../types';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
-import { PERSONA_ASCII_GLYPHS } from '../../utils/asciiAnimations';
 
 interface PersonaChatSelectorProps {
   activePersonaId?: string | null;
@@ -72,7 +70,7 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
       await api.activate_persona(p.id);
       setActivePersona(p);
       setIsOpen(false);
-      showToast(`Личность переключена: ${p.name}`, 'success');
+      showToast(`Персона: ${p.name}`, 'success');
       if (onPersonaChanged) {
         onPersonaChanged(p);
       }
@@ -83,20 +81,20 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
   };
 
   const getPersonaIcon = (iconName: string) => {
-    switch (iconName.toLowerCase()) {
+    switch (iconName?.toLowerCase()) {
       case 'shield':
-        return <Shield size={14} className="text-purple-400" />;
+        return <Shield size={13} className="text-[var(--theme-text-muted)]" />;
       case 'zap':
-        return <Zap size={14} className="text-amber-400" />;
+        return <Zap size={13} className="text-[var(--theme-text-muted)]" />;
       case 'book':
       case 'bookopen':
-        return <BookOpen size={14} className="text-sky-400" />;
+        return <BookOpen size={13} className="text-[var(--theme-text-muted)]" />;
       case 'code':
-        return <Code size={14} className="text-emerald-400" />;
+        return <Code size={13} className="text-[var(--theme-text-muted)]" />;
       case 'layers':
-        return <Layers size={14} className="text-cyan-400" />;
+        return <Layers size={13} className="text-[var(--theme-text-muted)]" />;
       default:
-        return <Sparkles size={14} className="text-pink-400" />;
+        return <User size={13} className="text-[var(--theme-text-muted)]" />;
     }
   };
 
@@ -106,75 +104,74 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 rounded-xl transition-all cursor-pointer select-none ${
+        className={`flex items-center gap-1.5 rounded-lg transition-all cursor-pointer select-none bento-card text-xs ${
           compact
-            ? 'px-2.5 py-1 bg-white/[0.04] border border-white/10 hover:border-purple-500/40 text-xs text-slate-200'
-            : 'px-3 py-1.5 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 hover:border-purple-500/60 shadow-lg text-xs font-semibold text-white'
+            ? 'px-2.5 py-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+            : 'px-2.5 py-1 text-[var(--theme-text)] font-medium'
         }`}
-        title="Сменить активную личность (Persona)"
+        title="Сменить персону"
       >
         <span className="shrink-0">
-          {activePersona ? getPersonaIcon(activePersona.icon) : <User size={13} />}
+          {activePersona ? getPersonaIcon(activePersona.icon) : <User size={13} className="text-[var(--theme-text-muted)]" />}
         </span>
 
-        <span className="font-semibold text-xs truncate max-w-[120px]">
-          {activePersona ? activePersona.name : 'Личность'}
+        <span className="font-medium text-xs truncate max-w-[120px] text-[var(--theme-text)]">
+          {activePersona ? activePersona.name : 'Персона'}
         </span>
 
-        <ChevronDown size={12} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={12} className={`text-[var(--theme-text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {/* Dropdown Menu */}
       {isOpen && (
-        <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-72 sm:w-80 rounded-2xl glass-panel shadow-2xl z-50 overflow-hidden border border-white/15 animate-fadeIn p-2 space-y-1">
+        <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-72 sm:w-80 rounded-xl bento-card shadow-2xl z-50 overflow-hidden border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 p-2 space-y-1 animate-fadeIn">
           
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 text-xs font-bold text-slate-200">
+          <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)]">
             <span className="flex items-center gap-1.5">
-              <Sparkles size={13} className="text-purple-400" />
-              <span>Выберите личность ИИ</span>
+              <User size={13} className="text-[var(--theme-text-muted)]" />
+              <span>Выбор персоны</span>
             </span>
-            {loading && <RefreshCw size={11} className="animate-spin text-slate-400" />}
+            {loading && <RefreshCw size={11} className="animate-spin text-[var(--theme-text-muted)]" />}
           </div>
 
           <div className="max-h-60 overflow-y-auto space-y-1 p-1 scrollbar-thin">
             {personas.map((p) => {
-              const isCurrent = activePersona?.id === p.id;
-              const glyph = PERSONA_ASCII_GLYPHS[p.id] || null;
-
+              const isSelected = activePersona?.id === p.id;
               return (
                 <div
                   key={p.id}
                   onClick={() => handleSelectPersona(p)}
-                  className={`p-2.5 rounded-xl border transition-all cursor-pointer flex flex-col gap-1 ${
-                    isCurrent
-                      ? 'bg-purple-500/20 border-purple-500/50 text-white shadow-md'
-                      : 'bg-white/[0.02] border-transparent hover:bg-white/[0.06] hover:border-white/10 text-slate-300'
+                  className={`p-2 rounded-lg cursor-pointer transition-colors flex items-start justify-between gap-2 border ${
+                    isSelected
+                      ? 'bg-white/10 border-[var(--theme-border)] text-[var(--theme-text)]'
+                      : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                    <div className="mt-0.5 shrink-0 p-1 rounded-md bg-black/40">
                       {getPersonaIcon(p.icon)}
-                      <span className="font-bold text-xs">{p.name}</span>
                     </div>
-                    {isCurrent && <Check size={14} className="text-purple-400 shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-semibold text-xs text-[var(--theme-text)] truncate">{p.name}</span>
+                        {p.is_active && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-white/10 font-mono">
+                            active
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-1 mt-0.5">
+                        {p.description || 'Пользовательская персона ИИ'}
+                      </p>
+                    </div>
                   </div>
 
-                  <p className="text-[11px] text-slate-400 leading-tight">
-                    {p.description || 'Пользовательская личность'}
-                  </p>
-
-                  {glyph && (
-                    <div className="mt-1 p-1 rounded bg-black/40 text-[9px] font-mono text-purple-300/80 leading-none overflow-x-hidden">
-                      <pre className="m-0 select-none">{glyph}</pre>
-                    </div>
+                  {isSelected && (
+                    <Check size={14} className="text-[var(--theme-text)] shrink-0 mt-1" />
                   )}
                 </div>
               );
             })}
-          </div>
-
-          <div className="px-3 py-1.5 border-t border-white/10 text-[10px] text-slate-500 text-center font-mono">
-            Настроить SOUL.md и USER.md можно во вкладке «Личности» в Настройках.
           </div>
         </div>
       )}

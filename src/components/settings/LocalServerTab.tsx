@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Cpu, Play, Square, Folder, AlertTriangle, Zap, Activity, RefreshCw, HardDrive } from 'lucide-react';
+import { Cpu, Folder, AlertTriangle, Zap, Activity, RefreshCw, HardDrive } from 'lucide-react';
 import { GgufMetadata, HardwareInfo, LocalModelItem } from '../../types';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -125,7 +125,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   setServerLogs,
   serverLogsAutoScroll,
   setServerLogsAutoScroll,
-  setApiUrl,
+  setApiUrl: _setApiUrl,
 }) => {
   const { showToast } = useToast();
   const [logFilePath, setLogFilePath] = useState<string>('');
@@ -166,7 +166,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   };
 
-  // 1. Initial Load: Hardware, Releases, Server Logs & Initial Server Status
   useEffect(() => {
     async function loadData() {
       try {
@@ -229,7 +228,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     loadData();
   }, []);
 
-  // 2. Parse GGUF Metadata whenever modelPath changes
+  // Parse GGUF Metadata whenever modelPath changes
   useEffect(() => {
     if (modelPath && modelPath.trim().length > 0) {
       api.parse_gguf(modelPath.trim())
@@ -240,7 +239,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     }
   }, [modelPath]);
 
-  // 3. Health & Slots Polling Timer
+  // Health & Slots Polling Timer
   useEffect(() => {
     let timer: any = null;
     if (serverStatus === 'running') {
@@ -263,14 +262,14 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     };
   }, [serverStatus, host, port]);
 
-  // 4. Log Inspection Crash Adviser
+  // Log Inspection Crash Adviser
   useEffect(() => {
     const logsStr = serverLogs.join('\n');
     if (logsStr.includes('pinned memory') || logsStr.includes('CUDA error') || logsStr.includes('out of memory')) {
       if (!mmap) {
-        setCrashAdvice('Советчик по ошибкам: Падение сервера вызваны включенной опцией --no-mmap (отключение Mmap). Включите Mmap обратно или уменьшите число GPU слоев.');
+        setCrashAdvice('Советчик: Падение вызвано опцией --no-mmap. Включите Mmap обратно или уменьшите число GPU слоев.');
       } else {
-        setCrashAdvice('Советчик по ошибкам: Падение вызвано нехваткой VRAM на видеокарте. Уменьшите количество GPU слоев (-ngl) или размер контекста (-c).');
+        setCrashAdvice('Советчик: Падение вызвано нехваткой VRAM. Уменьшите количество GPU слоев (-ngl) или размер контекста (-c).');
       }
     } else {
       setCrashAdvice(null);
@@ -359,7 +358,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       await refreshInstalledVersions();
       showToast(res.message || 'Активная версия переключена!', 'success');
     } catch (err: any) {
-      showToast(`Ошибка переключения версии: ${err.message || err}`, 'error');
+      showToast(`Ошибка переключения: ${err.message || err}`, 'error');
     }
   };
 
@@ -377,7 +376,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       }
       showToast(res.message || `Сборка ${tag} удалена!`, 'success');
     } catch (err: any) {
-      showToast(`Ошибка удаления сборки: ${err.message || err}`, 'error');
+      showToast(`Ошибка удаления: ${err.message || err}`, 'error');
     } finally {
       setDeletingTag(null);
     }
@@ -390,7 +389,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       await refreshInstalledVersions();
       showToast(res.message, res.removedCount > 0 ? 'success' : 'info');
     } catch (err: any) {
-      showToast(`Ошибка очистки старых версий: ${err.message || err}`, 'error');
+      showToast(`Ошибка очистки: ${err.message || err}`, 'error');
     } finally {
       setIsCleaningOld(false);
     }
@@ -416,64 +415,9 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     };
   }, []);
 
-  const handleStartServer = async () => {
-    setHealthStatus('loading');
-    setApiUrl(`http://${host}:${port}/v1`);
-    setServerLogs((prev) => [...prev, `[SYSTEM] Launching llama.cpp server at http://${host}:${port}/v1...`]);
-
-    try {
-      const res = await api.start_local_server({
-        exePath,
-        modelPath,
-        host,
-        port,
-        ctxSize,
-        gpuLayers,
-        threads,
-        batchSize,
-        ubatchSize,
-        temp,
-        repeatPenalty,
-        minP,
-        topK,
-        topP,
-        predict,
-        flashAttn,
-        mmap,
-        mlock,
-        embedding,
-        contBatching,
-        parallelSlots,
-        cacheReuse,
-        slotSavePath,
-        customArgs,
-      });
-      if (res && res.success) {
-        setServerStatus('running');
-      }
-    } catch (err: any) {
-      setServerStatus('stopped');
-      setHealthStatus('stopped');
-      const errMsg = err.message || err;
-      setServerLogs((prev) => [...prev, `[SYSTEM ERROR] Failed to start server:\n${errMsg}`]);
-      showToast(`Ошибка запуска сервера llama.cpp:\n${errMsg}`, 'error');
-    }
+  const handleClearLogs = () => {
+    setServerLogs([]);
   };
-
-  const handleStopServer = async () => {
-    try {
-      await api.stop_local_server();
-    } catch {}
-    setServerStatus('stopped');
-    setHealthStatus('stopped');
-    setServerLogs((prev) => [...prev, '[SYSTEM] Server stopped.']);
-  };
-
-  useEffect(() => {
-    if (serverLogsAutoScroll && logsContainerRef.current) {
-      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
-    }
-  }, [serverLogs, serverLogsAutoScroll]);
 
   const handleDownloadLogs = () => {
     const text = serverLogs.join('\n');
@@ -494,14 +438,15 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
   const handleApplyFastPreset = () => {
     setGpuLayers(99);
-    setThreads(8);
-    setBatchSize(512);
+    setThreads(0);
+    setBatchSize(2048);
     setUbatchSize(512);
-    setFlashAttn(false);
-    setParallelSlots(2);
+    setFlashAttn(true);
+    setParallelSlots(1);
     setCacheReuse(256);
-    setCtxSize(65536);
-    showToast('Применен пресет быстрой работы (50+ t/s)!', 'success');
+    setCtxSize(16384);
+    setCustomArgs('-ctk q8_0 -ctv q8_0');
+    showToast('Применен быстрый пресет (Flash Attention + Q8 KV + 1 слот)!', 'success');
   };
 
   const isSelectedVersionInstalled = installedVersions.some(
@@ -509,29 +454,29 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   );
 
   return (
-    <div className="space-y-5 font-sans text-slate-100 max-w-full">
+    <div className="space-y-4 font-sans text-[var(--theme-text)] max-w-full">
       {/* Top Header & Live Health Metric */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[var(--theme-border)] pb-3">
         <div>
-          <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <Cpu size={18} className="text-emerald-400" />
+          <h3 className="text-sm font-semibold text-[var(--theme-text)] flex items-center gap-2">
+            <Cpu size={16} className="text-[var(--theme-text-muted)]" />
             <span>Параметры и Логи ИИ-Сервера Llama.cpp</span>
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Настройка локального ИИ-движка, выбора релиза с GitHub и просмотр реальных логов работы в режиме реального времени.
+          <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
+            Настройка локального ИИ-движка, выбор релизов и просмотр реальных логов работы.
           </p>
         </div>
 
         {/* Live Slot & Health Metrics Badge */}
         {serverStatus === 'running' && (
-          <div className="flex items-center gap-2 text-xs font-mono bg-emerald-950/80 px-3 py-1.5 rounded-lg border border-emerald-500/40 select-none shadow-md">
-            <Activity size={14} className={healthStatus === 'ok' ? 'text-emerald-400 animate-pulse' : 'text-amber-400 animate-spin'} />
-            <span className="text-emerald-200 font-semibold">
+          <div className="flex items-center gap-2 text-xs font-mono bento-card px-3 py-1.5 rounded-lg select-none">
+            <Activity size={13} className="text-[var(--theme-text-muted)] animate-pulse" />
+            <span className="text-[var(--theme-text)] font-medium">
               {healthStatus === 'loading'
-                ? 'Загрузка модели в память GPU...'
+                ? 'Загрузка модели в GPU...'
                 : healthStatus === 'ok'
-                ? `Готов | Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 4}`
-                : 'Процесс запущен | Инициализация...'}
+                ? `Готов | Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 1}`
+                : 'Инициализация...'}
             </span>
           </div>
         )}
@@ -539,31 +484,31 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
       {/* Crash Advisory Alert Box */}
       {crashAdvice && (
-        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs flex items-start gap-2 animate-fadeIn shadow-lg">
-          <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+        <div className="p-3 rounded-xl bento-card border border-[var(--theme-border)] text-xs flex items-start gap-2 animate-fadeIn bg-white/5">
+          <AlertTriangle size={15} className="shrink-0 mt-0.5 text-[var(--theme-text-muted)]" />
           <span>{crashAdvice}</span>
         </div>
       )}
 
       {/* MAIN 2-COLUMN GRID LAYOUT */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         
         {/* LEFT COLUMN: Server Settings & Controls */}
-        <div className="lg:col-span-7 space-y-4">
+        <div className="lg:col-span-7 space-y-3.5">
           
           {/* Hardware GPU Status Banner */}
           {hardwareInfo && hardwareInfo.isAutoDetected && (
-            <div className="p-3.5 rounded-xl bg-slate-900/90 border border-emerald-500/30 flex items-center justify-between gap-3 text-xs shadow-md">
+            <div className="p-3.5 rounded-xl bento-card flex items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
-                  <Zap size={16} />
+                <div className="p-1.5 rounded-lg bg-white/5 border border-[var(--theme-border)] text-[var(--theme-text-muted)]">
+                  <Zap size={15} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 font-semibold text-slate-200">
+                  <div className="flex items-center gap-2 font-medium text-[var(--theme-text)]">
                     <span>Видеокарта:</span>
-                    <span className="text-emerald-300 font-mono">{hardwareInfo.gpuName}</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono text-[10px]">
-                      100% Full GPU Offload (-ngl 999)
+                    <span className="font-mono text-[var(--theme-text)]">{hardwareInfo.gpuName}</span>
+                    <span className="px-2 py-0.5 rounded-md bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono text-[10px]">
+                      Full GPU Offload (-ngl 999)
                     </span>
                   </div>
                 </div>
@@ -572,7 +517,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           )}
 
           {/* GitHub Releases Llama.cpp Installer Section */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <LlamaInstallerSection
               githubReleases={githubReleases}
               selectedTag={selectedTag}
@@ -602,14 +547,14 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           </div>
 
           {/* Executable Path & Model Selector Card */}
-          <div className="p-4 rounded-xl glass-card border border-white/10 space-y-3">
+          <div className="p-4 rounded-xl bento-card space-y-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-200 flex items-center justify-between">
+              <label className="text-xs font-semibold text-[var(--theme-text)] flex items-center justify-between">
                 <span>Исполняемый файл (llama-server.exe)</span>
                 <button
                   type="button"
                   onClick={handleSelectExe}
-                  className="text-[11px] text-sky-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer font-normal"
+                  className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-normal"
                 >
                   <Folder size={12} />
                   <span>Обзор...</span>
@@ -620,21 +565,21 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 value={exePath}
                 onChange={(e) => setExePath(e.target.value)}
                 placeholder="C:\Users\user\.0xagent\llama\llama-server.exe"
-                className="w-full px-3 py-2 rounded flat-input text-xs font-mono text-slate-100 placeholder-slate-500 focus:outline-none"
+                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
               />
             </div>
 
-            <div className="space-y-2 pt-1">
+            <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                  <HardDrive size={13} className="text-purple-400" />
+                <label className="text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5">
+                  <HardDrive size={13} className="text-[var(--theme-text-muted)]" />
                   <span>Файл GGUF Модели (.gguf)</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={refreshScannedModels}
-                    className="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer font-normal"
+                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-normal"
                     title="Пересканировать папку models/"
                   >
                     <RefreshCw size={11} />
@@ -643,7 +588,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                   <button
                     type="button"
                     onClick={handleSelectModel}
-                    className="text-[11px] text-sky-400 hover:text-sky-300 flex items-center gap-1 cursor-pointer font-normal"
+                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-normal"
                     title="Выбрать файл через проводник"
                   >
                     <Folder size={12} />
@@ -665,16 +610,16 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                     setModelPath(val);
                   }
                 }}
-                className="w-full px-3 py-2 rounded flat-input text-xs font-mono text-slate-100 bg-slate-900 border border-white/15 focus:outline-none focus:border-purple-500/50 cursor-pointer"
+                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none cursor-pointer"
               >
-                <option value="">-- Выберите локальную GGUF модель из ~/.0xagent/models/ --</option>
+                <option value="" className="bg-black">-- Выберите локальную GGUF модель из ~/.0xagent/models/ --</option>
                 {scannedLocalModels.map((m) => (
-                  <option key={m.id || m.filePath} value={m.filePath}>
+                  <option key={m.id || m.filePath} value={m.filePath} className="bg-black">
                     {m.title || m.fileName} ({m.quantization} • {m.sizeGB})
                   </option>
                 ))}
                 {modelPath && !scannedLocalModels.some((m) => m.filePath.toLowerCase() === modelPath.toLowerCase()) && (
-                  <option value="custom">Пользовательский путь: {modelPath}</option>
+                  <option value="custom" className="bg-black">Пользовательский путь: {modelPath}</option>
                 )}
               </select>
 
@@ -684,16 +629,16 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 value={modelPath}
                 onChange={(e) => setModelPath(e.target.value)}
                 placeholder="C:\Users\user\.0xagent\models\model.gguf"
-                className="w-full px-3 py-1.5 rounded flat-input text-[11px] font-mono text-slate-400 bg-black/40 border border-white/5 focus:outline-none focus:text-slate-200"
+                className="w-full px-3 py-1.5 rounded-lg bento-card text-[11px] font-mono text-[var(--theme-text-muted)] bg-black/40 focus:outline-none focus:text-[var(--theme-text)]"
               />
             </div>
 
             {/* GGUF Model Metadata Card */}
             {modelMeta && (
-              <div className="p-3 rounded-lg bg-slate-900/90 border border-emerald-500/30 text-xs space-y-1.5 font-mono">
-                <div className="flex items-center justify-between text-emerald-300 font-bold border-b border-emerald-500/20 pb-1">
+              <div className="p-3 rounded-lg bg-black/40 border border-[var(--theme-border)] text-xs space-y-1 font-mono">
+                <div className="flex items-center justify-between text-[var(--theme-text)] font-semibold border-b border-[var(--theme-border)] pb-1">
                   <span className="truncate">{modelMeta.architecture} ({modelMeta.modelName || 'GGUF'})</span>
-                  <span className="px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 text-[10px]">
+                  <span className="px-1.5 py-0.2 rounded-md bg-white/10 text-[var(--theme-text-muted)] text-[10px]">
                     {modelMeta.fileSizeFormatted}
                   </span>
                 </div>
@@ -752,32 +697,10 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             onSelectSlotSavePath={handleSelectSlotSavePath}
             onApplyFastPreset={handleApplyFastPreset}
           />
-
-          {/* Action Buttons: Start & Stop Server */}
-          <div className="flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={handleStartServer}
-              disabled={serverStatus === 'running'}
-              className="flex-1 flat-btn py-3 rounded-xl text-xs font-bold text-emerald-400 hover:text-emerald-300 border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg cursor-pointer transition-all"
-            >
-              <Play size={14} />
-              <span>Запустить сервер llama.cpp</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleStopServer}
-              disabled={serverStatus !== 'running'}
-              className="flex-1 flat-btn py-3 rounded-xl text-xs font-bold text-rose-400 hover:text-rose-300 border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg cursor-pointer transition-all"
-            >
-              <Square size={14} />
-              <span>Остановить сервер</span>
-            </button>
-          </div>
         </div>
 
         {/* RIGHT COLUMN: Terminal Logs Console */}
-        <div className="lg:col-span-5 h-full flex flex-col space-y-2 sticky top-4">
+        <div className="lg:col-span-5">
           <ServerLogsConsole
             serverLogs={serverLogs}
             logFilePath={logFilePath}
@@ -786,7 +709,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             isCopiedLogs={isCopiedLogs}
             onCopyLogs={handleCopyLogs}
             onDownloadLogs={handleDownloadLogs}
-            onClearLogs={() => setServerLogs([])}
+            onClearLogs={handleClearLogs}
             logsContainerRef={logsContainerRef}
             logsEndRef={logsEndRef}
           />

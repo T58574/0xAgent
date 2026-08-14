@@ -1,11 +1,10 @@
 import React from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, Shield, User } from 'lucide-react';
+import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { GeneralTab } from './GeneralTab';
 import { PersonasTab } from './PersonasTab';
 import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
-import { SecurityTab } from './SecurityTab';
 import { useSettingsState } from './useSettingsState';
 
 interface SettingsPageProps {
@@ -22,32 +21,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const s = useSettingsState(config, onSaveConfig);
 
   return (
-    <div className="w-full h-full bg-scifi-grid text-slate-100 flex flex-col overflow-hidden font-sans select-text">
+    <div className="w-full h-full bg-[var(--theme-bg)] text-[var(--theme-text)] flex flex-col overflow-hidden font-sans select-text">
       {/* Settings Top Header Bar */}
-      <div className="px-4 py-3 border-b border-white/10 glass-panel flex items-center justify-between shrink-0 select-none">
+      <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-panel)] flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={onCancel}
-            className="flat-btn p-1.5 rounded-md text-slate-400 hover:text-white cursor-pointer"
+            className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
             title="Вернуться в чат"
           >
             <ChevronLeft size={16} />
           </button>
-          <h2 className="text-sm font-semibold text-slate-100">Настройки приложения</h2>
+          <h2 className="text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider">Настройки</h2>
         </div>
 
         {/* Auto-save Indicator */}
-        <div className="flex items-center gap-2 text-xs font-medium text-slate-400 bg-slate-900/60 px-3 py-1 rounded-md border border-white/10">
+        <div className="flex items-center gap-2 text-xs font-mono text-[var(--theme-text-muted)] bento-card px-3 py-1 rounded-lg">
           {s.saveStatus === 'saving' ? (
             <>
-              <RefreshCw size={12} className="animate-spin text-sky-400" />
+              <RefreshCw size={12} className="animate-spin text-[var(--theme-text-muted)]" />
               <span>Сохранение...</span>
             </>
           ) : (
             <>
-              <Check size={12} className="text-emerald-400" />
-              <span className="text-slate-300">Сохранено</span>
+              <Check size={12} className="text-[var(--theme-text)]" />
+              <span>Сохранено</span>
             </>
           )}
         </div>
@@ -56,70 +55,57 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       {/* Main Settings Layout (Sidebar Navigation + Right Content Panel) */}
       <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden">
         {/* Left Vertical Navigation Menu */}
-        <div className="w-full md:w-56 glass-panel border-r border-white/10 p-3 shrink-0 flex flex-row md:flex-col gap-1 select-none overflow-x-auto scrollbar-none">
+        <div className="w-full md:w-56 bg-[var(--theme-panel)] border-r border-[var(--theme-border)] p-3 shrink-0 flex flex-row md:flex-col gap-1 select-none overflow-x-auto scrollbar-none">
           <button
             type="button"
             onClick={() => s.setActiveSubtab('general')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
               s.activeSubtab === 'general'
-                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
-                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
             }`}
           >
-            <Sliders size={14} className={s.activeSubtab === 'general' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
+            <Sliders size={14} className="text-[var(--theme-text-muted)]" />
             <span>Основные</span>
           </button>
 
           <button
             type="button"
             onClick={() => s.setActiveSubtab('personas')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
               s.activeSubtab === 'personas'
-                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
-                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
             }`}
           >
-            <User size={14} className={s.activeSubtab === 'personas' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
+            <User size={14} className="text-[var(--theme-text-muted)]" />
             <span>Личности (Personas)</span>
           </button>
 
           <button
             type="button"
             onClick={() => s.setActiveSubtab('themes')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
               s.activeSubtab === 'themes'
-                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
-                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
             }`}
           >
-            <Palette size={14} className={s.activeSubtab === 'themes' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
+            <Palette size={14} className="text-[var(--theme-text-muted)]" />
             <span>Темы оформления</span>
           </button>
 
           <button
             type="button"
             onClick={() => s.setActiveSubtab('local_server')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
               s.activeSubtab === 'local_server'
-                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
-                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
+                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
             }`}
           >
-            <Cpu size={14} className={s.activeSubtab === 'local_server' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
+            <Cpu size={14} className="text-[var(--theme-text-muted)]" />
             <span>Сервер LLM</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => s.setActiveSubtab('security')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left ${
-              s.activeSubtab === 'security'
-                ? 'bg-white/10 text-white font-semibold border border-white/20 shadow-sm'
-                : 'text-theme-muted hover:text-theme-text hover:bg-white/[0.03]'
-            }`}
-          >
-            <Shield size={14} className={s.activeSubtab === 'security' ? 'text-[var(--theme-accent)]' : 'text-slate-500'} />
-            <span>Безопасность</span>
           </button>
         </div>
 
@@ -193,16 +179,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setRepeatPenalty={s.setRepeatPenalty}
               flashAttn={s.flashAttn}
               setFlashAttn={s.setFlashAttn}
+              mmap={s.mmap}
+              setMmap={s.setMmap}
+              mlock={s.mlock}
+              setMlock={s.setMlock}
               embedding={s.embedding}
               setEmbedding={s.setEmbedding}
               contBatching={s.contBatching}
               setContBatching={s.setContBatching}
               promptCache={s.promptCache}
               setPromptCache={s.setPromptCache}
-              mlock={s.mlock}
-              setMlock={s.setMlock}
-              mmap={s.mmap}
-              setMmap={s.setMmap}
               parallelSlots={s.parallelSlots}
               setParallelSlots={s.setParallelSlots}
               cacheReuse={s.cacheReuse}
@@ -219,10 +205,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setServerLogsAutoScroll={s.setServerLogsAutoScroll}
               setApiUrl={s.setApiUrl}
             />
-          )}
-
-          {s.activeSubtab === 'security' && (
-            <SecurityTab />
           )}
         </div>
       </div>

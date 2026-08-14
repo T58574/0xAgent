@@ -137,35 +137,43 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
     const port = (req.query.port as string) || cfg.local_server?.port || 11434;
     const isProcessRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
 
+    if (!isProcessRunning) {
+      return res.json({ ok: false, status: 'stopped', processRunning: false });
+    }
+
     try {
-      const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(1800) });
+      const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(5000) });
       const data: any = await response.json().catch(() => ({}));
       const isHealthy = response.ok || data.status === 'ok' || data.status === 'loading model' || data.status === 'no slot available';
 
       res.json({
-        ok: isHealthy || isProcessRunning,
-        status: data.status || (isProcessRunning ? 'loading' : 'stopped'),
-        processRunning: isProcessRunning,
+        ok: isHealthy,
+        status: data.status || 'ok',
+        processRunning: true,
       });
     } catch {
-      res.json({ ok: isProcessRunning, status: isProcessRunning ? 'loading' : 'stopped', processRunning: isProcessRunning });
+      res.json({ ok: true, status: 'busy', processRunning: true });
     }
   });
 
   router.get('/server-slots', async (req, res) => {
     const host = (req.query.host as string) || '127.0.0.1';
     const port = (req.query.port as string) || '11434';
+    const isProcessRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+    if (!isProcessRunning) {
+      return res.json({ ok: false, totalSlots: 0, activeSlots: 0 });
+    }
     try {
-      const response = await fetch(`http://${host}:${port}/slots`, { signal: AbortSignal.timeout(1500) });
+      const response = await fetch(`http://${host}:${port}/slots`, { signal: AbortSignal.timeout(4000) });
       if (response.ok) {
         const slotsData: any[] = await response.json();
         const activeSlots = slotsData.filter((s) => s.state !== 0 && s.is_processing).length;
         res.json({ ok: true, totalSlots: slotsData.length, activeSlots });
       } else {
-        res.json({ ok: false, totalSlots: 0, activeSlots: 0 });
+        res.json({ ok: true, totalSlots: 1, activeSlots: 1 });
       }
     } catch {
-      res.json({ ok: false, totalSlots: 0, activeSlots: 0 });
+      res.json({ ok: true, totalSlots: 1, activeSlots: 1 });
     }
   });
 
@@ -319,7 +327,9 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       if (gpuLayers !== undefined && gpuLayers !== null) args.push('-ngl', String(gpuLayers));
 
       const threads = body.threads !== undefined ? body.threads : ls.threads;
-      if (threads) args.push('-t', String(threads));
+      if (threads !== undefined && threads !== null && Number(threads) > 0) {
+        args.push('-t', String(threads));
+      }
 
       const batchSize = body.batchSize !== undefined ? body.batchSize : ls.batch_size;
       if (batchSize) args.push('-b', String(batchSize));
@@ -333,14 +343,39 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       const repeatPenalty = body.repeatPenalty !== undefined ? body.repeatPenalty : ls.repeat_penalty;
       if (repeatPenalty !== undefined && repeatPenalty !== null) args.push('--repeat-penalty', String(repeatPenalty));
 
+      const minP = body.minP !== undefined ? body.minP : ls.min_p;
+      if (minP !== undefined && minP !== null && Number(minP) > 0) args.push('--min-p', String(minP));
+
+      const topK = body.topK !== undefined ? body.topK : ls.top_k;
+      if (topK !== undefined && topK !== null) {
+        const tk = Math.round(Number(topK));
+        if (tk >= 1) args.push('--top-k', String(tk));
+      }
+
+      const topP = body.topP !== undefined ? body.topP : ls.top_p;
+      if (topP !== undefined && topP !== null && Number(topP) < 1 && Number(topP) > 0) args.push('--top-p', String(topP));
+
       const flashAttn = body.flashAttn !== undefined ? body.flashAttn : ls.flash_attn;
-      if (flashAttn) args.push('-fa');
+      if (flashAttn) args.push('-fa', 'on');
+
+      const mmap = body.mmap !== undefined ? body.mmap : ls.mmap;
+      if (mmap === false) args.push('--no-mmap');
+
+      const mlock = body.mlock !== undefined ? body.mlock : ls.mlock;
+      if (mlock === true) args.push('--mlock');
+
+      const cacheReuse = body.cacheReuse !== undefined ? body.cacheReuse : ls.cache_reuse;
+      if (cacheReuse !== undefined && cacheReuse !== null && Number(cacheReuse) > 0) args.push('--cache-reuse', String(cacheReuse));
+
+      const slotSavePath = body.slotSavePath !== undefined ? body.slotSavePath : ls.slot_save_path;
+      if (slotSavePath && typeof slotSavePath === 'string' && slotSavePath.trim()) args.push('--slot-save-path', slotSavePath.trim());
 
       const embedding = body.embedding !== undefined ? body.embedding : ls.embedding;
       if (embedding) args.push('--embedding');
 
       const parallelSlots = body.parallelSlots !== undefined ? body.parallelSlots : ls.parallel_slots;
-      if (parallelSlots && parallelSlots > 1) args.push('-np', String(parallelSlots));
+      const nSlots = (parallelSlots !== undefined && parallelSlots !== null && Number(parallelSlots) >= 1) ? Number(parallelSlots) : 1;
+      args.push('-np', String(nSlots));
 
       const customArgs = body.customArgs !== undefined ? body.customArgs : ls.custom_args;
       if (customArgs && typeof customArgs === 'string' && customArgs.trim()) {

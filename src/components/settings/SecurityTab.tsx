@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, KeyRound, Lock, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Shield, KeyRound, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
 import * as api from '../../services/api';
 
 export const SecurityTab: React.FC = () => {
@@ -31,7 +31,7 @@ export const SecurityTab: React.FC = () => {
     try {
       const res = await api.change_password(currentPassword, newPassword.trim());
       if (res.success) {
-        setStatusMsg({ type: 'success', text: 'Мастер-пароль успешно изменён! Сессия обновлена.' });
+        setStatusMsg({ type: 'success', text: 'Мастер-пароль успешно изменён!' });
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
@@ -51,188 +51,143 @@ export const SecurityTab: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-3xl flex flex-col gap-6 font-sans text-slate-100">
+    <div className="w-full max-w-3xl flex flex-col gap-4 font-sans text-[var(--theme-text)]">
       
       {/* Header Banner */}
-      <div className="flex items-center gap-3 p-4 rounded-xl glass-panel border border-[var(--theme-border)]">
-        <div className="w-10 h-10 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-          <Shield size={20} />
+      <div className="flex items-center gap-3 p-4 rounded-xl bento-card">
+        <div className="w-9 h-9 rounded-lg bg-white/5 border border-[var(--theme-border)] flex items-center justify-center text-[var(--theme-text-muted)]">
+          <Shield size={18} />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-white">Защита Локальной Сети (LAN) и Сессий</h3>
-          <p className="text-xs text-slate-400">Настройки доступа к веб-интерфейсу 0xAgent и рабочей станции PC.</p>
+          <h3 className="text-xs font-semibold text-[var(--theme-text)]">Защита LAN и авторизация</h3>
+          <p className="text-xs text-[var(--theme-text-muted)]">Безопасность доступа к веб-интерфейсу 0xAgent.</p>
         </div>
       </div>
 
       {/* Security Status Badges */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div className="p-3.5 rounded-lg glass-panel border border-[var(--theme-border)] flex items-center gap-3">
-          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+        <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
+          <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <div>
-            <div className="text-xs font-semibold text-white">PBKDF2 Хеширование</div>
-            <div className="text-[11px] text-slate-400">100 000 итераций SHA-256 с уникальной солью</div>
+            <div className="text-xs font-medium text-[var(--theme-text)]">PBKDF2 Хеширование</div>
+            <div className="text-[11px] text-[var(--theme-text-muted)]">100 000 итераций SHA-256</div>
           </div>
         </div>
 
-        <div className="p-3.5 rounded-lg glass-panel border border-[var(--theme-border)] flex items-center gap-3">
-          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+        <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
+          <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <div>
-            <div className="text-xs font-semibold text-white">Защита от Брутфорса</div>
-            <div className="text-[11px] text-slate-400">Максимум 5 попыток, блокировка на 15 минут</div>
+            <div className="text-xs font-medium text-[var(--theme-text)]">Защита от брутфорса</div>
+            <div className="text-[11px] text-[var(--theme-text-muted)]">Ограничение попыток ввода</div>
           </div>
         </div>
 
-        <div className="p-3.5 rounded-lg glass-panel border border-[var(--theme-border)] flex items-center gap-3">
-          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+        <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
+          <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <div>
-            <div className="text-xs font-semibold text-white">Авторизация WebSocket</div>
-            <div className="text-[11px] text-slate-400">Канал обмена сообщениями с ПК защищён токеном</div>
+            <div className="text-xs font-medium text-[var(--theme-text)]">Авторизация WebSocket</div>
+            <div className="text-[11px] text-[var(--theme-text-muted)]">Канал обмена данными защищён</div>
           </div>
         </div>
 
-        <div className="p-3.5 rounded-lg glass-panel border border-[var(--theme-border)] flex items-center gap-3">
-          <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+        <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
+          <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <div>
-            <div className="text-xs font-semibold text-white">Изоляция REST API</div>
-            <div className="text-[11px] text-slate-400">Все конечные точки требуют Bearer токен</div>
+            <div className="text-xs font-medium text-[var(--theme-text)]">Изоляция REST API</div>
+            <div className="text-[11px] text-[var(--theme-text-muted)]">Bearer токен аутентификация</div>
           </div>
         </div>
       </div>
 
-      {/* AGENT CAPABILITIES & SAFETY SWITCHES */}
-      <div className="p-5 rounded-xl glass-panel border border-[var(--theme-border)] flex flex-col gap-4">
-        <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-          <Shield size={16} className="text-sky-400" />
-          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Управление Ограничениями и Режимами Агента</h4>
+      {/* Password Change Form */}
+      <div className="p-4 rounded-xl bento-card flex flex-col gap-3">
+        <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-2 text-xs font-medium text-[var(--theme-text)]">
+          <KeyRound size={14} className="text-[var(--theme-text-muted)]" />
+          <span>Смена мастер-пароля</span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-          {/* 1. System Protection Switch */}
-          <div className="p-3 rounded-lg bg-slate-900/60 border border-emerald-500/30 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-emerald-300 flex items-center gap-1.5">
-                <CheckCircle2 size={14} className="text-emerald-400" />
-                Защита System32 & Команд
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Автоблокировка System32 и деструктивных команд</div>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">АКТИВНА</span>
+        {statusMsg && (
+          <div
+            className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+              statusMsg.type === 'success'
+                ? 'bg-white/10 border-[var(--theme-border)] text-[var(--theme-text)]'
+                : 'bg-white/5 border-rose-500/40 text-rose-300'
+            }`}
+          >
+            {statusMsg.type === 'success' ? (
+              <CheckCircle2 size={14} className="shrink-0" />
+            ) : (
+              <AlertTriangle size={14} className="shrink-0" />
+            )}
+            <span>{statusMsg.text}</span>
           </div>
+        )}
 
-          {/* 2. Web Search Switch */}
-          <div className="p-3 rounded-lg bg-slate-900/60 border border-white/10 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-slate-200">Интернет-Поиск (SearXNG/DDG)</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Разрешить агенту искать инфу в сети</div>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40">РАЗРЕШЁН</span>
-          </div>
-
-          {/* 3. Reasoning Switch */}
-          <div className="p-3 rounded-lg bg-slate-900/60 border border-white/10 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-slate-200">Режим Размышления (&lt;think&gt;)</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Выводить цепочку рассуждений модели</div>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold border border-indigo-500/40">ВКЛЮЧЁН</span>
-          </div>
-
-          {/* 4. Tools Execution Switch */}
-          <div className="p-3 rounded-lg bg-slate-900/60 border border-white/10 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-semibold text-slate-200">Модификация Файлов (Tools)</div>
-              <div className="text-[11px] text-slate-400 mt-0.5">Разрешить вызов write/patch/execute</div>
-            </div>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/40">РАЗРЕШЁН</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Status Alert Notification */}
-      {statusMsg && (
-        <div
-          className={`p-3 rounded-lg border text-xs flex items-center gap-2 ${
-            statusMsg.type === 'success'
-              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
-              : 'bg-rose-500/15 border-rose-500/30 text-rose-300'
-          }`}
-        >
-          {statusMsg.type === 'success' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
-          <span>{statusMsg.text}</span>
-        </div>
-      )}
-
-      {/* Change Password Form */}
-      <div className="p-5 rounded-xl glass-panel border border-[var(--theme-border)] flex flex-col gap-4">
-        <div className="flex items-center gap-2 border-b border-white/10 pb-3">
-          <KeyRound size={16} className="text-amber-400" />
-          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Смена Мастер-Пароля</h4>
-        </div>
-
-        <form onSubmit={handleChangePassword} className="flex flex-col gap-3.5">
-          <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1">Текущий Мастер-Пароль</label>
+        <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-[var(--theme-text-muted)]">Текущий пароль</label>
             <input
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Введите текущий пароль"
-              className="w-full px-3 py-2 rounded-lg bg-slate-900/80 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-500"
+              placeholder="••••••••"
+              className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none"
               required
             />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Новый Пароль</label>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-[var(--theme-text-muted)]">Новый пароль</label>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Минимум 4 символа"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/80 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-500"
+                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none"
                 required
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Подтвердите Новый Пароль</label>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-[var(--theme-text-muted)]">Повторите новый пароль</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Повторите новый пароль"
-                className="w-full px-3 py-2 rounded-lg bg-slate-900/80 border border-white/15 text-xs text-white focus:outline-none focus:border-emerald-500"
+                placeholder="••••••••"
+                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none"
                 required
               />
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="self-start mt-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-2 cursor-pointer transition-all disabled:opacity-50"
-          >
-            <Lock size={14} />
-            <span>Сохранить Новый Пароль</span>
-          </button>
+          <div className="flex justify-end pt-1">
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {isSubmitting ? 'Сохранение...' : 'Обновить пароль'}
+            </button>
+          </div>
         </form>
       </div>
 
-      {/* Active Session Logout Box */}
-      <div className="p-4 rounded-xl glass-panel border border-[var(--theme-border)] flex items-center justify-between">
+      {/* Logout Session */}
+      <div className="p-4 rounded-xl bento-card flex items-center justify-between">
         <div>
-          <div className="text-xs font-semibold text-white">Выход из активной сессии</div>
-          <div className="text-[11px] text-slate-400">Сбросить текущий токен авторизации в этом браузере.</div>
+          <div className="text-xs font-medium text-[var(--theme-text)]">Завершить сеанс</div>
+          <div className="text-[11px] text-[var(--theme-text-muted)]">Сброс токена авторизации в браузере</div>
         </div>
 
         <button
           type="button"
           onClick={handleLogout}
-          className="px-3.5 py-2 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 text-xs font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors"
         >
-          <LogOut size={14} />
-          <span>Заблокировать и Выйти</span>
+          <LogOut size={13} />
+          <span>Выйти</span>
         </button>
       </div>
 

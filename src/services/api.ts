@@ -399,6 +399,12 @@ export async function get_server_logs(): Promise<{ logs: string[]; logFilePath: 
   return res.json();
 }
 
+export async function get_lan_info(): Promise<{ urls: string[] }> {
+  const res = await authFetch(`${API_BASE}/get-local-ips`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function get_personas(): Promise<PersonaMetadata[]> {
   const res = await authFetch(`${API_BASE}/personas`);
   if (!res.ok) throw new Error(await res.text());

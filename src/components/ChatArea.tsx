@@ -4,31 +4,17 @@ import {
   Sparkles,
   Zap,
   Cpu,
-  Play,
-  AlertCircle,
-  Plus,
-  Folder,
   Layers,
-  X,
-  Code,
-  ShieldAlert,
-  RefreshCw,
-  MessageSquare,
-  Code2,
-  Tv,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata } from '../types';
-import { cleanContent, getWorkspaceBaseName } from '../utils/helpers';
+import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
 import { MaterialIcon } from './common/MaterialIcon';
-import { AsciiArt } from './common/AsciiArt';
-import { PersonaChatSelector } from './chat/PersonaChatSelector';
-import {
-  ASCII_HERO_LOGO,
-  THINKING_BRAIN_FRAMES,
-  TOOL_EXECUTION_FRAMES,
-} from '../utils/asciiAnimations';
+import { AsciiCanvasEngine } from './common/AsciiCanvasEngine';
+import { FloatingCommandBar } from './chat/FloatingCommandBar';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -50,8 +36,6 @@ interface ChatAreaProps {
   modelName?: string;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
-  chatMode?: 'agent' | 'simple';
-  onToggleChatMode?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -65,22 +49,18 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   liveTelemetry,
   planningMode = true,
   onTogglePlanningMode,
-  isServerOffline = false,
-  onStartServer,
-  workspaceDir,
-  onSelectWorkspace,
-  modelName,
+  isServerOffline: _isServerOffline = false,
+  onStartServer: _onStartServer,
+  workspaceDir: _workspaceDir,
+  onSelectWorkspace: _onSelectWorkspace,
+  modelName: _modelName,
   config,
-  onModelChanged: _onModelChanged,
-  chatMode = 'agent',
-  onToggleChatMode,
+  onModelChanged,
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-  const [showAsciiArtLogo, setShowAsciiArtLogo] = useState<boolean>(true);
-  const imageFileInputRef = useRef<HTMLInputElement>(null);
 
   const historyEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -92,24 +72,48 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  // Summarization WebSocket events state
+  // Summarization state
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [summarizePhase, setSummarizePhase] = useState('Инициализация фоновой суммаризации...');
+  const [summarizePhase, setSummarizePhase] = useState('Инициализация суммаризации...');
   const [summarizePercent, setSummarizePercent] = useState(0);
   const [summarizeMetrics, setSummarizeMetrics] = useState<{ oldTokens?: number; newTokens?: number }>({});
 
-  // Active persona in chat
+  // Personas
+  const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersona, setActivePersona] = useState<PersonaMetadata | null>(null);
 
-  const activeModelId = config?.model_name || modelName || 'gemini-3.6-flash';
-  const isLocalModelActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
-  const showOfflineBanner = isServerOffline && isLocalModelActive;
+  // Live thinking timer state
+  const [thinkingSeconds, setThinkingSeconds] = useState(0);
+
+  useEffect(() => {
+    let timer: any = null;
+    if (agentStatus === 'thinking' || agentStatus === 'executing_tool') {
+      const startTime = Date.now();
+      timer = setInterval(() => {
+        setThinkingSeconds((Date.now() - startTime) / 1000);
+      }, 100);
+    } else {
+      setThinkingSeconds(0);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [agentStatus]);
+
+  // Load personas list for quick switching
+  useEffect(() => {
+    api.get_personas().then((list) => {
+      setPersonas(list);
+      const active = list.find((p) => (config?.active_persona_id ? p.id === config.active_persona_id : p.is_active)) || list[0];
+      if (active) setActivePersona(active);
+    }).catch((err) => console.error('Failed to load personas in ChatArea:', err));
+  }, [config?.active_persona_id]);
 
   useEffect(() => {
     const u1 = api.listen<{ promptTokens: number; estimatedNewTokens: number }>('agent-summarizing-start', (e) => {
       setIsSummarizing(true);
       setSummarizePercent(15);
-      setSummarizePhase('Инициализация фоновой LLM-суммаризации...');
+      setSummarizePhase('Инициализация сжатия контекста...');
       setSummarizeMetrics({ oldTokens: e.payload.promptTokens });
     });
 
@@ -121,7 +125,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     let sumTimer: any = null;
     const u3 = api.listen<{ oldTokens: number; newTokens: number; summary: string }>('agent-summarizing-end', (e) => {
       setSummarizePercent(100);
-      setSummarizePhase('Контекст успешно сжат!');
+      setSummarizePhase('Контекст успешно оптимизирован!');
       setSummarizeMetrics({ oldTokens: e.payload.oldTokens, newTokens: e.payload.newTokens });
       sumTimer = setTimeout(() => {
         setIsSummarizing(false);
@@ -139,7 +143,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleChatScroll = () => {
     if (!chatContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
-    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 120;
     isUserScrolledUpRef.current = !isAtBottom;
   };
 
@@ -209,7 +213,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     setAttachedImages([]);
   };
 
-  const handleMicClick = async () => {
+  const handleSelectPersona = async (personaId: string) => {
+    const p = personas.find((item) => item.id === personaId);
+    if (!p) return;
+    try {
+      await api.activate_persona(p.id);
+      setActivePersona(p);
+      showToast(`Персона: ${p.name}`, 'success');
+    } catch (err: any) {
+      showToast(`Ошибка смены персоны: ${err.message || err}`, 'error');
+    }
+  };
+
+  const handleMicToggle = async () => {
     if (isRecording) {
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
@@ -246,7 +262,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           const keyToUse = groqApiKey || '';
           if (!keyToUse) {
-            showToast('Укажите Groq API Key в Настройках для использования распознавания речи Whisper', 'error');
+            showToast('Укажите Groq API Key в Настройках для распознавания речи', 'error');
             return;
           }
 
@@ -255,10 +271,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             const transcribedText = await api.transcribe_audio(base64Audio, keyToUse);
             if (transcribedText.trim()) {
               setInputText((prev) => (prev ? `${prev} ${transcribedText}` : transcribedText));
-              showToast('Речь успешно распознана!', 'success');
+              showToast('Речь распознана', 'success');
             }
           } catch (err: any) {
-            console.error('STT Transcription error:', err);
             showToast(`Ошибка распознавания речи: ${err.message || err}`, 'error');
           } finally {
             setIsTranscribing(false);
@@ -269,102 +284,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       mediaRecorder.start();
       setIsRecording(true);
-    } catch (err: any) {
-      console.error('Microphone access error:', err);
+    } catch (err) {
       showToast('Не удалось получить доступ к микрофону', 'error');
     }
   };
 
+  const extractThinkingFromContent = (raw: string) => {
+    const match = raw.match(/<think>([\s\S]*?)<\/think>/i);
+    if (match) {
+      return {
+        thinking: match[1].trim(),
+        text: raw.replace(/<think>[\s\S]*?<\/think>/i, '').trim(),
+      };
+    }
+    const unclosed = raw.match(/<think>([\s\S]*)$/i);
+    if (unclosed) {
+      return {
+        thinking: unclosed[1].trim(),
+        text: '',
+      };
+    }
+    return { thinking: '', text: raw };
+  };
+
   const hasMessages = messages.length > 0;
-
-  const renderAttachedImagesPreview = () => {
-    if (attachedImages.length === 0) return null;
-    return (
-      <div className="flex flex-wrap gap-2 p-2 bg-slate-950/60 rounded-lg border border-white/10 max-h-32 overflow-y-auto">
-        {attachedImages.map((img, idx) => (
-          <div key={idx} className="relative group shrink-0">
-            <img
-              src={img}
-              alt={`Прикрепленное изображение ${idx + 1}`}
-              className="w-14 h-14 object-cover rounded-md border border-white/20"
-            />
-            <button
-              type="button"
-              onClick={() => handleRemoveImage(idx)}
-              className="absolute -top-1.5 -right-1.5 p-0.5 rounded-full bg-rose-500 text-white shadow hover:bg-rose-600 cursor-pointer"
-            >
-              <X size={10} />
-            </button>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  const renderStreamingBanner = () => {
-    if (!liveTelemetry || (agentStatus !== 'thinking' && agentStatus !== 'executing_tool')) return null;
-    return (
-      <div className="p-3 rounded-xl bg-slate-900/90 border border-sky-500/30 text-xs font-mono text-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg my-2">
-        <div className="flex items-center gap-2">
-          <RefreshCw size={14} className="animate-spin text-sky-400 shrink-0" />
-          <span className="text-sky-300 font-semibold">
-            {agentStatus === 'executing_tool' ? 'Выполнение действий агента...' : 'Генерация ответа ИИ...'}
-          </span>
-        </div>
-
-        {/* ASCII Tool Pipeline Animation if executing */}
-        {agentStatus === 'executing_tool' && (
-          <div className="hidden sm:block">
-            <AsciiArt frames={TOOL_EXECUTION_FRAMES} fps={3} color="amber" />
-          </div>
-        )}
-
-        <div className="flex items-center gap-3 text-[10px] text-theme-muted">
-          {liveTelemetry.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <Zap size={11} />
-              <span>{liveTelemetry.tokensPerSec} t/s</span>
-            </span>
-          )}
-          {liveTelemetry.contextUsed !== undefined && (
-            <span className="text-sky-300 flex items-center gap-1">
-              <MaterialIcon name="psychology" size={12} />
-              <span>{liveTelemetry.contextUsed.toLocaleString()} tok</span>
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  const renderSummarizingBanner = () => {
-    if (!isSummarizing) return null;
-    return (
-      <div className="p-3 rounded-xl bg-purple-950/80 border border-purple-500/40 text-xs font-mono text-purple-200 flex flex-col gap-1.5 shadow-lg my-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles size={14} className="animate-spin text-purple-400" />
-            <span className="font-bold text-purple-300">{summarizePhase}</span>
-          </div>
-          <span className="text-[10px] font-bold text-purple-400">{summarizePercent}%</span>
-        </div>
-        <div className="w-full h-1.5 rounded-full bg-purple-900/60 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-purple-500 to-fuchsia-400 transition-all duration-300"
-            style={{ width: `${summarizePercent}%` }}
-          />
-        </div>
-        {summarizeMetrics.oldTokens && (
-          <div className="text-[10px] text-purple-300/80 flex items-center justify-between">
-            <span>Сжатие контекста: {summarizeMetrics.oldTokens.toLocaleString()} токенов</span>
-            {summarizeMetrics.newTokens && (
-              <span className="text-emerald-400 font-bold">➔ {summarizeMetrics.newTokens.toLocaleString()} токенов</span>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <div
@@ -373,596 +316,268 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       onDrop={handleDrop}
       onPaste={handlePaste}
       className={`w-full h-full flex flex-col overflow-hidden relative font-sans ${
-        isDraggingOver ? 'bg-sky-500/5 ring-2 ring-sky-500/40 ring-inset' : ''
+        isDraggingOver ? 'ring-1 ring-[var(--theme-border)] ring-inset' : ''
       }`}
     >
-      <input
-        ref={imageFileInputRef}
-        type="file"
-        accept="image/*"
-        multiple
-        className="hidden"
-        onChange={(e) => e.target.files && processImageFiles(e.target.files)}
-      />
-
-      {/* TOP HEADER CONTROLS BAR (MODE SWITCHER & PERSONA SELECTOR) */}
-      <div className="px-3 py-1.5 bg-theme-panel/80 border-b border-theme-border flex items-center justify-between select-none z-10 shrink-0 backdrop-blur-md">
-        
-        {/* Left: Mode Switcher (IDE Agent vs Simple Chat) */}
-        <div className="flex items-center gap-2">
-          {onToggleChatMode && (
-            <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-white/10">
-              <button
-                type="button"
-                onClick={() => chatMode !== 'agent' && onToggleChatMode()}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  chatMode === 'agent'
-                    ? 'bg-sky-500/20 text-sky-200 border border-sky-500/40 shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-                title="Автономный агент разработки проектов с доступом к файлам и терминалу"
-              >
-                <Code2 size={13} className="text-sky-400" />
-                <span>IDE Agent</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => chatMode !== 'simple' && onToggleChatMode()}
-                className={`px-2.5 py-1 rounded-md text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                  chatMode === 'simple'
-                    ? 'bg-purple-500/20 text-purple-200 border border-purple-500/40 shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-white/5'
-                }`}
-                title="Простой диалоговый чат с возможностью смены личности"
-              >
-                <MessageSquare size={13} className="text-purple-400" />
-                <span>Simple Chat</span>
-              </button>
-            </div>
-          )}
-
-          {/* Quick Persona Picker (Always available, highlighted in Simple Chat) */}
-          <PersonaChatSelector
-            activePersonaId={config?.active_persona_id}
-            onPersonaChanged={(p) => setActivePersona(p)}
-            compact={chatMode === 'agent'}
-          />
-        </div>
-
-        {/* Right: Workspace badge or ASCII toggle */}
-        <div className="flex items-center gap-2">
-          {chatMode === 'agent' && onSelectWorkspace && (
-            <button
-              type="button"
-              onClick={onSelectWorkspace}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/10 hover:border-white/20 text-[11px] text-slate-300 transition-colors cursor-pointer"
-              title={workspaceDir || 'Выбрать рабочую папку'}
-            >
-              <Folder size={12} className="text-emerald-400" />
-              <span className="font-mono text-[11px] truncate max-w-[120px]">
-                {getWorkspaceBaseName(workspaceDir)}
-              </span>
-            </button>
-          )}
-
-          {!hasMessages && (
-            <button
-              type="button"
-              onClick={() => setShowAsciiArtLogo(!showAsciiArtLogo)}
-              className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-all cursor-pointer ${
-                showAsciiArtLogo
-                  ? 'bg-sky-500/15 border-sky-500/40 text-sky-300'
-                  : 'bg-white/[0.03] border-white/10 text-slate-400 hover:text-white'
-              }`}
-              title="Переключить анимацию ASCII-логотипа"
-            >
-              <Tv size={13} />
-              <span className="text-[10px] font-mono hidden md:inline">ASCII HUD</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* OFFLINE LOCAL SERVER WARNING BANNER */}
-      {showOfflineBanner && (
-        <div className="p-2.5 bg-rose-950/80 border-b border-rose-500/30 text-xs text-rose-200 flex items-center justify-between gap-3 shrink-0 z-20">
-          <div className="flex items-center gap-2">
-            <AlertCircle size={15} className="text-rose-400 shrink-0" />
-            <span>Локальный ИИ-сервер llama.cpp не запущен для модели <code className="font-mono text-white bg-black/40 px-1 py-0.5 rounded">{activeModelId}</code></span>
-          </div>
-          {onStartServer && (
-            <button
-              type="button"
-              onClick={onStartServer}
-              className="flat-btn px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-semibold cursor-pointer flex items-center gap-1 text-xs shrink-0"
-            >
-              <Play size={11} />
-              <span>Запустить сервер</span>
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* 1. EMPTY CHAT STATE */}
+      {/* 1. EMPTY CHAT STATE: CLEAN FLOATING ASCII HERO */}
       {!hasMessages && (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto scrollbar-none">
-          <div className="w-full max-w-2xl space-y-5 text-center">
-            
-            {/* Dynamic ASCII Waves Hero Art or Standard Glass Icon */}
-            {showAsciiArtLogo ? (
-              <div className="flex flex-col items-center justify-center">
-                <div className="p-3 rounded-2xl glass-card border border-sky-500/30 shadow-2xl bg-black/60 overflow-x-auto max-w-full">
-                  <AsciiArt
-                    frames={ASCII_HERO_LOGO}
-                    fps={2}
-                    color="accent"
-                    interactive
-                    className="text-[10px] sm:text-xs font-bold leading-none select-none text-sky-400"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="inline-flex items-center justify-center p-3.5 rounded-2xl bg-gradient-to-tr from-sky-500/20 to-purple-500/20 border border-white/15 shadow-xl backdrop-blur-xl">
-                  <Sparkles size={28} className="text-sky-400 animate-pulse" />
-                </div>
-                <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-                  0xAgent <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-purple-400">Developer IDE</span>
-                </h1>
-              </div>
-            )}
-
-            <p className="text-xs sm:text-sm text-slate-400 max-w-lg mx-auto leading-relaxed">
-              {chatMode === 'agent'
-                ? 'Автономный локальный ИИ-разработчик. Создание, рефакторинг и аудит проектов через локальные .gguf модели и API.'
-                : 'Диалоговый режим общения с ИИ. Выберите подходящую личность (Persona) и задавайте любые вопросы.'}
-            </p>
-
-            {/* Active Persona Badge in Simple Chat Mode */}
-            {chatMode === 'simple' && activePersona && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/30 text-xs text-purple-300 font-mono">
-                <Sparkles size={13} className="text-purple-400" />
-                <span>Активная личность: <strong className="text-white">{activePersona.name}</strong></span>
-              </div>
-            )}
-
-            {/* Quick Action Prompt Suggestion Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-left max-w-xl mx-auto pt-1">
-              {chatMode === 'agent' ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setInputText('Создай новое веб-приложение React с современным стеклом и анимациями.')}
-                    className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-sky-500/40 hover:bg-sky-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
-                  >
-                    <Code size={16} className="text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="font-semibold text-slate-100">Создать веб-приложение</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">Разработка React UI с компонентами и анимациями</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setInputText('Проведи аудит безопасности и найди баги в активном проекте.')}
-                    className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
-                  >
-                    <ShieldAlert size={16} className="text-purple-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="font-semibold text-slate-100">Поиск и исправление багов</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">Анализ кода, типов и архитектурных узких мест</div>
-                    </div>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setInputText('Привет! Расскажи о своем опыте и чем ты можешь мне помочь?')}
-                    className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
-                  >
-                    <Sparkles size={16} className="text-purple-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="font-semibold text-slate-100">Знакомство с Личностью</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">Диалог согласно характеру в SOUL.md</div>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setInputText('Объясни сложную концепцию простыми словами с жизненными аналогиями.')}
-                    className="p-3 rounded-xl bg-white/[0.03] border border-white/10 hover:border-sky-500/40 hover:bg-sky-500/5 transition-all text-xs text-slate-300 hover:text-white flex items-start gap-2.5 cursor-pointer group"
-                  >
-                    <Zap size={16} className="text-sky-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
-                    <div>
-                      <div className="font-semibold text-slate-100">Глубокое объяснение</div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">Разбор концепций, идей и алгоритмов</div>
-                    </div>
-                  </button>
-                </>
-              )}
+          <div className="w-full max-w-2xl space-y-6 text-center">
+            {/* Transparent Floating ASCII Animation */}
+            <div className="flex flex-col items-center justify-center select-none pointer-events-auto">
+              <AsciiCanvasEngine
+                effect="hero_wave"
+                fps={60}
+                color="platinum"
+                fontSize={11}
+                interactive
+              />
             </div>
 
-            {/* Input Form Box */}
+            {/* Bottom Floating Command Bar for Empty State */}
             <div className="pt-2 w-full max-w-xl mx-auto">
-              <form onSubmit={handleSubmit} className="w-full">
-                <div className="rounded-2xl glass-card p-3 focus-within:border-[var(--theme-accent)]/50 transition-all flex flex-col gap-2 shadow-2xl">
-                  {renderAttachedImagesPreview()}
-
-                  <textarea
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSubmit(e);
-                      }
-                    }}
-                    placeholder={chatMode === 'agent' ? 'Опишите задачу для ИИ-разработчика...' : 'Напишите сообщение...'}
-                    rows={2}
-                    className="w-full p-1 bg-transparent text-sm text-slate-100 placeholder-slate-500 focus:outline-none resize-none leading-relaxed font-sans"
-                  />
-
-                  <div className="flex items-center justify-between gap-2 border-t border-white/5 pt-2">
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => imageFileInputRef.current?.click()}
-                        className="p-1.5 rounded-full text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
-                        title="Прикрепить изображение"
-                      >
-                        <Plus size={18} />
-                      </button>
-
-                      {chatMode === 'agent' && onTogglePlanningMode && (
-                        <button
-                          type="button"
-                          onClick={onTogglePlanningMode}
-                          className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                            planningMode
-                              ? 'bg-[var(--theme-accent)]/20 text-theme-accent border border-[var(--theme-accent)]/40'
-                              : 'bg-white/5 text-theme-muted hover:text-theme-text border border-transparent'
-                          }`}
-                        >
-                          <MaterialIcon name="psychology" size={16} />
-                          <span>Размышление</span>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleMicClick}
-                        className={`p-2 rounded-full transition-colors cursor-pointer ${
-                          isRecording ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'text-theme-muted hover:text-theme-text hover:bg-white/5'
-                        }`}
-                        title="Голосовой ввод"
-                      >
-                        {isRecording ? <MaterialIcon name="stop" size={18} /> : <MaterialIcon name="mic" size={18} />}
-                      </button>
-
-                      <button
-                        type="submit"
-                        disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
-                        className="w-8 h-8 rounded-full btn-primary flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow cursor-pointer shrink-0"
-                        title="Отправить"
-                      >
-                        <MaterialIcon name="send" size={16} className="translate-x-[0.5px]" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </form>
+              <FloatingCommandBar
+                inputText={inputText}
+                setInputText={setInputText}
+                onSubmit={handleSubmit}
+                agentStatus={agentStatus}
+                onCancelAgent={onCancelAgent}
+                planningMode={planningMode}
+                onTogglePlanningMode={onTogglePlanningMode}
+                personas={personas}
+                activePersonaId={activePersona?.id || 'default'}
+                onSelectPersona={handleSelectPersona}
+                attachedImages={attachedImages}
+                onAttachImages={(imgs) => setAttachedImages(imgs)}
+                onRemoveImage={handleRemoveImage}
+                isRecording={isRecording}
+                onToggleRecording={handleMicToggle}
+                isTranscribing={isTranscribing}
+                config={config}
+                onModelChanged={onModelChanged}
+              />
             </div>
-
           </div>
         </div>
       )}
 
-      {/* 2. MAIN CHAT HISTORY LIST */}
+      {/* 2. ACTIVE CHAT MESSAGES STREAM */}
       {hasMessages && (
-        <div className="flex-grow flex flex-col justify-between overflow-hidden relative w-full max-w-4xl mx-auto select-text">
-          
+        <>
+          {/* Background Context Compression Banner */}
+          {isSummarizing && (
+            <div className="px-4 py-2.5 bg-black/40 border-b border-[var(--theme-border)] shrink-0 flex items-center justify-between text-xs z-10 backdrop-blur-md animate-fadeIn">
+              <div className="flex items-center gap-2 font-mono">
+                <Sparkles size={14} className="animate-spin text-[var(--theme-text-muted)]" />
+                <span className="font-semibold text-[var(--theme-text)]">{summarizePhase}</span>
+                {summarizeMetrics.oldTokens && (
+                  <span className="text-[var(--theme-text-muted)] text-[11px] hidden sm:inline">
+                    ({summarizeMetrics.oldTokens.toLocaleString()} токенов)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 w-32">
+                <div className="flex-1 bg-white/10 h-1.5 rounded-full overflow-hidden">
+                  <div
+                    className="bg-white h-full transition-all duration-300 rounded-full"
+                    style={{ width: `${summarizePercent}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">{summarizePercent}%</span>
+              </div>
+            </div>
+          )}
+
+          {/* Messages Scroll Area */}
           <div
             ref={chatContainerRef}
             onScroll={handleChatScroll}
-            className="flex-grow overflow-y-auto p-4 space-y-4 scrollbar-none flex flex-col min-h-0 select-text"
+            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 select-text scrollbar-thin"
           >
-            {messages.map((msg) => {
-              const textOutput = cleanContent(msg.content);
+            {messages.map((msg, index) => {
+              const isUser = msg.role === 'user';
+              const isSystem = msg.role === 'system';
+
+              if (isSystem) {
+                return (
+                  <div key={index} className="flex justify-center my-2">
+                    <div className="px-3 py-1 rounded-lg bento-card text-[11px] text-[var(--theme-text-muted)] font-mono flex items-center gap-1.5">
+                      <Terminal size={12} />
+                      <span>{msg.content}</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              const { thinking, text } = !isUser ? extractThinkingFromContent(msg.content) : { thinking: '', text: msg.content };
+
               return (
-                <div key={msg.id} className="flex flex-col space-y-1 w-full select-text">
-                  {msg.role === 'user' && (
-                    <div className="self-end max-w-[80%] rounded-2xl glass-card px-4 py-2.5 text-theme-text text-sm font-sans select-text shadow-sm flex flex-col gap-2">
-                      {msg.images && msg.images.length > 0 && (
-                        <div className="flex flex-wrap gap-2 my-1">
-                          {msg.images.map((imgUrl, i) => (
-                            <img
-                              key={i}
-                              src={imgUrl}
-                              alt={`Прикрепленное изображение ${i + 1}`}
-                              className="max-w-[240px] max-h-[180px] rounded-lg border border-white/20 object-contain bg-slate-950/60 shadow-md"
-                            />
-                          ))}
-                        </div>
+                <div
+                  key={index}
+                  className={`flex gap-3 max-w-4xl mx-auto ${isUser ? 'justify-end' : 'justify-start'}`}
+                >
+                  {!isUser && (
+                    <div className="w-7 h-7 rounded-lg bento-card flex items-center justify-center shrink-0 mt-0.5 text-[var(--theme-text)]">
+                      {activePersona ? (
+                        <MaterialIcon name={activePersona.icon || 'smart_toy'} size={15} />
+                      ) : (
+                        <MaterialIcon name="smart_toy" size={15} />
                       )}
-                      {msg.content && <div className="whitespace-pre-wrap">{msg.content}</div>}
                     </div>
                   )}
 
-                  {msg.role === 'tool' && (
-                    <div className="self-start max-w-[95%] w-full rounded-xl border border-white/10 p-3 bg-black/60 text-slate-300 font-mono text-xs max-h-40 overflow-y-auto whitespace-pre-wrap my-1 select-text">
-                      <div className="text-[10px] text-slate-400 font-medium uppercase tracking-wider mb-1 flex items-center gap-1 font-sans">
-                        <Terminal size={10} />
-                        <span>Результат выполнения инструмента</span>
-                      </div>
-                      {msg.content}
-                    </div>
-                  )}
-
-                  {msg.role === 'assistant' && (() => {
-                    let thinkText = '';
-                    let bodyText = textOutput;
-
-                    if (textOutput) {
-                      // 1. Standard <think>...</think> or <thought>...</thought> (closed)
-                      const thinkRegex = /<(?:think|thought)>([\s\S]*?)<\/(?:think|thought)>/i;
-                      const match = textOutput.match(thinkRegex);
-                      if (match) {
-                        thinkText = match[1].trim();
-                        bodyText = textOutput.replace(thinkRegex, '').trim();
-                      }
-                      // 2. Gemma 4 <|channel>thought...<channel|> (closed)
-                      else {
-                        const gemmaThinkRegex = /<\|?channel\|?thought([\s\S]*?)<\|?channel\|?>/i;
-                        const gemmaMatch = textOutput.match(gemmaThinkRegex);
-                        if (gemmaMatch) {
-                          thinkText = gemmaMatch[1].trim();
-                          bodyText = textOutput.replace(gemmaThinkRegex, '').trim();
-                        }
-                        // 3. Standard <think> or <thought> (unclosed / streaming)
-                        else {
-                          const openMatch = textOutput.match(/<(?:think|thought)>/i);
-                          if (openMatch && openMatch.index !== undefined) {
-                            const startIdx = openMatch.index;
-                            thinkText = textOutput.substring(startIdx + openMatch[0].length).trim();
-                            bodyText = textOutput.substring(0, startIdx).trim();
-                          }
-                          // 4. Gemma 4 <|channel>thought (unclosed / streaming)
-                          else {
-                            const gemmaOpenMatch = textOutput.match(/<\|?channel\|?thought/i);
-                            if (gemmaOpenMatch && gemmaOpenMatch.index !== undefined) {
-                              const startIdx = gemmaOpenMatch.index;
-                              thinkText = textOutput.substring(startIdx + gemmaOpenMatch[0].length).trim();
-                              bodyText = textOutput.substring(0, startIdx).trim();
-                            }
-                          }
-                        }
-                      }
-                    }
-
-                    return (
-                      <div className="self-start w-full text-slate-100 text-sm leading-relaxed my-2 select-text px-1">
-                        
-                        {/* REASONING ACCORDION WITH ANIMATED ASCII CYBER BRAIN */}
-                        {reasoningEnabled && thinkText && (
-                          <details
-                            open={agentStatus === 'thinking'}
-                            className="mb-2.5 border border-theme-border rounded-xl glass-panel overflow-hidden group shadow-md"
-                          >
-                            <summary className="px-3 py-2 text-[11px] font-medium text-theme-muted select-none cursor-pointer hover:bg-white/5 transition-colors flex items-center justify-between font-sans">
-                              <span className="flex items-center gap-2 text-sky-400 font-semibold">
-                                <MaterialIcon name="psychology" size={15} />
-                                <span>Ход мыслей (Размышление)</span>
-                                {agentStatus === 'thinking' && (
-                                  <span className="text-[10px] font-mono text-cyan-300 animate-pulse hidden sm:inline">
-                                    [ 🧠 NEURAL CORE: EVALUATING ]
-                                  </span>
-                                )}
-                              </span>
-                              <span className="text-[10px] text-theme-muted group-open:rotate-180 transition-transform">▼</span>
-                            </summary>
-
-                            <div className="p-3 border-t border-theme-border bg-black/50 space-y-2">
-                              {/* ASCII Neural Brain Animation during active thinking */}
-                              {agentStatus === 'thinking' && (
-                                <div className="p-2 rounded bg-black/60 border border-sky-500/20 flex justify-center">
-                                  <AsciiArt frames={THINKING_BRAIN_FRAMES} fps={2} color="cyan" />
-                                </div>
-                              )}
-                              <div className="font-mono text-[11px] text-theme-text/90 whitespace-pre-wrap leading-relaxed max-h-56 overflow-y-auto">
-                                {thinkText}
-                              </div>
-                            </div>
-                          </details>
-                        )}
-
-                        <NotionMarkdown content={bodyText} />
-
-                        {/* MULTI-FILE CHANGES SUMMARY BADGE */}
-                        {msg.tool_calls && msg.tool_calls.length > 1 && (() => {
-                          let totalAdds = 0;
-                          let totalDels = 0;
-                          msg.tool_calls.forEach((t) => {
-                            try {
-                              const args = JSON.parse(t.arguments);
-                              if (t.name === 'write_file' && args.content) {
-                                totalAdds += (args.content as string).split(/\r?\n/).length;
-                              } else if (t.name === 'patch_file' && args.content) {
-                                const raw = args.content as string;
-                                const s = raw.match(/<<<<<<< SEARCH([\s\S]*?)=======/g) || [];
-                                for (const m of s) totalDels += Math.max(0, m.split(/\r?\n/).length - 2);
-                                const r = raw.match(/=======([\s\S]*?)>>>>>>> REPLACE/g) || [];
-                                for (const m of r) totalAdds += Math.max(0, m.split(/\r?\n/).length - 2);
-                              }
-                            } catch {}
-                          });
-
-                          return (
-                            <div className="my-2 p-2.5 rounded-xl glass-panel flex items-center justify-between text-xs font-mono">
-                              <div className="flex items-center gap-2">
-                                <span className="font-bold text-theme-text flex items-center gap-1.5 font-sans">
-                                  <Layers size={14} className="text-amber-400" />
-                                  <span>{msg.tool_calls.length} файлов изменено</span>
-                                </span>
-                                {(totalAdds > 0 || totalDels > 0) && (
-                                  <span className="text-[11px] font-bold">
-                                    {totalAdds > 0 && <span className="text-emerald-400">+{totalAdds} </span>}
-                                    {totalDels > 0 && <span className="text-rose-400">-{totalDels}</span>}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {/* TOOL EXECUTION CARDS */}
-                        {msg.tool_calls && msg.tool_calls.map((tool) => (
-                          <ToolCard 
-                            key={tool.id} 
-                            tool={tool} 
-                            onRespond={onRespondToTool} 
+                  <div className={`space-y-2 max-w-[88%] ${isUser ? 'items-end' : 'items-start'}`}>
+                    {/* User Attached Images */}
+                    {isUser && msg.images && msg.images.length > 0 && (
+                      <div className="flex flex-wrap gap-2 justify-end mb-2">
+                        {msg.images.map((imgSrc, imgIdx) => (
+                          <img
+                            key={imgIdx}
+                            src={imgSrc}
+                            alt="Attached"
+                            className="max-h-48 rounded-lg border border-[var(--theme-border)] shadow-md object-contain"
                           />
                         ))}
+                      </div>
+                    )}
 
-                        {/* METRICS FOOTER PILL */}
-                        {msg.metrics && (
-                          <div className="mt-2 pt-2 border-t border-white/5 flex flex-wrap items-center gap-3 text-[10px] font-mono text-theme-muted select-none">
-                            {msg.metrics.tokensPerSec !== undefined && msg.metrics.tokensPerSec > 0 && (
-                              <span className="flex items-center gap-1 text-emerald-400 font-semibold">
-                                <Zap size={11} />
-                                <span>{msg.metrics.tokensPerSec} t/s</span>
-                              </span>
-                            )}
-                            {msg.metrics.contextUsed !== undefined && (
-                              <span className="flex items-center gap-1 text-theme-muted">
-                                <MaterialIcon name="psychology" size={12} />
-                                <span>Контекст: {msg.metrics.contextUsed.toLocaleString()} / {msg.metrics.contextMax?.toLocaleString()} tok</span>
-                              </span>
-                            )}
-                            {msg.metrics.modelName && (
-                              <span className="flex items-center gap-1 text-theme-muted">
-                                <Cpu size={11} />
-                                <span>{msg.metrics.modelName}</span>
-                              </span>
-                            )}
-                          </div>
+                    {/* Thinking / Reasoning Accordion Block */}
+                    {!isUser && reasoningEnabled && thinking && (
+                      <ThinkingAccordion thinking={thinking} />
+                    )}
+
+                    {/* Message Bubble */}
+                    {(text || isUser) && (
+                      <div
+                        className={`p-4 rounded-xl text-xs sm:text-sm leading-relaxed ${
+                          isUser
+                            ? 'bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] rounded-tr-sm'
+                            : 'bento-card text-[var(--theme-text)] rounded-tl-sm'
+                        }`}
+                      >
+                        {isUser ? (
+                          <div className="whitespace-pre-wrap">{text}</div>
+                        ) : (
+                          <NotionMarkdown content={cleanContent(text)} />
                         )}
                       </div>
-                    );
-                  })()}
+                    )}
+
+                    {/* Tool Calls Rendering */}
+                    {!isUser && msg.tool_calls && msg.tool_calls.length > 0 && (
+                      <div className="space-y-2 pt-1 w-full">
+                        {msg.tool_calls.map((tool) => (
+                          <ToolCard
+                            key={tool.id}
+                            tool={tool}
+                            onRespond={onRespondToTool}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               );
             })}
 
-            {/* LIVE STREAMING TELEMETRY BANNER */}
-            {renderStreamingBanner()}
+            {/* Live Thinking Status Indicator */}
+            {agentStatus === 'thinking' && (
+              <div className="flex items-center gap-3 max-w-4xl mx-auto p-3 rounded-xl bento-card animate-fadeIn">
+                <div className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center animate-spin">
+                  <Sparkles size={12} className="text-[var(--theme-text)]" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-xs font-semibold text-[var(--theme-text)] flex items-center gap-2">
+                    <span>ИИ-Агент рассуждает...</span>
+                    <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
+                      {thinkingSeconds.toFixed(1)}s
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Live Telemetry Card during Generation */}
+            {liveTelemetry && agentStatus !== 'idle' && (
+              <div className="max-w-4xl mx-auto p-2.5 rounded-xl bento-card border border-[var(--theme-border)] flex items-center justify-between text-[11px] font-mono text-[var(--theme-text-muted)]">
+                <div className="flex items-center gap-3">
+                  {liveTelemetry.tokensPerSec !== undefined && (
+                    <span className="flex items-center gap-1">
+                      <Zap size={11} />
+                      <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
+                    </span>
+                  )}
+                  {liveTelemetry.tokenCount !== undefined && (
+                    <span className="flex items-center gap-1">
+                      <Cpu size={11} />
+                      <span>{liveTelemetry.tokenCount} токенов</span>
+                    </span>
+                  )}
+                  {liveTelemetry.contextUsed !== undefined && (
+                    <span className="flex items-center gap-1 hidden sm:flex">
+                      <Layers size={11} />
+                      <span>{liveTelemetry.contextUsed} контекст</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div ref={historyEndRef} />
           </div>
 
-          {/* SUMMARIZING SCI-FI BANNER */}
-          {renderSummarizingBanner()}
-
-          {/* INPUT FORM CONTAINER */}
-          <div className="p-3 bg-theme-bg border-t border-theme-border select-none z-10 w-full flex flex-col gap-2">
-            {renderAttachedImagesPreview()}
-
-            <form onSubmit={handleSubmit} className="w-full max-w-3xl mx-auto">
-              <div className="rounded-2xl glass-card p-3 focus-within:border-[var(--theme-accent)]/50 transition-all flex flex-col gap-2 shadow-2xl">
-                
-                {/* Top Input Area: Plus Button & Textarea */}
-                <div className="flex items-start gap-2">
-                  <button
-                    type="button"
-                    onClick={() => imageFileInputRef.current?.click()}
-                    className="p-1.5 mt-0.5 rounded-full text-slate-400 hover:text-white hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-                    title="Прикрепить файл или изображение"
-                  >
-                    <Plus size={18} />
-                  </button>
-
-                  <textarea
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSubmit(e);
-                      }
-                    }}
-                    rows={1}
-                    placeholder={chatMode === 'agent' ? 'Опишите задачу для ИИ-разработчика...' : 'Напишите сообщение...'}
-                    className="w-full bg-transparent text-slate-100 placeholder-slate-500 text-sm focus:outline-none resize-none min-h-[38px] max-h-[200px] py-1.5 leading-relaxed font-sans"
-                  />
-                </div>
-
-                {/* Bottom Input Controls Bar */}
-                <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                  
-                  {/* Left Pill: Thinking / Planning Toggle */}
-                  <div className="flex items-center gap-2">
-                    {chatMode === 'agent' && onTogglePlanningMode && (
-                      <button
-                        type="button"
-                        onClick={onTogglePlanningMode}
-                        className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                          planningMode
-                            ? 'bg-[var(--theme-accent)]/20 text-theme-accent border border-[var(--theme-accent)]/40'
-                            : 'bg-white/5 text-theme-muted hover:text-theme-text border border-transparent'
-                        }`}
-                        title="Переключить режим планирования/размышления"
-                      >
-                        <MaterialIcon name="psychology" size={16} className={planningMode ? 'text-theme-accent' : 'text-theme-muted'} />
-                        <span>Размышление</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Right Actions: Mic & Submit / Stop */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleMicClick}
-                      className={`p-2 rounded-full transition-colors cursor-pointer ${
-                        isRecording ? 'bg-rose-500/20 text-rose-400 animate-pulse' : 'text-theme-muted hover:text-theme-text hover:bg-white/5'
-                      }`}
-                      title="Голосовой ввод"
-                    >
-                      {isRecording ? <MaterialIcon name="stop" size={18} /> : <MaterialIcon name="mic" size={18} />}
-                    </button>
-
-                    {agentStatus !== 'idle' && onCancelAgent ? (
-                      <button
-                        type="button"
-                        onClick={onCancelAgent}
-                        className="w-8 h-8 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center transition-colors shadow cursor-pointer shrink-0"
-                        title="Остановить генерацию"
-                      >
-                        <MaterialIcon name="stop" size={16} />
-                      </button>
-                    ) : (
-                      <button
-                        type="submit"
-                        disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
-                        className="w-8 h-8 rounded-full btn-primary flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow cursor-pointer shrink-0"
-                        title="Отправить"
-                      >
-                        <MaterialIcon name="send" size={16} className="translate-x-[0.5px]" />
-                      </button>
-                    )}
-                  </div>
-
-                </div>
-
-              </div>
-            </form>
+          {/* Bottom Floating Command Bar for Active Chat */}
+          <div className="p-3 sm:p-4 shrink-0 max-w-4xl mx-auto w-full">
+            <FloatingCommandBar
+              inputText={inputText}
+              setInputText={setInputText}
+              onSubmit={handleSubmit}
+              agentStatus={agentStatus}
+              onCancelAgent={onCancelAgent}
+              planningMode={planningMode}
+              onTogglePlanningMode={onTogglePlanningMode}
+              personas={personas}
+              activePersonaId={activePersona?.id || 'default'}
+              onSelectPersona={handleSelectPersona}
+              attachedImages={attachedImages}
+              onAttachImages={(imgs) => setAttachedImages(imgs)}
+              onRemoveImage={handleRemoveImage}
+              isRecording={isRecording}
+              onToggleRecording={handleMicToggle}
+              isTranscribing={isTranscribing}
+              config={config}
+              onModelChanged={onModelChanged}
+            />
           </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+// Helper: Collapsible Reasoning / Thinking Accordion
+const ThinkingAccordion: React.FC<{ thinking: string }> = ({ thinking }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="rounded-xl bento-card border border-[var(--theme-border)] overflow-hidden font-mono text-xs max-w-full">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3 py-2 bg-black/40 flex items-center justify-between text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer select-none transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="text-[var(--theme-text-muted)]" />
+          <span className="font-semibold text-[11px] text-[var(--theme-text)]">Ход мыслей (CoT Reasoning)</span>
+        </div>
+        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </button>
+
+      {isOpen && (
+        <div className="p-3 bg-black/30 border-t border-[var(--theme-border)] text-[var(--theme-text-muted)] text-[11px] leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto scrollbar-thin select-text font-mono">
+          {thinking}
         </div>
       )}
-
     </div>
   );
 };

@@ -11,21 +11,32 @@ import {
   Copy,
   RefreshCw,
   Sparkles,
+  Edit3,
+  Save,
 } from 'lucide-react';
 import { KnowledgeEntry, KnowledgeCategory } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { NotionMarkdown } from './NotionMarkdown';
 
 export const KnowledgeVault: React.FC = () => {
   const { showToast } = useToast();
 
   const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
-  const [_categories, setCategories] = useState<{ category: string; count: number }[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedEntry, setSelectedEntry] = useState<KnowledgeEntry | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [copied, setCopied] = useState<boolean>(false);
+
+  // Edit Mode state
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editTitle, setEditTitle] = useState<string>('');
+  const [editCategory, setEditCategory] = useState<KnowledgeCategory>('strategy');
+  const [editSummary, setEditSummary] = useState<string>('');
+  const [editContent, setEditContent] = useState<string>('');
+  const [editTags, setEditTags] = useState<string>('');
+  const [editSaving, setEditSaving] = useState<boolean>(false);
 
   // New Entry Modal state
   const [modalOpen, setModalOpen] = useState<boolean>(false);
@@ -34,22 +45,17 @@ export const KnowledgeVault: React.FC = () => {
   const [newSummary, setNewSummary] = useState<string>('');
   const [newContent, setNewContent] = useState<string>('');
   const [newTags, setNewTags] = useState<string>('');
-  const [newSource, _setNewSource] = useState<string>('User Directive');
   const [saving, setSaving] = useState<boolean>(false);
 
   const fetchKnowledge = async () => {
     setLoading(true);
     try {
-      const [fetchedEntries, fetchedCategories] = await Promise.all([
-        api.get_knowledge_entries({
-          query: searchQuery.trim() || undefined,
-          category: selectedCategory !== 'all' ? selectedCategory : undefined,
-        }),
-        api.get_knowledge_categories(),
-      ]);
+      const fetchedEntries = await api.get_knowledge_entries({
+        query: searchQuery.trim() || undefined,
+        category: selectedCategory !== 'all' ? selectedCategory : undefined,
+      });
 
       setEntries(fetchedEntries);
-      setCategories(fetchedCategories);
 
       if (fetchedEntries.length > 0) {
         if (!selectedEntry || !fetchedEntries.some(e => e.id === selectedEntry.id)) {
@@ -63,7 +69,7 @@ export const KnowledgeVault: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Failed to load Knowledge Vault:', err);
-      showToast('Ошибка загрузки Архива Знаний: ' + (err.message || err), 'error');
+      showToast('Ошибка загрузки Базы Знаний: ' + (err.message || err), 'error');
     } finally {
       setLoading(false);
     }
@@ -76,6 +82,50 @@ export const KnowledgeVault: React.FC = () => {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     fetchKnowledge();
+  };
+
+  const handleStartEdit = () => {
+    if (!selectedEntry) return;
+    setEditTitle(selectedEntry.title);
+    setEditCategory((selectedEntry.category as KnowledgeCategory) || 'strategy');
+    setEditSummary(selectedEntry.summary || '');
+    setEditContent(selectedEntry.content);
+    setEditTags(selectedEntry.tags.join(', '));
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedEntry || !editTitle.trim() || !editContent.trim()) {
+      showToast('Заголовок и содержимое обязательны для заполнения', 'error');
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const tagsArray = editTags
+        .split(',')
+        .map(t => t.trim())
+        .filter(Boolean);
+
+      const updated = await api.save_knowledge_entry({
+        id: selectedEntry.id,
+        title: editTitle.trim(),
+        category: editCategory,
+        summary: editSummary.trim() || undefined,
+        content: editContent.trim(),
+        tags: tagsArray,
+        source: selectedEntry.source || 'User Directive',
+      });
+
+      showToast('Запись успешно обновлена!', 'success');
+      setSelectedEntry(updated);
+      setIsEditing(false);
+      fetchKnowledge();
+    } catch (err: any) {
+      showToast('Ошибка сохранения записи: ' + (err.message || err), 'error');
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const handleCreateEntry = async (e: React.FormEvent) => {
@@ -98,10 +148,10 @@ export const KnowledgeVault: React.FC = () => {
         summary: newSummary.trim() || undefined,
         content: newContent.trim(),
         tags: tagsArray,
-        source: newSource.trim() || 'User Directive',
+        source: 'User Directive',
       });
 
-      showToast(`Запись "${created.title}" успешно сохранена в Архив!`, 'success');
+      showToast(`Запись "${created.title}" успешно сохранена!`, 'success');
       setModalOpen(false);
       setNewTitle('');
       setNewSummary('');
@@ -117,15 +167,16 @@ export const KnowledgeVault: React.FC = () => {
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!window.confirm(`Вы уверены, что хотите удалить статью "${title}" из Архива Знаний?`)) {
+    if (!window.confirm(`Вы уверены, что хотите удалить запись "${title}" из Базы Знаний?`)) {
       return;
     }
 
     try {
       await api.delete_knowledge_entry(id);
-      showToast(`Статья "${title}" удалена.`, 'success');
+      showToast(`Запись "${title}" удалена.`, 'success');
       if (selectedEntry?.id === id) {
         setSelectedEntry(null);
+        setIsEditing(false);
       }
       fetchKnowledge();
     } catch (err: any) {
@@ -142,39 +193,32 @@ export const KnowledgeVault: React.FC = () => {
     });
   };
 
-  const getCategoryColor = (cat: string) => {
-    switch (cat.toLowerCase()) {
-      case 'strategy':
-        return 'bg-amber-500/15 border-amber-500/30 text-amber-300';
-      case 'architecture':
-        return 'bg-cyan-500/15 border-cyan-500/30 text-cyan-300';
-      case 'research':
-        return 'bg-violet-500/15 border-violet-500/30 text-violet-300';
-      case 'user_directive':
-        return 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300';
-      case 'market_insight':
-        return 'bg-rose-500/15 border-rose-500/30 text-rose-300';
-      default:
-        return 'bg-slate-500/15 border-slate-500/30 text-slate-300';
-    }
-  };
+  const categoriesList = [
+    { id: 'all', label: 'Все' },
+    { id: 'strategy', label: 'Стратегия' },
+    { id: 'architecture', label: 'Архитектура' },
+    { id: 'research', label: 'Исследования' },
+    { id: 'user_directive', label: 'Указания' },
+    { id: 'market_insight', label: 'Рынок' },
+    { id: 'general', label: 'Общее' },
+  ];
 
   return (
-    <div className="w-full h-full flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-white/[0.08] bg-black/40 backdrop-blur-xl flex flex-wrap items-center justify-between gap-4 shrink-0">
+    <div className="w-full h-full flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-hidden font-sans select-text">
+      {/* Header Bar */}
+      <div className="px-5 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-panel)] flex flex-wrap items-center justify-between gap-3 shrink-0 select-none">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-violet-500/15 border border-violet-500/30 text-violet-400">
-            <BookOpen size={20} />
+          <div className="p-1.5 rounded-lg bg-white/5 border border-[var(--theme-border)] text-[var(--theme-text-muted)]">
+            <BookOpen size={16} />
           </div>
           <div>
-            <h1 className="text-base font-bold text-white tracking-wide flex items-center gap-2">
-              <span>Knowledge Vault</span>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/40 font-mono">
-                {entries.length} записей
+            <div className="flex items-center gap-2">
+              <h2 className="text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider">База знаний</h2>
+              <span className="text-[10px] px-2 py-0.2 rounded-md bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono">
+                {entries.length}
               </span>
-            </h1>
-            <p className="text-xs text-slate-400">Внешний мозг и архив стратегических инсайтов 0xAgent</p>
+            </div>
+            <p className="text-[11px] text-[var(--theme-text-muted)]">Архив стратегических инсайтов, архитектурных решений и указаний</p>
           </div>
         </div>
 
@@ -183,81 +227,70 @@ export const KnowledgeVault: React.FC = () => {
           <button
             type="button"
             onClick={fetchKnowledge}
-            className="p-2 rounded-lg bg-white/[0.05] border border-white/10 hover:border-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer transition-colors"
             title="Обновить список"
           >
-            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="px-3.5 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-medium text-xs flex items-center gap-1.5 shadow-lg shadow-violet-600/25 transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
           >
-            <Plus size={15} />
+            <Plus size={14} />
             <span>Добавить запись</span>
           </button>
         </div>
       </div>
 
-      {/* Main Area: Split Screen */}
+      {/* Main Split Screen */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar: Filter, Search & Entries List */}
-        <div className="w-80 md:w-96 border-r border-white/[0.08] bg-black/20 flex flex-col shrink-0 overflow-hidden">
+        <div className="w-80 md:w-96 border-r border-[var(--theme-border)] bg-[var(--theme-panel)] flex flex-col shrink-0 overflow-hidden">
           {/* Search bar */}
-          <div className="p-3 border-b border-white/[0.08]">
+          <div className="p-3 border-b border-[var(--theme-border)]">
             <form onSubmit={handleSearchSubmit} className="relative">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Поиск по статьям и тегам..."
-                className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/10 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-violet-500/50 transition-colors"
+                className="w-full pl-8 pr-3 py-1.5 rounded-lg bento-card text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] bg-black/40 focus:outline-none"
               />
-              <Search size={14} className="absolute left-3 top-2 text-slate-400" />
+              <Search size={13} className="absolute left-2.5 top-2 text-[var(--theme-text-muted)]" />
             </form>
           </div>
 
-          {/* Category Tabs */}
-          <div className="px-3 py-2 border-b border-white/[0.08] flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('all')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                selectedCategory === 'all'
-                  ? 'bg-violet-500/25 text-violet-300 border border-violet-500/40'
-                  : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
-              }`}
-            >
-              Все
-            </button>
-            {['strategy', 'architecture', 'research', 'user_directive', 'market_insight', 'general'].map(cat => (
+          {/* Category Chips */}
+          <div className="px-3 py-2 border-b border-[var(--theme-border)] flex items-center gap-1.5 overflow-x-auto scrollbar-none select-none">
+            {categoriesList.map(cat => (
               <button
-                key={cat}
+                key={cat.id}
                 type="button"
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-medium capitalize whitespace-nowrap transition-colors cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-violet-500/25 text-violet-300 border border-violet-500/40'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer border ${
+                  selectedCategory === cat.id
+                    ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)] font-semibold shadow-sm'
+                    : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
                 }`}
               >
-                {cat.replace('_', ' ')}
+                {cat.label}
               </button>
             ))}
           </div>
 
           {/* List of Entries */}
-          <div className="flex-1 overflow-y-auto p-2 space-y-2">
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-1.5 scrollbar-thin">
             {loading ? (
-              <div className="flex flex-col items-center justify-center h-48 gap-2 text-slate-500 text-xs">
-                <RefreshCw size={18} className="animate-spin text-violet-400" />
+              <div className="flex flex-col items-center justify-center h-48 gap-2 text-[var(--theme-text-muted)] text-xs">
+                <RefreshCw size={16} className="animate-spin text-[var(--theme-text-muted)]" />
                 <span>Загрузка записей...</span>
               </div>
             ) : entries.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-center p-4">
-                <BookOpen size={28} className="text-slate-600 mb-2" />
-                <span className="text-xs text-slate-400 font-medium">Архив пока пуст</span>
-                <p className="text-[11px] text-slate-500 mt-1">Добавьте первую статью или попросите 0xAgent сохранить инсайт</p>
+                <BookOpen size={24} className="text-[var(--theme-text-muted)] mb-2" />
+                <span className="text-xs text-[var(--theme-text)] font-medium">Записей не найдено</span>
+                <p className="text-[11px] text-[var(--theme-text-muted)] mt-1">Добавьте новую запись или измените фильтр</p>
               </div>
             ) : (
               entries.map(item => {
@@ -265,29 +298,34 @@ export const KnowledgeVault: React.FC = () => {
                 return (
                   <div
                     key={item.id}
-                    onClick={() => setSelectedEntry(item)}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer ${
+                    onClick={() => {
+                      setSelectedEntry(item);
+                      setIsEditing(false);
+                    }}
+                    className={`p-3 rounded-lg bento-card cursor-pointer transition-all border ${
                       isSelected
-                        ? 'bg-violet-500/10 border-violet-500/40 shadow-lg shadow-violet-500/5'
-                        : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/10'
+                        ? 'bg-white/10 border-[var(--theme-border)] text-[var(--theme-text)] shadow-sm'
+                        : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2 mb-1.5">
-                      <span className={`text-[10px] px-2 py-0.5 rounded border uppercase font-mono font-semibold ${getCategoryColor(item.category)}`}>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] uppercase font-mono">
                         {item.category.replace('_', ' ')}
                       </span>
-                      <span className="text-[10px] text-slate-500 font-mono">
+                      <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
                         {new Date(item.createdAt).toLocaleDateString()}
                       </span>
                     </div>
 
-                    <h3 className="text-xs font-semibold text-white line-clamp-1 mb-1">{item.title}</h3>
-                    <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed mb-2">{item.summary}</p>
+                    <h4 className="text-xs font-semibold text-[var(--theme-text)] line-clamp-1 mb-1">{item.title}</h4>
+                    {item.summary && (
+                      <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed mb-2">{item.summary}</p>
+                    )}
 
                     {item.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {item.tags.slice(0, 3).map(tag => (
-                          <span key={tag} className="text-[9px] px-1.5 py-0.2 rounded bg-white/[0.05] text-slate-400 border border-white/[0.05]">
+                          <span key={tag} className="text-[9px] px-1.5 py-0.2 rounded-md bg-white/5 text-[var(--theme-text-muted)] font-mono">
                             #{tag}
                           </span>
                         ))}
@@ -301,39 +339,50 @@ export const KnowledgeVault: React.FC = () => {
         </div>
 
         {/* Right Pane: Reading & Content View */}
-        <div className="flex-1 bg-theme-bg overflow-y-auto p-6">
+        <div className="flex-1 bg-[var(--theme-bg)] overflow-y-auto p-6 md:p-8 scrollbar-thin">
           {selectedEntry ? (
-            <div className="max-w-4xl mx-auto space-y-6">
-              {/* Header section */}
-              <div className="border-b border-white/[0.08] pb-4">
-                <div className="flex items-center justify-between gap-4 mb-3">
+            <div className="max-w-4xl mx-auto space-y-5">
+              {/* Header Action Bar */}
+              <div className="border-b border-[var(--theme-border)] pb-4 space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2.5 py-1 rounded-md border font-mono font-semibold uppercase ${getCategoryColor(selectedEntry.category)}`}>
+                    <span className="text-xs px-2 py-0.5 rounded-md bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono uppercase font-semibold">
                       {selectedEntry.category.replace('_', ' ')}
                     </span>
                     {selectedEntry.source && (
-                      <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
-                        <Layers size={12} className="text-slate-500" />
+                      <span className="text-xs text-[var(--theme-text-muted)] flex items-center gap-1 font-mono">
+                        <Layers size={12} />
                         <span>{selectedEntry.source}</span>
                       </span>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {!isEditing && (
+                      <button
+                        type="button"
+                        onClick={handleStartEdit}
+                        className="px-2.5 py-1 rounded-lg bento-card text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition-colors cursor-pointer"
+                        title="Редактировать запись"
+                      >
+                        <Edit3 size={13} />
+                        <span>Изменить</span>
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleCopyContent}
-                      className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/10 hover:border-white/20 text-slate-300 hover:text-white text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bento-card text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition-colors cursor-pointer"
                       title="Скопировать контент"
                     >
-                      {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                      <span>Копировать</span>
+                      {copied ? <Check size={13} className="text-[var(--theme-text)]" /> : <Copy size={13} />}
+                      <span>{copied ? 'Скопировано' : 'Копировать'}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(selectedEntry.id, selectedEntry.title)}
-                      className="px-2.5 py-1 rounded-lg bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 text-rose-300 text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title="Удалить статью"
+                      className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Удалить запись"
                     >
                       <Trash2 size={13} />
                       <span>Удалить</span>
@@ -341,44 +390,137 @@ export const KnowledgeVault: React.FC = () => {
                   </div>
                 </div>
 
-                <h1 className="text-xl font-bold text-white tracking-tight leading-snug mb-2">{selectedEntry.title}</h1>
+                {isEditing ? (
+                  /* IN-PLACE EDIT MODE */
+                  <div className="space-y-3 pt-2 animate-fadeIn">
+                    <div>
+                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Заголовок</label>
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={e => setEditTitle(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bento-card text-sm font-semibold text-[var(--theme-text)] focus:outline-none bg-black/40"
+                      />
+                    </div>
 
-                <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
-                  <span className="flex items-center gap-1">
-                    <Calendar size={13} className="text-slate-500" />
-                    <span>Добавлено: {new Date(selectedEntry.createdAt).toLocaleString()}</span>
-                  </span>
-                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Категория</label>
+                        <select
+                          value={editCategory}
+                          onChange={e => setEditCategory(e.target.value as KnowledgeCategory)}
+                          className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40 cursor-pointer"
+                        >
+                          <option value="strategy">Strategy (Стратегия)</option>
+                          <option value="architecture">Architecture (Архитектура)</option>
+                          <option value="research">Research (Исследования)</option>
+                          <option value="user_directive">User Directive (Указание пользователя)</option>
+                          <option value="market_insight">Market Insight (Анализ рынка)</option>
+                          <option value="general">General (Общее)</option>
+                        </select>
+                      </div>
 
-                {selectedEntry.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 mt-3">
-                    {selectedEntry.tags.map(tag => (
-                      <span key={tag} className="text-xs px-2 py-0.5 rounded-md bg-white/[0.04] text-slate-300 border border-white/[0.08]">
-                        #{tag}
-                      </span>
-                    ))}
+                      <div>
+                        <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Теги (через запятую)</label>
+                        <input
+                          type="text"
+                          value={editTags}
+                          onChange={e => setEditTags(e.target.value)}
+                          placeholder="tag1, tag2, tag3"
+                          className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Краткое резюме / Summary</label>
+                      <input
+                        type="text"
+                        value={editSummary}
+                        onChange={e => setEditSummary(e.target.value)}
+                        placeholder="Краткое описание сути..."
+                        className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Содержимое (Markdown)</label>
+                      <textarea
+                        rows={12}
+                        value={editContent}
+                        onChange={e => setEditContent(e.target.value)}
+                        className="w-full p-3 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
+                      />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditing(false)}
+                        className="px-3.5 py-1.5 rounded-lg bento-card text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
+                      >
+                        Отмена
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSaveEdit}
+                        disabled={editSaving}
+                        className="px-4 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {editSaving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
+                        <span>Сохранить изменения</span>
+                      </button>
+                    </div>
                   </div>
+                ) : (
+                  /* NORMAL READING VIEW */
+                  <>
+                    <h2 className="text-xl font-bold text-[var(--theme-text)] tracking-tight leading-snug">{selectedEntry.title}</h2>
+
+                    <div className="flex items-center gap-4 text-xs text-[var(--theme-text-muted)] font-mono">
+                      <span className="flex items-center gap-1">
+                        <Calendar size={13} />
+                        <span>Добавлено: {new Date(selectedEntry.createdAt).toLocaleString()}</span>
+                      </span>
+                    </div>
+
+                    {selectedEntry.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {selectedEntry.tags.map(tag => (
+                          <span key={tag} className="text-xs px-2 py-0.5 rounded-md bg-white/5 text-[var(--theme-text-muted)] border border-[var(--theme-border)] font-mono">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 
-              {/* Summary Box */}
-              {selectedEntry.summary && (
-                <div className="p-4 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-200 text-xs leading-relaxed">
-                  <span className="font-bold text-violet-300 block mb-1 uppercase text-[10px] tracking-wider font-mono">Резюме статьи:</span>
-                  {selectedEntry.summary}
-                </div>
-              )}
+              {!isEditing && (
+                <>
+                  {/* Summary Box */}
+                  {selectedEntry.summary && (
+                    <div className="p-4 rounded-xl bento-card space-y-1 bg-black/30">
+                      <span className="text-[10px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider font-mono block">
+                        Резюме записи
+                      </span>
+                      <p className="text-xs text-[var(--theme-text)] leading-relaxed">{selectedEntry.summary}</p>
+                    </div>
+                  )}
 
-              {/* Article Markdown Body */}
-              <div className="bg-white/[0.02] border border-white/[0.06] rounded-2xl p-6 text-slate-200 text-xs sm:text-sm leading-relaxed font-sans whitespace-pre-wrap selection:bg-violet-500/30">
-                {selectedEntry.content}
-              </div>
+                  {/* Article Markdown Body */}
+                  <div className="p-6 rounded-xl bento-card bg-black/20">
+                    <NotionMarkdown content={selectedEntry.content} />
+                  </div>
+                </>
+              )}
             </div>
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center text-slate-500">
-              <Sparkles size={36} className="text-slate-600 mb-3" />
-              <span className="text-sm font-semibold text-slate-400">Выберите запись для чтения</span>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm">Или сохраните новый инсайт через ИИ-агента или форму добавления</p>
+            <div className="h-full flex flex-col items-center justify-center text-center text-[var(--theme-text-muted)]">
+              <Sparkles size={32} className="text-[var(--theme-text-muted)] mb-3 opacity-60" />
+              <span className="text-sm font-medium text-[var(--theme-text)]">Выберите запись для чтения</span>
+              <p className="text-xs text-[var(--theme-text-muted)] mt-1 max-w-sm">Или сохраните новый инсайт через ИИ-агента или форму добавления</p>
             </div>
           )}
         </div>
@@ -386,44 +528,45 @@ export const KnowledgeVault: React.FC = () => {
 
       {/* Modal: New Knowledge Entry */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-2xl glass-panel border border-white/15 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4 select-none animate-fadeIn">
+          <div className="w-full max-w-2xl bento-card border border-[var(--theme-border)] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] bg-[var(--theme-panel)] text-[var(--theme-text)]">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/[0.02]">
+            <div className="px-5 py-3.5 border-b border-[var(--theme-border)] flex items-center justify-between bg-black/40">
               <div className="flex items-center gap-2">
-                <BookOpen size={18} className="text-violet-400" />
-                <h2 className="text-sm font-bold text-white">Добавить запись в Архив Знаний</h2>
+                <BookOpen size={16} className="text-[var(--theme-text-muted)]" />
+                <h3 className="text-xs font-semibold text-[var(--theme-text)]">Добавить запись в Базу Знаний</h3>
               </div>
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
               >
-                <X size={16} />
+                <X size={15} />
               </button>
             </div>
 
             {/* Form Form */}
-            <form onSubmit={handleCreateEntry} className="p-6 space-y-4 overflow-y-auto flex-1 text-xs">
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Заголовок статьи / инсайта *</label>
+            <form onSubmit={handleCreateEntry} className="p-5 space-y-3.5 overflow-y-auto flex-1 text-xs">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[var(--theme-text-muted)]">Заголовок статьи / инсайта *</label>
                 <input
                   type="text"
                   required
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
                   placeholder="Например: Парадигма AI как усилителя стратегического оператора..."
-                  className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+                  className="w-full px-3 py-2 rounded-lg bento-card text-xs font-medium text-[var(--theme-text)] focus:outline-none bg-black/40"
+                  autoFocus
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Категория</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-[var(--theme-text-muted)]">Категория</label>
                   <select
                     value={newCategory}
                     onChange={e => setNewCategory(e.target.value as KnowledgeCategory)}
-                    className="w-full px-3 py-2 rounded-lg flat-input text-theme-text focus:outline-none"
+                    className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40 cursor-pointer"
                   >
                     <option value="strategy">Strategy (Стратегия)</option>
                     <option value="architecture">Architecture (Архитектура)</option>
@@ -434,55 +577,55 @@ export const KnowledgeVault: React.FC = () => {
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-slate-300 font-medium mb-1">Теги (через запятую)</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-[var(--theme-text-muted)]">Теги (через запятую)</label>
                   <input
                     type="text"
                     value={newTags}
                     onChange={e => setNewTags(e.target.value)}
-                    placeholder="strategy, hitl, telegram, 0xagent"
-                    className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+                    placeholder="strategy, hitl, 0xagent"
+                    className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Краткое резюме / Summary</label>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[var(--theme-text-muted)]">Краткое резюме / Summary</label>
                 <input
                   type="text"
                   value={newSummary}
                   onChange={e => setNewSummary(e.target.value)}
-                  placeholder="Краткое описание сути для списков и поиска..."
-                  className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500"
+                  placeholder="Краткое описание сути для списков..."
+                  className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40"
                 />
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-medium mb-1">Полный контент статьи (Markdown) *</label>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[var(--theme-text-muted)]">Полный контент статьи (Markdown) *</label>
                 <textarea
                   required
                   rows={8}
                   value={newContent}
                   onChange={e => setNewContent(e.target.value)}
                   placeholder="Вставьте полный текст статьи, выводы или стратегический план..."
-                  className="w-full px-3 py-2 rounded-lg bg-white/[0.05] border border-white/10 text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 font-mono text-xs"
+                  className="w-full p-3 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-white/10">
+              <div className="flex justify-end gap-2 pt-3 border-t border-[var(--theme-border)]">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-white/[0.05] hover:bg-white/10 text-slate-300 font-medium cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg bento-card text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-medium shadow-lg shadow-violet-600/30 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
                 >
-                  {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                  {saving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
                   <span>Сохранить в Архив</span>
                 </button>
               </div>

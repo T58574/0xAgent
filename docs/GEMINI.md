@@ -163,7 +163,10 @@ Connection: `ws://localhost:3001/ws`. Messages: `{ event, payload }`.
 
 - Local GGUF models are executed via `llama.cpp` binaries spawned directly by the Node backend (`server/index.ts`).
 - **Endpoint `/api/start-local-server`**:
-  - Spawns `llama-server.exe` with configured parameters (`-m`, `-c`, `-ngl`, `-t`, `-b`, `-ub`, `--temp`, `--min-p`, `--repeat-penalty`, `-fa`, `--no-mmap`, `--mlock`, `--embedding`, `--cont-batching`).
+  - Spawns `llama-server.exe` with configured parameters (`-m`, `-c`, `-ngl`, `-t`, `-b`, `-ub`, `--temp`, `--min-p`, `--repeat-penalty`, `-fa on`, `-np 1`, `--no-mmap`, `--mlock`, `--embedding`, `--cont-batching`, `-ctk`, `-ctv`).
+  - **Flash Attention**: Must always use `-fa on` or `--flash-attn on` (modern llama.cpp b10423+ syntax).
+  - **Parallel Slots**: Default to `-np 1` to prevent 4x VRAM multiplier for single-agent use.
+  - **30B+ on 16GB VRAM**: Requires `-fa on`, `-ctk q8_0 -ctv q8_0`, and context <= 16k.
   - Auto-detects installed binaries in `~/.0xagent/llama/` and GGUF models in `~/.0xagent/models/` if parameters are omitted.
   - Calls `killProcessOnPort(port)` before spawn to handle orphaned processes from tsx restarts.
   - Streams stdout/stderr real-time logs over WebSocket (`llama-server-log` event).
@@ -175,8 +178,8 @@ Connection: `ws://localhost:3001/ws`. Messages: `{ event, payload }`.
 ## 7. Configuration & State Persistence Rules (CRITICAL)
 
 - **Auto-save Mechanism**: `SettingsPage.tsx` uses a 600ms debounced `useEffect` to automatically save changes to `/api/config`.
-- **CRITICAL RULE**: When adding or updating configuration fields in `SettingsPage.tsx` or `AppConfig` (`src/types.ts`), you **MUST** ensure that `useEffect` on `config` load restores **ALL** fields from `config.local_server` into state.
-  - *Failure to restore a state property when loading `config` causes the debounced auto-save to overwrite `config.json` with initial default values on startup!*
+- **CRITICAL RULE (Zero Falsy Bug)**: When adding or updating configuration fields in `SettingsPage.tsx` or `AppConfig` (`src/types.ts`), you **MUST** ensure that `useEffect` on `config` load restores **ALL** fields from `config.local_server` into state using strict `val !== undefined && val !== null` checks.
+  - *Never use truthiness checks like `if (ls.threads)` because values like `0` ("0 = Auto") or `false` will be discarded and overwritten with defaults on startup!*
 
 ---
 
@@ -232,7 +235,21 @@ Tools configuration is decoupled from Personas and managed globally in `server/t
 
 ---
 
-## 10. Verification Checklist for Developers / AI Models
+## 11. UI/UX Design System & Resource Governance
+
+1. **Persona-Style Popovers**: All dropdown menus (Model Selector, Persona Selector, Slash Commands `/`, LAN sharing) follow a uniform design language:
+   - Radius: `rounded-2xl` (16px).
+   - Glassmorphism: `bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] shadow-2xl`.
+   - Upward/Contextual placement: `bottom-full mb-2` inside bottom inputs.
+   - Clean flat item rows with monochromatic transparency instead of nested cards and rainbow badges.
+2. **Contextual Input Controls**: Selection of models and personas is embedded directly inside `FloatingCommandBar.tsx` next to the chat prompt, keeping the top `Navbar.tsx` light and minimal.
+3. **Auto-Free VRAM on Model Switch**: Switching to an API model (Google AI Studio) automatically stops `llama-server.exe` (`api.stop_local_server()`) to free GPU memory and CPU threads.
+4. **Sidebar Ergonomics**: Sidebar collapse toggle is anchored at the vertical center (50% height) on the outer edge, with a floating button on the viewport edge when collapsed.
+5. **Modern Typography**: Strict use of `Inter` for UI and `JetBrains Mono` for code and tokens.
+
+---
+
+## 12. Verification Checklist for Developers / AI Models
 
 When making changes to 0xAgent:
 1. Run `npx tsc --noEmit` to verify type safety across frontend and backend.

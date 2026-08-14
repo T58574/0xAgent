@@ -71,20 +71,20 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 font-sans select-none animate-fadeIn">
-      <div className="w-full max-w-xl glass-panel rounded-2xl border border-theme-border shadow-2xl overflow-hidden text-theme-text">
+      <div className="w-full max-w-xl bento-card rounded-xl border border-[var(--theme-border)] shadow-2xl overflow-hidden text-[var(--theme-text)] bg-[var(--theme-panel)]">
         
         {/* Header */}
-        <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between bg-slate-950/60">
-          <div className="flex items-center gap-2.5">
-            <FolderPlus size={18} className="text-emerald-400" />
-            <h3 className="text-sm font-semibold text-slate-100">Выбор папки Workspace (Проекта)</h3>
+        <div className="px-5 py-3.5 border-b border-[var(--theme-border)] flex items-center justify-between bg-black/40">
+          <div className="flex items-center gap-2">
+            <FolderPlus size={16} className="text-[var(--theme-text-muted)]" />
+            <h3 className="text-xs font-semibold text-[var(--theme-text)]">Выбор папки Workspace (Проекта)</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
+            className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
 
@@ -92,15 +92,15 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
         <div className="p-5 space-y-4">
           
           {errorMsg && (
-            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 font-sans">
-              <AlertCircle size={15} className="shrink-0 text-rose-400" />
+            <div className="p-3 rounded-lg bg-white/5 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 font-sans">
+              <AlertCircle size={15} className="shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {/* Form with Path Input */}
           <form onSubmit={handleSubmit} className="space-y-3">
-            <label className="block text-xs font-medium text-slate-300">
+            <label className="block text-xs font-medium text-[var(--theme-text-muted)]">
               Укажите абсолютный путь к папке проекта на диске:
             </label>
 
@@ -110,7 +110,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                 value={inputPath}
                 onChange={(e) => setInputPath(e.target.value)}
                 placeholder="C:\Users\user\Documents\projects\my-app"
-                className="flex-1 px-3.5 py-2.5 rounded-xl flat-input text-xs font-mono text-slate-100 focus:outline-none border border-white/10 bg-black/40"
+                className="flex-1 px-3.5 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
                 autoFocus
               />
 
@@ -118,10 +118,10 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                 type="button"
                 onClick={handleNativeBrowse}
                 disabled={isLoadingNative}
-                className="px-3.5 py-2.5 rounded-xl flat-btn text-xs font-medium text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50 transition-colors"
                 title="Обзор через проводник Windows"
               >
-                <Folder size={14} className="text-emerald-400" />
+                <Folder size={14} className="text-[var(--theme-text-muted)]" />
                 <span>{isLoadingNative ? 'Открытие...' : 'Проводник'}</span>
               </button>
             </div>
@@ -130,14 +130,14 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 cursor-pointer"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 cursor-pointer transition-colors"
               >
                 Отмена
               </button>
               <button
                 type="submit"
                 disabled={!inputPath.trim()}
-                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-40"
+                className="px-4 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-[var(--theme-border)] text-[var(--theme-text)] text-xs font-medium transition-colors shadow-sm cursor-pointer disabled:opacity-40"
               >
                 Открыть проект
               </button>
@@ -146,40 +146,47 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
 
           {/* Recent Workspaces List */}
           {uniqueRecent.length > 0 && (
-            <div className="pt-3 border-t border-white/10 space-y-2">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+            <div className="pt-3 border-t border-[var(--theme-border)] space-y-2">
+              <span className="text-[11px] font-medium text-[var(--theme-text-muted)] uppercase tracking-wider block">
                 Недавние воркспейсы
               </span>
 
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {uniqueRecent.map((dir) => (
-                  <button
-                    key={dir}
-                    type="button"
-                    onClick={async () => {
-                      setInputPath(dir);
-                      await onSelectWorkspaceDir(dir);
-                      onClose();
-                    }}
-                    className="w-full p-2.5 rounded-xl border border-white/5 hover:border-emerald-500/30 bg-black/20 hover:bg-emerald-500/10 text-left flex items-center justify-between gap-2 transition-all cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Folder size={15} className="text-slate-400 group-hover:text-emerald-400 shrink-0" />
-                      <span className="font-mono text-xs text-slate-200 truncate">{dir}</span>
-                    </div>
-                    {dir === currentWorkspaceDir && (
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30 shrink-0">
-                        Активный
-                      </span>
-                    )}
-                  </button>
-                ))}
+              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                {uniqueRecent.map((dir) => {
+                  const isActive = currentWorkspaceDir && dir.toLowerCase() === currentWorkspaceDir.toLowerCase();
+                  return (
+                    <button
+                      key={dir}
+                      type="button"
+                      onClick={async () => {
+                        setInputPath(dir);
+                        await onSelectWorkspaceDir(dir);
+                        onClose();
+                      }}
+                      className={`w-full p-2.5 rounded-lg bento-card text-left text-xs font-mono transition-all flex items-center justify-between gap-2 border cursor-pointer ${
+                        isActive
+                          ? 'bg-white/10 border-[var(--theme-border)] text-[var(--theme-text)]'
+                          : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Folder size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
+                        <span className="truncate">{dir}</span>
+                      </div>
+
+                      {isActive && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md font-mono bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] shrink-0">
+                          Активный
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
         </div>
-
       </div>
     </div>
   );
