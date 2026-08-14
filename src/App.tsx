@@ -815,18 +815,20 @@ export default function App() {
           </button>
         )}
 
-        {/* Floating Minimalist New Chat Button on the Right Edge (50% vertical height, transparent background) */}
-        <button
-          type="button"
-          onClick={() => handleCreateSession()}
-          className="fixed right-2 top-1/2 -translate-y-1/2 z-40 group flex items-center gap-1.5 p-2 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 transition-all cursor-pointer select-none bg-transparent"
-          title="Новый чат"
-        >
-          <Plus size={18} className="transition-transform duration-200 group-hover:rotate-90" />
-          <span className="max-w-0 overflow-hidden group-hover:max-w-[75px] transition-all duration-200 text-xs font-mono whitespace-nowrap opacity-0 group-hover:opacity-100">
-            Новый чат
-          </span>
-        </button>
+        {/* Floating Minimalist New Chat Button on the Right Edge (only visible in chat view, 50% vertical height, transparent background) */}
+        {activeView === 'chat' && (
+          <button
+            type="button"
+            onClick={() => handleCreateSession()}
+            className="fixed right-2 top-1/2 -translate-y-1/2 z-40 group flex items-center gap-1.5 p-2 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 transition-all cursor-pointer select-none bg-transparent"
+            title="Новый чат"
+          >
+            <Plus size={18} className="transition-transform duration-200 group-hover:rotate-90" />
+            <span className="max-w-0 overflow-hidden group-hover:max-w-[75px] transition-all duration-200 text-xs font-mono whitespace-nowrap opacity-0 group-hover:opacity-100">
+              Новый чат
+            </span>
+          </button>
+        )}
 
         {/* CONTENT VIEWPORT */}
         <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">

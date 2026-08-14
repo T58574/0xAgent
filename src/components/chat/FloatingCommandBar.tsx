@@ -19,17 +19,8 @@ import {
   RefreshCw,
   Sliders,
 } from 'lucide-react';
-import { AppConfig, PersonaMetadata, AvailableModelsResponse } from '../../types';
-import * as api from '../../services/api';
-import { useToast } from '../../context/ToastContext';
-
-interface ServerStatusData {
-  running: boolean;
-  host: string;
-  port: number;
-  modelPath?: string | null;
-  modelName?: string | null;
-}
+import { AppConfig, PersonaMetadata } from '../../types';
+import { useModelManager } from '../../hooks/useModelManager';
 
 interface FloatingCommandBarProps {
   inputText: string;
@@ -85,207 +76,33 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   config,
   onModelChanged,
 }) => {
-  const { showToast } = useToast();
-  
   // Single active popup state - prevents any double opening
   const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash'>('none');
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedSlashIndex, setSelectedSlashIndex] = useState(0);
 
-  // Model & Server Status State
-  const [isStartingServer, setIsStartingServer] = useState(false);
-  const [serverStatus, setServerStatus] = useState<ServerStatusData>({
-    running: false,
-    host: '127.0.0.1',
-    port: 11434,
-    modelPath: null,
-    modelName: null,
-  });
-  const [modelsData, setModelsData] = useState<AvailableModelsResponse>({
-    cloud: [
-      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', badge: 'Medium', speed: 'Medium', provider: 'Google AI Studio' },
-      { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT', badge: 'Fast', speed: 'Fast', provider: 'Google AI Studio' },
-      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', badge: 'Ultra Fast', speed: 'Ultra Fast', provider: 'Google AI Studio' },
-      { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash Preview TTS', badge: 'Fast', speed: 'TTS Audio', provider: 'Google AI Studio', isAudio: true },
-    ],
-    local: [],
-    activeModelId: config?.model_name || 'gemini-3.6-flash',
-  });
-
-  const activeModelId = config?.model_name || modelsData.activeModelId || 'gemini-3.6-flash';
-  const isLocalActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
+  // Model & Server Management Hook
+  const {
+    modelsData,
+    serverStatus,
+    activeModelId,
+    isLocalActive,
+    isStartingServer,
+    fetchModelsAndStatus,
+    selectCloudModel,
+    selectLocalModel,
+    toggleServer,
+    getDisplayTitle,
+  } = useModelManager(config, onModelChanged);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  const fetchModelsAndStatus = async () => {
-    try {
-      const [data, status] = await Promise.all([
-        api.get_available_models(),
-        api.get_server_status(),
-      ]);
-      setModelsData(data);
-      setServerStatus(status as ServerStatusData);
-    } catch (err) {
-      console.error('Failed to fetch available models / status:', err);
-    }
-  };
-
-  useEffect(() => {
-    fetchModelsAndStatus();
-    const interval = setInterval(fetchModelsAndStatus, 4000);
-    return () => clearInterval(interval);
-  }, []);
-
   const currentPersona = personas.find((p) => p.id === activePersonaId) || {
     id: 'default',
     name: '0xAgent',
     icon: 'smart_toy',
-  };
-
-  const isModelRunning = (model: any): boolean => {
-    if (!serverStatus.running || !serverStatus.modelPath) return false;
-    const serverModelPath = serverStatus.modelPath.toLowerCase().replace(/\\/g, '/');
-    const modelFilePath = (model.filePath || '').toLowerCase().replace(/\\/g, '/');
-    if (modelFilePath && serverModelPath === modelFilePath) return true;
-    const serverBasename = serverModelPath.split('/').pop() || '';
-    const modelBasename = (model.fileName || '').toLowerCase();
-    return serverBasename === modelBasename;
-  };
-
-  // Switch to an API Model and STOP local server
-  const handleSelectCloudModel = async (modelId: string) => {
-    setOpenMenu('none');
-    try {
-      let currentCfg = config;
-      if (!currentCfg) currentCfg = await api.get_config();
-      const updatedCfg: AppConfig = { ...currentCfg, model_name: modelId };
-      await api.save_config(updatedCfg);
-
-      setModelsData((prev) => ({ ...prev, activeModelId: modelId }));
-      if (onModelChanged) onModelChanged(modelId);
-
-      if (serverStatus.running) {
-        try {
-          await api.stop_local_server();
-          setServerStatus((prev) => ({ ...prev, running: false }));
-          showToast(`Модель: ${modelId}. Сервер остановлен.`, 'info');
-        } catch {
-          showToast(`Модель: ${modelId}`, 'success');
-        }
-      } else {
-        showToast(`Модель: ${modelId}`, 'success');
-      }
-    } catch (err: any) {
-      showToast(`Ошибка смены модели: ${err.message || err}`, 'error');
-    }
-  };
-
-  // Switch to a Local GGUF Model and start/switch server
-  const handleSelectLocalModel = async (model: any) => {
-    setOpenMenu('none');
-    try {
-      let currentCfg = config;
-      if (!currentCfg) currentCfg = await api.get_config();
-      const updatedCfg: AppConfig = {
-        ...currentCfg,
-        model_name: model.id,
-        local_server: {
-          ...(currentCfg?.local_server || {}),
-          model_path: model.filePath,
-        },
-      };
-      await api.save_config(updatedCfg);
-      setModelsData((prev) => ({ ...prev, activeModelId: model.id }));
-      if (onModelChanged) onModelChanged(model.id);
-
-      if (!serverStatus.running || !isModelRunning(model)) {
-        setIsStartingServer(true);
-        showToast(`Запуск llama.cpp (${model.title || model.fileName})...`, 'info');
-        try {
-          const ls = updatedCfg.local_server;
-          await api.start_local_server({
-            modelPath: model.filePath,
-            exePath: ls?.exe_path,
-            host: ls?.host || '127.0.0.1',
-            port: ls?.port || 11434,
-            ctxSize: ls?.ctx_size,
-            gpuLayers: ls?.gpu_layers,
-            threads: ls?.threads,
-            flashAttn: ls?.flash_attn,
-          });
-          setServerStatus((prev) => ({
-            ...prev,
-            running: true,
-            modelPath: model.filePath,
-            modelName: model.title || model.fileName,
-          }));
-          showToast('Локальный сервер готов!', 'success');
-        } catch (serverErr: any) {
-          showToast(`Ошибка старта сервера: ${serverErr.message || serverErr}`, 'error');
-        } finally {
-          setIsStartingServer(false);
-        }
-      } else {
-        showToast(`Локальная модель: ${model.title || model.fileName}`, 'success');
-      }
-    } catch (err: any) {
-      showToast(`Ошибка смены модели: ${err.message || err}`, 'error');
-    }
-  };
-
-  // Manual Toggle Server
-  const handleToggleServer = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (serverStatus.running) {
-      try {
-        await api.stop_local_server();
-        setServerStatus((prev) => ({ ...prev, running: false }));
-        showToast('Сервер llama.cpp остановлен', 'info');
-      } catch (err: any) {
-        showToast(`Ошибка остановки: ${err.message || err}`, 'error');
-      }
-    } else {
-      setIsStartingServer(true);
-      try {
-        let currentCfg = config;
-        if (!currentCfg) currentCfg = await api.get_config();
-        const ls = currentCfg?.local_server;
-        const res = await api.start_local_server({
-          modelPath: ls?.model_path,
-          exePath: ls?.exe_path,
-          host: ls?.host || '127.0.0.1',
-          port: ls?.port || 11434,
-          ctxSize: ls?.ctx_size,
-          gpuLayers: ls?.gpu_layers,
-          threads: ls?.threads,
-          flashAttn: ls?.flash_attn,
-        });
-        if (res?.success) {
-          setServerStatus((prev) => ({ ...prev, running: true }));
-          showToast('Сервер llama.cpp запущен!', 'success');
-        }
-      } catch (err: any) {
-        showToast(`Ошибка запуска: ${err.message || err}`, 'error');
-      } finally {
-        setIsStartingServer(false);
-      }
-    }
-  };
-
-  const getDisplayTitle = (id: string): string => {
-    const cloudMatch = modelsData.cloud.find((m) => m.id === id);
-    if (cloudMatch) return cloudMatch.name;
-
-    const localMatch = modelsData.local.find((m) => m.id === id || m.fileName === id || `local:${m.fileName}` === id);
-    if (localMatch) return localMatch.title || localMatch.fileName;
-
-    if (id.startsWith('local:')) {
-      const fn = id.replace(/^local:/, '');
-      return fn.replace(/\.gguf$/i, '');
-    }
-    return id;
   };
 
   useEffect(() => {
@@ -464,7 +281,10 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               <button
                 key={m.id}
                 type="button"
-                onClick={() => handleSelectCloudModel(m.id)}
+                onClick={() => {
+                  selectCloudModel(m.id);
+                  setOpenMenu('none');
+                }}
                 className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
                   activeModelId === m.id
                     ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
@@ -494,7 +314,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             </div>
             <button
               type="button"
-              onClick={handleToggleServer}
+              onClick={toggleServer}
               disabled={isStartingServer}
               className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[var(--theme-text)] border border-[var(--theme-border)] text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-colors"
             >
@@ -522,7 +342,10 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => handleSelectLocalModel(m)}
+                    onClick={() => {
+                      selectLocalModel(m);
+                      setOpenMenu('none');
+                    }}
                     className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
                       isActive
                         ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'

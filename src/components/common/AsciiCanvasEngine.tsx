@@ -116,6 +116,8 @@ export const AsciiCanvasEngine: React.FC<AsciiCanvasEngineProps> = ({
     const render = (currentTime: number) => {
       animFrameIdRef.current = requestAnimationFrame(render);
 
+      if (document.hidden) return;
+
       const delta = currentTime - lastRender;
       if (delta < interval) return;
       lastRender = currentTime - (delta % interval);
