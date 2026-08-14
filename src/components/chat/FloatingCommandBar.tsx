@@ -266,9 +266,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       <form onSubmit={onSubmit}>
         <div className="bento-card p-2.5 bg-[var(--theme-panel)]/95 backdrop-blur-xl border border-[var(--theme-border)] focus-within:border-[var(--theme-border)] focus-within:ring-1 focus-within:ring-[var(--theme-border)] transition-all flex flex-col gap-1.5">
           
-          {/* Top Row: Attachment + Persona Chip + Textarea */}
+          {/* Top Row: Attachment + Full-width Textarea */}
           <div className="flex items-start gap-2">
-            
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -277,26 +276,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             >
               <Plus size={16} />
             </button>
-
-            {personas.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-                className="inline-flex items-center gap-1.5 px-2 py-1 mt-0.5 rounded-md bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border border-[var(--theme-border)] text-xs font-mono transition-all cursor-pointer shrink-0"
-                title="Сменить персону"
-              >
-                <User size={12} />
-                <span className="max-w-[90px] truncate">{currentPersona.name}</span>
-              </button>
-            )}
-
-            {/* Model Selector Dropdown Chip */}
-            <ModelSelectorDropdown
-              config={config || null}
-              onModelChanged={onModelChanged}
-              direction="up"
-              compact={true}
-            />
 
             <textarea
               ref={textareaRef}
@@ -309,10 +288,31 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             />
           </div>
 
-          {/* Bottom Action Controls */}
+          {/* Bottom Action Controls: Chips, Toggles & Send */}
           <div className="flex items-center justify-between pt-1.5 border-t border-[var(--theme-border)] text-xs">
             
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Persona Selector Chip */}
+              {personas.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setShowPersonaMenu(!showPersonaMenu)}
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border border-[var(--theme-border)] text-xs font-mono transition-all cursor-pointer shrink-0"
+                  title="Сменить персону"
+                >
+                  <User size={12} />
+                  <span className="max-w-[85px] truncate">{currentPersona.name}</span>
+                </button>
+              )}
+
+              {/* Model Selector Dropdown Chip */}
+              <ModelSelectorDropdown
+                config={config || null}
+                onModelChanged={onModelChanged}
+                direction="up"
+                compact={true}
+              />
+
               {onTogglePlanningMode && (
                 <button
                   type="button"

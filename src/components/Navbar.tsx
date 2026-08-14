@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  Plus,
   MessageSquare,
   Code,
   Settings as SettingsIcon,
@@ -49,7 +48,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onModelChanged: _onModelChanged,
   onOpenJarvis,
   activeJulesCount,
-  onNewChat,
+  onNewChat: _onNewChat,
   onOpenMemorySkills,
 }) => {
   const { showToast } = useToast();
@@ -107,24 +106,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Right Section: View Switcher Bento Tabs + "+ Новый чат" Hover Button + Utilities */}
+      {/* Right Section: View Switcher Bento Tabs + Utilities */}
       <div className="flex items-center gap-2">
-        
-        {/* "+ Новый чат" Hover-expanding Button */}
-        {onNewChat && (
-          <button
-            type="button"
-            onClick={onNewChat}
-            className="group relative flex items-center gap-1 px-2 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-[var(--theme-text)] text-xs font-medium cursor-pointer transition-all duration-200 shadow-sm"
-            title="Создать новый чат"
-          >
-            <Plus size={14} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" />
-            <span className="max-w-0 overflow-hidden group-hover:max-w-[75px] transition-all duration-200 whitespace-nowrap text-[11px] font-sans">
-              Новый чат
-            </span>
-          </button>
-        )}
-
         {/* View Switcher Bento Tabs */}
         <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-[var(--theme-border)]">
           <button
