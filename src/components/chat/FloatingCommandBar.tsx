@@ -1,7 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, Send, Square, Mic, MicOff, Terminal, Bot, Globe, Brain, Code, User } from 'lucide-react';
-import { AppConfig, PersonaMetadata } from '../../types';
-import { ModelSelectorDropdown } from '../ModelSelectorDropdown';
+import {
+  Plus,
+  X,
+  Send,
+  Square,
+  Mic,
+  MicOff,
+  Terminal,
+  Bot,
+  Globe,
+  Brain,
+  Code,
+  User,
+  Cloud,
+  Cpu,
+  HardDrive,
+  Check,
+  Volume2,
+  Play,
+  RefreshCw,
+  Sliders,
+} from 'lucide-react';
+import { AppConfig, PersonaMetadata, AvailableModelsResponse } from '../../types';
+import * as api from '../../services/api';
+import { useToast } from '../../context/ToastContext';
+
+interface ServerStatusData {
+  running: boolean;
+  host: string;
+  port: number;
+  modelPath?: string | null;
+  modelName?: string | null;
+}
 
 interface FloatingCommandBarProps {
   inputText: string;
@@ -58,24 +88,212 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   onRemoveImage,
   isRecording = false,
   onToggleRecording,
-  isTranscribing = false,
+  isTranscribing: _isTranscribing = false,
   onTriggerSlashCommand,
   config,
   onModelChanged,
 }) => {
-  const [showSlashMenu, setShowSlashMenu] = useState(false);
-  const [showPersonaMenu, setShowPersonaMenu] = useState(false);
+  const { showToast } = useToast();
+  
+  // Single active popup state - prevents any double opening
+  const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash'>('none');
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedSlashIndex, setSelectedSlashIndex] = useState(0);
+
+  // Model & Server Status State
+  const [isStartingServer, setIsStartingServer] = useState(false);
+  const [serverStatus, setServerStatus] = useState<ServerStatusData>({
+    running: false,
+    host: '127.0.0.1',
+    port: 11434,
+    modelPath: null,
+    modelName: null,
+  });
+  const [modelsData, setModelsData] = useState<AvailableModelsResponse>({
+    cloud: [
+      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', badge: 'Medium', speed: 'Medium', provider: 'Google AI Studio' },
+      { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT', badge: 'Fast', speed: 'Fast', provider: 'Google AI Studio' },
+      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', badge: 'Ultra Fast', speed: 'Ultra Fast', provider: 'Google AI Studio' },
+      { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash Preview TTS', badge: 'Fast', speed: 'TTS Audio', provider: 'Google AI Studio', isAudio: true },
+    ],
+    local: [],
+    activeModelId: config?.model_name || 'gemini-3.6-flash',
+  });
+
+  const activeModelId = config?.model_name || modelsData.activeModelId || 'gemini-3.6-flash';
+  const isLocalActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
+  const fetchModelsAndStatus = async () => {
+    try {
+      const [data, status] = await Promise.all([
+        api.get_available_models(),
+        api.get_server_status(),
+      ]);
+      setModelsData(data);
+      setServerStatus(status as ServerStatusData);
+    } catch (err) {
+      console.error('Failed to fetch available models / status:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchModelsAndStatus();
+    const interval = setInterval(fetchModelsAndStatus, 4000);
+    return () => clearInterval(interval);
+  }, []);
+
   const currentPersona = personas.find((p) => p.id === activePersonaId) || {
     id: 'default',
     name: '0xAgent',
     icon: 'smart_toy',
+  };
+
+  const isModelRunning = (model: any): boolean => {
+    if (!serverStatus.running || !serverStatus.modelPath) return false;
+    const serverModelPath = serverStatus.modelPath.toLowerCase().replace(/\\/g, '/');
+    const modelFilePath = (model.filePath || '').toLowerCase().replace(/\\/g, '/');
+    if (modelFilePath && serverModelPath === modelFilePath) return true;
+    const serverBasename = serverModelPath.split('/').pop() || '';
+    const modelBasename = (model.fileName || '').toLowerCase();
+    return serverBasename === modelBasename;
+  };
+
+  // Switch to an API Model and STOP local server
+  const handleSelectCloudModel = async (modelId: string) => {
+    setOpenMenu('none');
+    try {
+      let currentCfg = config;
+      if (!currentCfg) currentCfg = await api.get_config();
+      const updatedCfg: AppConfig = { ...currentCfg, model_name: modelId };
+      await api.save_config(updatedCfg);
+
+      setModelsData((prev) => ({ ...prev, activeModelId: modelId }));
+      if (onModelChanged) onModelChanged(modelId);
+
+      if (serverStatus.running) {
+        try {
+          await api.stop_local_server();
+          setServerStatus((prev) => ({ ...prev, running: false }));
+          showToast(`Модель: ${modelId}. Сервер остановлен.`, 'info');
+        } catch {
+          showToast(`Модель: ${modelId}`, 'success');
+        }
+      } else {
+        showToast(`Модель: ${modelId}`, 'success');
+      }
+    } catch (err: any) {
+      showToast(`Ошибка смены модели: ${err.message || err}`, 'error');
+    }
+  };
+
+  // Switch to a Local GGUF Model and start/switch server
+  const handleSelectLocalModel = async (model: any) => {
+    setOpenMenu('none');
+    try {
+      let currentCfg = config;
+      if (!currentCfg) currentCfg = await api.get_config();
+      const updatedCfg: AppConfig = {
+        ...currentCfg,
+        model_name: model.id,
+        local_server: {
+          ...(currentCfg?.local_server || {}),
+          model_path: model.filePath,
+        },
+      };
+      await api.save_config(updatedCfg);
+      setModelsData((prev) => ({ ...prev, activeModelId: model.id }));
+      if (onModelChanged) onModelChanged(model.id);
+
+      if (!serverStatus.running || !isModelRunning(model)) {
+        setIsStartingServer(true);
+        showToast(`Запуск llama.cpp (${model.title || model.fileName})...`, 'info');
+        try {
+          const ls = updatedCfg.local_server;
+          await api.start_local_server({
+            modelPath: model.filePath,
+            exePath: ls?.exe_path,
+            host: ls?.host || '127.0.0.1',
+            port: ls?.port || 11434,
+            ctxSize: ls?.ctx_size,
+            gpuLayers: ls?.gpu_layers,
+            threads: ls?.threads,
+            flashAttn: ls?.flash_attn,
+          });
+          setServerStatus((prev) => ({
+            ...prev,
+            running: true,
+            modelPath: model.filePath,
+            modelName: model.title || model.fileName,
+          }));
+          showToast('Локальный сервер готов!', 'success');
+        } catch (serverErr: any) {
+          showToast(`Ошибка старта сервера: ${serverErr.message || serverErr}`, 'error');
+        } finally {
+          setIsStartingServer(false);
+        }
+      } else {
+        showToast(`Локальная модель: ${model.title || model.fileName}`, 'success');
+      }
+    } catch (err: any) {
+      showToast(`Ошибка смены модели: ${err.message || err}`, 'error');
+    }
+  };
+
+  // Manual Toggle Server
+  const handleToggleServer = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (serverStatus.running) {
+      try {
+        await api.stop_local_server();
+        setServerStatus((prev) => ({ ...prev, running: false }));
+        showToast('Сервер llama.cpp остановлен', 'info');
+      } catch (err: any) {
+        showToast(`Ошибка остановки: ${err.message || err}`, 'error');
+      }
+    } else {
+      setIsStartingServer(true);
+      try {
+        let currentCfg = config;
+        if (!currentCfg) currentCfg = await api.get_config();
+        const ls = currentCfg?.local_server;
+        const res = await api.start_local_server({
+          modelPath: ls?.model_path,
+          exePath: ls?.exe_path,
+          host: ls?.host || '127.0.0.1',
+          port: ls?.port || 11434,
+          ctxSize: ls?.ctx_size,
+          gpuLayers: ls?.gpu_layers,
+          threads: ls?.threads,
+          flashAttn: ls?.flash_attn,
+        });
+        if (res?.success) {
+          setServerStatus((prev) => ({ ...prev, running: true }));
+          showToast('Сервер llama.cpp запущен!', 'success');
+        }
+      } catch (err: any) {
+        showToast(`Ошибка запуска: ${err.message || err}`, 'error');
+      } finally {
+        setIsStartingServer(false);
+      }
+    }
+  };
+
+  const getDisplayTitle = (id: string): string => {
+    const cloudMatch = modelsData.cloud.find((m) => m.id === id);
+    if (cloudMatch) return cloudMatch.name;
+
+    const localMatch = modelsData.local.find((m) => m.id === id || m.fileName === id || `local:${m.fileName}` === id);
+    if (localMatch) return localMatch.title || localMatch.fileName;
+
+    if (id.startsWith('local:')) {
+      const fn = id.replace(/^local:/, '');
+      return fn.replace(/\.gguf$/i, '');
+    }
+    return id;
   };
 
   useEffect(() => {
@@ -89,18 +307,17 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     if (inputText.startsWith('/')) {
       const query = inputText.slice(1).toLowerCase();
       setSlashFilter(query);
-      setShowSlashMenu(true);
+      setOpenMenu('slash');
       setSelectedSlashIndex(0);
-    } else {
-      setShowSlashMenu(false);
+    } else if (openMenu === 'slash') {
+      setOpenMenu('none');
     }
   }, [inputText]);
 
   useEffect(() => {
     const handleDocClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowSlashMenu(false);
-        setShowPersonaMenu(false);
+        setOpenMenu('none');
       }
     };
     document.addEventListener('mousedown', handleDocClick);
@@ -113,34 +330,15 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
   const handleSelectSlash = (item: SlashCommandItem) => {
     setInputText(`${item.cmd} `);
-    setShowSlashMenu(false);
+    setOpenMenu('none');
     if (onTriggerSlashCommand) {
       onTriggerSlashCommand(item.cmd);
     }
     textareaRef.current?.focus();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file) => {
-      if (file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (event.target?.result) {
-            onAttachImages([...attachedImages, event.target.result as string]);
-          }
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (showSlashMenu && filteredSlashCommands.length > 0) {
+    if (openMenu === 'slash' && filteredSlashCommands.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedSlashIndex((prev) => (prev + 1) % filteredSlashCommands.length);
@@ -158,7 +356,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       }
       if (e.key === 'Escape') {
         e.preventDefault();
-        setShowSlashMenu(false);
+        setOpenMenu('none');
         return;
       }
     }
@@ -167,6 +365,22 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       e.preventDefault();
       onSubmit(e);
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string') {
+          onAttachImages([...attachedImages, reader.result]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
   };
 
   const isBusy = agentStatus === 'thinking' || agentStatus === 'executing_tool';
@@ -182,14 +396,14 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         className="hidden"
       />
 
-      {/* Slash Commands Dropdown */}
-      {showSlashMenu && filteredSlashCommands.length > 0 && (
+      {/* 1. Slash Commands Dropdown */}
+      {openMenu === 'slash' && filteredSlashCommands.length > 0 && (
         <div className="absolute bottom-full mb-2 left-0 w-full bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
           <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider flex items-center justify-between border-b border-[var(--theme-border)]/50 mb-1">
             <span>Команды</span>
             <span>Tab / ↵ для выбора</span>
           </div>
-          <div className="max-h-48 overflow-y-auto space-y-0.5">
+          <div className="max-h-48 overflow-y-auto space-y-0.5 scrollbar-thin">
             {filteredSlashCommands.map((item, idx) => (
               <button
                 key={item.cmd}
@@ -215,20 +429,20 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
-      {/* Persona Selector Popover */}
-      {showPersonaMenu && personas.length > 0 && (
+      {/* 2. Persona Selector Popover (Unified Persona Card Style) */}
+      {openMenu === 'persona' && personas.length > 0 && (
         <div className="absolute bottom-full mb-2 left-4 w-60 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
           <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1">
             Персона
           </div>
-          <div className="max-h-48 overflow-y-auto space-y-0.5">
+          <div className="max-h-48 overflow-y-auto space-y-0.5 scrollbar-thin">
             {personas.map((p) => (
               <button
                 key={p.id}
                 type="button"
                 onClick={() => {
                   if (onSelectPersona) onSelectPersona(p.id);
-                  setShowPersonaMenu(false);
+                  setOpenMenu('none');
                 }}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
                   p.id === activePersonaId
@@ -240,6 +454,97 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 <span className="truncate">{p.name}</span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Model Selector Popover (EXACT SAME Container & Styling as Persona Popover) */}
+      {openMenu === 'model' && (
+        <div className="absolute bottom-full mb-2 left-24 sm:left-28 w-68 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn">
+          {/* Cloud API Models */}
+          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
+            <span>Облачные API</span>
+            <span className="opacity-60 text-[9px]">Google AI</span>
+          </div>
+          <div className="space-y-0.5 mb-1.5">
+            {modelsData.cloud.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => handleSelectCloudModel(m.id)}
+                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                  activeModelId === m.id
+                    ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  {m.isAudio ? (
+                    <Volume2 size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                  ) : (
+                    <Cloud size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                  )}
+                  <span className="truncate">{m.name}</span>
+                </div>
+                {activeModelId === m.id && <Check size={12} className="text-[var(--theme-text)] shrink-0" />}
+              </button>
+            ))}
+          </div>
+
+          {/* Local Models */}
+          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span>Локальные GGUF</span>
+              <span className="text-[9px] font-mono opacity-60">
+                ({serverStatus.running ? 'online' : 'offline'})
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleToggleServer}
+              disabled={isStartingServer}
+              className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[var(--theme-text)] border border-[var(--theme-border)] text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              {isStartingServer ? (
+                <RefreshCw size={8} className="animate-spin" />
+              ) : serverStatus.running ? (
+                <Square size={7} fill="currentColor" />
+              ) : (
+                <Play size={7} fill="currentColor" />
+              )}
+              <span>{serverStatus.running ? 'Стоп' : 'Старт'}</span>
+            </button>
+          </div>
+
+          <div className="max-h-40 overflow-y-auto space-y-0.5 scrollbar-thin">
+            {modelsData.local.length === 0 ? (
+              <div className="text-[10px] text-[var(--theme-text-muted)] italic py-1 px-2.5 font-mono">
+                нет файлов в ~/.0xagent/models/
+              </div>
+            ) : (
+              modelsData.local.map((m) => {
+                const isActive =
+                  activeModelId === m.id || activeModelId === m.fileName || activeModelId === `local:${m.fileName}`;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => handleSelectLocalModel(m)}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                      isActive
+                        ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <HardDrive size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                      <span className="truncate">{m.title || m.fileName}</span>
+                    </div>
+                    <span className="text-[10px] font-mono opacity-60 shrink-0">{m.sizeGB}</span>
+                  </button>
+                );
+              })
+            )}
           </div>
         </div>
       )}
@@ -296,8 +601,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               {personas.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border border-[var(--theme-border)] text-xs font-mono transition-all cursor-pointer shrink-0"
+                  onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')}
+                  className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-mono transition-all cursor-pointer shrink-0 border ${
+                    openMenu === 'persona'
+                      ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)] shadow-sm'
+                      : 'bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
+                  }`}
                   title="Сменить персону"
                 >
                   <User size={12} />
@@ -305,13 +614,29 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 </button>
               )}
 
-              {/* Model Selector Dropdown Chip */}
-              <ModelSelectorDropdown
-                config={config || null}
-                onModelChanged={onModelChanged}
-                direction="up"
-                compact={true}
-              />
+              {/* Model Selector Chip */}
+              <button
+                type="button"
+                onClick={() => {
+                  fetchModelsAndStatus();
+                  setOpenMenu(openMenu === 'model' ? 'none' : 'model');
+                }}
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-mono transition-all cursor-pointer shrink-0 border ${
+                  openMenu === 'model' || isLocalActive
+                    ? 'bg-white/15 text-[var(--theme-text)] border-[var(--theme-border)] shadow-sm'
+                    : 'bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
+                }`}
+                title={`Текущая модель: ${activeModelId}`}
+              >
+                <div className="relative shrink-0 flex items-center">
+                  {isLocalActive ? <Cpu size={12} /> : <Cloud size={12} />}
+                  {isLocalActive && serverStatus.running && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-white absolute -top-0.5 -right-0.5 animate-pulse" />
+                  )}
+                </div>
+                <span className="max-w-[120px] truncate">{getDisplayTitle(activeModelId)}</span>
+                <Sliders size={10} className="text-[var(--theme-text-muted)] opacity-60 shrink-0" />
+              </button>
 
               {onTogglePlanningMode && (
                 <button
@@ -333,7 +658,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 type="button"
                 onClick={() => {
                   setInputText('/');
-                  setShowSlashMenu(true);
+                  setOpenMenu('slash');
                   textareaRef.current?.focus();
                 }}
                 className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer"
@@ -364,24 +689,22 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 <button
                   type="button"
                   onClick={onCancelAgent}
-                  className="px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-[var(--theme-text)] font-medium flex items-center gap-1 text-xs transition-colors cursor-pointer shrink-0 border border-[var(--theme-border)]"
-                  title="Остановить генерацию"
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-[var(--theme-text)] transition-colors cursor-pointer"
+                  title="Остановить выполнение"
                 >
-                  <Square size={12} fill="currentColor" />
-                  <span>Стоп</span>
+                  <Square size={14} fill="currentColor" />
                 </button>
               ) : (
                 <button
                   type="submit"
-                  disabled={(!inputText.trim() && attachedImages.length === 0) || isTranscribing}
-                  className="p-1.5 rounded-lg bento-card hover:bg-white/15 text-[var(--theme-text)] flex items-center justify-center disabled:opacity-25 disabled:cursor-not-allowed transition-all cursor-pointer shrink-0"
-                  title="Отправить (Enter)"
+                  disabled={!inputText.trim() && attachedImages.length === 0}
+                  className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:hover:bg-transparent text-[var(--theme-text)] transition-colors cursor-pointer"
+                  title="Отправить"
                 >
                   <Send size={14} />
                 </button>
               )}
             </div>
-
           </div>
 
         </div>
