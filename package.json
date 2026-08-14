@@ -8,6 +8,7 @@
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite",
     "build": "tsc && vite build",
+    "build:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-launcher.ps1",
     "preview": "vite preview",
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1"
   },

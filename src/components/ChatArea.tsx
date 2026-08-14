@@ -2,19 +2,23 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Terminal,
   Sparkles,
-  Zap,
-  Cpu,
-  Layers,
-  ChevronDown,
-  ChevronRight,
-  Bot,
+  CheckCheck,
 } from 'lucide-react';
 import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata } from '../types';
-import { cleanContent } from '../utils/helpers';
+import {
+  cleanContent,
+  extractThinkingFromContent,
+  formatDateSeparator,
+  isSameDay,
+  formatTime,
+} from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
 import { AsciiCanvasEngine } from './common/AsciiCanvasEngine';
+import { MaterialIcon } from './common/MaterialIcon';
 import { FloatingCommandBar } from './chat/FloatingCommandBar';
+import { ReasoningViewer } from './chat/ReasoningViewer';
+import { ChatTimelineScrubber } from './chat/ChatTimelineScrubber';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -76,8 +80,20 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersona, setActivePersona] = useState<PersonaMetadata | null>(null);
 
+  // ASCII thinking animation frames
+  const ASCII_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  const [asciiFrameIndex, setAsciiFrameIndex] = useState(0);
+
   // Live thinking timer state
   const [thinkingSeconds, setThinkingSeconds] = useState(0);
+
+  useEffect(() => {
+    if (agentStatus !== 'thinking' && agentStatus !== 'executing_tool') return;
+    const interval = setInterval(() => {
+      setAsciiFrameIndex((prev) => (prev + 1) % ASCII_FRAMES.length);
+    }, 75);
+    return () => clearInterval(interval);
+  }, [agentStatus]);
 
   useEffect(() => {
     let timer: any = null;
@@ -102,6 +118,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       if (active) setActivePersona(active);
     }).catch((err) => console.error('Failed to load personas in ChatArea:', err));
   }, [config?.active_persona_id]);
+
+
 
   useEffect(() => {
     const u1 = api.listen<{ promptTokens: number; estimatedNewTokens: number }>('agent-summarizing-start', (e) => {
@@ -220,23 +238,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
 
-  const extractThinkingFromContent = (raw: string) => {
-    const match = raw.match(/<think>([\s\S]*?)<\/think>/i);
-    if (match) {
-      return {
-        thinking: match[1].trim(),
-        text: raw.replace(/<think>[\s\S]*?<\/think>/i, '').trim(),
-      };
-    }
-    const unclosed = raw.match(/<think>([\s\S]*)$/i);
-    if (unclosed) {
-      return {
-        thinking: unclosed[1].trim(),
-        text: '',
-      };
-    }
-    return { thinking: '', text: raw };
-  };
+
 
   const hasMessages = messages.length > 0;
 
@@ -318,123 +320,206 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           <div
             ref={chatContainerRef}
             onScroll={handleChatScroll}
-            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 select-text scrollbar-thin"
+            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 select-text scrollbar-thin relative"
           >
+            {/* Interactive Timeline Navigation Scrubber */}
+            <ChatTimelineScrubber
+              messages={messages}
+              containerRef={chatContainerRef}
+              isScrolledUp={isUserScrolledUpRef.current}
+              isGenerating={agentStatus === 'thinking' || agentStatus === 'executing_tool'}
+              onScrollToBottom={() => {
+                if (chatContainerRef.current) {
+                  chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+                  isUserScrolledUpRef.current = false;
+                }
+              }}
+              onScrollToTop={() => {
+                if (chatContainerRef.current) {
+                  chatContainerRef.current.scrollTop = 0;
+                }
+              }}
+            />
+
             {messages.map((msg, index) => {
               const isUser = msg.role === 'user';
               const isSystem = msg.role === 'system';
+              const prevMsg = index > 0 ? messages[index - 1] : null;
+              const isFirstOfDay = !prevMsg || (msg.timestamp && prevMsg.timestamp && !isSameDay(prevMsg.timestamp, msg.timestamp));
 
               if (isSystem) {
                 return (
-                  <div key={index} className="flex justify-center my-2">
-                    <div className="px-3 py-1 rounded-lg bento-card text-[11px] text-[var(--theme-text-muted)] font-mono flex items-center gap-1.5">
-                      <Terminal size={12} />
-                      <span>{msg.content}</span>
+                  <React.Fragment key={msg.id || index}>
+                    {isFirstOfDay && msg.timestamp && (
+                      <div className="flex justify-center my-4">
+                        <span className="px-3 py-0.5 rounded-full bg-black/40 border border-white/5 text-[10px] font-mono text-[var(--theme-text-muted)] select-none">
+                          {formatDateSeparator(msg.timestamp)}
+                        </span>
+                      </div>
+                    )}
+                    <div id={`msg-${msg.id || index}`} className="flex justify-center my-3 transition-all duration-300">
+                      <div className="px-3.5 py-1 rounded-full bento-card text-[11px] text-[var(--theme-text-muted)] font-mono flex items-center gap-1.5 shadow-sm">
+                        <Terminal size={12} />
+                        <span>{msg.content}</span>
+                      </div>
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
               }
 
-              const { thinking, text } = !isUser ? extractThinkingFromContent(msg.content) : { thinking: '', text: msg.content };
+              const { thinking, text, isStreamingThink } = !isUser
+                ? extractThinkingFromContent(msg.content)
+                : { thinking: '', text: msg.content, isStreamingThink: false };
+
+              const isLastAssistantMessage = !isUser && index === messages.length - 1;
+              const isActivelyGenerating = isLastAssistantMessage && (agentStatus === 'thinking' || agentStatus === 'executing_tool');
+              const hasThinking = Boolean(thinking && thinking.trim().length > 0);
+              const hasText = Boolean(text && text.trim().length > 0);
+              const hasTools = Boolean(msg.tool_calls && msg.tool_calls.length > 0);
+
+              // Do not render empty bubble if there is no content and message is not actively generating
+              if (!isUser && !hasThinking && !hasText && !hasTools && !isActivelyGenerating) {
+                return null;
+              }
 
               return (
-                <div
-                  key={index}
-                  className={`flex gap-3 max-w-4xl mx-auto ${isUser ? 'justify-end' : 'justify-start'}`}
-                >
-                  {!isUser && (
-                    <div className="w-6 h-6 rounded-lg bento-card border border-[var(--theme-border)] flex items-center justify-center shrink-0 mt-0.5 text-[var(--theme-text-muted)] shadow-sm">
-                      <Bot size={13} />
+                <React.Fragment key={msg.id || index}>
+                  {/* Date section separator */}
+                  {isFirstOfDay && msg.timestamp && (
+                    <div className="flex justify-center my-4">
+                      <span className="px-3 py-0.5 rounded-full bg-black/40 border border-white/5 text-[10px] font-mono text-[var(--theme-text-muted)] select-none">
+                        {formatDateSeparator(msg.timestamp)}
+                      </span>
                     </div>
                   )}
 
-                  <div className={`space-y-2 max-w-[88%] ${isUser ? 'items-end' : 'items-start'}`}>
-                    {/* User Attached Images */}
-                    {isUser && msg.images && msg.images.length > 0 && (
-                      <div className="flex flex-wrap gap-2 justify-end mb-2">
-                        {msg.images.map((imgSrc, imgIdx) => (
-                          <img
-                            key={imgIdx}
-                            src={imgSrc}
-                            alt="Attached"
-                            className="max-h-48 rounded-lg border border-[var(--theme-border)] shadow-md object-contain"
-                          />
-                        ))}
+                  <div
+                    id={`msg-${msg.id || index}`}
+                    className={`flex max-w-3xl mx-auto w-full my-3 transition-all duration-300 ${isUser ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {isUser ? (
+                      /* User Bubble (Telegram Outgoing Style with Theme Styling) */
+                      <div className="relative w-fit max-w-[78%] bg-[var(--theme-accent,#38bdf8)]/15 text-[var(--theme-text)] border border-[var(--theme-accent,#38bdf8)]/30 rounded-2xl rounded-tr-[4px] px-4 py-2.5 shadow-md text-[13.5px] leading-relaxed select-text space-y-1.5 transition-all">
+                        {/* Attached Images */}
+                        {msg.images && msg.images.length > 0 && (
+                          <div className="flex flex-wrap gap-2 justify-end mb-2">
+                            {msg.images.map((imgSrc, imgIdx) => (
+                              <img
+                                key={imgIdx}
+                                src={imgSrc}
+                                alt="Attached"
+                                className="max-h-48 rounded-xl border border-[var(--theme-border)] shadow-md object-contain"
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Text & Inline Timestamp with Double Checkmarks */}
+                        <div className="flex flex-wrap items-end justify-end gap-x-3 gap-y-1">
+                          <span className="whitespace-pre-wrap flex-1 text-left">{text}</span>
+                          <span className="text-[10px] text-[var(--theme-text-muted)] font-sans select-none shrink-0 inline-flex items-center gap-1 opacity-80">
+                            {formatTime(msg.timestamp)}
+                            <CheckCheck size={13} className="text-[var(--theme-accent,#38bdf8)]" />
+                          </span>
+                        </div>
                       </div>
-                    )}
+                    ) : (
+                      /* Assistant Bubble (Telegram Incoming Style with Bento Glass Theme) */
+                      <div className="relative w-fit max-w-[85%] bento-card text-[var(--theme-text)] border border-[var(--theme-border)] rounded-2xl rounded-tl-[4px] px-4.5 py-3 shadow-md text-[13.5px] leading-relaxed select-text space-y-2.5 transition-all">
+                        {/* Thinking / Reasoning Block (Active when thinking exists OR while actively generating before text begins) */}
+                        {reasoningEnabled && (hasThinking || (isActivelyGenerating && !hasText)) && (
+                          <div className="mb-2 w-full">
+                            <ReasoningViewer
+                              thinking={thinking}
+                              isLive={isStreamingThink || isActivelyGenerating}
+                              thinkingSeconds={thinkingSeconds}
+                              liveTelemetry={liveTelemetry}
+                              defaultExpanded={false}
+                            />
+                          </div>
+                        )}
 
-                    {/* Thinking / Reasoning Accordion Block */}
-                    {!isUser && reasoningEnabled && thinking && (
-                      <ThinkingAccordion thinking={thinking} />
-                    )}
+                        {/* Assistant Text & Bottom Right Timestamp */}
+                        {text && (
+                          <div className="space-y-1">
+                            <NotionMarkdown content={cleanContent(text)} />
+                            <div className="flex justify-end pt-0.5">
+                              <span className="text-[10px] text-[var(--theme-text-muted)] opacity-60 font-sans select-none">
+                                {formatTime(msg.timestamp)}
+                              </span>
+                            </div>
+                          </div>
+                        )}
 
-                    {/* Message Bubble */}
-                    {(text || isUser) && (
-                      <div
-                        className={`p-4 rounded-xl text-xs sm:text-sm leading-relaxed ${
-                          isUser
-                            ? 'bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] rounded-tr-sm'
-                            : 'bento-card text-[var(--theme-text)] rounded-tl-sm'
-                        }`}
-                      >
-                        {isUser ? (
-                          <div className="whitespace-pre-wrap">{text}</div>
-                        ) : (
-                          <NotionMarkdown content={cleanContent(text)} />
+                        {/* Tool Calls Rendering */}
+                        {msg.tool_calls && msg.tool_calls.length > 0 && (
+                          <div className="space-y-2 pt-1 w-full">
+                            {msg.tool_calls.map((tool) => (
+                              <ToolCard
+                                key={tool.id}
+                                tool={tool}
+                                onRespond={onRespondToTool}
+                              />
+                            ))}
+                          </div>
                         )}
                       </div>
                     )}
-
-                    {/* Tool Calls Rendering */}
-                    {!isUser && msg.tool_calls && msg.tool_calls.length > 0 && (
-                      <div className="space-y-2 pt-1 w-full">
-                        {msg.tool_calls.map((tool) => (
-                          <ToolCard
-                            key={tool.id}
-                            tool={tool}
-                            onRespond={onRespondToTool}
-                          />
-                        ))}
-                      </div>
-                    )}
                   </div>
-                </div>
+                </React.Fragment>
               );
             })}
 
-            {/* Live Thinking Status Indicator: Compact Left-Aligned Pill */}
-            {agentStatus === 'thinking' && (
-              <div className="flex items-center justify-start max-w-4xl mx-auto pl-9">
-                <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bento-card border border-[var(--theme-border)] text-xs text-[var(--theme-text)] animate-fadeIn shadow-sm">
-                  <Sparkles size={13} className="text-[var(--theme-text-muted)] animate-spin" />
-                  <span className="font-medium">ИИ-Агент рассуждает...</span>
-                  <span className="text-[10px] font-mono text-[var(--theme-text-muted)] opacity-70">
-                    {thinkingSeconds.toFixed(1)}s
+            {/* Live Thinking ASCII HUD (displayed while agent is thinking before assistant message tokens arrive) */}
+            {agentStatus === 'thinking' && (!messages.some((m) => m.role === 'assistant' && (m.content.trim().length > 0 || (m.tool_calls && m.tool_calls.length > 0)))) && (
+              <div className="flex justify-start max-w-3xl mx-auto w-full my-3">
+                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bento-card border border-[var(--theme-border)] text-xs text-[var(--theme-text)] animate-fadeIn shadow-sm font-mono">
+                  <span className="text-[var(--theme-accent)] font-bold text-sm tracking-wider select-none">
+                    {ASCII_FRAMES[asciiFrameIndex]}
                   </span>
+                  <span className="font-medium text-xs text-[var(--theme-text)]">
+                    ИИ-Агент рассуждает...
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10px] text-[var(--theme-text-muted)] opacity-80">
+                    <MaterialIcon name="schedule" size={11} />
+                    <span>{thinkingSeconds.toFixed(1)}s</span>
+                  </span>
+                  {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-[var(--theme-accent)] font-semibold pl-1 border-l border-[var(--theme-border)]">
+                      <MaterialIcon name="bolt" size={11} />
+                      <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
+                    </span>
+                  )}
+                  {liveTelemetry?.tokenCount !== undefined && liveTelemetry.tokenCount > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-[var(--theme-text-muted)]">
+                      <MaterialIcon name="memory" size={11} />
+                      <span>{liveTelemetry.tokenCount} tok</span>
+                    </span>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Live Telemetry Card during Generation: Compact Pill */}
+            {/* Live Telemetry Card during Generation */}
             {liveTelemetry && agentStatus !== 'idle' && (
-              <div className="flex items-center justify-start max-w-4xl mx-auto pl-9">
+              <div className="flex justify-start max-w-3xl mx-auto w-full my-2">
                 <div className="inline-flex items-center gap-3 px-3 py-1 rounded-full bento-card border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-text-muted)] shadow-sm">
                   {liveTelemetry.tokensPerSec !== undefined && (
-                    <span className="flex items-center gap-1">
-                      <Zap size={11} />
+                    <span className="flex items-center gap-1 text-[var(--theme-accent)] font-semibold">
+                      <MaterialIcon name="bolt" size={12} />
                       <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
                     </span>
                   )}
                   {liveTelemetry.tokenCount !== undefined && (
-                    <span className="flex items-center gap-1">
-                      <Cpu size={11} />
+                    <span className="flex items-center gap-1 text-[var(--theme-text)]">
+                      <MaterialIcon name="memory" size={12} className="text-[var(--theme-text-muted)]" />
                       <span>{liveTelemetry.tokenCount} токенов</span>
                     </span>
                   )}
                   {liveTelemetry.contextUsed !== undefined && (
-                    <span className="flex items-center gap-1 hidden sm:flex">
-                      <Layers size={11} />
-                      <span>{liveTelemetry.contextUsed}</span>
+                    <span className="flex items-center gap-1 hidden sm:flex text-[var(--theme-text-muted)]">
+                      <MaterialIcon name="storage" size={12} />
+                      <span>{liveTelemetry.contextUsed.toLocaleString()}{liveTelemetry.contextMax ? ` / ${liveTelemetry.contextMax.toLocaleString()}` : ''}</span>
                     </span>
                   )}
                 </div>
@@ -445,7 +530,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
 
           {/* Bottom Floating Command Bar for Active Chat */}
-          <div className="p-3 sm:p-4 shrink-0 max-w-4xl mx-auto w-full">
+          <div className="p-3 sm:p-4 shrink-0 max-w-3xl mx-auto w-full">
             <FloatingCommandBar
               inputText={inputText}
               setInputText={setInputText}
@@ -468,29 +553,3 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   );
 };
 
-// Helper: Collapsible Reasoning / Thinking Accordion
-const ThinkingAccordion: React.FC<{ thinking: string }> = ({ thinking }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="rounded-xl bento-card border border-[var(--theme-border)] overflow-hidden font-mono text-xs max-w-full">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3 py-2 bg-black/40 flex items-center justify-between text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer select-none transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          <Sparkles size={13} className="text-[var(--theme-text-muted)]" />
-          <span className="font-semibold text-[11px] text-[var(--theme-text)]">Ход мыслей (CoT Reasoning)</span>
-        </div>
-        {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-      </button>
-
-      {isOpen && (
-        <div className="p-3 bg-black/30 border-t border-[var(--theme-border)] text-[var(--theme-text-muted)] text-[11px] leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto scrollbar-thin select-text font-mono">
-          {thinking}
-        </div>
-      )}
-    </div>
-  );
-};

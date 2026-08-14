@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Check, AlertTriangle, Sparkles, CheckCircle2, ShieldAlert, ChevronRight } from 'lucide-react';
-import { MaterialIcon } from './common/MaterialIcon';
+import { Copy, Check } from 'lucide-react';
 
 interface NotionMarkdownProps {
   content: string;
@@ -85,15 +84,16 @@ const FormattedMarkdownSection: React.FC<{ rawText: string }> = ({ rawText }) =>
     const codeId = `code-block-${blockCount++}`;
 
     elements.push(
-      <div key={codeId} className="my-3 rounded-lg border border-white/10 bg-slate-950/90 overflow-hidden font-mono shadow-md">
-        <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-900/90 border-b border-white/5 text-[11px] text-slate-400 select-none">
-          <span className="text-purple-300 font-medium lowercase flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-purple-400/80 inline-block" />
+      <div key={codeId} className="my-3 rounded-xl border border-[var(--theme-border)] bg-black/50 overflow-hidden font-mono shadow-md">
+        <div className="flex items-center justify-between px-3.5 py-1.5 bg-black/40 border-b border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] select-none">
+          <span className="text-[var(--theme-text)] font-medium lowercase flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] inline-block" />
             {lang}
           </span>
           <button
+            type="button"
             onClick={() => handleCopy(codeContent, codeId)}
-            className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer text-slate-400 px-2 py-0.5 rounded hover:bg-white/5"
+            className="flex items-center gap-1 hover:text-[var(--theme-text)] transition-colors cursor-pointer text-[var(--theme-text-muted)] px-2 py-0.5 rounded hover:bg-white/5"
           >
             {copiedCodeId === codeId ? (
               <>
@@ -108,7 +108,7 @@ const FormattedMarkdownSection: React.FC<{ rawText: string }> = ({ rawText }) =>
             )}
           </button>
         </div>
-        <pre className="p-3.5 text-xs text-slate-200 overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
+        <pre className="p-3.5 text-xs text-[var(--theme-text)] overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
           <code>{codeContent}</code>
         </pre>
       </div>
@@ -125,14 +125,14 @@ const FormattedMarkdownSection: React.FC<{ rawText: string }> = ({ rawText }) =>
       const codeContent = unclosedMatch[2];
       const codeId = `code-block-${blockCount++}`;
       elements.push(
-        <div key={codeId} className="my-3 rounded-lg border border-purple-500/30 bg-slate-950/90 overflow-hidden font-mono shadow-md">
-          <div className="flex items-center justify-between px-3.5 py-1.5 bg-slate-900/90 border-b border-white/5 text-[11px] text-slate-400 select-none">
-            <span className="text-purple-300 font-medium lowercase flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse inline-block" />
+        <div key={codeId} className="my-3 rounded-xl border border-[var(--theme-accent)]/30 bg-black/50 overflow-hidden font-mono shadow-md">
+          <div className="flex items-center justify-between px-3.5 py-1.5 bg-black/40 border-b border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] select-none">
+            <span className="text-[var(--theme-accent)] font-medium lowercase flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] animate-pulse inline-block" />
               {lang} (генерация...)
             </span>
           </div>
-          <pre className="p-3.5 text-xs text-slate-200 overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
+          <pre className="p-3.5 text-xs text-[var(--theme-text)] overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
             <code>{codeContent}</code>
           </pre>
         </div>
@@ -182,7 +182,7 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
     // Headers
     if (trimmed.startsWith('# ')) {
       renderedElements.push(
-        <h1 key={`h1-${index}`} className="text-base sm:text-lg font-bold text-slate-100 mt-4 mb-2 pb-1 border-b border-white/10 font-sans tracking-tight">
+        <h1 key={`h1-${index}`} className="text-base sm:text-lg font-bold text-[var(--theme-text)] mt-4 mb-2 pb-1 border-b border-[var(--theme-border)] font-sans tracking-tight">
           {trimmed.substring(2)}
         </h1>
       );
@@ -190,8 +190,8 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
     }
     if (trimmed.startsWith('## ')) {
       renderedElements.push(
-        <h2 key={`h2-${index}`} className="text-sm sm:text-base font-semibold text-slate-200 mt-3 mb-1.5 font-sans tracking-tight flex items-center gap-1.5">
-          <ChevronRight size={14} className="text-emerald-400 shrink-0" />
+        <h2 key={`h2-${index}`} className="text-sm sm:text-base font-semibold text-[var(--theme-text)] mt-3 mb-1.5 font-sans tracking-tight flex items-center gap-1.5">
+          <span className="text-[var(--theme-accent)] font-bold font-mono">›</span>
           <span>{trimmed.substring(3)}</span>
         </h2>
       );
@@ -199,7 +199,7 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
     }
     if (trimmed.startsWith('### ')) {
       renderedElements.push(
-        <h3 key={`h3-${index}`} className="text-xs sm:text-sm font-semibold text-slate-300 mt-2 mb-1 font-sans">
+        <h3 key={`h3-${index}`} className="text-xs sm:text-sm font-semibold text-[var(--theme-text-muted)] mt-2 mb-1 font-sans">
           {trimmed.substring(4)}
         </h3>
       );
@@ -211,14 +211,14 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
       const isChecked = trimmed.startsWith('- [x] ') || trimmed.startsWith('- [X] ');
       const checkText = trimmed.substring(6);
       renderedElements.push(
-        <div key={`check-${index}`} className="flex items-start gap-2 my-1 text-xs sm:text-sm text-slate-200 font-sans">
+        <div key={`check-${index}`} className="flex items-start gap-2 my-1 text-[13.5px] text-[var(--theme-text)] font-sans">
           <input
             type="checkbox"
             checked={isChecked}
             readOnly
-            className="mt-0.5 rounded border-white/20 bg-slate-900 text-emerald-500 focus:ring-0 cursor-default"
+            className="mt-0.5 rounded border-[var(--theme-border)] bg-black/40 text-[var(--theme-accent,#38bdf8)] focus:ring-0 cursor-default"
           />
-          <span className={isChecked ? 'line-through text-slate-400' : ''}>
+          <span className={isChecked ? 'line-through opacity-50' : ''}>
             <InlineFormattedText text={checkText} />
           </span>
         </div>
@@ -229,8 +229,8 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
     // Bullet point
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       renderedElements.push(
-        <div key={`bullet-${index}`} className="flex items-start gap-2 my-1 text-xs sm:text-sm text-slate-200 font-sans pl-2">
-          <span className="text-emerald-400 font-bold select-none">•</span>
+        <div key={`bullet-${index}`} className="flex items-start gap-2 my-1 text-[13.5px] text-[var(--theme-text)] font-sans pl-2">
+          <span className="text-[var(--theme-accent,#38bdf8)] font-bold select-none">•</span>
           <span><InlineFormattedText text={trimmed.substring(2)} /></span>
         </div>
       );
@@ -245,7 +245,7 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
 
     // Standard paragraph
     renderedElements.push(
-      <p key={`p-${index}`} className="my-1 text-xs sm:text-sm text-slate-200 leading-relaxed font-sans">
+      <p key={`p-${index}`} className="my-1 text-[13.5px] text-[var(--theme-text)] leading-relaxed font-sans">
         <InlineFormattedText text={line} />
       </p>
     );
@@ -368,17 +368,19 @@ const RenderNotionCallout: React.FC<{ line: string }> = ({ line }) => {
   }
 
   const styles = {
-    note: { border: 'border-[var(--theme-accent)]/40', bg: 'bg-[var(--theme-accent)]/10', text: 'text-theme-text', icon: <MaterialIcon name="info" size={14} className="text-theme-accent" /> },
-    tip: { border: 'border-emerald-500/40', bg: 'bg-emerald-950/20', text: 'text-emerald-200', icon: <Sparkles size={14} className="text-emerald-400" /> },
-    warning: { border: 'border-amber-500/40', bg: 'bg-amber-950/20', text: 'text-amber-200', icon: <AlertTriangle size={14} className="text-amber-400" /> },
-    important: { border: 'border-purple-500/40', bg: 'bg-purple-950/20', text: 'text-purple-200', icon: <CheckCircle2 size={14} className="text-purple-400" /> },
-    caution: { border: 'border-rose-500/40', bg: 'bg-rose-950/20', text: 'text-rose-200', icon: <ShieldAlert size={14} className="text-rose-400" /> },
-    quote: { border: 'border-white/20', bg: 'bg-slate-900/60', text: 'text-slate-300', icon: <ChevronRight size={14} className="text-slate-400" /> },
+    note: { border: 'border-[var(--theme-accent)]/40', bg: 'bg-[var(--theme-accent)]/10', text: 'text-[var(--theme-text)]', badge: '[NOTE]', badgeClass: 'text-[var(--theme-accent)] font-bold' },
+    tip: { border: 'border-[var(--theme-accent)]/40', bg: 'bg-[var(--theme-accent)]/10', text: 'text-[var(--theme-text)]', badge: '[TIP]', badgeClass: 'text-[var(--theme-accent)] font-bold' },
+    warning: { border: 'border-amber-500/40', bg: 'bg-amber-950/20', text: 'text-amber-200', badge: '[WARN]', badgeClass: 'text-amber-400 font-bold' },
+    important: { border: 'border-[var(--theme-accent)]/50', bg: 'bg-[var(--theme-accent)]/15', text: 'text-[var(--theme-text)]', badge: '[IMPORTANT]', badgeClass: 'text-[var(--theme-accent)] font-bold' },
+    caution: { border: 'border-red-500/40', bg: 'bg-red-950/20', text: 'text-red-200', badge: '[CAUTION]', badgeClass: 'text-red-400 font-bold' },
+    quote: { border: 'border-[var(--theme-border)]', bg: 'bg-black/30', text: 'text-[var(--theme-text-muted)]', badge: '[>]', badgeClass: 'text-[var(--theme-text-muted)]' },
   }[type];
 
   return (
-    <div className={`my-2 p-3 rounded-md border-l-3 ${styles.border} ${styles.bg} ${styles.text} text-xs sm:text-sm flex items-start gap-2.5 shadow-sm`}>
-      <span className="mt-0.5 shrink-0 select-none">{styles.icon}</span>
+    <div className={`my-2.5 p-3 rounded-xl border-l-4 ${styles.border} ${styles.bg} ${styles.text} text-xs sm:text-sm flex items-start gap-2.5 shadow-sm font-sans`}>
+      <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/40 border border-[var(--theme-border)] shrink-0 select-none ${styles.badgeClass}`}>
+        {styles.badge}
+      </span>
       <div className="flex-1 whitespace-pre-wrap font-sans leading-relaxed">
         <InlineFormattedText text={content} />
       </div>
@@ -403,9 +405,9 @@ const RenderNotionTable: React.FC<{ lines: string[] }> = ({ lines }) => {
     .map(parseRow);
 
   return (
-    <div className="my-3 overflow-x-auto rounded-md border border-white/10 shadow-sm">
-      <table className="w-full text-xs text-left border-collapse">
-        <thead className="bg-slate-900/90 text-slate-200 border-b border-white/10 font-semibold font-sans">
+    <div className="my-3 overflow-x-auto rounded-xl border border-[var(--theme-border)] shadow-sm bg-black/30">
+      <table className="w-full text-xs text-left border-collapse font-sans">
+        <thead className="bg-black/50 text-[var(--theme-text)] border-b border-[var(--theme-border)] font-semibold">
           <tr>
             {headerCells.map((cell, idx) => (
               <th key={idx} className="px-3.5 py-2">
@@ -414,7 +416,7 @@ const RenderNotionTable: React.FC<{ lines: string[] }> = ({ lines }) => {
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/5 bg-slate-950/40 text-slate-300 font-sans">
+        <tbody className="divide-y divide-[var(--theme-border)]/40 text-[var(--theme-text-muted)]">
           {bodyRows.map((row, rIdx) => (
             <tr key={rIdx} className="hover:bg-white/5 transition-colors">
               {row.map((cell, cIdx) => (

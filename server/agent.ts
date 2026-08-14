@@ -335,6 +335,36 @@ export async function runAgentLoop(
     const decoder = new TextDecoder('utf-8');
     let buffer = '';
     let isStreamDone = false;
+    let isInReasoning = false;
+
+    const processJsonData = (data: string) => {
+      try {
+        const parsed = JSON.parse(data);
+        const delta = parsed.choices?.[0]?.delta;
+        const reasoningChunk = delta?.reasoning_content || delta?.reasoning || delta?.thought;
+        const contentChunk = delta?.content || parsed.choices?.[0]?.text;
+
+        if (reasoningChunk) {
+          if (!isInReasoning) {
+            emitToken('<think>' + reasoningChunk);
+            isInReasoning = true;
+          } else {
+            emitToken(reasoningChunk);
+          }
+        }
+
+        if (contentChunk) {
+          if (isInReasoning) {
+            emitToken('</think>' + contentChunk);
+            isInReasoning = false;
+          } else {
+            emitToken(contentChunk);
+          }
+        }
+      } catch {
+        // Ignore parse errors for partial chunks
+      }
+    };
 
     while (!isStreamDone) {
       if (activeCancelTokens.has(sessionId)) {
@@ -353,13 +383,7 @@ export async function runAgentLoop(
             if (line.startsWith('data:')) {
               const data = line.slice(5).trim();
               if (data === '[DONE]') break;
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text;
-                if (content) {
-                  emitToken(content);
-                }
-              } catch {}
+              processJsonData(data);
             }
           }
         }
@@ -378,18 +402,14 @@ export async function runAgentLoop(
             isStreamDone = true;
             break;
           }
-
-          try {
-            const parsed = JSON.parse(data);
-            const content = parsed.choices?.[0]?.delta?.content || parsed.choices?.[0]?.text;
-            if (content) {
-              emitToken(content);
-            }
-          } catch {
-            // Ignore parse errors for broken chunk lines
-          }
+          processJsonData(data);
         }
       }
+    }
+
+    if (isInReasoning) {
+      emitToken('</think>');
+      isInReasoning = false;
     }
 
     // Sanitize assistant content from drafts, metadata headers, and LaTeX arrows

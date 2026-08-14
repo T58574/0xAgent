@@ -31,21 +31,21 @@ export const IdeStatusBar: React.FC<IdeStatusBarProps> = ({
       case 'thinking':
         return (
           <span className="flex items-center gap-1 text-[var(--theme-accent)] font-bold animate-pulse">
-            <span>⚡</span>
+            <span className="text-xs">›</span>
             <span>[THINKING]</span>
           </span>
         );
       case 'executing_tool':
         return (
           <span className="flex items-center gap-1 text-amber-400 font-bold animate-pulse">
-            <span>⚙️</span>
+            <span className="text-xs">›</span>
             <span>[EXEC TOOLS]</span>
           </span>
         );
       case 'waiting_approval':
         return (
-          <span className="flex items-center gap-1 text-rose-400 font-bold animate-pulse">
-            <span>✋</span>
+          <span className="flex items-center gap-1 text-red-400 font-bold animate-pulse">
+            <span className="text-xs">!</span>
             <span>[CONFIRM]</span>
           </span>
         );

@@ -286,6 +286,26 @@ export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
     xmlSpec: `23. <jules_send_feedback session_id="..." prompt="..." />
     - Отправляет доработку в фоновую сессию Jules.`,
   },
+  {
+    id: 'update_user_profile',
+    name: 'update_user_profile',
+    description: 'Мгновенное сохранение факта, имени, привычек или предпочтений пользователя в профиль USER.md активной персоны.',
+    category: 'memory',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `24. <update_user_profile trait="..." category="preferences|profile|knowledge" />
+    - Мгновенно сохраняет и дополняет информацию о пользователе в USER.md активной персоны. НЕ создавайте файлы USER.md в корне рабочей области!`,
+  },
+  {
+    id: 'update_persona_file',
+    name: 'update_persona_file',
+    description: 'Обновление файла активной персоны (SOUL.md, USER.md или TOOLS.md) в системном каталоге ~/.0xagent/personas/.',
+    category: 'memory',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `25. <update_persona_file file="SOUL.md|USER.md|TOOLS.md">контент</update_persona_file>
+    - Обновляет файл активной персоны в системной директории. НЕ пишите файлы персоны в проект!`,
+  },
 ];
 
 export function loadToolsToggles(): Record<string, boolean> {

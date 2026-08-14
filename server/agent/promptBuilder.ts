@@ -29,15 +29,25 @@ Before executing modifying tool calls (<write_file>, <patch_file>, <execute_comm
     : '';
 
   const activePersona = getActivePersona();
-  const personaContext = `\n\n# 🎭 ACTIVE AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
+  const personaContext = `\n\n# ACTIVE AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
 
 ## SOUL.md — CHARACTER & BEHAVIOR
 ${activePersona.soul}
 
 ## USER.md — USER PROFILE & OBSERVED TRAITS (${activePersona.metadata.user_id})
-${activePersona.user}`;
+${activePersona.user}
 
-  const toolExecutionDirective = `\n\n# ⚠️ CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & CODE MODIFICATIONS
+## PERSONA MEMORY & USER PROFILE RULES:
+- Active Persona Directory: ~/.0xagent/personas/${activePersona.metadata.id}/
+- NEVER create or write USER.md, SOUL.md, or profile files in the user's project workspace directory!
+- To quickly remember user preferences, user name, habits, or facts: ALWAYS use the fast tool: <update_user_profile trait="User info here" category="profile" />
+- To update persona character or behavior: use <update_persona_file file="SOUL.md">new soul content</update_persona_file>.`;
+
+  const reasoningDirective = `\n\n# REASONING & CHAIN-OF-THOUGHT INSTRUCTIONS:
+- You should output your step-by-step reasoning and plan inside <think>...</think> tags before providing your answer or executing tools.
+- Everything inside <think>...</think> is processed as internal reasoning and rendered cleanly in the reasoning viewer for the user.`;
+
+  const toolExecutionDirective = `\n\n# CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & CODE MODIFICATIONS
 1. EXPLANATION FIRST: Always write a brief natural language explanation of your diagnosis and intended changes BEFORE emitting XML tool calls.
 2. MANDATORY PATCH FIRST POLICY: ALWAYS use <patch_file> for modifying existing codebase files. NEVER use <write_file> to rewrite an entire file (>50 lines) just to change a few components or lines!
 3. MULTI-BLOCK PATCHES: You can place MULTIPLE SEARCH/REPLACE blocks inside a single <patch_file path="..."> tag to modify multiple places at once. Keep SEARCH blocks concise and unique (3-8 lines).
@@ -49,11 +59,12 @@ ${activePersona.user}`;
   const isGemmaModel = modelNameLower.includes('gemma') || modelPathLower.includes('gemma');
 
   const gemmaToolDirective = isGemmaModel
-    ? `\n\n# 🔧 ALTERNATIVE TOOL CALL FORMAT (Gemma 4)
+    ? `\n\n# ALTERNATIVE TOOL CALL FORMAT (Gemma 4 / JSON)
 You may also call tools using JSON format wrapped in <tool_call> tags:
 <tool_call>{"name": "read_file", "arguments": {"path": "src/main.ts"}}</tool_call>
 <tool_call>{"name": "write_file", "arguments": {"path": "src/main.ts", "content": "file contents here"}}</tool_call>
 <tool_call>{"name": "execute_command", "arguments": {"command": "npm run build"}}</tool_call>
+<tool_call>{"name": "update_user_profile", "arguments": {"trait": "User preferred theme is matrix", "category": "preferences"}}</tool_call>
 <tool_call>{"name": "list_dir", "arguments": {"path": "."}}</tool_call>
 <tool_call>{"name": "grep_search", "arguments": {"pattern": "TODO", "path": "src/"}}</tool_call>
 <tool_call>{"name": "patch_file", "arguments": {"path": "file.ts", "content": "<<<<<<< SEARCH\nold code\n=======\nnew code\n>>>>>>> REPLACE"}}</tool_call>
@@ -65,6 +76,7 @@ Both XML and JSON tool call formats are accepted.`
 
   return (
     personaContext +
+    reasoningDirective +
     unifiedToolsContext +
     toolExecutionDirective +
     gemmaToolDirective +

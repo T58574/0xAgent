@@ -101,23 +101,63 @@
   --theme-accent-text: #451a03;
 }
 
-/* Custom Sleek Cyber Scrollbars */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+/* ==========================================
+   UNIVERSAL SLEEK CUSTOM SCROLLBAR SYSTEM
+   ========================================== */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-border) transparent;
 }
 
-::-webkit-scrollbar-track {
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+*::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
   background: var(--theme-border);
-  border-radius: 4px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
 
-::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background: var(--theme-text-muted);
+  box-shadow: 0 0 6px var(--theme-accent-glow);
+}
+
+*::-webkit-scrollbar-thumb:active {
+  background: var(--theme-accent);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Specific class for ultra-minimal scrollbars */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Typography Base Rules */
@@ -330,4 +370,23 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 
 .animate-pulseGlow {
   animation: pulseGlow 2.4s ease-in-out infinite;
+}
+
+@keyframes messageHighlightPulse {
+  0% {
+    box-shadow: 0 0 0 0 var(--theme-accent-glow, rgba(56, 189, 248, 0.5));
+    transform: scale(1.008);
+  }
+  50% {
+    box-shadow: 0 0 24px 4px var(--theme-accent-glow, rgba(56, 189, 248, 0.35));
+    transform: scale(1.012);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    transform: scale(1);
+  }
+}
+
+.highlight-pulse {
+  animation: messageHighlightPulse 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }

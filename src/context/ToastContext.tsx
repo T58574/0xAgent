@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
-import { CheckCircle, AlertCircle, Info, X } from 'lucide-react';
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
 export interface ToastItem {
   id: string;
@@ -32,7 +31,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 4000) => {
+  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 3500) => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type, duration }]);
 
@@ -47,32 +46,50 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ showToast, removeToast }}>
       {children}
       {/* Floating Toasts Container */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none px-3">
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            className={`pointer-events-auto flex items-start justify-between gap-3 p-3.5 rounded-xl border shadow-xl backdrop-blur-md transition-all duration-300 animate-slideInRight ${
-              toast.type === 'success'
-                ? 'bg-slate-900/90 border-emerald-500/50 text-emerald-200 shadow-emerald-950/40'
-                : toast.type === 'error'
-                ? 'bg-slate-900/90 border-rose-500/50 text-rose-200 shadow-rose-950/40'
-                : 'bg-slate-900/90 border-sky-500/50 text-sky-200 shadow-sky-950/40'
-            }`}
-          >
-            <div className="flex items-start gap-2.5 min-w-0">
-              {toast.type === 'success' && <CheckCircle size={18} className="text-emerald-400 shrink-0 mt-0.5" />}
-              {toast.type === 'error' && <AlertCircle size={18} className="text-rose-400 shrink-0 mt-0.5" />}
-              {toast.type === 'info' && <Info size={18} className="text-sky-400 shrink-0 mt-0.5" />}
-              <span className="text-xs font-sans font-medium leading-relaxed break-words">{toast.message}</span>
-            </div>
-            <button
-              onClick={() => removeToast(toast.id)}
-              className="text-slate-400 hover:text-white shrink-0 p-0.5 rounded-md hover:bg-white/10 transition-colors"
+      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3 font-mono">
+        {toasts.map((toast) => {
+          let badgeText = '[INFO]';
+          let badgeClass = 'text-[var(--theme-text-muted)] bg-white/5 border-[var(--theme-border)]';
+          let cardBorder = 'border-[var(--theme-border)]';
+
+          if (toast.type === 'success') {
+            badgeText = '[✓ OK]';
+            badgeClass = 'text-[var(--theme-accent)] bg-[var(--theme-accent)]/15 border-[var(--theme-accent)]/30 font-bold';
+            cardBorder = 'border-[var(--theme-accent)]/40 shadow-[0_0_16px_var(--theme-accent-glow)]';
+          } else if (toast.type === 'error') {
+            badgeText = '[! ERR]';
+            badgeClass = 'text-red-400 bg-red-500/15 border-red-500/30 font-bold';
+            cardBorder = 'border-red-500/40 shadow-[0_0_16px_rgba(239,68,68,0.2)]';
+          } else if (toast.type === 'warning') {
+            badgeText = '[WARN]';
+            badgeClass = 'text-amber-400 bg-amber-500/15 border-amber-500/30 font-bold';
+            cardBorder = 'border-amber-500/40';
+          }
+
+          return (
+            <div
+              key={toast.id}
+              className={`pointer-events-auto flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl border ${cardBorder} bg-[var(--theme-panel-solid,#0a0c12)]/95 text-[var(--theme-text)] shadow-2xl backdrop-blur-2xl transition-all duration-300 animate-slideInRight font-mono`}
             >
-              <X size={14} />
-            </button>
-          </div>
-        ))}
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className={`px-1.5 py-0.5 rounded text-[10px] border shrink-0 ${badgeClass}`}>
+                  {badgeText}
+                </span>
+                <span className="text-xs font-medium leading-tight break-words text-[var(--theme-text)] font-sans">
+                  {toast.message}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeToast(toast.id)}
+                className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] shrink-0 px-1.5 py-0.5 rounded hover:bg-white/10 transition-colors text-[11px] font-bold cursor-pointer"
+                title="Закрыть"
+              >
+                [x]
+              </button>
+            </div>
+          );
+        })}
       </div>
     </ToastContext.Provider>
   );

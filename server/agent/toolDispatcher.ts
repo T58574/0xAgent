@@ -25,7 +25,7 @@ import {
 } from '../tools';
 import { addOrUpdateMemory, queryMemories } from '../memory';
 import { listSkills, readSkill } from '../skills';
-import { getActivePersona, appendSilentUserTrait } from '../personas';
+import { getActivePersona, appendSilentUserTrait, updatePersonaFile } from '../personas';
 import { listSessions, loadSession } from '../session';
 
 export async function dispatchToolExecution(
@@ -216,6 +216,27 @@ export async function dispatchToolExecution(
         tc.arguments.session_id || tc.arguments.sessionId || tc.arguments.id,
         tc.arguments.prompt
       );
+
+    case 'update_user_profile': {
+      const trait = tc.arguments.trait || tc.arguments.content || tc.arguments.value || '';
+      const category = tc.arguments.category || 'profile';
+      if (!trait.trim()) {
+        return 'Error: trait content cannot be empty for update_user_profile.';
+      }
+      appendSilentUserTrait(activePersona.metadata.id, `[${category}] ${trait.trim()}`);
+      addOrUpdateMemory(`user_${category}`, trait.trim(), category);
+      return `[OK] Профиль пользователя (${activePersona.metadata.user_id}) успешно дополнен в ~/.0xagent/personas/${activePersona.metadata.id}/USER.md: [${category}] ${trait.trim()}`;
+    }
+
+    case 'update_persona_file': {
+      const filename = (tc.arguments.file || tc.arguments.filename || 'USER.md') as 'SOUL.md' | 'TOOLS.md' | 'USER.md';
+      const content = tc.arguments.content || '';
+      if (!['SOUL.md', 'TOOLS.md', 'USER.md'].includes(filename)) {
+        return `Error: Invalid persona filename '${filename}'. Allowed: SOUL.md, TOOLS.md, USER.md`;
+      }
+      updatePersonaFile(activePersona.metadata.id, filename, content);
+      return `[OK] Файл ${filename} активной персоны [${activePersona.metadata.name}] успешно обновлен в ~/.0xagent/personas/${activePersona.metadata.id}/${filename}`;
+    }
 
     default:
       throw new Error(`Unknown tool name: ${tc.name}`);

@@ -1,0 +1,464 @@
+using System;
+using System.Diagnostics;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.IO;
+using System.Net;
+using System.Reflection;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+using System.Windows.Forms;
+
+namespace OxAgent.Launcher
+{
+    public class TrayApplicationContext : ApplicationContext
+    {
+        private NotifyIcon _notifyIcon;
+        private ContextMenuStrip _contextMenu;
+        private ToolStripMenuItem _statusMenuItem;
+        private Process _devProcess;
+        private System.Windows.Forms.Timer _healthTimer;
+        private string _projectDir;
+        private string _logFilePath;
+        private StreamWriter _logWriter;
+        private bool _isShuttingDown = false;
+        private bool _hasAutoOpenedBrowser = false;
+
+        public TrayApplicationContext()
+        {
+            _projectDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            if (string.IsNullOrEmpty(_projectDir))
+            {
+                _projectDir = AppDomain.CurrentDomain.BaseDirectory;
+            }
+
+            string logsDir = Path.Combine(_projectDir, "logs");
+            if (!Directory.Exists(logsDir))
+            {
+                Directory.CreateDirectory(logsDir);
+            }
+            _logFilePath = Path.Combine(logsDir, "0xAgent_launcher.log");
+
+            try
+            {
+                _logWriter = new StreamWriter(new FileStream(_logFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite), Encoding.UTF8)
+                {
+                    AutoFlush = true
+                };
+            }
+            catch
+            {
+                // Fallback if log writer cannot open
+            }
+
+            Log("[0xAgent Launcher] Initializing Tray Supervisor...");
+
+            InitializeTrayIcon();
+            StartServices();
+
+            _healthTimer = new System.Windows.Forms.Timer
+            {
+                Interval = 3000
+            };
+            _healthTimer.Tick += HealthTimer_Tick;
+            _healthTimer.Start();
+        }
+
+        private void Log(string message)
+        {
+            try
+            {
+                string line = string.Format("[{0:yyyy-MM-dd HH:mm:ss}] {1}", DateTime.Now, message);
+                if (_logWriter != null)
+                {
+                    _logWriter.WriteLine(line);
+                }
+            }
+            catch {}
+        }
+
+        private Icon CreateCyberAppIcon()
+        {
+            try
+            {
+                using (Bitmap bmp = new Bitmap(32, 32))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.Clear(Color.Transparent);
+
+                    // Outer glowing rounded box
+                    using (GraphicsPath path = new GraphicsPath())
+                    {
+                        int radius = 8;
+                        Rectangle rect = new Rectangle(1, 1, 29, 29);
+                        path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
+                        path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90);
+                        path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90);
+                        path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90);
+                        path.CloseFigure();
+
+                        using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(240, 9, 13, 22)))
+                        {
+                            g.FillPath(bgBrush, path);
+                        }
+
+                        using (Pen borderPen = new Pen(Color.FromArgb(255, 16, 185, 129), 2f))
+                        {
+                            g.DrawPath(borderPen, path);
+                        }
+                    }
+
+                    // Cyber symbol "0x"
+                    using (Font font = new Font("Consolas", 11, FontStyle.Bold))
+                    using (SolidBrush textBrush = new SolidBrush(Color.FromArgb(255, 56, 189, 248)))
+                    {
+                        StringFormat sf = new StringFormat
+                        {
+                            Alignment = StringAlignment.Center,
+                            LineAlignment = StringAlignment.Center
+                        };
+                        g.DrawString("0x", font, textBrush, new RectangleF(0, 0, 32, 32), sf);
+                    }
+
+                    IntPtr hIcon = bmp.GetHicon();
+                    return Icon.FromHandle(hIcon);
+                }
+            }
+            catch
+            {
+                return SystemIcons.Application;
+            }
+        }
+
+        private void InitializeTrayIcon()
+        {
+            _contextMenu = new ContextMenuStrip
+            {
+                ShowImageMargin = false,
+                RenderMode = ToolStripRenderMode.System
+            };
+
+            // 1. Open UI
+            var openItem = new ToolStripMenuItem("🌐  Открыть 0xAgent UI (localhost:5173)", null, (s, e) => OpenWebUI());
+            openItem.Font = new Font(_contextMenu.Font, FontStyle.Bold);
+            _contextMenu.Items.Add(openItem);
+
+            _contextMenu.Items.Add(new ToolStripSeparator());
+
+            // 2. Status item
+            _statusMenuItem = new ToolStripMenuItem("📊  Статус: Инициализация...")
+            {
+                Enabled = false
+            };
+            _contextMenu.Items.Add(_statusMenuItem);
+
+            // 3. Show Logs
+            var logsItem = new ToolStripMenuItem("📜  Показать логи", null, (s, e) => OpenLogs());
+            _contextMenu.Items.Add(logsItem);
+
+            _contextMenu.Items.Add(new ToolStripSeparator());
+
+            // 4. Restart
+            var restartItem = new ToolStripMenuItem("🔄  Перезапустить платформу", null, (s, e) => RestartServices());
+            _contextMenu.Items.Add(restartItem);
+
+            // 5. Exit
+            var exitItem = new ToolStripMenuItem("🛑  Выход (Остановить все процессы)", null, (s, e) => ExitApplication());
+            _contextMenu.Items.Add(exitItem);
+
+            _notifyIcon = new NotifyIcon
+            {
+                Icon = CreateCyberAppIcon(),
+                ContextMenuStrip = _contextMenu,
+                Text = "0xAgent AI Platform",
+                Visible = true
+            };
+
+            _notifyIcon.DoubleClick += (s, e) => OpenWebUI();
+
+            _notifyIcon.ShowBalloonTip(3000, "0xAgent AI Platform", "Платформа запущена в фоновом режиме и доступна в трее.", ToolTipIcon.Info);
+        }
+
+        private void StartServices()
+        {
+            KillStalePorts();
+
+            Log("[0xAgent Launcher] Starting 'npm run dev' in background...");
+
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c npm run dev",
+                    WorkingDirectory = _projectDir,
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                };
+
+                _devProcess = new Process { StartInfo = psi };
+
+                _devProcess.OutputDataReceived += (s, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Log("[DEV] " + e.Data);
+                        if (!_hasAutoOpenedBrowser && (e.Data.Contains("localhost:5173") || e.Data.Contains("5173")))
+                        {
+                            _hasAutoOpenedBrowser = true;
+                            ThreadPool.QueueUserWorkItem(_ =>
+                            {
+                                Thread.Sleep(800);
+                                OpenWebUI();
+                            });
+                        }
+                    }
+                };
+
+                _devProcess.ErrorDataReceived += (s, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Log("[DEV-ERR] " + e.Data);
+                    }
+                };
+
+                _devProcess.Start();
+                _devProcess.BeginOutputReadLine();
+                _devProcess.BeginErrorReadLine();
+
+                Log("[0xAgent Launcher] Process started with PID: " + _devProcess.Id);
+            }
+            catch (Exception ex)
+            {
+                Log("[0xAgent Launcher] ERROR starting process: " + ex.Message);
+                MessageBox.Show("Не удалось запустить 0xAgent: " + ex.Message, "0xAgent Launcher Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void KillStalePorts()
+        {
+            try
+            {
+                string cleanupScript = Path.Combine(_projectDir, "scripts", "cleanup.ps1");
+                if (File.Exists(cleanupScript))
+                {
+                    ProcessStartInfo psi = new ProcessStartInfo
+                    {
+                        FileName = "powershell.exe",
+                        Arguments = string.Format("-NoProfile -ExecutionPolicy Bypass -File \"{0}\" -Quiet", cleanupScript),
+                        WorkingDirectory = _projectDir,
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    };
+                    using (Process p = Process.Start(psi))
+                    {
+                        if (p != null) p.WaitForExit(3000);
+                    }
+                }
+            }
+            catch {}
+        }
+
+        private void HealthTimer_Tick(object sender, EventArgs e)
+        {
+            if (_isShuttingDown) return;
+
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                bool isServerUp = false;
+                bool isClientUp = false;
+
+                try
+                {
+                    HttpWebRequest req1 = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:3001/api/health");
+                    req1.Timeout = 1500;
+                    using (HttpWebResponse res1 = (HttpWebResponse)req1.GetResponse())
+                    {
+                        isServerUp = (res1.StatusCode == HttpStatusCode.OK);
+                    }
+                }
+                catch {}
+
+                try
+                {
+                    HttpWebRequest req2 = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:5173");
+                    req2.Timeout = 1500;
+                    using (HttpWebResponse res2 = (HttpWebResponse)req2.GetResponse())
+                    {
+                        isClientUp = (res2.StatusCode == HttpStatusCode.OK);
+                    }
+                }
+                catch {}
+
+                if (!_hasAutoOpenedBrowser && (isServerUp || isClientUp))
+                {
+                    _hasAutoOpenedBrowser = true;
+                    OpenWebUI();
+                }
+
+                if (_statusMenuItem != null && !_isShuttingDown)
+                {
+                    try
+                    {
+                        Control parent = _statusMenuItem.GetCurrentParent();
+                        if (parent != null)
+                        {
+                            parent.BeginInvoke(new Action(delegate()
+                            {
+                                if (isServerUp && isClientUp)
+                                {
+                                    _statusMenuItem.Text = "📊  Статус: Online (Порты 3001, 5173)";
+                                    _notifyIcon.Text = "0xAgent AI Platform — Online";
+                                }
+                                else if (isServerUp)
+                                {
+                                    _statusMenuItem.Text = "📊  Статус: Сервер готов (:3001)";
+                                    _notifyIcon.Text = "0xAgent Server — Ready";
+                                }
+                                else
+                                {
+                                    _statusMenuItem.Text = "📊  Статус: Запуск сервисов...";
+                                    _notifyIcon.Text = "0xAgent — Starting...";
+                                }
+                            }));
+                        }
+                    }
+                    catch {}
+                }
+            });
+        }
+
+        private void OpenWebUI()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "http://localhost:5173",
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                Log("[0xAgent Launcher] Failed to open browser: " + ex.Message);
+            }
+        }
+
+        private void OpenLogs()
+        {
+            try
+            {
+                if (File.Exists(_logFilePath))
+                {
+                    Process.Start("notepad.exe", _logFilePath);
+                }
+                else
+                {
+                    MessageBox.Show("Файл логов пока не создан: " + _logFilePath, "0xAgent Logs", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Ошибка открытия логов: " + ex.Message, "0xAgent Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void RestartServices()
+        {
+            Log("[0xAgent Launcher] Restarting services...");
+            StopChildProcesses();
+            Thread.Sleep(1000);
+            StartServices();
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.ShowBalloonTip(2000, "0xAgent", "Платформа перезапущена.", ToolTipIcon.Info);
+            }
+        }
+
+        private void StopChildProcesses()
+        {
+            try
+            {
+                if (_devProcess != null && !_devProcess.HasExited)
+                {
+                    _devProcess.Kill();
+                }
+            }
+            catch {}
+            KillStalePorts();
+        }
+
+        private void ExitApplication()
+        {
+            _isShuttingDown = true;
+            Log("[0xAgent Launcher] Terminating application and cleaning up all processes...");
+
+            if (_healthTimer != null)
+            {
+                _healthTimer.Stop();
+                _healthTimer.Dispose();
+            }
+
+            if (_notifyIcon != null)
+            {
+                _notifyIcon.Visible = false;
+                _notifyIcon.Dispose();
+            }
+
+            StopChildProcesses();
+
+            try
+            {
+                if (_logWriter != null)
+                {
+                    _logWriter.Flush();
+                    _logWriter.Close();
+                }
+            }
+            catch {}
+
+            Application.Exit();
+        }
+    }
+
+    public static class Program
+    {
+        private const string MutexName = "Global\\0xAgent_Single_Instance_Mutex_Unique";
+
+        [STAThread]
+        public static void Main()
+        {
+            bool createdNew;
+            using (Mutex mutex = new Mutex(true, MutexName, out createdNew))
+            {
+                if (!createdNew)
+                {
+                    // Already running -> open Web UI in browser
+                    try
+                    {
+                        Process.Start(new ProcessStartInfo
+                        {
+                            FileName = "http://localhost:5173",
+                            UseShellExecute = true
+                        });
+                    }
+                    catch {}
+                    return;
+                }
+
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(new TrayApplicationContext());
+            }
+        }
+    }
+}

@@ -167,6 +167,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       }
     }
 
+    if (e.key === 'Escape' && openMenu !== 'none') {
+      e.preventDefault();
+      setOpenMenu('none');
+      return;
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       onSubmit(e);
