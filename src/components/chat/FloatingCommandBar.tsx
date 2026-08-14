@@ -105,7 +105,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(160, Math.max(36, textareaRef.current.scrollHeight))}px`;
+      textareaRef.current.style.height = `${Math.min(160, Math.max(30, textareaRef.current.scrollHeight))}px`;
     }
   }, [inputText]);
 
@@ -394,7 +394,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             <Plus size={18} />
           </button>
 
-          {/* Centered Message Textarea with 15px font size */}
+          {/* Centered Message Textarea with balanced 13.5px font size */}
           <textarea
             ref={textareaRef}
             value={inputText}
@@ -402,7 +402,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Спросите что угодно или введите / для команд..."
-            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[15px] focus:outline-none resize-none min-h-[36px] max-h-[140px] py-1.5 px-1 leading-normal font-sans self-center"
+            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[13.5px] focus:outline-none resize-none min-h-[30px] max-h-[140px] py-1 px-1 leading-normal font-sans self-center"
           />
 
           {/* Right Action Controls: Circular Send / Stop Button */}
