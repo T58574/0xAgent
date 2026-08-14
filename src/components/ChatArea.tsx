@@ -291,7 +291,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
       {/* 2. ACTIVE CHAT MESSAGES STREAM */}
       {hasMessages && (
-        <>
+        <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
           {/* Background Context Compression Banner */}
           {isSummarizing && (
             <div className="px-4 py-2.5 bg-black/40 border-b border-[var(--theme-border)] shrink-0 flex items-center justify-between text-xs z-10 backdrop-blur-md animate-fadeIn">
@@ -316,31 +316,31 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           )}
 
+          {/* Interactive Timeline Navigation Scrubber (Pinned to viewport center-right) */}
+          <ChatTimelineScrubber
+            messages={messages}
+            containerRef={chatContainerRef}
+            isScrolledUp={isUserScrolledUpRef.current}
+            isGenerating={agentStatus === 'thinking' || agentStatus === 'executing_tool'}
+            onScrollToBottom={() => {
+              if (chatContainerRef.current) {
+                chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+                isUserScrolledUpRef.current = false;
+              }
+            }}
+            onScrollToTop={() => {
+              if (chatContainerRef.current) {
+                chatContainerRef.current.scrollTop = 0;
+              }
+            }}
+          />
+
           {/* Messages Scroll Area */}
           <div
             ref={chatContainerRef}
             onScroll={handleChatScroll}
-            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 select-text scrollbar-thin relative"
+            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 select-text scrollbar-thin"
           >
-            {/* Interactive Timeline Navigation Scrubber */}
-            <ChatTimelineScrubber
-              messages={messages}
-              containerRef={chatContainerRef}
-              isScrolledUp={isUserScrolledUpRef.current}
-              isGenerating={agentStatus === 'thinking' || agentStatus === 'executing_tool'}
-              onScrollToBottom={() => {
-                if (chatContainerRef.current) {
-                  chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-                  isUserScrolledUpRef.current = false;
-                }
-              }}
-              onScrollToTop={() => {
-                if (chatContainerRef.current) {
-                  chatContainerRef.current.scrollTop = 0;
-                }
-              }}
-            />
-
             {messages.map((msg, index) => {
               const isUser = msg.role === 'user';
               const isSystem = msg.role === 'system';
@@ -547,7 +547,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onModelChanged={onModelChanged}
             />
           </div>
-        </>
+        </div>
       )}
     </div>
   );

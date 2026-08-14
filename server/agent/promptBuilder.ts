@@ -48,12 +48,6 @@ ${activePersona.user}
 - To quickly remember user preferences, user name, habits, or facts: ALWAYS use the fast tool: <update_user_profile trait="User info here" category="profile" />
 - To update persona character or behavior: use <update_persona_file file="SOUL.md">new soul content</update_persona_file>.`;
 
-  const reasoningDirective = `\n\n# REASONING & CHAIN-OF-THOUGHT INSTRUCTIONS:
-- When thinking is enabled, output your internal reasoning and step-by-step plan before answering or executing tools.
-- Gemma 4 format: <|channel>thought\\n[Internal reasoning]<channel|>
-- Alternative format: <think>[Internal reasoning]</think>
-- Everything inside the thought block is rendered in the reasoning HUD.`;
-
   const toolExecutionDirective = `\n\n# CRITICAL INSTRUCTIONS FOR TOOL EXECUTION & CODE MODIFICATIONS
 1. EXPLANATION FIRST: Always write a brief natural language explanation of your diagnosis and intended changes BEFORE emitting XML tool calls.
 2. MANDATORY PATCH FIRST POLICY: ALWAYS use <patch_file> for modifying existing codebase files. NEVER use <write_file> to rewrite an entire file (>50 lines) just to change a few components or lines!
@@ -84,7 +78,6 @@ Both XML and JSON tool call formats are accepted.`
   return (
     thinkTrigger +
     personaContext +
-    reasoningDirective +
     unifiedToolsContext +
     toolExecutionDirective +
     gemmaToolDirective +

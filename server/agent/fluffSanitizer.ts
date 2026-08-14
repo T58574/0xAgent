@@ -38,8 +38,8 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
     return { thinkText, bodyText };
   }
 
-  // 2. Gemma 4 / Channel format: <|channel>thought ... <channel|> or <channel|thought ... channel|> (closed)
-  const gemmaThinkRegex = /<\|?channel\|?thought([\s\S]*?)<\|?channel\|?>/i;
+  // 2. Gemma 4 / Channel format: <|channel>thought ... <channel|> or <|channel|> or </channel> (closed)
+  const gemmaThinkRegex = /<\|?channel\|?>?thought([\s\S]*?)(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>)/i;
   const gemmaMatch = text.match(gemmaThinkRegex);
   if (gemmaMatch) {
     thinkText = gemmaMatch[1].trim();

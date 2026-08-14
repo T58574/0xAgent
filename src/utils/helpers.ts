@@ -169,38 +169,48 @@ export function isSameDay(ts1: number, ts2: number): boolean {
 export function extractThinkingFromContent(raw: string): { thinking: string; text: string; isStreamingThink: boolean } {
   if (!raw) return { thinking: '', text: '', isStreamingThink: false };
 
-  // 1. Standard closed <think>, <thought>, <|thought|>, <|start_thought|>, [THINK], [THINKING]
-  const closedThinkMatch = raw.match(/<(?:think|thought|\|thought\||\|start_thought\|)>([\s\S]*?)<\/(?:think|thought|\|thought\||\|end_thought\|)>/i);
+  // 1. Standard closed <think>...</think>, <thought>...</thought>
+  const closedThinkMatch = raw.match(/<(?:think|thought)>([\s\S]*?)<\/(?:think|thought)>/i);
   if (closedThinkMatch) {
     return {
       thinking: closedThinkMatch[1].trim(),
-      text: raw.replace(/<(?:think|thought|\|thought\||\|start_thought\|)>[\s\S]*?<\/(?:think|thought|\|thought\||\|end_thought\|)>/i, '').trim(),
+      text: raw.replace(/<(?:think|thought)>[\s\S]*?<\/(?:think|thought)>/gi, '').trim(),
       isStreamingThink: false,
     };
   }
 
-  // Bracket style [THINK]...[/THINK]
+  // 2. Gemma 4 / Channel format: <|channel>thought\n...<channel|> / <|channel|> / </channel> / <channel|>
+  const gemmaClosedMatch = raw.match(/<\|?channel\|?>?thought([\s\S]*?)(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>)/i);
+  if (gemmaClosedMatch) {
+    return {
+      thinking: gemmaClosedMatch[1].trim(),
+      text: raw.replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>)/gi, '').trim(),
+      isStreamingThink: false,
+    };
+  }
+
+  // 3. Special tokens: <|start_thought|>...<|end_thought|>, <|thought|>...<|thought|>
+  const specialClosedMatch = raw.match(/<(?:\|start_thought\||\|thought\|)>([\s\S]*?)<(?:\|end_thought\||\|thought\||\/\|thought\|)>/i);
+  if (specialClosedMatch) {
+    return {
+      thinking: specialClosedMatch[1].trim(),
+      text: raw.replace(/<(?:\|start_thought\||\|thought\|)>[\s\S]*?<(?:\|end_thought\||\|thought\||\/\|thought\|)>/gi, '').trim(),
+      isStreamingThink: false,
+    };
+  }
+
+  // 4. Bracket style [THINK]...[/THINK], [THINKING]...[/THINKING]
   const closedBracketMatch = raw.match(/\[(?:think|thinking)\]([\s\S]*?)\[\/(?:think|thinking)\]/i);
   if (closedBracketMatch) {
     return {
       thinking: closedBracketMatch[1].trim(),
-      text: raw.replace(/\[(?:think|thinking)\][\s\S]*?\[\/(?:think|thinking)\]/i, '').trim(),
+      text: raw.replace(/\[(?:think|thinking)\][\s\S]*?\[\/(?:think|thinking)\]/gi, '').trim(),
       isStreamingThink: false,
     };
   }
 
-  // 2. Gemma 4 / Channel format: <|channel>thought\n...<channel|> / <|channel|> / </channel>
-  const gemmaClosedMatch = raw.match(/<\|?channel\|?>?thought([\s\S]*?)(?:<\|?channel\|?>|<\/channel>|<channel\|>)/i);
-  if (gemmaClosedMatch) {
-    return {
-      thinking: gemmaClosedMatch[1].trim(),
-      text: raw.replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?channel\|?>|<\/channel>|<channel\|>)/i, '').trim(),
-      isStreamingThink: false,
-    };
-  }
-
-  // 3. Unclosed streaming standard <think>, <thought>, <|thought|>, <|start_thought|>
-  const openThinkMatch = raw.match(/<(?:think|thought|\|thought\||\|start_thought\|)>/i);
+  // 5. Unclosed streaming standard <think>, <thought>
+  const openThinkMatch = raw.match(/<(?:think|thought)>/i);
   if (openThinkMatch && openThinkMatch.index !== undefined) {
     const startIdx = openThinkMatch.index;
     const tagLen = openThinkMatch[0].length;
@@ -211,11 +221,11 @@ export function extractThinkingFromContent(raw: string): { thinking: string; tex
     };
   }
 
-  // Unclosed bracket style [THINK], [THINKING]
-  const openBracketMatch = raw.match(/\[(?:think|thinking)\]/i);
-  if (openBracketMatch && openBracketMatch.index !== undefined) {
-    const startIdx = openBracketMatch.index;
-    const tagLen = openBracketMatch[0].length;
+  // 6. Unclosed streaming Gemma 4 channel: <|channel>thought...
+  const gemmaOpenMatch = raw.match(/<\|?channel\|?>?thought\s*/i);
+  if (gemmaOpenMatch && gemmaOpenMatch.index !== undefined) {
+    const startIdx = gemmaOpenMatch.index;
+    const tagLen = gemmaOpenMatch[0].length;
     return {
       thinking: raw.substring(startIdx + tagLen).trim(),
       text: raw.substring(0, startIdx).trim(),
@@ -223,11 +233,11 @@ export function extractThinkingFromContent(raw: string): { thinking: string; tex
     };
   }
 
-  // 4. Unclosed streaming Gemma 4 channel format: <|channel>thought...
-  const gemmaOpenMatch = raw.match(/<\|?channel\|?>?thought\s*/i);
-  if (gemmaOpenMatch && gemmaOpenMatch.index !== undefined) {
-    const startIdx = gemmaOpenMatch.index;
-    const tagLen = gemmaOpenMatch[0].length;
+  // 7. Unclosed streaming special tokens: <|start_thought|>, <|thought|>, [THINK]
+  const specialOpenMatch = raw.match(/<(?:\|start_thought\||\|thought\|)>|\[(?:think|thinking)\]/i);
+  if (specialOpenMatch && specialOpenMatch.index !== undefined) {
+    const startIdx = specialOpenMatch.index;
+    const tagLen = specialOpenMatch[0].length;
     return {
       thinking: raw.substring(startIdx + tagLen).trim(),
       text: raw.substring(0, startIdx).trim(),
