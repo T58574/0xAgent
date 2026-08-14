@@ -380,6 +380,42 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
           </div>
         )}
 
+        {tool.name === 'update_user_profile' && (
+          <div className="rounded-md p-2.5 bg-black/40 border border-theme-border flex items-start gap-2.5 text-xs">
+            <MaterialIcon name="person" size={16} className="text-theme-accent shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1 space-y-1 font-sans">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-theme-text text-[11.5px]">Обновление профиля пользователя:</span>
+                <span className="px-1.5 py-0.2 rounded bg-white/5 border border-theme-border text-[10px] font-mono text-theme-muted uppercase">
+                  {parsedArgs.category || 'profile'}
+                </span>
+              </div>
+              <div className="text-[12px] text-theme-text font-mono bg-black/30 p-1.5 rounded border border-white/5">
+                {parsedArgs.trait || parsedArgs.content || '(пусто)'}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tool.name === 'update_persona_file' && (
+          <div className="rounded-md p-2.5 bg-black/40 border border-theme-border flex items-start gap-2.5 text-xs">
+            <MaterialIcon name="psychology" size={16} className="text-theme-accent shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1 space-y-1 font-sans">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-theme-text text-[11.5px]">Обновление файла персоны:</span>
+                <span className="px-1.5 py-0.2 rounded bg-white/5 border border-theme-border text-[10px] font-mono text-theme-muted">
+                  {parsedArgs.file || 'SOUL.md'}
+                </span>
+              </div>
+              {parsedArgs.content && (
+                <div className="text-[10.5px] font-mono whitespace-pre-wrap max-h-32 overflow-y-auto bg-black/30 p-2 rounded border border-white/5 text-theme-muted">
+                  {parsedArgs.content}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {tool.name === 'run_scratch_script' && (
           <div className="space-y-1.5">
             <div className="text-theme-muted text-[11px]">Скрипт ({parsedArgs.language})</div>

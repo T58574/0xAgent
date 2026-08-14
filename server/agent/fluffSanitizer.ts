@@ -78,14 +78,25 @@ export function stripToolCallTags(text: string): string {
   if (!text) return text;
   let cleaned = text;
 
-  // Remove XML tool blocks (<patch_file>...</patch_file>, <write_file>...</write_file>, <read_file.../>, etc.)
+  // Remove XML tool blocks
   cleaned = cleaned.replace(/<patch_file[\s\S]*?(?:<\/patch_file>|$)/gi, '');
   cleaned = cleaned.replace(/<write_file[\s\S]*?(?:<\/write_file>|$)/gi, '');
   cleaned = cleaned.replace(/<read_file[\s\S]*?(?:<\/read_file>|\/>|$)/gi, '');
   cleaned = cleaned.replace(/<list_dir[\s\S]*?(?:<\/list_dir>|\/>|$)/gi, '');
   cleaned = cleaned.replace(/<grep_search[\s\S]*?(?:<\/grep_search>|\/>|$)/gi, '');
-  cleaned = cleaned.replace(/<tool_?call[\s\S]*?(?:<\/tool_?call>|$)/gi, '');
+  cleaned = cleaned.replace(/<fff_search[\s\S]*?(?:<\/fff_search>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<web_search[\s\S]*?(?:<\/web_search>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<read_web_page[\s\S]*?(?:<\/read_web_page>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<save_knowledge[\s\S]*?(?:<\/save_knowledge>|$)/gi, '');
+  cleaned = cleaned.replace(/<search_knowledge[\s\S]*?(?:<\/search_knowledge>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<list_knowledge[\s\S]*?(?:<\/list_knowledge>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<update_?user_?profile[\s\S]*?(?:<\/update_?user_?profile>|\/>|>|$)/gi, '');
+  cleaned = cleaned.replace(/<update_?persona_?file[\s\S]*?(?:<\/update_?persona_?file>|\/>|>|$)/gi, '');
   cleaned = cleaned.replace(/<execute_command[\s\S]*?(?:<\/execute_command>|$)/gi, '');
+  cleaned = cleaned.replace(/<run_scratch_script[\s\S]*?(?:<\/run_scratch_script>|$)/gi, '');
+  cleaned = cleaned.replace(/<ask_user[\s\S]*?(?:<\/ask_user>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<spawn_subagent[\s\S]*?(?:<\/spawn_subagent>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<tool_?call[\s\S]*?(?:<\/tool_?call>|$)/gi, '');
 
   // Remove leaked standalone SEARCH/REPLACE markers
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, '');

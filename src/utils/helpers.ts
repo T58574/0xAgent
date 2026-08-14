@@ -31,16 +31,20 @@ export function cleanContent(content: string): string {
   let cleaned = content;
 
   // 1. Strip markdown code block wrappers containing tool tags
-  cleaned = cleaned.replace(/```(?:xml|bash|powershell|js|ts|python)?\s*<(?:write_file|patch_file|read_file|execute_command|run_scratch_script)[\s\S]*?```/gi, "");
+  cleaned = cleaned.replace(/```(?:xml|bash|powershell|js|ts|python)?\s*<(?:write_file|patch_file|read_file|execute_command|run_scratch_script|update_?user_?profile|update_?persona_?file)[\s\S]*?```/gi, "");
 
   // 2. Strip closed & unclosed tool tags for all tools
   cleaned = cleaned.replace(/<write_file\s+path=["'][^"']*["']\s*>([\s\S]*?)(?:<\/write_file>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<patch_file\s+path=["'][^"']*["']\s*>([\s\S]*?)(?:<\/patch_file>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<execute_command\s*>([\s\S]*?)(?:<\/execute_command>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<run_scratch_script\s+language=["'][^"']*["']\s*>([\s\S]*?)(?:<\/run_scratch_script>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<save_knowledge[\s\S]*?(?:<\/save_knowledge>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<update_?persona_?file[\s\S]*?(?:<\/update_?persona_?file>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<update_?user_?profile[\s\S]*?(?:<\/update_?user_?profile>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<tool_?call[\s\S]*?(?:<\/tool_?call>|(?=<[a-z_]+|$))/gi, "");
   
   // Single self-closing tags
-  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|ask_user|spawn_subagent)\s+[^>]*\/?>/gi, "");
+  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|fff_search|web_search|read_web_page|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|search_knowledge|list_knowledge|ask_user|spawn_subagent|update_?user_?profile)\s+[^>]*\/?>/gi, "");
   
   // 3. Strip any orphaned SEARCH / REPLACE diff blocks leaked outside XML tags
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, "");

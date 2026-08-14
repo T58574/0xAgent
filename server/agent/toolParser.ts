@@ -202,6 +202,55 @@ function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): 
   }
 }
 
+function parsePersonaAndProfileToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
+  let match: RegExpExecArray | null;
+
+  // 1. update_user_profile / updateuserprofile
+  // Matches: <update_user_profile trait="..." category="..." />, <updateuserprofile trait="Любит" category="preferences" />
+  // Supports both self-closing (/>) and block formats
+  const reProfile = /<update_?user_?profile\b([^>]*?)(?:\/>|>([\s\S]*?)<\/update_?user_?profile>|>)/gi;
+  while ((match = reProfile.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      const attrStr = match[1] || '';
+      const bodyStr = match[2] || '';
+
+      const traitMatch = /trait=["']([^"']*)["']/i.exec(attrStr);
+      const catMatch = /category=["']([^"']*)["']/i.exec(attrStr);
+
+      let trait = traitMatch ? traitMatch[1] : bodyStr.trim();
+      let category = catMatch ? catMatch[1] : 'profile';
+
+      if (trait !== undefined && trait !== null) {
+        toolCalls.push({
+          id: `profile_${uuidv4().substring(0, 8)}`,
+          name: 'update_user_profile',
+          arguments: { trait: trait.trim(), category: category.trim() },
+          raw_content: raw,
+        });
+      }
+    }
+  }
+
+  // 2. update_persona_file / updatepersonafile
+  // Matches: <update_persona_file file="SOUL.md">content</update_persona_file>
+  // <updatepersonafile file="SOUL.md">...</updatepersonafile>
+  const rePersona = /<update_?persona_?file\b(?:\s+file=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/update_?persona_?file>/gi;
+  while ((match = rePersona.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      const file = match[1] || 'SOUL.md';
+      const content = match[2] ? match[2].trim() : '';
+      toolCalls.push({
+        id: `persona_${uuidv4().substring(0, 8)}`,
+        name: 'update_persona_file',
+        arguments: { file, content },
+        raw_content: raw,
+      });
+    }
+  }
+}
+
 function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
   let match: RegExpExecArray | null;
 
@@ -314,6 +363,13 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
     'searchknowledge': 'search_knowledge',
     'list_knowledge': 'list_knowledge',
     'listknowledge': 'list_knowledge',
+    'update_user_profile': 'update_user_profile',
+    'updateuserprofile': 'update_user_profile',
+    'user_profile': 'update_user_profile',
+    'update_profile': 'update_user_profile',
+    'update_persona_file': 'update_persona_file',
+    'updatepersonafile': 'update_persona_file',
+    'persona_file': 'update_persona_file',
   };
 
   while ((match = reToolCall.exec(text)) !== null) {
@@ -341,18 +397,24 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
         }
       }
 
-      // Extract attributes: path="...", query="...", command="...", url="..."
+      // Extract attributes: path="...", query="...", command="...", url="...", trait="...", category="...", file="..."
       const pathMatch = /path=["']([^"']+)["']/i.exec(raw);
       const queryMatch = /query=["']([^"']+)["']/i.exec(raw);
       const urlMatch = /url=["']([^"']+)["']/i.exec(raw);
       const commandMatch = /command=["']([^"']+)["']/i.exec(raw);
       const contentMatch = /content=["']([^"']+)["']/i.exec(raw);
+      const traitMatch = /trait=["']([^"']*)["']/i.exec(raw);
+      const categoryMatch = /category=["']([^"']*)["']/i.exec(raw);
+      const fileMatch = /file=["']([^"']+)["']/i.exec(raw);
 
       if (pathMatch) args.path = pathMatch[1];
       if (queryMatch) args.query = queryMatch[1];
       if (urlMatch) args.url = urlMatch[1];
       if (commandMatch) args.command = commandMatch[1];
       if (contentMatch) args.content = contentMatch[1];
+      if (traitMatch) args.trait = traitMatch[1];
+      if (categoryMatch) args.category = categoryMatch[1];
+      if (fileMatch) args.file = fileMatch[1];
     }
 
     // Secondary fallback: if name is still empty after JSON parse, check toolNameMap against raw string
@@ -386,6 +448,7 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
 
   parseFileToolCalls(sanitizedText, toolCalls);
   parseSearchAndDirToolCalls(sanitizedText, toolCalls);
+  parsePersonaAndProfileToolCalls(sanitizedText, toolCalls);
   parseExecAndInteractiveToolCalls(sanitizedText, toolCalls);
   parseGemmaToolCalls(sanitizedText, toolCalls);
   return toolCalls;
