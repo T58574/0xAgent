@@ -7,12 +7,12 @@ import {
   Layers,
   ChevronDown,
   ChevronRight,
+  Bot,
 } from 'lucide-react';
 import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata } from '../types';
 import { cleanContent } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
-import { MaterialIcon } from './common/MaterialIcon';
 import { AsciiCanvasEngine } from './common/AsciiCanvasEngine';
 import { FloatingCommandBar } from './chat/FloatingCommandBar';
 import * as api from '../services/api';
@@ -343,12 +343,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   className={`flex gap-3 max-w-4xl mx-auto ${isUser ? 'justify-end' : 'justify-start'}`}
                 >
                   {!isUser && (
-                    <div className="w-7 h-7 rounded-lg bento-card flex items-center justify-center shrink-0 mt-0.5 text-[var(--theme-text)]">
-                      {activePersona ? (
-                        <MaterialIcon name={activePersona.icon || 'smart_toy'} size={15} />
-                      ) : (
-                        <MaterialIcon name="smart_toy" size={15} />
-                      )}
+                    <div className="w-6 h-6 rounded-lg bento-card border border-[var(--theme-border)] flex items-center justify-center shrink-0 mt-0.5 text-[var(--theme-text-muted)] shadow-sm">
+                      <Bot size={13} />
                     </div>
                   )}
 
@@ -406,27 +402,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               );
             })}
 
-            {/* Live Thinking Status Indicator */}
+            {/* Live Thinking Status Indicator: Compact Left-Aligned Pill */}
             {agentStatus === 'thinking' && (
-              <div className="flex items-center gap-3 max-w-4xl mx-auto p-3 rounded-xl bento-card animate-fadeIn">
-                <div className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center animate-spin">
-                  <Sparkles size={12} className="text-[var(--theme-text)]" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-xs font-semibold text-[var(--theme-text)] flex items-center gap-2">
-                    <span>ИИ-Агент рассуждает...</span>
-                    <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
-                      {thinkingSeconds.toFixed(1)}s
-                    </span>
-                  </div>
+              <div className="flex items-center justify-start max-w-4xl mx-auto pl-9">
+                <div className="inline-flex items-center gap-2.5 px-3 py-1.5 rounded-full bento-card border border-[var(--theme-border)] text-xs text-[var(--theme-text)] animate-fadeIn shadow-sm">
+                  <Sparkles size={13} className="text-[var(--theme-text-muted)] animate-spin" />
+                  <span className="font-medium">ИИ-Агент рассуждает...</span>
+                  <span className="text-[10px] font-mono text-[var(--theme-text-muted)] opacity-70">
+                    {thinkingSeconds.toFixed(1)}s
+                  </span>
                 </div>
               </div>
             )}
 
-            {/* Live Telemetry Card during Generation */}
+            {/* Live Telemetry Card during Generation: Compact Pill */}
             {liveTelemetry && agentStatus !== 'idle' && (
-              <div className="max-w-4xl mx-auto p-2.5 rounded-xl bento-card border border-[var(--theme-border)] flex items-center justify-between text-[11px] font-mono text-[var(--theme-text-muted)]">
-                <div className="flex items-center gap-3">
+              <div className="flex items-center justify-start max-w-4xl mx-auto pl-9">
+                <div className="inline-flex items-center gap-3 px-3 py-1 rounded-full bento-card border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-text-muted)] shadow-sm">
                   {liveTelemetry.tokensPerSec !== undefined && (
                     <span className="flex items-center gap-1">
                       <Zap size={11} />
@@ -442,7 +434,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   {liveTelemetry.contextUsed !== undefined && (
                     <span className="flex items-center gap-1 hidden sm:flex">
                       <Layers size={11} />
-                      <span>{liveTelemetry.contextUsed} контекст</span>
+                      <span>{liveTelemetry.contextUsed}</span>
                     </span>
                   )}
                 </div>
