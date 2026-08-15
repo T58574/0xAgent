@@ -276,6 +276,56 @@ export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
     xmlSpec: `26. <todo_write todos='[{"content": "...", "status": "pending|in_progress|completed"}]' />
     - Обновляет текущий список шагов/задач для наглядного отображения прогресса пользователю.`,
   },
+  {
+    id: 'ask_user_question',
+    name: 'ask_user_question',
+    description: 'Запрос структурированного ответа или выбора вариантов у пользователя (single/multi-select, custom write-in, plan-review).',
+    category: 'interactive',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `27. <ask_user_question questions='[{"id":"q1","question":"...","options":[{"label":"A","description":"..."},{"label":"B"}]}]' />
+    - Отправляет структурированный интерактивный опрос в UI.`,
+  },
+  {
+    id: 'code_run',
+    name: 'code_run',
+    description: 'Запуск async TypeScript/JavaScript кода в изолированной песочнице с привязками к tools.* для пакетных операций за 1 шаг.',
+    category: 'interactive',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `28. <code_run>const res = await tools.list_dir({path: '.'}); return res;</code_run>
+    - Выполняет JavaScript программу с доступом ко всем инструментам (tools.read_file, tools.patch_file, etc.) в 1 ход.`,
+  },
+  {
+    id: 'send_subagent_message',
+    name: 'send_subagent_message',
+    description: 'Отправка нового сообщения или указания запущенному субагенту в процессе его работы.',
+    category: 'agents',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `29. <send_subagent_message subagent_id="..." message="..." />
+    - Отправляет указание работающему субагенту.`,
+  },
+  {
+    id: 'interrupt_subagent',
+    name: 'interrupt_subagent',
+    description: 'Принудительная остановка или прерывание выполнения субагента.',
+    category: 'agents',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `30. <interrupt_subagent subagent_id="..." />
+    - Прерывает выполнение субагента.`,
+  },
+  {
+    id: 'list_subagents',
+    name: 'list_subagents',
+    description: 'Получение списка всех активных и завершенных субагентов текущей сессии.',
+    category: 'agents',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `31. <list_subagents />
+    - Возвращает список субагентов и их статусы.`,
+  },
 ];
 
 export function loadToolsToggles(): Record<string, boolean> {

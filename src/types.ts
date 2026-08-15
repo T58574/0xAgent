@@ -104,7 +104,10 @@ export interface AppConfig {
   jarvis_model?: string | null;
   tts_config?: TtsConfig | null;
   proactive_companion_enabled?: boolean | null;
+  permission_preset?: PermissionPreset | null;
 }
+
+export type PermissionPreset = 'readonly' | 'workspace-write' | 'prompt' | 'unrestricted';
 
 export interface TtsConfig {
   enabled: boolean;
@@ -348,5 +351,67 @@ export interface JarvisState {
   activeSparks?: JarvisSparkProposal[];
   isSpeaking?: boolean;
   updatedAt: number;
+}
+
+export interface AskUserQuestionOption {
+  label: string;
+  description?: string;
+}
+
+export type AskUserQuestionIntent = {
+  kind: 'plan-review';
+  approve: string;
+};
+
+export interface AskUserQuestionItem {
+  id: string;
+  question: string;
+  detail?: string;
+  header?: string;
+  options?: AskUserQuestionOption[];
+  multiSelect?: boolean;
+  intent?: AskUserQuestionIntent;
+}
+
+export interface AskUserQuestionAnswerItem {
+  id: string;
+  selected: string[];
+  custom?: string;
+}
+
+export interface AskUserQuestionRequest {
+  sessionId: string;
+  toolCallId: string;
+  questions: AskUserQuestionItem[];
+}
+
+export interface AskUserQuestionAnswer {
+  answers: AskUserQuestionAnswerItem[];
+}
+
+export interface CodeRunResult {
+  success: boolean;
+  value?: any;
+  logs: string[];
+  error?: string;
+  executionTimeMs: number;
+}
+
+export interface SubagentInfo {
+  id: string;
+  parentId: string;
+  role: string;
+  goal: string;
+  status: 'idle' | 'running' | 'completed' | 'error' | 'interrupted';
+  createdAt: number;
+  updatedAt: number;
+  lastReport?: string;
+}
+
+export interface SessionEvent {
+  id: string;
+  type: string;
+  timestamp: number;
+  payload: any;
 }
 

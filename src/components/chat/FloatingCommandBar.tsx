@@ -17,8 +17,9 @@ import {
   Play,
   RefreshCw,
   Mic,
+  Shield,
 } from 'lucide-react';
-import { AppConfig, PersonaMetadata } from '../../types';
+import { AppConfig, PersonaMetadata, PermissionPreset } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
 import * as api from '../../services/api';
 
@@ -76,9 +77,28 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   onModelChanged,
 }) => {
   // Single active popup state - prevents any double opening
-  const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash'>('none');
+  const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash' | 'permission'>('none');
+  const [permissionPreset, setPermissionPreset] = useState<PermissionPreset>(
+    (config?.permission_preset as PermissionPreset) || 'prompt'
+  );
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedSlashIndex, setSelectedSlashIndex] = useState(0);
+
+  useEffect(() => {
+    if (config?.permission_preset) {
+      setPermissionPreset(config.permission_preset as PermissionPreset);
+    }
+  }, [config?.permission_preset]);
+
+  const handleSelectPreset = async (preset: PermissionPreset) => {
+    setPermissionPreset(preset);
+    setOpenMenu('none');
+    try {
+      if (config) {
+        await api.save_config({ ...config, permission_preset: preset });
+      }
+    } catch {}
+  };
 
   // Model & Server Management Hook
   const {
@@ -413,6 +433,41 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
+      {/* 4. Permission Preset Popover */}
+      {openMenu === 'permission' && (
+        <div className="absolute bottom-full mb-3 left-48 sm:left-64 w-72 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
+          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
+            <span>Безопасность (DeepSeek Presets)</span>
+            <Shield size={12} className="opacity-60" />
+          </div>
+          <div className="space-y-1">
+            {[
+              { id: 'readonly', title: 'Только чтение', desc: 'Запрещены любые изменения файлов и запуск команд' },
+              { id: 'workspace-write', title: 'Песочница проекта', desc: 'Разрешено менять файлы только внутри проекта' },
+              { id: 'prompt', title: 'Подтверждение', desc: 'Запрашивать одобрение на опасные и модифицирующие действия' },
+              { id: 'unrestricted', title: 'Полная автономия', desc: 'Автоматическое выполнение всех действий' },
+            ].map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                onClick={() => handleSelectPreset(preset.id as PermissionPreset)}
+                className={`w-full flex items-start justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                  permissionPreset === preset.id
+                    ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                <div className="min-w-0 pr-2">
+                  <div className="font-medium text-xs text-[var(--theme-text)]">{preset.title}</div>
+                  <div className="text-[10px] text-[var(--theme-text-muted)] leading-tight">{preset.desc}</div>
+                </div>
+                {permissionPreset === preset.id && <Check size={13} className="text-[var(--theme-text)] shrink-0 mt-0.5" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Attached Images Previews */}
       {attachedImages.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-2 px-2">
@@ -606,6 +661,29 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               )}
             </div>
             <span className="truncate max-w-[150px]">{getDisplayTitle(activeModelId)}</span>
+          </button>
+
+          {/* Permission Preset Selector below input */}
+          <button
+            type="button"
+            onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all cursor-pointer border ${
+              openMenu === 'permission'
+                ? 'text-[var(--theme-text)] bg-white/15 border-[var(--theme-border)] shadow-sm font-semibold'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+            }`}
+            title={`Режим безопасности: ${permissionPreset}`}
+          >
+            <Shield size={13} />
+            <span className="truncate max-w-[100px]">
+              {permissionPreset === 'readonly'
+                ? 'Readonly'
+                : permissionPreset === 'workspace-write'
+                ? 'Sandbox'
+                : permissionPreset === 'unrestricted'
+                ? 'Full Auto'
+                : 'Prompt'}
+            </span>
           </button>
         </div>
 

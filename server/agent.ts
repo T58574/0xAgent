@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { AppConfig, ChatMessage, ToolCallInfo } from '../src/types';
 import { loadSession, saveSession } from './session';
-import { summarizeContext, estimatePromptTokens } from './summarizer';
+import { estimatePromptTokens } from './summarizer';
 
 // 0xVoice2Text Model Configuration Stack & Fallback Chain
 export const PRIMARY_TEXT_MODEL = 'gemini-3.6-flash';
@@ -17,13 +17,14 @@ export const DEFAULT_FALLBACK_CHAIN: string[] = [
 ];
 
 import { strip_ai_reasoning_fluff, stripToolCallTags } from './agent/fluffSanitizer';
-import { pruneMessagesForContext, detectRepetitionLoop } from './agent/contextManager';
-import { buildFullSystemPrompt, formatMessageContent } from './agent/promptBuilder';
+import { detectRepetitionLoop } from './agent/contextManager';
+import { buildFullSystemPrompt } from './agent/promptBuilder';
 import { dispatchToolExecution } from './agent/toolDispatcher';
 import { parseToolCalls } from './agent/toolParser';
-import { pruneHistoricalMessages } from './agent/toolResultPruner';
 import { loopBreaker } from './agent/loopBreaker';
 import { handleOutputSpill } from './agent/outputSpiller';
+import { evaluateToolPermission } from './agent/permissionGuard';
+import { runCompactionPipeline } from './agent/compactionPipeline';
 import {
   PendingConfirmation,
   activeConfirmations,
@@ -64,6 +65,7 @@ export async function runAgentLoop(
 
     broadcast('agent-status-changed', { sessionId, status: 'thinking' });
     let loopRetryCount = 0;
+    const contextMax = config.local_server?.ctx_size || config.max_tokens || 16384;
 
   while (true) {
     if (activeCancelTokens.has(sessionId)) {
@@ -73,55 +75,8 @@ export async function runAgentLoop(
     }
 
     const fullSystemPrompt = buildFullSystemPrompt(sessionConfig);
-    const effectiveMessages = pruneHistoricalMessages(session.messages);
-
-    const rawMessages: { role: string; content: string | any[] }[] = [
-      { role: 'system', content: fullSystemPrompt },
-      ...effectiveMessages.map((m) => ({
-        role: m.role === 'tool' ? 'user' : m.role,
-        content: formatMessageContent(m, m.role === 'assistant'),
-      })),
-    ];
-
-    const contextMax = config.local_server?.ctx_size || config.max_tokens || 16384;
-    const estPromptTokens = estimatePromptTokens(rawMessages);
-
-    let messages: { role: string; content: string | any[] }[] = rawMessages;
-    if (estPromptTokens > Math.floor(contextMax * 0.75) && session.messages.length > 6) {
-      console.log(`[agent] Context size (${estPromptTokens} tokens) exceeded 75% threshold (${contextMax}). Invoking LLM summarizer...`);
-      try {
-        const tailCount = 4;
-        const msgsToSummarize = session.messages.slice(0, Math.max(1, session.messages.length - tailCount));
-        const tailMsgs = session.messages.slice(session.messages.length - tailCount);
-
-        const summaryText = await summarizeContext(msgsToSummarize, config, broadcast);
-
-        session.messages = [
-          {
-            id: uuidv4(),
-            role: 'user',
-            content: `[СВОДКА ПРЕДЫДУЩЕЙ ЧАСТИ ДИАЛОГА]:\n${summaryText}`,
-            timestamp: Date.now(),
-          },
-          ...tailMsgs,
-        ];
-        session.updated_at = Date.now();
-        await saveSession(session);
-
-        messages = [
-          { role: 'system', content: fullSystemPrompt },
-          ...session.messages.map((m) => ({
-            role: m.role === 'tool' ? 'user' : m.role,
-            content: formatMessageContent(m, m.role === 'assistant'),
-          })),
-        ];
-      } catch (sumErr) {
-        console.error('LLM context summarization failed, falling back to basic pruning:', sumErr);
-        messages = pruneMessagesForContext(rawMessages, contextMax);
-      }
-    } else {
-      messages = pruneMessagesForContext(rawMessages, contextMax);
-    }
+    const compactionRes = await runCompactionPipeline(session, sessionConfig, fullSystemPrompt, broadcast);
+    const messages = compactionRes.messages;
 
     const selectedModel = config.model_name || PRIMARY_TEXT_MODEL;
     const isLocalModel = selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf') || config.api_url.includes('127.0.0.1') || config.api_url.includes('localhost');
@@ -506,10 +461,42 @@ export async function runAgentLoop(
         return;
       }
 
-      const isInteractive = tc.name === 'write_file' || tc.name === 'patch_file' || tc.name === 'execute_command' || tc.name === 'ask_user';
+      const perm = evaluateToolPermission(
+        tc.name,
+        tc.arguments,
+        sessionConfig.permission_preset || 'prompt',
+        sessionConfig.workspace_dir
+      );
+
+      if (!perm.allowed) {
+        const output = perm.reason || `[SECURITY REJECTED]: Tool '${tc.name}' denied by permission policy.`;
+        broadcast('agent-tool-status-changed', {
+          sessionId,
+          message_id: assistantMessageId,
+          tool_id: tc.id,
+          status: 'error',
+          output,
+        });
+        toolResults.push({
+          id: uuidv4(),
+          role: 'tool',
+          content: `Tool ${tc.name} [${tc.id}] output:\n${output}`,
+          timestamp: Date.now(),
+        });
+        if (lastMsg && lastMsg.tool_calls) {
+          const t = lastMsg.tool_calls.find((x) => x.id === tc.id);
+          if (t) {
+            t.status = 'error';
+            t.output = output;
+          }
+        }
+        hasNewExecutions = true;
+        continue;
+      }
+
       let userResponseOrApproved: boolean | string = true;
 
-      if (isInteractive) {
+      if (perm.requiresApproval) {
         broadcast('agent-status-changed', { sessionId, status: 'waiting_approval' });
         broadcast('agent-tool-status-changed', {
           sessionId,

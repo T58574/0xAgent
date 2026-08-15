@@ -9,8 +9,9 @@ import {
   User,
   MessageSquare,
   Unlink,
+  GitBranch,
 } from 'lucide-react';
-import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata, JarvisSparkProposal, ChatSession } from '../types';
+import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata, JarvisSparkProposal, ChatSession, AskUserQuestionItem } from '../types';
 import {
   cleanContent,
   extractThinkingFromContent,
@@ -29,6 +30,7 @@ import { ReasoningViewer } from './chat/ReasoningViewer';
 import { ChatTimelineScrubber } from './chat/ChatTimelineScrubber';
 import { JarvisSparkCard } from './chat/JarvisSparkCard';
 import { PlanProgressStrip } from './chat/PlanProgressStrip';
+import { InteractiveQuestionCard } from './chat/InteractiveQuestionCard';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -665,12 +667,30 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </div>
                         )}
 
-                        {/* Text & Inline Timestamp with Double Checkmarks */}
+                        {/* Text & Inline Timestamp with Double Checkmarks and Fork Button */}
                         <div className="flex flex-wrap items-end justify-end gap-x-3 gap-y-1">
                           <span className="whitespace-pre-wrap flex-1 text-left">{text}</span>
-                          <span className="text-[10px] text-[var(--theme-text-muted)] font-sans select-none shrink-0 inline-flex items-center gap-1 opacity-80">
+                          <span className="text-[10px] text-[var(--theme-text-muted)] font-sans select-none shrink-0 inline-flex items-center gap-1.5 opacity-80">
                             {formatTime(msg.timestamp)}
                             <CheckCheck size={13} className="text-[var(--theme-accent,#38bdf8)]" />
+                            {currentSession?.id && (
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    const forked = await api.fork_session(currentSession.id, msg.id);
+                                    showToast(`Диалог ответвлен: ${forked.title}`, 'success');
+                                  } catch (err: any) {
+                                    showToast(err.message || 'Ошибка ветвления', 'error');
+                                  }
+                                }}
+                                className="p-0.5 hover:text-white transition-colors"
+                                title="Создать ветку с этого сообщения"
+                              >
+                                <GitBranch size={11} />
+                              </button>
+                            )}
                           </span>
                         </div>
                       </div>
@@ -690,14 +710,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </div>
                         )}
 
-                        {/* Assistant Text & Bottom Right Timestamp */}
+                        {/* Assistant Text & Bottom Right Timestamp with Fork */}
                         {text && (
                           <div className="space-y-1">
                             <NotionMarkdown content={cleanContent(text)} />
-                            <div className="flex justify-end pt-0.5">
+                            <div className="flex justify-end items-center gap-1.5 pt-0.5">
                               <span className="text-[10px] text-[var(--theme-text-muted)] opacity-60 font-sans select-none">
                                 {formatTime(msg.timestamp)}
                               </span>
+                              {currentSession?.id && (
+                                <button
+                                  type="button"
+                                  onClick={async (e) => {
+                                    e.stopPropagation();
+                                    try {
+                                      const forked = await api.fork_session(currentSession.id, msg.id);
+                                      showToast(`Диалог ответвлен: ${forked.title}`, 'success');
+                                    } catch (err: any) {
+                                      showToast(err.message || 'Ошибка ветвления', 'error');
+                                    }
+                                  }}
+                                  className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] p-0.5 transition-colors"
+                                  title="Создать ветку с этого ответа"
+                                >
+                                  <GitBranch size={11} />
+                                </button>
+                              )}
                             </div>
                           </div>
                         )}
@@ -705,13 +743,46 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         {/* Tool Calls Rendering */}
                         {msg.tool_calls && msg.tool_calls.length > 0 && (
                           <div className="space-y-2 pt-1 w-full">
-                            {msg.tool_calls.map((tool) => (
-                              <ToolCard
-                                key={tool.id}
-                                tool={tool}
-                                onRespond={onRespondToTool}
-                              />
-                            ))}
+                            {msg.tool_calls.map((tool) => {
+                              if (tool.name === 'ask_user_question' && tool.status === 'pending') {
+                                let questions: AskUserQuestionItem[] = [];
+                                try {
+                                  const parsed = JSON.parse(tool.arguments);
+                                  questions = Array.isArray(parsed.questions)
+                                    ? parsed.questions
+                                    : Array.isArray(parsed)
+                                    ? parsed
+                                    : [parsed];
+                                } catch {}
+                                return (
+                                  <InteractiveQuestionCard
+                                    key={tool.id}
+                                    toolCallId={tool.id}
+                                    questions={
+                                      questions.length > 0
+                                        ? questions
+                                        : [{ id: 'q1', question: 'Пожалуйста, ответьте на вопрос:' }]
+                                    }
+                                    onSubmitAnswers={async (answers) => {
+                                      try {
+                                        await api.answer_user_question(tool.id, answers);
+                                        showToast('Ответ отправлен агенту', 'success');
+                                      } catch (err: any) {
+                                        showToast(err.message || 'Ошибка отправки ответа', 'error');
+                                      }
+                                    }}
+                                  />
+                                );
+                              }
+
+                              return (
+                                <ToolCard
+                                  key={tool.id}
+                                  tool={tool}
+                                  onRespond={onRespondToTool}
+                                />
+                              );
+                            })}
                           </div>
                         )}
                       </div>

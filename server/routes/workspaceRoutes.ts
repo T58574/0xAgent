@@ -11,6 +11,7 @@ import {
   createAutoWorkspaceDir,
   updateSessionWorkspace,
 } from '../session';
+import { forkSession } from '../agent/sessionEvents';
 import {
   getWorkspaceTree,
   executeReadFile,
@@ -38,6 +39,17 @@ workspaceRouter.post('/sessions/:id/workspace', async (req, res) => {
     const { workspace_dir } = req.body || {};
     const updated = await updateSessionWorkspace(req.params.id, workspace_dir || null);
     res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fork session checkpoint
+workspaceRouter.post('/sessions/:id/fork', async (req, res) => {
+  try {
+    const { fromMessageId, newTitle } = req.body || {};
+    const forked = await forkSession(req.params.id, fromMessageId, newTitle);
+    res.json(forked);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

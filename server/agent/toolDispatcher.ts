@@ -23,6 +23,9 @@ import { addOrUpdateMemory, queryMemories } from '../memory';
 import { listSkills, readSkill } from '../skills';
 import { getActivePersona, appendSilentUserTrait, updatePersonaFile } from '../personas';
 import { listSessions, loadSession, saveSession } from '../session';
+import { executeCodeProgram } from './codeRuntime';
+import { subagentOrchestrator } from './subagentOrchestrator';
+import { userQuestionService } from './userQuestionService';
 
 export async function dispatchToolExecution(
   tc: { name: string; arguments: any },
@@ -164,37 +167,102 @@ export async function dispatchToolExecution(
       return `User responded to question: "${tc.arguments.question}"`;
     }
 
+    case 'ask_user_question': {
+      if (typeof userResponseOrApproved === 'string') {
+        return `Ответ пользователя на опрос: ${userResponseOrApproved}`;
+      }
+      let questions = tc.arguments.questions;
+      if (typeof questions === 'string') {
+        try {
+          questions = JSON.parse(questions);
+        } catch {}
+      }
+      if (!Array.isArray(questions)) {
+        questions = [
+          {
+            id: 'q1',
+            question: tc.arguments.question || 'Пожалуйста, сделайте выбор:',
+            options: Array.isArray(tc.arguments.options)
+              ? tc.arguments.options.map((o: any) => (typeof o === 'string' ? { label: o } : o))
+              : undefined,
+            multiSelect: tc.arguments.multiSelect || false,
+          },
+        ];
+      }
+
+      if (sessionId && broadcast) {
+        try {
+          const answer = await userQuestionService.askQuestions(
+            {
+              sessionId,
+              toolCallId: tc.arguments.toolCallId || 'q_' + Date.now(),
+              questions,
+            },
+            broadcast
+          );
+          return `Ответ пользователя получен:\n${JSON.stringify(answer.answers, null, 2)}`;
+        } catch (err: any) {
+          return `Ожидание ответа пользователя прервано: ${err.message}`;
+        }
+      }
+
+      return `Интерактивный опрос зарегистрирован для пользователя.`;
+    }
+
+    case 'code_run': {
+      const program = tc.arguments.program || tc.arguments.code || '';
+      if (!program.trim()) {
+        return 'Error: No code provided to execute in code_run.';
+      }
+      const runRes = await executeCodeProgram(program, config, { timeoutMs: tc.arguments.timeoutMs || 15000 });
+      if (runRes.success) {
+        const valStr = runRes.value !== undefined ? JSON.stringify(runRes.value, null, 2) : 'undefined';
+        const logStr = runRes.logs.length > 0 ? `\n\nLogs:\n${runRes.logs.join('\n')}` : '';
+        return `[Code Mode Success in ${runRes.executionTimeMs}ms]\nReturn value: ${valStr}${logStr}`;
+      } else {
+        const logStr = runRes.logs.length > 0 ? `\n\nLogs before failure:\n${runRes.logs.join('\n')}` : '';
+        return `[Code Mode Execution Failed in ${runRes.executionTimeMs}ms]\nError: ${runRes.error}${logStr}`;
+      }
+    }
+
     case 'spawn_subagent': {
       const role = tc.arguments.role || 'Assistant Sub-Agent';
       const goal = tc.arguments.goal || 'Complete delegated task';
-      try {
-        const subApiEndpoint = `${config.api_url.replace(/\/$/, '')}/chat/completions`;
-        const subRes = await fetch(subApiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: config.model_name,
-            messages: [
-              {
-                role: 'system',
-                content: `You are a specialized sub-agent with role: "${role}". Focus strictly on achieving your designated goal.`,
-              },
-              { role: 'user', content: `Goal: ${goal}\nProvide your solution and synthesis.` },
-            ],
-            temperature: 0.2,
-            max_tokens: 2048,
-          }),
-        });
+      const sub = await subagentOrchestrator.spawnSubagent(sessionId || 'root', role, goal, config, broadcast);
+      return `[Субагент запущен: ID ${sub.id}]\nРоль: ${sub.role}\nЦель: ${sub.goal}\nСтатус: ${sub.status}. Вы можете проверить статус через list_subagents или отправить сообщение через send_subagent_message.`;
+    }
 
-        if (subRes.ok) {
-          const subData = (await subRes.json()) as any;
-          const subOutput = subData.choices?.[0]?.message?.content || 'Sub-agent returned no output.';
-          return `Sub-agent [${role}] result:\n${subOutput}`;
-        }
-        return `Sub-agent execution error: HTTP ${subRes.status} ${subRes.statusText}`;
-      } catch (err: any) {
-        return `Failed to spawn sub-agent: ${err.message || err}`;
-      }
+    case 'send_subagent_message': {
+      const subId = tc.arguments.subagent_id || tc.arguments.id;
+      const msg = tc.arguments.message || tc.arguments.content || '';
+      if (!subId) return 'Error: subagent_id is required.';
+      const rep = await subagentOrchestrator.sendMessage(subId, msg, config, broadcast);
+      return `[Ответ субагента ${subId}]:\n${rep}`;
+    }
+
+    case 'interrupt_subagent': {
+      const subId = tc.arguments.subagent_id || tc.arguments.id;
+      if (!subId) return 'Error: subagent_id is required.';
+      const stopped = subagentOrchestrator.interruptSubagent(subId, broadcast);
+      return stopped ? `[OK] Субагент ${subId} успешно остановлен.` : `Ошибка: субагент ${subId} не найден.`;
+    }
+
+    case 'list_subagents': {
+      const list = subagentOrchestrator.listSubagents(sessionId);
+      return list.length > 0
+        ? JSON.stringify(
+            list.map((s) => ({
+              id: s.id,
+              role: s.role,
+              goal: s.goal,
+              status: s.status,
+              updatedAt: new Date(s.updatedAt).toLocaleTimeString(),
+              lastReport: s.lastReport ? s.lastReport.substring(0, 150) + '...' : undefined,
+            })),
+            null,
+            2
+          )
+        : 'Нет активных или завершенных субагентов для этой сессии.';
     }
 
     case 'update_user_profile': {

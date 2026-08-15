@@ -224,6 +224,25 @@ export async function respond_to_tool(sessionId: string, toolCallId: string, app
   if (!res.ok) throw new Error(await res.text());
 }
 
+export async function answer_user_question(toolCallId: string, answers: any[]): Promise<void> {
+  const res = await authFetch(`${API_BASE}/answer-question`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ toolCallId, answers }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+}
+
+export async function fork_session(sessionId: string, fromMessageId?: string, newTitle?: string): Promise<any> {
+  const res = await authFetch(`${API_BASE}/sessions/${sessionId}/fork`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fromMessageId, newTitle }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function transcribe_audio(audioBase64: string, apiKey: string): Promise<string> {
   const res = await authFetch(`${API_BASE}/transcribe-audio`, {
     method: 'POST',

@@ -7,6 +7,7 @@ import {
   cancelAgentSession,
   respondToToolConfirmation,
 } from '../agent';
+import { userQuestionService } from '../agent/userQuestionService';
 
 type BroadcastFn = (event: string, payload: any) => void;
 
@@ -53,6 +54,16 @@ export function createAgentRouter(broadcast: BroadcastFn): Router {
   router.post('/respond-to-tool', (req, res) => {
     const { sessionId, toolCallId, approve } = req.body;
     const ok = respondToToolConfirmation(sessionId, toolCallId, approve);
+    res.json({ success: ok });
+  });
+
+  router.post('/answer-question', (req, res) => {
+    const { toolCallId, answers } = req.body;
+    if (!toolCallId || !answers) {
+      res.status(400).json({ error: 'toolCallId and answers are required' });
+      return;
+    }
+    const ok = userQuestionService.resolveQuestion(toolCallId, { answers });
     res.json({ success: ok });
   });
 
