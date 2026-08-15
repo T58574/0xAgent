@@ -80,27 +80,27 @@ export class VoiceMacroService {
     if (t.startsWith('открой') || t.startsWith('запусти')) {
       const app = t.replace(/^(открой|запусти)\s+/, '').trim();
       if (app === 'код' || app === 'вскод' || app === 'vscode' || app === 'vs code') {
-        spawn('code', [], { detached: true, stdio: 'ignore' });
+        this.safeSpawn('cmd', ['/c', 'start', 'code']);
         return { handled: true, action: 'launch_code', description: 'Запуск VS Code' };
       }
       if (app === 'хром' || app === 'браузер' || app === 'chrome') {
-        spawn('cmd', ['/c', 'start', 'chrome'], { detached: true, stdio: 'ignore' });
+        this.safeSpawn('cmd', ['/c', 'start', 'chrome']);
         return { handled: true, action: 'launch_chrome', description: 'Запуск Google Chrome' };
       }
       if (app === 'телеграм' || app === 'телегу' || app === 'telegram') {
-        spawn('cmd', ['/c', 'start', 'tg://'], { detached: true, stdio: 'ignore' });
+        this.safeSpawn('cmd', ['/c', 'start', 'tg://']);
         return { handled: true, action: 'launch_telegram', description: 'Запуск Telegram' };
       }
       if (app === 'калькулятор' || app === 'calc') {
-        spawn('calc', [], { detached: true, stdio: 'ignore' });
+        this.safeSpawn('cmd', ['/c', 'start', 'calc']);
         return { handled: true, action: 'launch_calc', description: 'Запуск Калькулятора' };
       }
       if (app === 'проводник' || app === 'папки' || app === 'файлы') {
-        spawn('explorer', [], { detached: true, stdio: 'ignore' });
+        this.safeSpawn('cmd', ['/c', 'start', 'explorer']);
         return { handled: true, action: 'launch_explorer', description: 'Запуск Проводника' };
       }
       if (app === 'терминал' || app === 'консоль') {
-        spawn('cmd', ['/c', 'start', 'powershell'], { detached: true, stdio: 'ignore' });
+        this.safeSpawn('cmd', ['/c', 'start', 'powershell']);
         return { handled: true, action: 'launch_terminal', description: 'Запуск Терминала' };
       }
     }
@@ -108,9 +108,16 @@ export class VoiceMacroService {
     return { handled: false, action: '', description: '' };
   }
 
+  private safeSpawn(cmd: string, args: string[] = []) {
+    try {
+      const proc = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+      proc.on('error', () => {});
+    } catch {}
+  }
+
   private sendKey(vkCode: number) {
     const py = `import ctypes; ctypes.windll.user32.keybd_event(${vkCode}, 0, 0, 0); ctypes.windll.user32.keybd_event(${vkCode}, 0, 2, 0)`;
-    spawn('python', ['-c', py], { stdio: 'ignore', detached: true });
+    this.safeSpawn('python', ['-c', py]);
   }
 
   private sendKeyRepeated(vkCode: number, count: number) {
@@ -120,7 +127,7 @@ for _ in range(${count}):
     ctypes.windll.user32.keybd_event(${vkCode}, 0, 2, 0)
     time.sleep(0.05)
 `;
-    spawn('python', ['-c', py], { stdio: 'ignore', detached: true });
+    this.safeSpawn('python', ['-c', py]);
   }
 }
 

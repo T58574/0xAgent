@@ -11,6 +11,8 @@ import { initPersonas, getPersonaDetail } from '../server/personas';
 import { logger } from '../server/logger';
 import { processWatcher } from '../server/agent/processWatcher';
 import { voiceDaemonManager } from '../server/agent/voiceDaemonManager';
+import { voiceMacroService } from '../server/agent/voiceMacroService';
+import { jarvisDiagnostics } from '../server/agent/jarvisDiagnostics';
 
 describe('Jarvis Companion & Voice Intercom Test Suite', () => {
   before(() => {
@@ -212,6 +214,88 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
       assert.ok(content.includes('VoiceDaemon'), 'Script must define VoiceDaemon class');
       assert.ok(content.includes('WAKE_WORDS'), 'Script must define wake words');
       assert.ok(content.includes('GAIN_BOOST'), 'Script must define gain boost');
+    });
+  });
+
+  describe('7. Voice Macro Service & Leading Greeting Stripper', () => {
+    it('should strip leading greetings and trailing stop words cleanly', () => {
+      const v1 = ttsService.cleanLeadingJarvisPhrase('Слушаю вас, сэр. Поставь на паузу трек');
+      assert.equal(v1.cleanText, 'Поставь на паузу трек');
+      assert.equal(v1.isOnlyGreeting, false);
+
+      const v2 = ttsService.cleanLeadingJarvisPhrase('Слушаю вас, сэр.');
+      assert.equal(v2.cleanText, '');
+      assert.equal(v2.isOnlyGreeting, true);
+
+      const v3 = ttsService.cleanLeadingJarvisPhrase('Да, сэр. Создай компонент кнопки');
+      assert.equal(v3.cleanText, 'Создай компонент кнопки');
+      assert.equal(v3.isOnlyGreeting, false);
+
+      const v4 = ttsService.cleanLeadingJarvisPhrase('На связи, открой код стоп');
+      assert.equal(v4.cleanText, 'открой код');
+      assert.equal(v4.isOnlyGreeting, false);
+    });
+
+    it('should correctly intercept Windows voice macros and identify actions', () => {
+      const media = voiceMacroService.processCommand('поставь на паузу трек');
+      assert.equal(media.handled, true);
+      assert.equal(media.action, 'media_play_pause');
+
+      const nextTrack = voiceMacroService.processCommand('следующий трек');
+      assert.equal(nextTrack.handled, true);
+      assert.equal(nextTrack.action, 'media_next');
+
+      const volUp = voiceMacroService.processCommand('сделай громче звук');
+      assert.equal(volUp.handled, true);
+      assert.equal(volUp.action, 'vol_up');
+
+      const volDown = voiceMacroService.processCommand('тише');
+      assert.equal(volDown.handled, true);
+      assert.equal(volDown.action, 'vol_down');
+
+      const volMute = voiceMacroService.processCommand('выключи звук');
+      assert.equal(volMute.handled, true);
+      assert.equal(volMute.action, 'vol_mute');
+
+      const minimize = voiceMacroService.processCommand('сверни все окна');
+      assert.equal(minimize.handled, true);
+      assert.equal(minimize.action, 'minimize_all');
+
+      const launchCode = voiceMacroService.processCommand('открой код');
+      assert.equal(launchCode.handled, true);
+      assert.equal(launchCode.action, 'launch_code');
+
+      const aiQuery = voiceMacroService.processCommand('напиши функцию для бинарного поиска');
+      assert.equal(aiQuery.handled, false, 'AI coding query must pass through to model');
+    });
+  });
+
+  describe('8. System Diagnostics & Synthetic Dialogue Simulation', () => {
+    it('should run full system diagnostics and return a structured report', async () => {
+      const report = await jarvisDiagnostics.runFullDiagnostics();
+      assert.ok(report, 'Report must be returned');
+      assert.ok(['healthy', 'degraded'].includes(report.overallStatus), `Overall status should be healthy/degraded, got: ${report.overallStatus}`);
+      assert.ok(report.totalChecks >= 6, 'Total checks should be at least 6');
+      assert.equal(report.failedChecks, 0, 'No diagnostic check should fail');
+      assert.ok(report.durationMs >= 0);
+      assert.ok(Array.isArray(report.checks));
+    });
+
+    it('should simulate voice dialogue with macro execution', async () => {
+      const sim = await jarvisDiagnostics.simulateVoiceDialogue('Слушаю вас, сэр. Поставь на паузу трек');
+      assert.equal(sim.cleanedCommand, 'Поставь на паузу трек');
+      assert.equal(sim.macroHandled, true);
+      assert.equal(sim.macroAction, 'Медиа: Воспроизведение / Пауза');
+      assert.equal(sim.isOnlyGreeting, false);
+      assert.ok(sim.ttsSpokenPhrase);
+    });
+
+    it('should simulate voice dialogue with AI command passthrough', async () => {
+      const sim = await jarvisDiagnostics.simulateVoiceDialogue('Да, сэр. Проверь статус сборки ветки dev');
+      assert.equal(sim.cleanedCommand, 'Проверь статус сборки ветки dev');
+      assert.equal(sim.macroHandled, false);
+      assert.equal(sim.isOnlyGreeting, false);
+      assert.equal(sim.ttsSpokenPhrase, 'Команда принята: Проверь статус сборки ветки dev');
     });
   });
 });

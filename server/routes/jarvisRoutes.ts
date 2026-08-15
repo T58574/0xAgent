@@ -5,6 +5,7 @@ import { ttsService } from '../ttsService';
 import { voiceDaemonManager } from '../agent/voiceDaemonManager';
 import { loadConfig, saveConfig } from '../config';
 import { voiceMacroService } from '../agent/voiceMacroService';
+import { jarvisDiagnostics } from '../agent/jarvisDiagnostics';
 
 export const jarvisRouter = Router();
 
@@ -254,5 +255,30 @@ jarvisRouter.post('/jarvis/voice-daemon/toggle', (req: Request, res: Response) =
   } else {
     voiceDaemonManager.stop();
     res.json({ success: true, running: false });
+  }
+});
+
+// Full system diagnostics & health calibration
+jarvisRouter.get('/jarvis/diagnostics', async (_req: Request, res: Response) => {
+  try {
+    const report = await jarvisDiagnostics.runFullDiagnostics();
+    res.json(report);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Diagnostics failed' });
+  }
+});
+
+// Synthetic dialogue simulation for self-testing and calibration
+jarvisRouter.post('/jarvis/simulate-dialogue', async (req: Request, res: Response) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      res.status(400).json({ error: 'Text prompt required' });
+      return;
+    }
+    const result = await jarvisDiagnostics.simulateVoiceDialogue(text);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Dialogue simulation failed' });
   }
 });
