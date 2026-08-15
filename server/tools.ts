@@ -265,7 +265,7 @@ export function getWorkspace0xAgentMdContext(workspaceDir?: string | null): stri
   const found = find0xAgentContext(rootDir);
   if (!found) return '';
 
-  return `\n\n# 📄 WORKSPACE AUTOMATIC CONTEXT INSTRUCTIONS (Loaded from ${path.basename(found.filePath)})
+  return `\n\n# [WORKSPACE] AUTOMATIC CONTEXT INSTRUCTIONS (Loaded from ${path.basename(found.filePath)})
 [Loaded automatically from: ${found.filePath}]
 
 --- BEGIN 0xagent.md DIRECTIVES ---
@@ -294,7 +294,7 @@ export function executeListDir(workspaceDir: string | null | undefined, pathStr:
   let result = list.join('\n');
   const localContext = find0xAgentContext(targetPath);
   if (localContext) {
-    result += `\n\n📌 [AUTOMATIC CONTEXT LOADED FROM ${path.basename(localContext.filePath)} IN ${targetPath}]:\n${localContext.content}`;
+    result += `\n\n[INFO: AUTOMATIC CONTEXT LOADED FROM ${path.basename(localContext.filePath)} IN ${targetPath}]:\n${localContext.content}`;
   }
 
   return result;
@@ -309,94 +309,104 @@ function searchSingleFile(filePath: string, regex: RegExp, results: string[], ma
     for (let i = 0; i < lines.length; i++) {
       if (regex.test(lines[i])) {
         results.push(`${filePath}:${i + 1}: ${lines[i].trim()}`);
-        if (results.length >= maxResults) break;
+        if (results.length >= maxResults) return;
       }
     }
-  } catch {
-    // Ignore binary / unreadable files
-  }
+  } catch {}
 }
 
-export function executeGrepSearch(workspaceDir: string | null | undefined, patternStr: string, pathStr: string): string {
-  const targetPath = resolvePath(workspaceDir, pathStr);
+export function executeGrepSearch(
+  workspaceDir: string | null | undefined,
+  pattern: string,
+  pathStr?: string,
+  isRegex = true,
+  caseSensitive = false
+): string {
+  const targetPath = resolvePath(workspaceDir, pathStr || '');
   if (!fs.existsSync(targetPath)) {
     throw new Error(`Search path does not exist: ${targetPath}`);
   }
 
   let regex: RegExp;
   try {
-    regex = new RegExp(patternStr, 'i');
-  } catch {
-    const escaped = patternStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    regex = new RegExp(escaped, 'i');
+    const flags = caseSensitive ? 'g' : 'gi';
+    regex = isRegex ? new RegExp(pattern, flags) : new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
+  } catch (err: any) {
+    throw new Error(`Invalid search pattern: ${err.message}`);
   }
+
   const results: string[] = [];
-
-  function walkDir(dir: string, depth: number) {
-    if (depth > 8 || results.length >= 100) return;
-    let entries: fs.Dirent[];
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-
-    for (const entry of entries) {
-      if (results.length >= 100) break;
-      const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        if (!IGNORED_DIRS.has(entry.name)) {
-          walkDir(fullPath, depth + 1);
-        }
-      } else if (entry.isFile()) {
-        searchSingleFile(fullPath, regex, results);
-      }
-    }
-  }
-
   const stat = fs.statSync(targetPath);
-  if (stat.isFile()) {
+
+  if (!stat.isDirectory()) {
     searchSingleFile(targetPath, regex, results);
   } else {
-    walkDir(targetPath, 0);
+    function walk(dir: string) {
+      if (results.length >= 100) return;
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (results.length >= 100) return;
+          if (IGNORED_DIRS.has(entry.name)) continue;
+
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) {
+            walk(full);
+          } else if (entry.isFile()) {
+            searchSingleFile(full, regex, results);
+          }
+        }
+      } catch {}
+    }
+    walk(targetPath);
   }
 
-  return results.length > 0 ? results.join('\n') : 'No matches found.';
+  if (results.length === 0) {
+    return `No matches found for pattern "${pattern}" in ${targetPath}`;
+  }
+
+  const header = results.length >= 100 ? `Found 100+ matches (capped at 100):\n` : `Found ${results.length} matches:\n`;
+  return header + results.join('\n');
 }
 
-export function executeShellCommand(workspaceDir: string | null | undefined, commandStr: string): Promise<string> {
+export function executeShellCommand(workspaceDir: string | null | undefined, command: string): Promise<string> {
+  const root = workspaceDir && workspaceDir.trim().length > 0 ? workspaceDir : process.cwd();
+  const normalizedRoot = path.normalize(path.resolve(root));
+
+  // Destructive pattern safety blocker
+  const forbiddenPatterns = [
+    /\bdel\s+\/s\s+\/q\s+[c-z]:\\/i,
+    /\bformat\s+[c-z]:/i,
+    /\brmdir\s+\/s\s+\/q\s+[c-z]:\\/i,
+    /\brm\s+-rf\s+\/\b/i,
+    /system32/i,
+  ];
+
+  for (const pattern of forbiddenPatterns) {
+    if (pattern.test(command)) {
+      return Promise.resolve(`[SYSTEM BLOCKED]: Execution rejected. Command contains potentially destructive or protected system target.`);
+    }
+  }
+
   return new Promise((resolve) => {
-    let cleanCmd = commandStr.trim();
-    const psWrapperRegex = /^powershell(?:\.exe)?\s+(?:-[a-zA-Z]+\s+)*-Command\s+["'](.*)["']$/is;
-    const match = psWrapperRegex.exec(cleanCmd);
-    if (match) {
-      cleanCmd = match[1];
-    }
-
-    // System Safety Protection Guard
-    const dangerousPatterns = [/system32/i, /windows\\system/i, /rmdir\s+\/[sS]\s+\/[qQ]\s+c:\\/i, /remove-item\s+.*-[rR]ecurse\s+[cC]:\\/i, /format\s+[cC]:/i];
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(cleanCmd)) {
-        return Promise.resolve(`[SECURITY BLOCK]: Выполнение команды остановлено защитной системой 0xAgent. Обнаружен потенциально опасный системный паттерн: "${cleanCmd}".`);
-      }
-    }
-
     const isWindows = process.platform === 'win32';
-    const shell = isWindows ? 'powershell.exe' : 'sh';
-    const args = isWindows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', cleanCmd] : ['-c', cleanCmd];
-    const cwd = workspaceDir && fs.existsSync(workspaceDir) ? workspaceDir : process.cwd();
+    const shell = isWindows ? 'powershell.exe' : '/bin/bash';
+    const shellArgs = isWindows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command] : ['-c', command];
 
-    const child = spawn(shell, args, { cwd });
     let stdout = '';
     let stderr = '';
     let isTimedOut = false;
+
+    const child = spawn(shell, shellArgs, {
+      cwd: normalizedRoot,
+      env: { ...process.env },
+    });
 
     const timeoutTimer = setTimeout(() => {
       isTimedOut = true;
       try {
         if (isWindows && child.pid) {
-          execSync(`taskkill /pid ${child.pid} /T /F`);
+          execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' });
         } else {
           child.kill('SIGKILL');
         }
@@ -404,7 +414,7 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
 
       const partialOutput = (stdout + (stderr ? `\n--- STDERR ---\n${stderr}` : '')).trim();
       resolve(
-        `⚠️ Ошибка: Команда превысила 30-секундный лимит и была принудительно остановлена.\n` +
+        `[INFO] Error: Команда превысила 30-секундный лимит и была принудительно остановлена.\n` +
         `Полученный вывод до останова:\n${partialOutput || '(Вывод отсутствует)'}\n`
       );
     }, 30000);
@@ -438,6 +448,8 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
     });
   });
 }
+
+export const executeCommand = executeShellCommand;
 
 export function getWorkspaceTree(workspaceDir?: string | null): FileNode[] {
   if (!workspaceDir || !workspaceDir.trim() || !fs.existsSync(workspaceDir)) {

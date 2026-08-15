@@ -404,7 +404,7 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         appendServerLog(exitMsg);
 
         if (!isIntentionalStop && lastLaunchParams) {
-          appendServerLog(`[WATCHDOG 🛡️] WARNING: Process crashed (code ${code}). Auto-recovering...`);
+          appendServerLog(`[WATCHDOG] WARNING: Process crashed (code ${code}). Auto-recovering...`);
           broadcast('llama-server-status', { status: 'recovering' });
           activeLlamaProcess = null;
         } else {

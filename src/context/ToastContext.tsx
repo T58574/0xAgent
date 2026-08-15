@@ -53,7 +53,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           let cardBorder = 'border-[var(--theme-border)]';
 
           if (toast.type === 'success') {
-            badgeText = '[✓ OK]';
+            badgeText = '[OK]';
             badgeClass = 'text-[var(--theme-accent)] bg-[var(--theme-accent)]/15 border-[var(--theme-accent)]/30 font-bold';
             cardBorder = 'border-[var(--theme-accent)]/40 shadow-[0_0_16px_var(--theme-accent-glow)]';
           } else if (toast.type === 'error') {

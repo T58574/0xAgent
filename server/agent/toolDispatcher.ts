@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFile } from 'node:child_process';
-import { AppConfig } from '../../src/types';
+import { AppConfig, TodoItem } from '../../src/types';
 import {
   executeReadFile,
   executeWriteFile,
@@ -22,14 +22,17 @@ import {
 import { addOrUpdateMemory, queryMemories } from '../memory';
 import { listSkills, readSkill } from '../skills';
 import { getActivePersona, appendSilentUserTrait, updatePersonaFile } from '../personas';
-import { listSessions, loadSession } from '../session';
+import { listSessions, loadSession, saveSession } from '../session';
 
 export async function dispatchToolExecution(
   tc: { name: string; arguments: any },
   config: AppConfig,
-  userResponseOrApproved: boolean | string
+  userResponseOrApproved: boolean | string,
+  sessionId?: string,
+  broadcast?: (event: string, payload: any) => void
 ): Promise<string> {
   const activePersona = getActivePersona();
+  let rawResult = '';
 
   switch (tc.name) {
     case 'read_file':
@@ -213,6 +216,49 @@ export async function dispatchToolExecution(
       }
       updatePersonaFile(activePersona.metadata.id, filename, content);
       return `[OK] Файл ${filename} активной персоны [${activePersona.metadata.name}] успешно обновлен в ~/.0xagent/personas/${activePersona.metadata.id}/${filename}`;
+    }
+
+    case 'todo_write': {
+      let todos: TodoItem[] = [];
+      if (Array.isArray(tc.arguments.todos)) {
+        todos = tc.arguments.todos;
+      } else if (typeof tc.arguments.todos === 'string') {
+        try {
+          todos = JSON.parse(tc.arguments.todos);
+        } catch {}
+      } else if (Array.isArray(tc.arguments)) {
+        todos = tc.arguments;
+      }
+
+      const validTodos: TodoItem[] = (todos || [])
+        .filter((t) => t && typeof t.content === 'string' && t.content.trim())
+        .map((t) => ({
+          content: t.content.trim(),
+          status: (['pending', 'in_progress', 'completed'].includes(t.status) ? t.status : 'pending') as TodoItem['status'],
+        }));
+
+      const pendingCount = validTodos.filter((t) => t.status === 'pending').length;
+      const inProgCount = validTodos.filter((t) => t.status === 'in_progress').length;
+      const doneCount = validTodos.filter((t) => t.status === 'completed').length;
+
+      if (sessionId) {
+        try {
+          const sess = await loadSession(sessionId);
+          if (sess) {
+            sess.active_todos = validTodos;
+            sess.updated_at = Date.now();
+            await saveSession(sess);
+            if (broadcast) {
+              broadcast('session-todos-updated', { sessionId, todos: validTodos });
+            }
+          }
+        } catch (e) {
+          console.error('Failed to save session todos:', e);
+        }
+      }
+
+      rawResult = `[ПЛАН ОБНОВЛЕН] Завершено: ${doneCount}, В процессе: ${inProgCount}, Ожидает: ${pendingCount}. Всего задач: ${validTodos.length}.`;
+      return rawResult;
     }
 
     default:

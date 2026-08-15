@@ -8,6 +8,8 @@ import {
   saveSession,
   createNewSession,
   deleteSession,
+  createAutoWorkspaceDir,
+  updateSessionWorkspace,
 } from '../session';
 import {
   getWorkspaceTree,
@@ -19,6 +21,27 @@ import {
 } from '../tools';
 
 export const workspaceRouter = Router();
+
+// Auto workspace generator (Antigravity-like ephemeral/isolated sandbox workspaces)
+workspaceRouter.post('/workspaces/create-auto', async (_req, res) => {
+  try {
+    const result = await createAutoWorkspaceDir();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Update specific session workspace
+workspaceRouter.post('/sessions/:id/workspace', async (req, res) => {
+  try {
+    const { workspace_dir } = req.body || {};
+    const updated = await updateSessionWorkspace(req.params.id, workspace_dir || null);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Real Local LAN IPs endpoint for mobile network sharing
 workspaceRouter.get('/get-local-ips', (_req, res) => {

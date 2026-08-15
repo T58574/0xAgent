@@ -3,14 +3,22 @@ import {
   Terminal,
   Sparkles,
   CheckCheck,
+  Folder,
+  FolderPlus,
+  ChevronDown,
+  User,
+  MessageSquare,
+  Unlink,
 } from 'lucide-react';
-import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata, JarvisSparkProposal } from '../types';
+import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata, JarvisSparkProposal, ChatSession } from '../types';
 import {
   cleanContent,
   extractThinkingFromContent,
   formatDateSeparator,
   isSameDay,
   formatTime,
+  getWorkspaceBaseName,
+  isAutoWorkspace,
 } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
@@ -20,11 +28,13 @@ import { FloatingCommandBar } from './chat/FloatingCommandBar';
 import { ReasoningViewer } from './chat/ReasoningViewer';
 import { ChatTimelineScrubber } from './chat/ChatTimelineScrubber';
 import { JarvisSparkCard } from './chat/JarvisSparkCard';
+import { PlanProgressStrip } from './chat/PlanProgressStrip';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
 interface ChatAreaProps {
   messages: ChatMessage[];
+  currentSession?: ChatSession | null;
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
   onSendMessage: (text: string, images?: string[]) => void;
   onRespondToTool: (toolId: string, approve: boolean | string) => void;
@@ -38,17 +48,24 @@ interface ChatAreaProps {
   onStartServer?: () => Promise<void>;
   workspaceDir?: string | null;
   onSelectWorkspace?: () => void;
+  onUpdateSessionWorkspace?: (dir: string | null) => void;
   modelName?: string;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
+  onAcceptSpark?: (spark: JarvisSparkProposal) => void;
+  personas?: PersonaMetadata[];
+  activePersonaId?: string;
+  onSelectPersona?: (id: string) => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
   messages,
+  currentSession,
   agentStatus,
   onSendMessage,
   onRespondToTool,
   onCancelAgent,
+  onAcceptSpark,
   reasoningEnabled = true,
   groqApiKey: _groqApiKey,
   liveTelemetry,
@@ -57,10 +74,14 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   isServerOffline: _isServerOffline = false,
   onStartServer: _onStartServer,
   workspaceDir: _workspaceDir,
-  onSelectWorkspace: _onSelectWorkspace,
+  onSelectWorkspace,
+  onUpdateSessionWorkspace,
   modelName: _modelName,
   config,
   onModelChanged,
+  personas: personasProp = [],
+  activePersonaId: activePersonaIdProp,
+  onSelectPersona: onSelectPersonaProp,
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
@@ -78,8 +99,19 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const [summarizeMetrics, setSummarizeMetrics] = useState<{ oldTokens?: number; newTokens?: number }>({});
 
   // Personas
-  const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
-  const [activePersona, setActivePersona] = useState<PersonaMetadata | null>(null);
+  const [localPersonas, setLocalPersonas] = useState<PersonaMetadata[]>([]);
+  const [wsMenuOpen, setWsMenuOpen] = useState(false);
+  const wsMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (wsMenuRef.current && !wsMenuRef.current.contains(e.target as Node)) {
+        setWsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Jarvis Proactive Sparks
   const [activeSparks, setActiveSparks] = useState<JarvisSparkProposal[]>([]);
@@ -114,14 +146,22 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     };
   }, [agentStatus]);
 
-  // Load personas list for quick switching
+  // Load fallback personas if not passed via props
   useEffect(() => {
-    api.get_personas().then((list) => {
-      setPersonas(list);
-      const active = list.find((p) => (config?.active_persona_id ? p.id === config.active_persona_id : p.is_active)) || list[0];
-      if (active) setActivePersona(active);
-    }).catch((err) => console.error('Failed to load personas in ChatArea:', err));
-  }, [config?.active_persona_id]);
+    if (personasProp.length === 0) {
+      api.get_personas().then((list) => {
+        setLocalPersonas(list);
+      }).catch((err) => console.error('Failed to load personas in ChatArea:', err));
+    }
+  }, [personasProp.length]);
+
+  const personas = personasProp.length > 0 ? personasProp : localPersonas;
+  const activePersonaId = activePersonaIdProp || config?.active_persona_id || 'default';
+  const currentPersona = personas.find((p) => p.id === activePersonaId) || personas[0] || {
+    id: 'default',
+    name: '0xAgent Core',
+    icon: 'Zap',
+  };
 
 
 
@@ -264,11 +304,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handleSelectPersona = async (personaId: string) => {
+    if (onSelectPersonaProp) {
+      onSelectPersonaProp(personaId);
+      return;
+    }
     const p = personas.find((item) => item.id === personaId);
     if (!p) return;
     try {
-      await api.activate_persona(p.id);
-      setActivePersona(p);
+      const updatedList = await api.activate_persona(p.id);
+      setLocalPersonas(updatedList);
       showToast(`Персона: ${p.name}`, 'success');
     } catch (err: any) {
       showToast(`Ошибка смены персоны: ${err.message || err}`, 'error');
@@ -276,10 +320,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handleAcceptSpark = async (spark: JarvisSparkProposal) => {
+    setActiveSparks((prev) => prev.filter((s) => s.id !== spark.id));
+    if (onAcceptSpark) {
+      onAcceptSpark(spark);
+      return;
+    }
     try {
       await api.accept_spark(spark.id);
-      setActiveSparks((prev) => prev.filter((s) => s.id !== spark.id));
-      onSendMessage(spark.suggestedAction || spark.description);
+      const directive = spark.directivePrompt || spark.suggestedAction || spark.description;
+      onSendMessage(directive);
     } catch (err: any) {
       showToast(`Ошибка запуска: ${err.message || err}`, 'error');
     }
@@ -305,10 +354,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
-
-
-
   const hasMessages = messages.length > 0;
+  const currentSessionWorkspace = currentSession?.workspace_dir !== undefined ? currentSession.workspace_dir : config?.workspace_dir;
+  const hasWs = !!currentSessionWorkspace;
+  const isAutoWs = isAutoWorkspace(currentSessionWorkspace);
+  const wsName = getWorkspaceBaseName(currentSessionWorkspace);
 
   return (
     <div
@@ -320,6 +370,117 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         isDraggingOver ? 'ring-1 ring-[var(--theme-border)] ring-inset' : ''
       }`}
     >
+      {/* 0. TOP WORKSPACE & CONTEXT BAR */}
+      <div className="px-3.5 py-2 border-b border-[var(--theme-border)] bg-[var(--theme-panel)]/80 backdrop-blur-xl flex items-center justify-between shrink-0 select-none text-xs font-mono z-20">
+        {/* Left: Session Title & Workspace Pill */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 text-[var(--theme-text)] font-semibold truncate max-w-[160px] sm:max-w-[260px]">
+            <MessageSquare size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+            <span className="truncate">{currentSession?.title || 'Диалог'}</span>
+          </div>
+
+          {/* Workspace Pill */}
+          <div ref={wsMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setWsMenuOpen(!wsMenuOpen)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+              title="Рабочая папка текущего диалога"
+            >
+              {isAutoWs ? (
+                <>
+                  <Terminal size={12} className="text-[var(--theme-text-muted)] shrink-0" />
+                  <span className="truncate max-w-[110px] sm:max-w-[170px]">{wsName}</span>
+                </>
+              ) : hasWs ? (
+                <>
+                  <Folder size={12} className="text-[var(--theme-text-muted)] shrink-0" />
+                  <span className="truncate max-w-[110px] sm:max-w-[170px]">{wsName}</span>
+                </>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-white/40" />
+                  <span>Без папки</span>
+                </>
+              )}
+              <ChevronDown size={11} className={`opacity-60 transition-transform ${wsMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Workspace Switcher Popover */}
+            {wsMenuOpen && (
+              <div className="absolute top-full left-0 mt-1.5 w-64 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 rounded-2xl space-y-1 animate-fadeIn font-sans text-xs">
+                <div className="px-2 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] border-b border-[var(--theme-border)]/40 mb-1">
+                  Контекст рабочей директории
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWsMenuOpen(false);
+                    onSelectWorkspace && onSelectWorkspace();
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-white/10 text-[var(--theme-text)] transition-colors cursor-pointer"
+                >
+                  <FolderPlus size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-xs">Сменить папку проекта...</span>
+                    <span className="text-[10px] text-[var(--theme-text-muted)]">Привязать каталог на диске</span>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setWsMenuOpen(false);
+                    if (onUpdateSessionWorkspace) {
+                      try {
+                        const autoWs = await api.create_auto_workspace();
+                        onUpdateSessionWorkspace(autoWs.path);
+                        showToast(`Создан авто-воркспейс: ${autoWs.slug}`, 'success');
+                      } catch (e: any) {
+                        showToast(`Ошибка: ${e.message}`, 'error');
+                      }
+                    }
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-white/10 text-[var(--theme-text)] transition-colors cursor-pointer"
+                >
+                  <Sparkles size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                  <div className="flex flex-col">
+                    <span className="font-semibold text-xs">Создать авто-воркспейс</span>
+                    <span className="text-[10px] text-[var(--theme-text-muted)]">Изолированная песочница ~/.0xagent</span>
+                  </div>
+                </button>
+
+                {hasWs && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWsMenuOpen(false);
+                      if (onUpdateSessionWorkspace) {
+                        onUpdateSessionWorkspace(null);
+                        showToast('Сессия переведена в общий режим (без файлов)', 'info');
+                      }
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl text-left hover:bg-red-500/10 text-red-400 transition-colors cursor-pointer border-t border-[var(--theme-border)]/40 mt-0.5 pt-1.5"
+                  >
+                    <Unlink size={13} className="shrink-0" />
+                    <span className="text-xs">Отвязать папку (Без файлов)</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Active Persona pill */}
+        <div className="flex items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-[var(--theme-border)] text-[10px] text-[var(--theme-text-muted)]">
+            <User size={11} className="text-[var(--theme-text-muted)]" />
+            <span className="truncate max-w-[100px] text-[var(--theme-text)] font-semibold">{currentPersona.name}</span>
+          </div>
+        </div>
+      </div>
+
       {/* 1. EMPTY CHAT STATE: CLEAN FLOATING ASCII HERO */}
       {!hasMessages && (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto scrollbar-none">
@@ -350,6 +511,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </div>
             )}
 
+            {/* Dynamic Plan & Todos HUD in Empty State */}
+            {currentSession?.active_todos && currentSession.active_todos.length > 0 && (
+              <div className="w-full max-w-xl mx-auto text-left">
+                <PlanProgressStrip todos={currentSession.active_todos} />
+              </div>
+            )}
+
             {/* Bottom Floating Command Bar for Empty State */}
             <div className="pt-2 w-full max-w-xl mx-auto">
               <FloatingCommandBar
@@ -359,7 +527,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 agentStatus={agentStatus}
                 onCancelAgent={onCancelAgent}
                 personas={personas}
-                activePersonaId={activePersona?.id || 'default'}
+                activePersonaId={activePersonaId}
                 onSelectPersona={handleSelectPersona}
                 attachedImages={attachedImages}
                 onAttachImages={(imgs) => setAttachedImages(imgs)}
@@ -629,6 +797,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </div>
             )}
 
+            {/* Dynamic Plan & Todos HUD in Active Chat */}
+            {currentSession?.active_todos && currentSession.active_todos.length > 0 && (
+              <PlanProgressStrip todos={currentSession.active_todos} />
+            )}
+
             <FloatingCommandBar
               inputText={inputText}
               setInputText={setInputText}
@@ -636,7 +809,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               agentStatus={agentStatus}
               onCancelAgent={onCancelAgent}
               personas={personas}
-              activePersonaId={activePersona?.id || 'default'}
+              activePersonaId={activePersonaId}
               onSelectPersona={handleSelectPersona}
               attachedImages={attachedImages}
               onAttachImages={(imgs) => setAttachedImages(imgs)}

@@ -136,6 +136,20 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
                         <p className="text-xs text-[var(--theme-text-muted)] mt-1">
                           {spark.description}
                         </p>
+                        {spark.targetFiles && spark.targetFiles.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                            <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">Target:</span>
+                            {spark.targetFiles.map((file, idx) => (
+                              <span
+                                key={idx}
+                                className="px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/30 text-[10px] font-mono text-sky-300 truncate max-w-[200px]"
+                                title={file}
+                              >
+                                {file}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <span className="text-[10px] font-mono text-[var(--theme-text-muted)] shrink-0">
                         {new Date(spark.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

@@ -21,6 +21,9 @@ import { pruneMessagesForContext, detectRepetitionLoop } from './agent/contextMa
 import { buildFullSystemPrompt, formatMessageContent } from './agent/promptBuilder';
 import { dispatchToolExecution } from './agent/toolDispatcher';
 import { parseToolCalls } from './agent/toolParser';
+import { pruneHistoricalMessages } from './agent/toolResultPruner';
+import { loopBreaker } from './agent/loopBreaker';
+import { handleOutputSpill } from './agent/outputSpiller';
 import {
   PendingConfirmation,
   activeConfirmations,
@@ -53,6 +56,12 @@ export async function runAgentLoop(
     let session = await loadSession(sessionId);
     activeCancelTokens.delete(sessionId);
 
+    const sessionWorkspace = session.workspace_dir !== undefined ? session.workspace_dir : config.workspace_dir;
+    const sessionConfig: AppConfig = {
+      ...config,
+      workspace_dir: sessionWorkspace,
+    };
+
     broadcast('agent-status-changed', { sessionId, status: 'thinking' });
     let loopRetryCount = 0;
 
@@ -63,11 +72,12 @@ export async function runAgentLoop(
       break;
     }
 
-    const fullSystemPrompt = buildFullSystemPrompt(config);
+    const fullSystemPrompt = buildFullSystemPrompt(sessionConfig);
+    const effectiveMessages = pruneHistoricalMessages(session.messages);
 
     const rawMessages: { role: string; content: string | any[] }[] = [
       { role: 'system', content: fullSystemPrompt },
-      ...session.messages.map((m) => ({
+      ...effectiveMessages.map((m) => ({
         role: m.role === 'tool' ? 'user' : m.role,
         content: formatMessageContent(m, m.role === 'assistant'),
       })),
@@ -155,7 +165,7 @@ export async function runAgentLoop(
             await new Promise((r) => setTimeout(r, 1500));
             continue;
           }
-          const errMsg = `⚠️ **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n👉 **Решение:** Нажмите кнопку **🚀 Запустить LLM Сервер в 1-клик** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
+          const errMsg = `[!] **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n[›] **Решение:** Нажмите кнопку **[Запустить LLM Сервер]** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
           handleAgentError(session, sessionId, broadcast, errMsg);
           return;
         }
@@ -164,7 +174,7 @@ export async function runAgentLoop(
       const apiKey = config.gemini_api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || config.groq_api_key || '';
       
       if (!apiKey && !selectedModel.includes('localhost') && !selectedModel.includes('127.0.0.1')) {
-        const errMsg = `⚠️ **Google AI Studio API Key не задан!**\nДля использования облачной модели \`${selectedModel}\` требуется API ключ Google AI Studio.\n\n👉 **Решение:** Укажите Ваш **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)** или в переменной окружения.`;
+        const errMsg = `[!] **Google AI Studio API Key не задан!**\nДля использования облачной модели \`${selectedModel}\` требуется API ключ Google AI Studio.\n\n[›] **Решение:** Укажите Ваш **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)** или в переменной окружения.`;
         handleAgentError(session, sessionId, broadcast, errMsg);
         return;
       }
@@ -248,34 +258,34 @@ export async function runAgentLoop(
     }
 
     if (!response || !response.ok) {
-      let errMsg = `⚠️ **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server / all fallback models exhausted'}\n\`\`\``;
+      let errMsg = `[!] **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server / all fallback models exhausted'}\n\`\`\``;
 
       if (lastStatusCode === 401 || lastStatusCode === 403) {
-        errMsg = `🔑 **Ошибка авторизации или регионального доступа Google API (HTTP ${lastStatusCode} Unauthorized/Forbidden)!**\n\n` +
+        errMsg = `[KEY] **Ошибка авторизации или регионального доступа Google API (HTTP ${lastStatusCode} Unauthorized/Forbidden)!**\n\n` +
           `Модель \`${activeModelName}\` отвергла запрос из-за недействительного API-ключа или региональных ограничений.\n\n` +
-          `👉 **Решения:**\n` +
+          `[›] **Решения:**\n` +
           `1. Проверьте **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)**.\n` +
           `2. Если Вы подключаетесь из региона с ограничениями Google Cloud, включите VPN / прокси.\n` +
           `3. Переключитесь на локальную модель ИИ вверху чата.\n\n` +
           `\`\`\`json\n${lastErrorText.substring(0, 400)}\n\`\`\``;
       } else if (lastStatusCode === 429) {
-        errMsg = `⏳ **Превышен лимит запросов / квота Google AI Studio (HTTP 429 Rate Limit Exceeded)!**\n\n` +
+        errMsg = `[TIME] **Превышен лимит запросов / квота Google AI Studio (HTTP 429 Rate Limit Exceeded)!**\n\n` +
           `Модель \`${activeModelName}\` вернула ошибку **429 Too Many Requests** (превышены ограничения RPM / TPM / RPD на бесплатном тарифе).\n\n` +
-          `👉 **Решения:**\n` +
+          `[›] **Решения:**\n` +
           `1. **Подождите 15-30 секунд** и повторите запрос (минутный лимит RPM восстановится).\n` +
           `2. **Переключитесь на локальную модель** вверху чата (без каких-либо лимитов).\n` +
-          `3. **Выберите другую модель Google** (например, \`Gemini 3.5 Flash Lite\` или \`Gemini 2.5 Flash\`).\n` +
+          `3. **Выберите другую модель Google** (например, \`Gemini 3.5 Flash Lite\` или \`Gemini 3.5 Flash\`).\n` +
           `4. Укажите новый **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)**.\n\n` +
           `\`\`\`json\n${lastErrorText.substring(0, 400)}\n\`\`\``;
       } else if (lastStatusCode === 404) {
-        errMsg = `🔍 **Модель не найдена в API эндпоинте Google (HTTP 404 Not Found)!**\n\n` +
+        errMsg = `[SEARCH] **Модель не найдена в API эндпоинте Google (HTTP 404 Not Found)!**\n\n` +
           `Модель \`${activeModelName}\` недоступна по эндпоинту Google AI Studio.\n\n` +
-          `👉 **Решение:** Выберите актуальную модель (\`Gemini 3.6 Flash\`, \`Gemini 3.5 Flash Lite\`, \`Gemini 2.5 Flash\`, \`Gemma 4 31B\`) из выпадающего списка.\n\n` +
+          `[›] **Решение:** Выберите актуальную модель (\`Gemini 3.6 Flash\`, \`Gemini 3.5 Flash Lite\`, \`Gemini 3.5 Flash\`, \`Gemma 4 31B\`) из выпадающего списка.\n\n` +
           `\`\`\`json\n${lastErrorText.substring(0, 300)}\n\`\`\``;
       } else if (lastStatusCode >= 500) {
-        errMsg = `🌐 **Сбой инфраструктуры ИИ / Сервер недоступен (HTTP ${lastStatusCode} Server Error)!**\n\n` +
+        errMsg = `[NET] **Сбой инфраструктуры ИИ / Сервер недоступен (HTTP ${lastStatusCode} Server Error)!**\n\n` +
           `Удаленный сервер моделей верунул ошибку инфраструктуры.\n\n` +
-          `👉 **Решения:**\n` +
+          `[›] **Решения:**\n` +
           `1. Повторите запрос через 5-10 секунд.\n` +
           `2. Переключитесь на локальную модель \`llama.cpp\`.\n\n` +
           `\`\`\`json\n${lastErrorText.substring(0, 300)}\n\`\`\``;
@@ -287,7 +297,7 @@ export async function runAgentLoop(
 
 
     if (!response.body) {
-      const errMsg = '⚠️ **LLM Сервер вернул пустой ответ (body is empty)**';
+      const errMsg = '[!] **LLM Сервер вернул пустой ответ (body is empty)**';
       handleAgentError(session, sessionId, broadcast, errMsg);
       return;
     }
@@ -452,7 +462,7 @@ export async function runAgentLoop(
 
         broadcast('agent-error', {
           sessionId,
-          message: '⚠️ Зафиксировано зацикливание модели. Автоматический сброс петли и повторный вызов с повышенным штрафом за повторы...',
+          message: '[!] Зафиксировано зацикливание модели. Автоматический сброс петли и повторный вызов с повышенным штрафом за повторы...',
         });
         continue;
       }
@@ -530,18 +540,9 @@ export async function runAgentLoop(
 
       let output = '';
       if (approved) {
-        try {
-          output = await dispatchToolExecution(tc, config, userResponseOrApproved);
-
-          broadcast('agent-tool-status-changed', {
-            sessionId,
-            message_id: assistantMessageId,
-            tool_id: tc.id,
-            status: 'completed',
-            output,
-          });
-        } catch (err: any) {
-          output = `Error: ${err.message}\n\n[SYSTEM HINT TO AGENT]: The tool call returned an error. Analyze the error message above, use <read_file> if needed to inspect exact file lines, and try a corrected approach.`;
+        const loopCheck = loopBreaker.trackCall(sessionId, tc.name, tc.arguments);
+        if (loopCheck.forceHalt) {
+          output = loopCheck.advisoryReminder || `[КРИТИЧЕСКАЯ ОШИБКА]: Превышен лимит повторных вызовов инструмента ${tc.name}.`;
           broadcast('agent-tool-status-changed', {
             sessionId,
             message_id: assistantMessageId,
@@ -549,6 +550,34 @@ export async function runAgentLoop(
             status: 'error',
             output,
           });
+        } else {
+          try {
+            output = await dispatchToolExecution(tc, sessionConfig, userResponseOrApproved, sessionId, broadcast);
+
+            if (loopCheck.advisoryReminder) {
+              output = `${output}\n\n${loopCheck.advisoryReminder}`;
+            }
+
+            const spillResult = await handleOutputSpill(output, tc.name);
+            output = spillResult.output;
+
+            broadcast('agent-tool-status-changed', {
+              sessionId,
+              message_id: assistantMessageId,
+              tool_id: tc.id,
+              status: 'completed',
+              output,
+            });
+          } catch (err: any) {
+            output = `Error: ${err.message}\n\n[SYSTEM HINT TO AGENT]: The tool call returned an error. Analyze the error message above, use <read_file> if needed to inspect exact file lines, and try a corrected approach.`;
+            broadcast('agent-tool-status-changed', {
+              sessionId,
+              message_id: assistantMessageId,
+              tool_id: tc.id,
+              status: 'error',
+              output,
+            });
+          }
         }
       } else {
         output = 'Tool execution rejected by the user.';
@@ -629,5 +658,6 @@ export async function runAgentLoop(
   }
   } finally {
     activeRunningLoops.delete(sessionId);
+    loopBreaker.reset(sessionId);
   }
 }

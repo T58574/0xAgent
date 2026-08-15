@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { loadConfig, saveConfig } from '../config';
 import { parseGgufMetadata } from '../ggufParser';
 import { voiceDaemonManager } from '../agent/voiceDaemonManager';
+import { stopLlamaServerProcess } from './llamaRoutes';
 
 export const configRouter = Router();
 
@@ -20,9 +21,25 @@ configRouter.get('/config', (_req, res) => {
 configRouter.post('/config', (req, res) => {
   try {
     saveConfig(req.body);
+
     if (req.body.tts_config && typeof req.body.tts_config.wake_word_enabled === 'boolean') {
       voiceDaemonManager.syncWithConfig(req.body.tts_config.wake_word_enabled);
     }
+
+    // Auto-Free GPU resources when switching to a cloud model (Rule 16)
+    const newModel = req.body.model_name;
+    if (newModel && typeof newModel === 'string') {
+      const isCloudModel =
+        !newModel.startsWith('local:') &&
+        !newModel.endsWith('.gguf') &&
+        !newModel.includes('localhost') &&
+        !newModel.includes('127.0.0.1');
+
+      if (isCloudModel) {
+        stopLlamaServerProcess();
+      }
+    }
+
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -36,13 +53,13 @@ configRouter.get('/models', (_req, res) => {
       {
         id: 'gemini-3.6-flash',
         name: 'Gemini 3.6 Flash',
-        badge: 'Medium',
-        speed: 'Medium >',
+        badge: 'Fast',
+        speed: 'Fast >',
         provider: 'Google AI Studio',
       },
       {
-        id: 'gemma-4-31b-it',
-        name: 'Gemma 4 31B IT',
+        id: 'gemini-3.5-flash',
+        name: 'Gemini 3.5 Flash',
         badge: 'Fast',
         speed: 'Fast >',
         provider: 'Google AI Studio',
@@ -52,6 +69,13 @@ configRouter.get('/models', (_req, res) => {
         name: 'Gemini 3.5 Flash Lite',
         badge: 'Ultra Fast',
         speed: 'Ultra Fast >',
+        provider: 'Google AI Studio',
+      },
+      {
+        id: 'gemma-4-31b-it',
+        name: 'Gemma 4 31B IT',
+        badge: 'Medium',
+        speed: 'Medium >',
         provider: 'Google AI Studio',
       },
       {

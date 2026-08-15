@@ -123,6 +123,10 @@ export interface JarvisSparkProposal {
   category: 'feature_spark' | 'code_polish' | 'exploration' | 'friendly_checkin' | 'error_incident';
   description: string;
   suggestedAction?: string;
+  targetFiles?: string[];
+  contextSnippet?: string;
+  errorTrace?: string;
+  directivePrompt?: string;
   previewDiff?: string;
   voicePhrase?: string;
   timestamp: number;
@@ -219,10 +223,16 @@ export interface ChatMessage {
   metrics?: MessageMetrics | null;
 }
 
+export interface TodoItem {
+  content: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
 export interface ChatSession {
   id: string;
   title: string;
   workspace_dir?: string | null;
+  active_todos?: TodoItem[];
   messages: ChatMessage[];
   created_at: number;
   updated_at: number;
@@ -310,22 +320,6 @@ export interface KnowledgeQueryOptions {
   tag?: string;
   startDate?: number;
   endDate?: number;
-  local_server?: LocalServerConfig | null;
-  fallback_models?: string[] | null;
-  jarvis_model?: string | null;
-  tts_config?: TtsConfig | null;
-  proactive_companion_enabled?: boolean | null;
-}
-
-export interface TtsConfig {
-  enabled: boolean;
-  voice: 'ru-RU-SvetlanaNeural' | 'ru-RU-DmitryNeural' | string;
-  rate: string; // e.g. "+20%", "+0%"
-  pitch: string; // e.g. "+0Hz", "-5Hz"
-  volume?: number; // 0-100
-  play_on_speaker?: boolean;
-  play_in_browser?: boolean;
-  wake_word_enabled?: boolean;
 }
 
 export interface JarvisActivityLog {

@@ -22,7 +22,7 @@ CRITICAL RULES FOR <execute_command>:
 
   const isPlanningMode = config.planning_mode !== false;
   const planningContext = isPlanningMode
-    ? `\n\n# 📋 PLANNING MODE IS ACTIVE
+    ? `\n\n# [PLAN] PLANNING MODE IS ACTIVE
 You are operating in Planning Mode.
 Before executing modifying tool calls (<write_file>, <patch_file>, <execute_command>), follow this mandatory workflow:
 1. RESEARCH & DIAGNOSE: Use read-only tools (<read_file>, <list_dir>, <grep_search>) to inspect existing codebase, imports, types, and find the exact root cause.

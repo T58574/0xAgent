@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
-import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo, JarvisState, JarvisSparkProposal } from './types';
+import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo, JarvisState, JarvisSparkProposal, PersonaMetadata, TodoItem } from './types';
 import { generateShortId } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -16,8 +16,10 @@ import { LockScreen } from './components/LockScreen';
 import { JarvisWidget } from './components/JarvisWidget';
 import { JarvisIntercomHud } from './components/chat/JarvisIntercomHud';
 import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
+import { useToast } from './context/ToastContext';
 
 export default function App() {
+  const { showToast } = useToast();
   // Authentication & Security state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [isPasswordSet, setIsPasswordSet] = useState<boolean>(false);
@@ -27,6 +29,8 @@ export default function App() {
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
+  const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
+  const [activePersonaId, setActivePersonaId] = useState<string>('default');
   const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
   const [isWorkspacePickerOpen, setIsWorkspacePickerOpen] = useState<boolean>(false);
   const [isJarvisOpen, setIsJarvisOpen] = useState<boolean>(false);
@@ -230,8 +234,15 @@ export default function App() {
       setConfig(cfg);
       addLog(`Loaded settings. Model: ${cfg.model_name}`);
 
-      if (cfg.workspace_dir) {
-        loadWorkspaceTree(cfg.workspace_dir);
+      try {
+        const pList = await api.get_personas();
+        setPersonas(pList);
+        const activeP = pList.find((p) => (cfg.active_persona_id ? p.id === cfg.active_persona_id : p.is_active)) || pList[0];
+        if (activeP) {
+          setActivePersonaId(activeP.id);
+        }
+      } catch (pErr) {
+        console.error('Failed to load personas on init:', pErr);
       }
 
       const sessionList = await api.list_sessions();
@@ -243,9 +254,14 @@ export default function App() {
         currentSessionIdRef.current = firstSession.id;
         const fullSession = await api.load_session(firstSession.id);
         updateSessionState(fullSession);
+        if (fullSession.workspace_dir) {
+          loadWorkspaceTree(fullSession.workspace_dir);
+        } else if (cfg.workspace_dir) {
+          loadWorkspaceTree(cfg.workspace_dir);
+        }
         addLog(`Restored session: "${fullSession.title}"`);
       } else {
-        await handleCreateSession('Default Session', cfg.workspace_dir || null);
+        await handleCreateSession('Default Session', 'auto');
       }
     } catch (err: any) {
       addLog(`Error during startup: ${err.message || err}`);
@@ -299,6 +315,12 @@ export default function App() {
       } else {
         updateSessionState(full);
       }
+      if (full.workspace_dir) {
+        loadWorkspaceTree(full.workspace_dir);
+      } else {
+        setWorkspaceTree([]);
+        setHas0xAgentMd(false);
+      }
       addLog(`Switched session to "${full.title}"`);
     } catch (err: any) {
       addLog(`Failed to load session ${id}: ${err.message || err}`);
@@ -307,16 +329,68 @@ export default function App() {
 
   const handleCreateSession = async (title?: string, workspace_dir?: string | null) => {
     try {
-      const name = title || `Session ${sessions.length + 1}`;
-      const targetWs = workspace_dir !== undefined ? workspace_dir : (config?.workspace_dir || null);
-      const newSess = await api.create_session(name, targetWs);
+      let targetWs = workspace_dir;
+      let name = title;
+
+      if (targetWs === 'auto') {
+        const autoWs = await api.create_auto_workspace();
+        targetWs = autoWs.path;
+        name = title && title !== 'Новый диалог' && title !== 'Быстрый чат' && title !== 'Новый чат' ? title : `Чат (${autoWs.slug})`;
+      } else if (targetWs === undefined) {
+        targetWs = config?.workspace_dir || null;
+      }
+
+      const newSess = await api.create_session(name || `Session ${sessions.length + 1}`, targetWs);
       setSessions((prev) => [newSess, ...prev]);
       setCurrentSessionId(newSess.id);
       currentSessionIdRef.current = newSess.id;
       updateSessionState(newSess);
-      addLog(`Created new session: "${name}"`);
+
+      if (newSess.workspace_dir) {
+        loadWorkspaceTree(newSess.workspace_dir);
+      } else {
+        setWorkspaceTree([]);
+        setHas0xAgentMd(false);
+      }
+      addLog(`Created new session: "${newSess.title}"`);
     } catch (err: any) {
       addLog(`Failed to create session: ${err.message || err}`);
+    }
+  };
+
+  const handleUpdateCurrentSessionWorkspace = async (workspace_dir: string | null) => {
+    if (!currentSessionId) return;
+    try {
+      const updated = await api.update_session_workspace(currentSessionId, workspace_dir);
+      updateSessionState(updated);
+      setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
+      if (workspace_dir) {
+        loadWorkspaceTree(workspace_dir);
+        addLog(`Привязана папка: "${workspace_dir}"`);
+      } else {
+        setWorkspaceTree([]);
+        setHas0xAgentMd(false);
+        addLog(`Сессия переведена в общий режим (без файлов)`);
+      }
+    } catch (err: any) {
+      addLog(`Ошибка обновления воркспейса: ${err.message || err}`);
+    }
+  };
+
+  const handleSelectPersona = async (id: string) => {
+    try {
+      const updatedList = await api.activate_persona(id);
+      setPersonas(updatedList);
+      setActivePersonaId(id);
+      setConfig((prev) => (prev ? { ...prev, active_persona_id: id } : prev));
+      const p = updatedList.find((item) => item.id === id);
+      if (p) {
+        addLog(`Активирована персона: ${p.name}`);
+        showToast(`Персона: ${p.name}`, 'success');
+      }
+    } catch (err: any) {
+      addLog(`Ошибка активации персоны: ${err.message || err}`);
+      showToast(`Ошибка смены персоны: ${err.message || err}`, 'error');
     }
   };
 
@@ -332,7 +406,7 @@ export default function App() {
         if (updatedList.length > 0) {
           handleSelectSession(updatedList[0].id);
         } else {
-          handleCreateSession('Default Session', config?.workspace_dir || null);
+          handleCreateSession('Default Session', 'auto');
         }
       }
     } catch (err: any) {
@@ -354,14 +428,16 @@ export default function App() {
       const updated = { ...currentCfg, workspace_dir: dirPath };
       await api.save_config(updated);
       setConfig(updated);
-      loadWorkspaceTree(dirPath);
+      if (currentSessionId) {
+        await handleUpdateCurrentSessionWorkspace(dirPath);
+      } else {
+        loadWorkspaceTree(dirPath);
+      }
       addLog(`Selected workspace: ${dirPath}`);
     } catch (err: any) {
       addLog(`Failed to select workspace directory: ${err.message || err}`);
-      throw err;
     }
   };
-
 
   // 5. Save settings config updates
   const handleSaveConfig = async (updated: AppConfig) => {
@@ -466,6 +542,50 @@ export default function App() {
       };
       updateSessionState(sessWithErr);
       api.save_session(sessWithErr).catch(() => {});
+    }
+  };
+
+  // Launch proactive initiative in dedicated session with rich context
+  const handleAcceptSpark = async (spark: JarvisSparkProposal) => {
+    try {
+      await api.accept_spark(spark.id);
+
+      const sparkTitle = `[Джарвис] ${spark.title}`;
+      const newSession = await api.create_session(sparkTitle, config?.workspace_dir);
+
+      setSessions((prev) => [newSession, ...prev]);
+      setCurrentSessionId(newSession.id);
+      currentSessionRef.current = newSession;
+      setCurrentSession(newSession);
+      activeSessionsMapRef.current.set(newSession.id, newSession);
+
+      setActiveView('chat');
+      setIsJarvisOpen(false);
+
+      const directive = spark.directivePrompt || spark.suggestedAction || spark.description;
+
+      const userMsg: ChatMessage = {
+        id: generateShortId(),
+        role: 'user',
+        content: directive,
+        timestamp: Date.now(),
+      };
+
+      const updatedSession: ChatSession = {
+        ...newSession,
+        messages: [userMsg],
+        updated_at: Date.now(),
+      };
+
+      updateSessionState(updatedSession);
+      await api.save_session(updatedSession);
+      await api.send_message(newSession.id);
+
+      showToast(`Инициатива запущена: ${spark.title}`, 'success');
+      addLog(`Initiative dispatched in dedicated session ${newSession.id}`);
+    } catch (err: any) {
+      console.error('Failed to accept spark:', err);
+      showToast(`Ошибка запуска: ${err.message || err}`, 'error');
     }
   };
 
@@ -718,6 +838,30 @@ export default function App() {
       }
     });
 
+    const unPersona = api.listen<{ activePersonaId?: string; personas: PersonaMetadata[] }>('persona-changed', (event) => {
+      if (event.payload?.personas) {
+        setPersonas(event.payload.personas);
+      }
+      if (event.payload?.activePersonaId) {
+        setActivePersonaId(event.payload.activePersonaId);
+        setConfig((prev) => (prev ? { ...prev, active_persona_id: event.payload.activePersonaId } : prev));
+      }
+    });
+
+    const unTodos = api.listen<{ sessionId: string; todos: TodoItem[] }>('session-todos-updated', (event) => {
+      if (event.payload?.sessionId && event.payload?.todos) {
+        setSessions((prev) =>
+          prev.map((s) => (s.id === event.payload.sessionId ? { ...s, active_todos: event.payload.todos } : s))
+        );
+        if (currentSessionIdRef.current === event.payload.sessionId) {
+          setCurrentSession((prev) => (prev ? { ...prev, active_todos: event.payload.todos } : prev));
+          if (currentSessionRef.current) {
+            currentSessionRef.current.active_todos = event.payload.todos;
+          }
+        }
+      }
+    });
+
     return () => {
       un1();
       un2();
@@ -725,8 +869,26 @@ export default function App() {
       unErr();
       un4();
       un5();
+      unPersona();
+      unTodos();
       window.removeEventListener('0xagent-ws-reconnected', onWsReconnected);
     };
+  }, []);
+
+  // Global Ctrl+N shortcut for New Chat
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n' && !e.shiftKey && !e.altKey) {
+        const target = e.target as HTMLElement;
+        if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+          return;
+        }
+        e.preventDefault();
+        handleCreateSession('Новый диалог', 'auto');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const handleTogglePlanningMode = async () => {
@@ -743,10 +905,12 @@ export default function App() {
   };
 
   const isSplitMode = activeView === 'workspace' || (activeView === 'chat' && selectedFile !== null);
+  const activeSessionWorkspace = currentSession?.workspace_dir !== undefined ? currentSession.workspace_dir : config?.workspace_dir;
 
   const renderChatComponent = () => (
     <ChatArea
       messages={currentSession ? currentSession.messages : []}
+      currentSession={currentSession}
       agentStatus={agentStatus}
       onSendMessage={handleSendMessage}
       onRespondToTool={handleRespondToTool}
@@ -758,11 +922,16 @@ export default function App() {
       onTogglePlanningMode={handleTogglePlanningMode}
       isServerOffline={isServerOffline}
       onStartServer={handleStartServer}
-      workspaceDir={config?.workspace_dir}
+      workspaceDir={activeSessionWorkspace}
       onSelectWorkspace={handleSelectWorkspace}
+      onUpdateSessionWorkspace={handleUpdateCurrentSessionWorkspace}
       modelName={config?.model_name}
       config={config}
       onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
+      onAcceptSpark={handleAcceptSpark}
+      personas={personas}
+      activePersonaId={activePersonaId}
+      onSelectPersona={handleSelectPersona}
     />
   );
 
@@ -783,7 +952,7 @@ export default function App() {
         onStartServer={handleStartServer}
         onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
         onOpenJarvis={() => setIsJarvisOpen(true)}
-        onNewChat={() => handleCreateSession('Новый чат', config?.workspace_dir || null)}
+        onNewChat={() => handleCreateSession('Новый диалог', 'auto')}
         onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
       />
 
@@ -799,7 +968,7 @@ export default function App() {
           onSelectSession={handleSelectSession}
           onCreateSession={handleCreateSession}
           onDeleteSession={handleDeleteSession}
-          workspaceDir={config?.workspace_dir}
+          workspaceDir={activeSessionWorkspace}
           onSelectWorkspace={handleSelectWorkspace}
           workspaceTreeNodes={workspaceTree}
           onFileClick={handleFileClick}
@@ -967,15 +1136,7 @@ export default function App() {
         onClose={() => setIsJarvisOpen(false)}
         jarvisState={jarvisState}
         onRefresh={fetchJarvisData}
-        onAcceptSpark={async (spark: JarvisSparkProposal) => {
-          try {
-            await api.accept_spark(spark.id);
-            setActiveView('chat');
-            handleSendMessage(spark.suggestedAction || spark.description);
-          } catch (err: any) {
-            console.error('Failed to accept spark:', err);
-          }
-        }}
+        onAcceptSpark={handleAcceptSpark}
         onDismissSpark={async (sparkId: string) => {
           try {
             await api.dismiss_spark(sparkId);
@@ -987,24 +1148,7 @@ export default function App() {
       />
 
       {/* JARVIS OLED MORPHIZM ASCII INTERCOM HUD */}
-      <JarvisIntercomHud
-        onAcceptSpark={async (spark: JarvisSparkProposal) => {
-          try {
-            await api.accept_spark(spark.id);
-            setActiveView('chat');
-            handleSendMessage(spark.suggestedAction || spark.description);
-          } catch (err: any) {
-            console.error('Failed to accept spark from HUD:', err);
-          }
-        }}
-        onDismissSpark={async (sparkId) => {
-          try {
-            await api.dismiss_spark(sparkId);
-          } catch (err: any) {
-            console.error('Failed to dismiss spark from HUD:', err);
-          }
-        }}
-      />
+      <JarvisIntercomHud />
 
       {(!isAuthenticated || !isPasswordSet) && (
         <LockScreen

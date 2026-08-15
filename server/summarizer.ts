@@ -20,10 +20,10 @@ const DEFAULT_SUMMARIZER_PROMPT = `# SUMMARIZER.md — Инструкция Фо
 5. Удаляйте лирику, приветствия и дубликаты сообщений.
 
 ## Формат Вывода
-- 🎯 Главная цель пользователя: ...
-- 📂 Измененные / Проверенные файлы: ...
-- 🛠️ Принятые решения и полученные результаты: ...
-- 📌 Текущий прогресс и следующий шаг: ...`;
+- [TARGET] Главная цель пользователя: ...
+- [FILES] Измененные / Проверенные файлы: ...
+- [ACTIONS] Принятые решения и полученные результаты: ...
+- [STATUS] Текущий прогресс и следующий шаг: ...`;
 
 export function extractCleanTextContent(content: any): string {
   if (!content) return '';
@@ -130,7 +130,7 @@ export async function summarizeContext(
   });
 
   broadcast('agent-summarizing-progress', {
-    phase: '🧠 Анализ истории диалога...',
+    phase: '[ANALYSIS] Анализ истории диалога...',
     percent: 25,
   });
 
@@ -147,7 +147,7 @@ export async function summarizeContext(
     .join('\n\n');
 
   broadcast('agent-summarizing-progress', {
-    phase: '⚙️ Запуск локального LLM-суммаризатора...',
+    phase: '[LLM] Запуск локального LLM-суммаризатора...',
     percent: 55,
   });
 
@@ -184,7 +184,7 @@ export async function summarizeContext(
     });
 
     broadcast('agent-summarizing-progress', {
-      phase: '✨ Сжатие вызовов инструментов и фиксация контекста...',
+      phase: '[COMPACT] Сжатие вызовов инструментов и фиксация контекста...',
       percent: 85,
     });
 

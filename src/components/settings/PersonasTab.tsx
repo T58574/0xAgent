@@ -22,6 +22,7 @@ import {
   get_tools_state,
   save_tools_toggles,
   save_tools_md,
+  listen,
 } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -107,6 +108,19 @@ export const PersonasTab: React.FC = () => {
     loadPersonas();
     loadSummarizer();
     loadToolsState();
+
+    const unsub = listen<{ activePersonaId?: string; personas: PersonaMetadata[] }>('persona-changed', (e) => {
+      if (e.payload?.personas) {
+        setPersonas(e.payload.personas);
+      }
+      if (e.payload?.activePersonaId) {
+        setActivePersonaId(e.payload.activePersonaId);
+      }
+    });
+
+    return () => {
+      unsub();
+    };
   }, []);
 
   useEffect(() => {

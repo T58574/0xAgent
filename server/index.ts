@@ -9,7 +9,7 @@ import { authRouter } from './routes/authRoutes';
 import { configRouter } from './routes/configRoutes';
 import { memoryRouter } from './routes/memoryRoutes';
 import { skillsRouter } from './routes/skillsRoutes';
-import { personasRouter } from './routes/personasRoutes';
+import { createPersonasRouter } from './routes/personasRoutes';
 import { workspaceRouter } from './routes/workspaceRoutes';
 import { hardwareRouter } from './routes/hardwareRoutes';
 import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes';
@@ -97,7 +97,7 @@ app.use('/api', authRouter);
 app.use('/api', configRouter);
 app.use('/api', memoryRouter);
 app.use('/api', skillsRouter);
-app.use('/api', personasRouter);
+app.use('/api', createPersonasRouter(broadcast));
 app.use('/api', workspaceRouter);
 app.use('/api', hardwareRouter);
 app.use('/api', createLlamaRouter(broadcast));
@@ -127,6 +127,6 @@ process.on('uncaughtException', (err) => {
 });
 
 server.listen(Number(PORT), HOST, () => {
-  process.stdout.write(`🚀 0xAgent Local Server running at http://${HOST}:${PORT}\n`);
-  process.stdout.write(`🔌 WebSocket server listening on ws://${HOST}:${PORT}/ws\n`);
+  process.stdout.write(`[0xAgent] Local Server running at http://${HOST}:${PORT}\n`);
+  process.stdout.write(`[WS] WebSocket server listening on ws://${HOST}:${PORT}/ws\n`);
 });

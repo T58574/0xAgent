@@ -5,6 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { PersonaMetadata, PersonaDetail } from '../src/types';
 import { loadUnifiedToolsMdContent } from './toolsConfig';
+import { loadConfig, saveConfig } from './config';
 
 export type { PersonaMetadata, PersonaDetail };
 
@@ -257,6 +258,15 @@ export function setActivePersona(id: string): PersonaMetadata[] {
         fs.writeFileSync(metaPath, JSON.stringify(parsed, null, 2), 'utf-8');
       } catch {}
     }
+  }
+
+  // Persist active_persona_id in config.json
+  try {
+    const cfg = loadConfig();
+    cfg.active_persona_id = id;
+    saveConfig(cfg);
+  } catch (err) {
+    console.error('Failed to save active_persona_id in config:', err);
   }
 
   return listPersonas();

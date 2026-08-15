@@ -121,6 +121,24 @@ export async function create_session(title?: string, workspace_dir?: string | nu
   return res.json();
 }
 
+export async function create_auto_workspace(): Promise<{ slug: string; path: string }> {
+  const res = await authFetch(`${API_BASE}/workspaces/create-auto`, {
+    method: 'POST',
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function update_session_workspace(sessionId: string, workspace_dir: string | null): Promise<ChatSession> {
+  const res = await authFetch(`${API_BASE}/sessions/${sessionId}/workspace`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ workspace_dir }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function delete_session(id: string): Promise<void> {
   const res = await authFetch(`${API_BASE}/sessions/${id}`, {
     method: 'DELETE',

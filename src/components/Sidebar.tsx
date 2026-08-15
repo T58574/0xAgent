@@ -12,10 +12,12 @@ import {
   MessageSquare,
   GitBranch,
   Plus,
+  Sparkles,
+  Terminal,
 } from 'lucide-react';
 import { ChatSession, FileNode } from '../types';
 import { WorkspaceTree } from './WorkspaceTree';
-import { getWorkspaceBaseName, formatRelativeTime } from '../utils/helpers';
+import { getWorkspaceBaseName, formatRelativeTime, isAutoWorkspace } from '../utils/helpers';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -48,24 +50,41 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [searchFilter, setSearchFilter] = useState('');
   const [isHoveringHistory, setIsHoveringHistory] = useState(false);
+  const [showNewChatMenu, setShowNewChatMenu] = useState(false);
+  const newChatMenuRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (newChatMenuRef.current && !newChatMenuRef.current.contains(e.target as Node)) {
+        setShowNewChatMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const toggleGroup = (key: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   };
-
-  // Collect unique workspace folders
-  const allWorkspaceDirsSet = new Set<string>();
-  if (workspaceDir) allWorkspaceDirsSet.add(workspaceDir);
-  sessions.forEach((s) => {
-    if (s.workspace_dir) allWorkspaceDirsSet.add(s.workspace_dir);
-  });
-  const workspaceDirs = Array.from(allWorkspaceDirsSet);
 
   // Filter sessions
   const filteredSessions = searchFilter.trim()
     ? sessions.filter((s) => s.title.toLowerCase().includes(searchFilter.toLowerCase()))
     : sessions;
 
+  // Separate sessions into Project Folders, Auto-Workspaces, and Standalone
+  const projectWorkspaceDirsSet = new Set<string>();
+  if (workspaceDir && !isAutoWorkspace(workspaceDir)) {
+    projectWorkspaceDirsSet.add(workspaceDir);
+  }
+  sessions.forEach((s) => {
+    if (s.workspace_dir && !isAutoWorkspace(s.workspace_dir)) {
+      projectWorkspaceDirsSet.add(s.workspace_dir);
+    }
+  });
+  const projectWorkspaceDirs = Array.from(projectWorkspaceDirsSet);
+
+  const autoWorkspaceSessions = filteredSessions.filter((s) => s.workspace_dir && isAutoWorkspace(s.workspace_dir));
   const standaloneSessions = filteredSessions.filter((s) => !s.workspace_dir);
 
   if (!isOpen) return null;
@@ -83,9 +102,82 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <ChevronLeft size={13} className="transition-transform group-hover:-translate-x-0.5" />
       </button>
 
-      {/* 1. TOP QUICK SEARCH BAR & WORKSPACE PICKER */}
-      <div className="p-2.5 border-b border-[var(--theme-border)] shrink-0 bg-black/20 flex items-center gap-1.5">
-        <div className="relative flex-1">
+      {/* 1. TOP HEADER: PROMINENT NEW CHAT & QUICK SEARCH */}
+      <div className="p-2.5 border-b border-[var(--theme-border)] shrink-0 bg-black/20 space-y-2">
+        {/* Primary Action Button: New Chat with Split dropdown */}
+        <div ref={newChatMenuRef} className="relative flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onCreateSession('Новый диалог', 'auto')}
+            className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer group"
+            title="Создать быстрый диалог с изолированным воркспейсом (Ctrl+N)"
+          >
+            <Plus size={14} className="transition-transform group-hover:rotate-90 text-[var(--theme-text)]" />
+            <span>Новый диалог</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowNewChatMenu(!showNewChatMenu)}
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+            title="Параметры создания диалога"
+          >
+            <ChevronDown size={14} className={`transition-transform duration-200 ${showNewChatMenu ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* New Chat Dropdown Popover */}
+          {showNewChatMenu && (
+            <div className="absolute top-full left-0 right-0 mt-1.5 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 rounded-2xl space-y-1 animate-fadeIn">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewChatMenu(false);
+                  onCreateSession('Быстрый чат', 'auto');
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-white/10 text-[var(--theme-text)] transition-colors cursor-pointer"
+              >
+                <Sparkles size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-semibold">Авто-воркспейс</span>
+                  <span className="text-[10px] text-[var(--theme-text-muted)]">Изолированная песочница ~/.0xagent</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewChatMenu(false);
+                  onCreateSession('Общий диалог', null);
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-white/10 text-[var(--theme-text)] transition-colors cursor-pointer"
+              >
+                <MessageSquare size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-semibold">Общий диалог</span>
+                  <span className="text-[10px] text-[var(--theme-text-muted)]">Без привязки к папке на диске</span>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewChatMenu(false);
+                  onSelectWorkspace();
+                }}
+                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-white/10 text-[var(--theme-text)] transition-colors cursor-pointer border-t border-[var(--theme-border)]/40 mt-0.5 pt-1.5"
+              >
+                <FolderPlus size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                <div className="flex flex-col">
+                  <span className="font-semibold">Открыть проект с диска...</span>
+                  <span className="text-[10px] text-[var(--theme-text-muted)]">Выбрать локальную папку</span>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Search filter input */}
+        <div className="relative">
           <input
             type="text"
             value={searchFilter}
@@ -95,22 +187,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
           <Search size={12} className="absolute left-2.5 top-2.5 text-[var(--theme-text-muted)]" />
         </div>
-
-        <button
-          type="button"
-          onClick={onSelectWorkspace}
-          className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-border)] transition-colors cursor-pointer shrink-0"
-          title="Открыть рабочую папку"
-        >
-          <FolderPlus size={14} />
-        </button>
       </div>
 
       {/* 2. CHATS TREE WITH VECTOR CONNECTORS */}
       <div className="flex-1 overflow-y-auto p-2.5 space-y-3 min-h-0 scrollbar-thin">
         
         {/* WORKSPACE PROJECT FOLDERS */}
-        {workspaceDirs.map((dir) => {
+        {projectWorkspaceDirs.map((dir) => {
           const isCurrentActiveWs = workspaceDir && dir.toLowerCase() === workspaceDir.toLowerCase();
           const projSessions = filteredSessions.filter(
             (s) => s.workspace_dir && s.workspace_dir.toLowerCase() === dir.toLowerCase()
@@ -212,6 +295,68 @@ export const Sidebar: React.FC<SidebarProps> = ({
           );
         })}
 
+        {/* AUTO-WORKSPACE SESSIONS */}
+        {autoWorkspaceSessions.length > 0 && (
+          <div className="space-y-1">
+            <div
+              onClick={() => toggleGroup('auto_workspaces')}
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer font-medium text-xs"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                {collapsedGroups['auto_workspaces'] ? (
+                  <ChevronRight size={13} className="shrink-0" />
+                ) : (
+                  <ChevronDown size={13} className="shrink-0" />
+                )}
+                <Sparkles size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
+                <span className="font-semibold">Авто-воркспейсы</span>
+              </div>
+              <span className="text-[10px] font-mono opacity-60">({autoWorkspaceSessions.length})</span>
+            </div>
+
+            {!collapsedGroups['auto_workspaces'] && (
+              <div className="relative pl-3 ml-3 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1">
+                {autoWorkspaceSessions.map((session) => {
+                  const isActive = session.id === currentSessionId;
+                  const relTime = formatRelativeTime(session.updated_at);
+                  return (
+                    <div
+                      key={session.id}
+                      onClick={() => onSelectSession(session.id)}
+                      className={`relative group px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                        isActive
+                          ? 'bg-white/15 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                          : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <Terminal size={12} className="shrink-0 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)]" />
+                        <span className="truncate">{session.title}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {relTime && (
+                          <span className="text-[10px] text-[var(--theme-text-muted)] font-mono group-hover:hidden opacity-75">
+                            {relTime}
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => onDeleteSession(session.id, e)}
+                          className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          title="Удалить"
+                        >
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* STANDALONE GENERAL CHATS */}
         {standaloneSessions.length > 0 && (
           <div className="space-y-1">
@@ -225,6 +370,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ) : (
                   <ChevronDown size={13} className="shrink-0" />
                 )}
+                <MessageSquare size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                 <span className="font-semibold">Общие диалоги</span>
               </div>
               <span className="text-[10px] font-mono opacity-60">({standaloneSessions.length})</span>

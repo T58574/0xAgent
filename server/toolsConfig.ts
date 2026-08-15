@@ -266,6 +266,16 @@ export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
     xmlSpec: `25. <update_persona_file file="SOUL.md|USER.md|TOOLS.md">контент</update_persona_file>
     - Обновляет файл активной персоны в системной директории. НЕ пишите файлы персоны в проект!`,
   },
+  {
+    id: 'todo_write',
+    name: 'todo_write',
+    description: 'Динамическое обновление плана задач (чеклиста) для прозрачного отображения прогресса в HUD-панели интерфейса.',
+    category: 'interactive',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `26. <todo_write todos='[{"content": "...", "status": "pending|in_progress|completed"}]' />
+    - Обновляет текущий список шагов/задач для наглядного отображения прогресса пользователю.`,
+  },
 ];
 
 export function loadToolsToggles(): Record<string, boolean> {
@@ -292,7 +302,7 @@ export function loadToolsToggles(): Record<string, boolean> {
 export function generateToolsMdContent(toggles: Record<string, boolean>): string {
   const activeTools = DEFAULT_TOOLS_REGISTRY.filter((t) => togglingIsEnabled(t.id, toggles));
 
-  let md = `# 🧰 UNIFIED SYSTEM TOOL REGISTRY & XML SPECIFICATION\n`;
+  let md = `# [REGISTRY] UNIFIED SYSTEM TOOL REGISTRY & XML SPECIFICATION\n`;
   md += `You have access to ${activeTools.length} native execution tools. Always emit valid XML tool calls inside your response:\n\n`;
 
   activeTools.forEach((tool, index) => {

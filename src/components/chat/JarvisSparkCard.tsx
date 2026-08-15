@@ -81,9 +81,23 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
         <h4 className="text-sm font-semibold text-zinc-100 tracking-tight mb-1">
           {spark.title}
         </h4>
-        <p className="text-xs text-zinc-300 leading-relaxed font-sans">
+        <p className="text-xs text-zinc-300 leading-relaxed font-sans mb-2">
           {spark.description}
         </p>
+        {spark.targetFiles && spark.targetFiles.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+            <span className="text-[10px] font-mono text-zinc-400">Цели:</span>
+            {spark.targetFiles.map((file, idx) => (
+              <span
+                key={idx}
+                className="px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/20 text-[10px] font-mono text-sky-300 truncate max-w-[200px]"
+                title={file}
+              >
+                {file}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Action Footer */}
@@ -110,10 +124,11 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
           </button>
           <button
             onClick={() => onAccept(spark)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium shadow-md shadow-sky-950/50 transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium shadow-md shadow-sky-950/50 transition-all active:scale-95 cursor-pointer font-mono"
+            title={spark.suggestedAction || 'Запустить задачу с полным контекстом'}
           >
             <MaterialIcon name="play_arrow" className="text-xs" />
-            <span>{spark.suggestedAction || 'В работу'}</span>
+            <span>Запустить</span>
           </button>
         </div>
       </div>

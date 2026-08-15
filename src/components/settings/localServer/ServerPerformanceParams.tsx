@@ -374,7 +374,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
                 className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-white/5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
                 title="Очистить"
               >
-                ✕
+                [x]
               </button>
             )}
           </div>

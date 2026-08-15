@@ -25,7 +25,7 @@ export function createAgentRouter(broadcast: BroadcastFn): Router {
       console.error('Agent loop error:', err);
       try {
         const session = await loadSession(sessionId);
-        const errMsg = `⚠️ **Системная ошибка выполнения Агента:**\n\`\`\`\n${err.message || err}\n\`\`\``;
+        const errMsg = `[!] **Системная ошибка выполнения Агента:**\n\`\`\`\n${err.message || err}\n\`\`\``;
         session.messages.push({
           id: uuidv4(),
           role: 'assistant',

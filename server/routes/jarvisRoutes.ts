@@ -167,13 +167,13 @@ jarvisRouter.post('/jarvis/voice-input', async (req: Request, res: Response) => 
       // 2. Check for Windows Voice Macros (Media Play/Pause, Volume, Window controls, App Launchers)
       const macro = voiceMacroService.processCommand(cleanText);
       if (macro.handled) {
-        jarvisSupervisor.logActivity('System', `⚡ Voice Macro: "${cleanText}" -> ${macro.description}`, 'success');
+        jarvisSupervisor.logActivity('System', `[CMD] Voice Macro: "${cleanText}" -> ${macro.description}`, 'success');
         if (config.tts_config?.enabled) {
           ttsService.playCategory('macro', config.tts_config).catch(() => {});
         }
         if ((jarvisSupervisor as any).wsBroadcaster) {
           (jarvisSupervisor as any).wsBroadcaster('jarvis_voice_transcribed', {
-            text: `[CMD] ${cleanText} (⚡ ${macro.description})`,
+            text: `[CMD] ${cleanText} ([MACRO] ${macro.description})`,
           });
         }
         voiceDaemonManager.broadcastState('idle', { lastText: cleanText, macro: macro.description });

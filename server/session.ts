@@ -54,16 +54,53 @@ export async function saveSession(session: ChatSession): Promise<void> {
   await fs.promises.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');
 }
 
+const ADJECTIVES = ['swift', 'quantum', 'amber', 'hyper', 'neon', 'stellar', 'cyber', 'nova', 'apex', 'nexus', 'vital', 'spectral', 'zenith', 'pulse', 'echo', 'prism', 'vortex'];
+const NOUNS = ['falcon', 'matrix', 'orbit', 'spark', 'flux', 'beacon', 'core', 'vector', 'haven', 'forge', 'pulse', 'strata', 'prism', 'relay', 'lattice'];
+
+export function generateWorkspaceSlug(): string {
+  const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
+  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
+  const hex = Math.random().toString(36).substring(2, 6);
+  return `${adj}-${noun}-${hex}`;
+}
+
+export async function createAutoWorkspaceDir(): Promise<{ slug: string; path: string }> {
+  const slug = generateWorkspaceSlug();
+  const workspacesRoot = path.join(getAppDir(), 'workspaces');
+  const targetDir = path.join(workspacesRoot, slug);
+  await fs.promises.mkdir(targetDir, { recursive: true });
+  return { slug, path: targetDir };
+}
+
 export async function createNewSession(title?: string, workspace_dir?: string | null): Promise<ChatSession> {
   const now = Date.now();
+  let resolvedWs = workspace_dir || null;
+  let finalTitle = title;
+
+  if (workspace_dir === 'auto') {
+    const autoWs = await createAutoWorkspaceDir();
+    resolvedWs = autoWs.path;
+    if (!finalTitle || finalTitle === 'New Session' || finalTitle === 'Новый диалог' || finalTitle === 'Быстрый чат') {
+      finalTitle = `Чат (${autoWs.slug})`;
+    }
+  }
+
   const session: ChatSession = {
     id: uuidv4(),
-    title: title || 'New Session',
-    workspace_dir: workspace_dir || null,
+    title: finalTitle || 'New Session',
+    workspace_dir: resolvedWs,
     messages: [],
     created_at: now,
     updated_at: now,
   };
+  await saveSession(session);
+  return session;
+}
+
+export async function updateSessionWorkspace(id: string, workspace_dir: string | null): Promise<ChatSession> {
+  const session = await loadSession(id);
+  session.workspace_dir = workspace_dir || null;
+  session.updated_at = Date.now();
   await saveSession(session);
   return session;
 }
@@ -77,3 +114,4 @@ export async function deleteSession(id: string): Promise<void> {
     // ignore if missing
   }
 }
+

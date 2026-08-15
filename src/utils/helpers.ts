@@ -81,6 +81,15 @@ export function getWorkspaceBaseName(dirPath?: string | null): string {
 }
 
 /**
+ * Checks whether a workspace directory is an auto-generated isolated sandbox workspace
+ */
+export function isAutoWorkspace(dirPath?: string | null): boolean {
+  if (!dirPath) return false;
+  const normalized = dirPath.replace(/\\/g, '/').toLowerCase();
+  return normalized.includes('/.0xagent/workspaces/') || normalized.includes('/.0xagent/workspaces');
+}
+
+/**
  * Generate a short unique ID for messages and transient components
  */
 export function generateShortId(): string {

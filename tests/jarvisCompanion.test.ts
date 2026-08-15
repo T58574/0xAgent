@@ -19,6 +19,12 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
     ttsService.setMuted(true);
   });
 
+  after(() => {
+    try { proactiveCompanion.stop(); } catch {}
+    try { processWatcher.stopScanner(); } catch {}
+    try { jarvisSupervisor.stopLoop(); } catch {}
+  });
+
   describe('1. TTS Engine & Caching Logic (ttsService)', () => {
     it('should generate consistent and unique md5 filenames for different phrases', () => {
       const fn1 = getPhraseFilename('На связи, сэр.', 'ru-RU-SvetlanaNeural', '+20%');
@@ -104,6 +110,7 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
       assert.equal(created.status, 'pending', 'Initial status must be pending');
       assert.equal(created.title, testSpark.title);
       assert.equal(created.category, testSpark.category);
+      assert.ok(created.directivePrompt && created.directivePrompt.includes('JARVIS AUTONOMOUS INITIATIVE'), 'Spark must have a rich directivePrompt');
       assert.ok(created.timestamp > 0);
 
       const sparks = proactiveCompanion.getActiveSparks();
