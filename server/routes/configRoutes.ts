@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { loadConfig, saveConfig } from '../config';
 import { parseGgufMetadata } from '../ggufParser';
+import { voiceDaemonManager } from '../agent/voiceDaemonManager';
 
 export const configRouter = Router();
 
@@ -19,6 +20,9 @@ configRouter.get('/config', (_req, res) => {
 configRouter.post('/config', (req, res) => {
   try {
     saveConfig(req.body);
+    if (req.body.tts_config && typeof req.body.tts_config.wake_word_enabled === 'boolean') {
+      voiceDaemonManager.syncWithConfig(req.body.tts_config.wake_word_enabled);
+    }
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

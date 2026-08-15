@@ -3,7 +3,8 @@ import { proactiveCompanion } from '../agent/proactiveCompanion';
 import { jarvisSupervisor } from '../agent/jarvisSupervisor';
 import { ttsService } from '../ttsService';
 import { voiceDaemonManager } from '../agent/voiceDaemonManager';
-import { loadConfig } from '../config';
+import { loadConfig, saveConfig } from '../config';
+import { voiceMacroService } from '../agent/voiceMacroService';
 
 export const jarvisRouter = Router();
 
@@ -117,7 +118,7 @@ jarvisRouter.post('/jarvis/voice-input', async (req: Request, res: Response) => 
       const formData = new FormData();
       const file = new File([audioBuffer], 'voice_recording.wav', { type: 'audio/wav' });
       formData.append('file', file);
-      formData.append('model', 'whisper-large-v3-turbo');
+      formData.append('model', 'whisper-large-v3');
       formData.append('language', 'ru');
       formData.append('response_format', 'json');
       formData.append('temperature', '0.0');
@@ -131,10 +132,10 @@ jarvisRouter.post('/jarvis/voice-input', async (req: Request, res: Response) => 
         body: formData,
       });
 
-      if (!groqRes.ok && groqRes.status === 404) {
+      if (!groqRes.ok) {
         const fallbackData = new FormData();
         fallbackData.append('file', new File([audioBuffer], 'voice_recording.wav', { type: 'audio/wav' }));
-        fallbackData.append('model', 'whisper-large-v3');
+        fallbackData.append('model', 'whisper-large-v3-turbo');
         fallbackData.append('language', 'ru');
         groqRes = await fetch(groqEndpoint, {
           method: 'POST',
@@ -152,13 +153,40 @@ jarvisRouter.post('/jarvis/voice-input', async (req: Request, res: Response) => 
     }
 
     if (transcribedText) {
-      jarvisSupervisor.logActivity('System', `Voice Command: "${transcribedText}"`, 'info');
-      // Broadcast transcribed event to frontend
-      if ((jarvisSupervisor as any).wsBroadcaster) {
-        (jarvisSupervisor as any).wsBroadcaster('jarvis_voice_transcribed', { text: transcribedText });
+      // 1. Clean leading greetings ("Слушаю вас, сэр...") and trailing stop words
+      const { cleanText, isOnlyGreeting } = ttsService.cleanLeadingJarvisPhrase(transcribedText);
+
+      if (isOnlyGreeting || !cleanText) {
+        jarvisSupervisor.logActivity('System', `Filtered self-echo Jarvis greeting: "${transcribedText}"`, 'info');
+        voiceDaemonManager.broadcastState('idle');
+        res.json({ success: true, text: '', filtered: true });
+        return;
       }
-      voiceDaemonManager.broadcastState('idle', { lastText: transcribedText });
-      res.json({ success: true, text: transcribedText });
+
+      // 2. Check for Windows Voice Macros (Media Play/Pause, Volume, Window controls, App Launchers)
+      const macro = voiceMacroService.processCommand(cleanText);
+      if (macro.handled) {
+        jarvisSupervisor.logActivity('System', `⚡ Voice Macro: "${cleanText}" -> ${macro.description}`, 'success');
+        if (config.tts_config?.enabled) {
+          ttsService.playCategory('macro', config.tts_config).catch(() => {});
+        }
+        if ((jarvisSupervisor as any).wsBroadcaster) {
+          (jarvisSupervisor as any).wsBroadcaster('jarvis_voice_transcribed', {
+            text: `[CMD] ${cleanText} (⚡ ${macro.description})`,
+          });
+        }
+        voiceDaemonManager.broadcastState('idle', { lastText: cleanText, macro: macro.description });
+        res.json({ success: true, text: cleanText, macro: macro.description });
+        return;
+      }
+
+      // 3. User Command / Question for AI Agent
+      jarvisSupervisor.logActivity('System', `Voice Command: "${cleanText}"`, 'info');
+      if ((jarvisSupervisor as any).wsBroadcaster) {
+        (jarvisSupervisor as any).wsBroadcaster('jarvis_voice_transcribed', { text: cleanText });
+      }
+      voiceDaemonManager.broadcastState('idle', { lastText: cleanText });
+      res.json({ success: true, text: cleanText });
     } else {
       voiceDaemonManager.broadcastState('idle');
       res.json({ success: false, text: '' });
@@ -169,13 +197,57 @@ jarvisRouter.post('/jarvis/voice-input', async (req: Request, res: Response) => 
   }
 });
 
-// Voice daemon status & toggle
+// Voice daemon status & manual record controls
 jarvisRouter.get('/jarvis/voice-daemon/status', (_req: Request, res: Response) => {
   res.json({ running: voiceDaemonManager.isRunning() });
 });
 
+jarvisRouter.post('/jarvis/voice-record/start', async (_req: Request, res: Response) => {
+  const config = loadConfig();
+  if (config.tts_config?.enabled) {
+    ttsService.playCategory('listening', config.tts_config).catch(() => {});
+  }
+  const ok = await voiceDaemonManager.startRecording();
+  res.json({ success: ok, state: 'recording' });
+});
+
+jarvisRouter.post('/jarvis/voice-record/stop', async (_req: Request, res: Response) => {
+  const ok = await voiceDaemonManager.stopRecording();
+  res.json({ success: ok, state: 'processing' });
+});
+
+jarvisRouter.post('/jarvis/voice-record/toggle', async (_req: Request, res: Response) => {
+  const ok = await voiceDaemonManager.toggleRecording();
+  res.json({ success: ok });
+});
+
+// Update voice daemon state from python process
+jarvisRouter.post('/jarvis/voice-state', (req: Request, res: Response) => {
+  const { state, extra } = req.body;
+  if (state) {
+    voiceDaemonManager.broadcastState(state, extra);
+  }
+  res.json({ success: true });
+});
+
 jarvisRouter.post('/jarvis/voice-daemon/toggle', (req: Request, res: Response) => {
   const { enable } = req.body;
+  const config = loadConfig();
+  if (!config.tts_config) {
+    config.tts_config = {
+      enabled: true,
+      voice: 'ru-RU-DmitryNeural',
+      rate: '+15%',
+      pitch: '-5Hz',
+      play_on_speaker: true,
+      play_in_browser: true,
+      wake_word_enabled: Boolean(enable),
+    };
+  } else {
+    config.tts_config.wake_word_enabled = Boolean(enable);
+  }
+  saveConfig(config);
+
   if (enable) {
     const ok = voiceDaemonManager.start();
     res.json({ success: ok, running: voiceDaemonManager.isRunning() });

@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { TtsConfig } from '../src/types';
 import { logger } from './logger';
+import { voiceDaemonManager } from './agent/voiceDaemonManager';
 
 const APP_DIR = path.join(os.homedir(), '.0xagent');
 const CACHE_DIR = path.join(APP_DIR, 'data', 'audio_cache', 'tts');
@@ -52,6 +53,14 @@ export const PRESET_PHRASES: Record<string, string[]> = {
     'Сформировал короткое предложение для вас.',
     'Взгляните, когда освободитесь.',
     'У меня готов аккуратный план действий.',
+  ],
+  macro: [
+    'Выполняю команду, сэр.',
+    'Есть, выполняю.',
+    'Принято.',
+    'Команда выполнена.',
+    'Сделано, сэр.',
+    'Запрос активирован.',
   ],
   companion_calm: [
     'Отдыхайте, сэр, я на страже.',
@@ -337,9 +346,62 @@ asyncio.run(run())
     });
   }
 
+  public cleanLeadingJarvisPhrase(rawText: string): { cleanText: string; isOnlyGreeting: boolean } {
+    if (!rawText || !rawText.trim()) {
+      return { cleanText: '', isOnlyGreeting: true };
+    }
+
+    let text = rawText.trim();
+
+    const greetings = [
+      'слушаю вас, сэр',
+      'слушаю вас сэр',
+      'слушаю вас',
+      'да, сэр',
+      'да сэр',
+      'на связи',
+      'я вас слушаю',
+      'внимательно слушаю',
+      'прием, сэр',
+      'прием сэр',
+      'готов к приему информации',
+      'команда принята к прослушиванию',
+      'слушаю',
+      'джарвис',
+      'джарвиз',
+      'жарвис',
+      'эй джарвис',
+    ];
+
+    for (const g of greetings) {
+      try {
+        const escaped = g.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const reg = new RegExp(`^${escaped}[\\s,.:;!?-]*`, 'i');
+        if (reg.test(text)) {
+          text = text.replace(reg, '').trim();
+        }
+      } catch {}
+    }
+
+    const stopWords = ['стоп', 'стопнули', 'хватит', 'отмена', 'отбой', 'пауза'];
+    for (const sw of stopWords) {
+      try {
+        const escaped = sw.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regStop = new RegExp(`[\\s,.:;!?-]+${escaped}[\\s,.:;!?-]*$`, 'i');
+        text = text.replace(regStop, '').trim();
+      } catch {}
+    }
+
+    return {
+      cleanText: text,
+      isOnlyGreeting: text.length === 0,
+    };
+  }
+
   private playLocalMp3(filePath: string) {
     this.stopLocalPlayback();
     this.isSpeakingFlag = true;
+    voiceDaemonManager.notifyTtsSpeaking(true);
 
     const playScript = `
 import ctypes
@@ -350,6 +412,7 @@ try:
     mci = ctypes.windll.winmm.mciSendStringW
     alias = f"jtts_{int(time.time()*1000)}"
     mci(f'open "{sys.argv[1]}" type mpegvideo alias {alias}', None, 0, 0)
+    mci(f'setaudio {alias} volume to 600', None, 0, 0)
     mci(f'play {alias} wait', None, 0, 0)
     mci(f'close {alias}', None, 0, 0)
 except Exception:
@@ -365,11 +428,13 @@ except Exception:
 
     proc.on('close', () => {
       this.isSpeakingFlag = false;
+      voiceDaemonManager.notifyTtsSpeaking(false);
       this.currentProcess = null;
     });
 
     proc.on('error', () => {
       this.isSpeakingFlag = false;
+      voiceDaemonManager.notifyTtsSpeaking(false);
       this.currentProcess = null;
     });
   }
@@ -384,6 +449,7 @@ except Exception:
       this.currentProcess = null;
     }
     this.isSpeakingFlag = false;
+    voiceDaemonManager.notifyTtsSpeaking(false);
   }
 
   private startBackgroundPrecaching() {

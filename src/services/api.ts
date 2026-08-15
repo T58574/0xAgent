@@ -611,6 +611,40 @@ export async function dismiss_spark(id: string): Promise<void> {
   if (!res.ok) throw new Error(await res.text());
 }
 
+export async function get_voice_daemon_status(): Promise<{ running: boolean }> {
+  const res = await authFetch(`${API_BASE}/jarvis/voice-daemon/status`);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function toggle_voice_daemon(enable: boolean): Promise<{ success: boolean; running: boolean }> {
+  const res = await authFetch(`${API_BASE}/jarvis/voice-daemon/toggle`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enable }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function toggle_voice_daemon_recording(): Promise<{ success: boolean }> {
+  const res = await authFetch(`${API_BASE}/jarvis/voice-record/toggle`, { method: 'POST' });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function start_voice_daemon_recording(): Promise<{ success: boolean; state: string }> {
+  const res = await authFetch(`${API_BASE}/jarvis/voice-record/start`, { method: 'POST' });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function stop_voice_daemon_recording(): Promise<{ success: boolean; state: string }> {
+  const res = await authFetch(`${API_BASE}/jarvis/voice-record/stop`, { method: 'POST' });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 
 
 

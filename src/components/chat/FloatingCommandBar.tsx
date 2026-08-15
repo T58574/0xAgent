@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { AppConfig, PersonaMetadata } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
-import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 import * as api from '../../services/api';
 
 interface FloatingCommandBarProps {
@@ -95,27 +94,20 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     getDisplayTitle,
   } = useModelManager(config, onModelChanged);
 
-  // Voice Recording with Groq Whisper & Software Gain Boost (3.2x)
-  const {
-    isRecording,
-    isTranscribing,
-    volumeLevel,
-    toggleRecording,
-  } = useAudioRecorder({
-    groqApiKey: config?.groq_api_key,
-    gainBoost: 3.2,
-    onTranscribed: (text) => {
-      setInputText(inputText ? `${inputText} ${text}` : text);
-    },
-    onError: (err) => {
-      console.error('Audio recording error:', err);
-    },
-  });
-
   const [daemonVoiceState, setDaemonVoiceState] = useState<'idle' | 'recording' | 'processing' | 'stopped'>('idle');
+  const [voicePhraseNotification, setVoicePhraseNotification] = useState<string | null>(null);
   const isListeningForWake = Boolean(config?.tts_config?.wake_word_enabled);
   const inputTextRef = useRef(inputText);
   inputTextRef.current = inputText;
+
+  // Toggle native desktop Voice Daemon recording (zero browser mic overhead)
+  const handleMicClick = async () => {
+    try {
+      await api.toggle_voice_daemon_recording();
+    } catch (err) {
+      console.error('Failed to toggle native voice recording:', err);
+    }
+  };
 
   // Subscribe to native desktop Voice Daemon events
   useEffect(() => {
@@ -123,12 +115,19 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       if (e.payload?.text) {
         const cur = inputTextRef.current;
         setInputText(cur ? `${cur} ${e.payload.text}` : e.payload.text);
+        if (textareaRef.current) {
+          textareaRef.current.focus();
+        }
       }
     });
 
-    const un2 = api.listen<{ state: 'idle' | 'recording' | 'processing' | 'stopped' }>('jarvis_voice_state', (e) => {
+    const un2 = api.listen<{ state: 'idle' | 'recording' | 'processing' | 'stopped'; phrase?: string }>('jarvis_voice_state', (e) => {
       if (e.payload?.state) {
         setDaemonVoiceState(e.payload.state);
+        if (e.payload.phrase) {
+          setVoicePhraseNotification(e.payload.phrase);
+          setTimeout(() => setVoicePhraseNotification(null), 3000);
+        }
       }
     });
 
@@ -432,18 +431,36 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
-      {/* Recording Waveform Active Banner */}
-      {isRecording && (
-        <div className="flex items-center justify-between px-4 py-1.5 mb-2 rounded-2xl bg-rose-950/50 border border-rose-500/30 text-rose-400 font-mono text-xs backdrop-blur-2xl animate-fadeIn shadow-lg shadow-rose-950/40">
+      {/* Recording / Voice Feedback HUD Banner */}
+      {daemonVoiceState === 'recording' && (
+        <div className="flex items-center justify-between px-4 py-2 mb-2 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-rose-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-rose-950/50">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
+            </span>
+            <span className="font-bold tracking-wider text-[11px] text-white">JARVIS :: RECORDING</span>
+            <span className="text-[11px] text-rose-300/80">
+              {voicePhraseNotification ? `«${voicePhraseNotification}»` : 'Слушаю вас... (Скажите «Стоп» или кликните)'}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-1 h-3 bg-rose-400 rounded-full animate-pulse" />
+            <span className="w-1 h-4 bg-rose-400 rounded-full animate-pulse delay-75" />
+            <span className="w-1 h-2 bg-rose-400 rounded-full animate-pulse delay-150" />
+            <span className="w-1 h-4 bg-rose-400 rounded-full animate-pulse delay-100" />
+            <span className="w-1 h-3 bg-rose-400 rounded-full animate-pulse" />
+          </div>
+        </div>
+      )}
+
+      {daemonVoiceState === 'processing' && (
+        <div className="flex items-center justify-between px-4 py-2 mb-2 rounded-2xl bg-sky-950/60 border border-sky-500/40 text-sky-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-sky-950/50">
           <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
-            <span className="font-bold tracking-wider uppercase text-[10px]">:: [MIC_ACTIVE]</span>
-            <span className="text-[10px] text-zinc-400">[Gain Boost 3.2x]</span>
+            <RefreshCw size={13} className="animate-spin text-sky-400" />
+            <span className="font-bold tracking-wider text-[11px] text-white">JARVIS :: GROQ WHISPER</span>
+            <span className="text-[11px] text-sky-300/80">Расшифровка голосовой команды...</span>
           </div>
-          <div className="text-xs font-bold select-none text-rose-300">
-            {volumeLevel > 0 ? `[${'|'.repeat(Math.min(10, Math.max(1, Math.round(volumeLevel / 10))))}]` : '[...]'}
-          </div>
-          <span className="text-[10px] text-zinc-400">Клик по микрофону для отправки</span>
         </div>
       )}
 
@@ -472,36 +489,36 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[13.5px] focus:outline-none resize-none min-h-[30px] max-h-[140px] py-1 px-1 leading-normal font-sans self-center"
           />
 
-          {/* Microphone Voice Input (Groq Whisper + Software Gain Boost + Wake Word) */}
+          {/* Microphone Voice Input (Groq Whisper + Native OS Voice Daemon) */}
           <button
             type="button"
-            onClick={toggleRecording}
-            disabled={isTranscribing}
+            onClick={handleMicClick}
+            disabled={daemonVoiceState === 'processing'}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 self-center relative ${
-              isRecording || daemonVoiceState === 'recording'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/50 scale-105'
-                : isTranscribing || daemonVoiceState === 'processing'
+              daemonVoiceState === 'recording'
+                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/50 scale-105 animate-pulse'
+                : daemonVoiceState === 'processing'
                 ? 'bg-white/10 text-sky-400 cursor-wait animate-pulse'
                 : isListeningForWake
                 ? 'text-sky-400 hover:bg-white/10'
                 : 'text-[var(--theme-text-muted)] hover:text-sky-400 hover:bg-white/10'
             }`}
             title={
-              isRecording || daemonVoiceState === 'recording'
-                ? 'Идет запись речи... (Скажите "Стоп" или кликните)'
-                : isTranscribing || daemonVoiceState === 'processing'
+              daemonVoiceState === 'recording'
+                ? 'Идет запись речи через системный демон... (Скажите "Стоп" или кликните)'
+                : daemonVoiceState === 'processing'
                 ? 'Расшифровка Groq Whisper...'
                 : isListeningForWake
-                ? 'Голосовой фоновый демон активен (Скажите "Джарвис" или кликните)'
+                ? 'Фоновый голосовой демон активен (Скажите "Джарвис" или кликните)'
                 : 'Голосовой ввод (Groq Whisper, Gain Boost 3.2x)'
             }
           >
-            {isRecording || daemonVoiceState === 'recording' ? (
+            {daemonVoiceState === 'recording' ? (
               <>
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60 pointer-events-none" />
                 <Square size={12} fill="currentColor" />
               </>
-            ) : isTranscribing || daemonVoiceState === 'processing' ? (
+            ) : daemonVoiceState === 'processing' ? (
               <RefreshCw size={14} className="animate-spin text-sky-400" />
             ) : (
               <>

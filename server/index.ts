@@ -37,9 +37,12 @@ app.use((req, res, next) => {
     '/api/auth/status',
     '/api/auth/setup',
     '/api/auth/login',
+    '/api/jarvis/voice-wake',
+    '/api/jarvis/voice-input',
+    '/api/jarvis/voice-state',
   ];
 
-  if (!req.path.startsWith('/api/') || publicAuthPaths.includes(req.path)) {
+  if (!req.path.startsWith('/api/') || publicAuthPaths.includes(req.path) || req.path.startsWith('/api/jarvis/voice-')) {
     return next();
   }
 

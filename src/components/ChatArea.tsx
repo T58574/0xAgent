@@ -162,9 +162,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     });
 
     const u6 = api.listen<{ text: string; audioBase64?: string }>('jarvis_speak', (e) => {
-      if (config?.tts_config?.play_in_browser && e.payload.audioBase64) {
+      // Only play in browser if play_in_browser is enabled and not playing directly on system speakers
+      if (config?.tts_config?.play_in_browser && !config?.tts_config?.play_on_speaker && e.payload.audioBase64) {
         try {
           const audio = new Audio(e.payload.audioBase64);
+          audio.volume = 0.6; // 60% master volume
           audio.play().catch(() => {});
         } catch {}
       }
