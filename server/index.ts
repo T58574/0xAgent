@@ -64,6 +64,10 @@ const server = http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 const clients = new Set<WebSocket>();
 
+wss.on('error', (err) => {
+  console.warn('[WSS SERVER ERROR]', err?.message || err);
+});
+
 wss.on('connection', (ws, req) => {
   const urlParams = new URLSearchParams((req.url || '').split('?')[1] || '');
   const token = urlParams.get('token') || (req.headers['sec-websocket-protocol'] as string);
@@ -75,15 +79,30 @@ wss.on('connection', (ws, req) => {
   }
 
   clients.add(ws);
+
+  ws.on('error', (err) => {
+    // Gracefully handle socket reset/drops without crashing process
+    console.warn('[WS CLIENT ERROR]', err?.message || err);
+    clients.delete(ws);
+  });
+
   ws.on('close', () => clients.delete(ws));
 });
 
 function broadcast(event: string, payload: any): void {
-  const message = JSON.stringify({ event, payload });
-  for (const client of clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
+  try {
+    const message = JSON.stringify({ event, payload });
+    for (const client of clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        try {
+          client.send(message);
+        } catch (sendErr) {
+          console.warn('[WS SEND ERROR]', sendErr);
+        }
+      }
     }
+  } catch (broadcastErr) {
+    console.error('[WS BROADCAST ERROR]', broadcastErr);
   }
 }
 
@@ -117,11 +136,28 @@ const cleanupOnExit = () => {
   jarvisSupervisor.stopLoop();
   stopLlamaServerProcess(broadcast);
 };
+
+server.on('error', (err: any) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[0xAgent] Port ${PORT} is already in use. Please run 'npm run stop' or check running processes.`);
+  } else {
+    console.error('[HTTP SERVER ERROR]', err);
+  }
+});
+
 process.on('SIGINT', () => { cleanupOnExit(); process.exit(0); });
 process.on('SIGTERM', () => { cleanupOnExit(); process.exit(0); });
 process.on('exit', () => { cleanupOnExit(); });
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED PROMISE REJECTION]', reason);
+});
+
+process.on('uncaughtException', (err: any) => {
+  console.error('[UNCAUGHT EXCEPTION]', err);
+  if (err && (err.name === 'AbortError' || err.code === 'ECONNRESET' || err.code === 'EPIPE')) {
+    return; // Non-fatal connection drops
+  }
   cleanupOnExit();
   process.exit(1);
 });
