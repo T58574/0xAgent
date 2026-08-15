@@ -21,6 +21,8 @@ import {
 import { AppConfig, PersonaMetadata } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
+import { useWakeWord } from '../../hooks/useWakeWord';
+import * as api from '../../services/api';
 
 interface FloatingCommandBarProps {
   inputText: string;
@@ -99,6 +101,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     isRecording,
     isTranscribing,
     volumeLevel,
+    startRecording,
+    stopRecording,
     toggleRecording,
   } = useAudioRecorder({
     groqApiKey: config?.groq_api_key,
@@ -108,6 +112,24 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     },
     onError: (err) => {
       console.error('Audio recording error:', err);
+    },
+  });
+
+  // Hands-Free Continuous Wake Word Spotter ("Джарвис" -> start recording, "Стоп" -> send)
+  const { isListeningForWake } = useWakeWord({
+    enabled: Boolean(config?.tts_config?.enabled),
+    onWakeDetected: async () => {
+      try {
+        await api.speak_category('listening');
+      } catch {}
+      if (!isRecording) {
+        startRecording();
+      }
+    },
+    onStopDetected: () => {
+      if (isRecording) {
+        stopRecording();
+      }
     },
   });
 
@@ -445,7 +467,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[13.5px] focus:outline-none resize-none min-h-[30px] max-h-[140px] py-1 px-1 leading-normal font-sans self-center"
           />
 
-          {/* Microphone Voice Input (Groq Whisper + Software Gain Boost) */}
+          {/* Microphone Voice Input (Groq Whisper + Software Gain Boost + Wake Word) */}
           <button
             type="button"
             onClick={toggleRecording}
@@ -455,6 +477,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/50 scale-105'
                 : isTranscribing
                 ? 'bg-white/10 text-sky-400 cursor-wait animate-pulse'
+                : isListeningForWake
+                ? 'text-sky-400 hover:bg-white/10'
                 : 'text-[var(--theme-text-muted)] hover:text-sky-400 hover:bg-white/10'
             }`}
             title={
@@ -462,6 +486,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 ? 'Идет запись... Клик — расшифровать через Groq'
                 : isTranscribing
                 ? 'Расшифровка Groq Whisper...'
+                : isListeningForWake
+                ? 'Голосовой ввод активен (Скажите "Джарвис" или кликните)'
                 : 'Голосовой ввод (Groq Whisper, Gain Boost 3.2x)'
             }
           >
@@ -473,7 +499,15 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             ) : isTranscribing ? (
               <RefreshCw size={14} className="animate-spin text-sky-400" />
             ) : (
-              <Mic size={16} />
+              <>
+                {isListeningForWake && (
+                  <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                )}
+                <Mic size={16} />
+              </>
             )}
           </button>
 

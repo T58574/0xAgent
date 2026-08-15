@@ -27,7 +27,19 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
     });
 
     it('should have all preset phrase categories defined and populated', () => {
-      const requiredCategories = ['greeting', 'spark_ready', 'companion_calm', 'success', 'error', 'background_task'];
+      const requiredCategories = [
+        'greeting',
+        'listening',
+        'spark_ready',
+        'companion_calm',
+        'gaming_momentum',
+        'coding_flow',
+        'late_night',
+        'success',
+        'error',
+        'background_task',
+        'processing',
+      ];
       for (const cat of requiredCategories) {
         assert.ok(Array.isArray(PRESET_PHRASES[cat]), `Category ${cat} must be an array`);
         assert.ok(PRESET_PHRASES[cat].length > 0, `Category ${cat} must not be empty`);
