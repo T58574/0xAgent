@@ -12,6 +12,9 @@ import { logger } from '../server/logger';
 import { processWatcher } from '../server/agent/processWatcher';
 
 describe('Jarvis Companion & Voice Intercom Test Suite', () => {
+  before(() => {
+    ttsService.setMuted(true);
+  });
 
   describe('1. TTS Engine & Caching Logic (ttsService)', () => {
     it('should generate consistent and unique md5 filenames for different phrases', () => {

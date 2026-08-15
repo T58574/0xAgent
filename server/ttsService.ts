@@ -151,6 +151,7 @@ export function getPhraseFilename(
 export class TtsService {
   private cacheDir: string;
   private isSpeakingFlag = false;
+  private isMutedFlag = process.env.NODE_ENV === 'test' || process.env.npm_lifecycle_event === 'test';
   private wsBroadcaster: ((event: string, data: any) => void) | null = null;
   private currentProcess: any = null;
 
@@ -159,6 +160,14 @@ export class TtsService {
     this.ensureDirectories();
     this.importExternalCache();
     this.startBackgroundPrecaching();
+  }
+
+  public setMuted(muted: boolean) {
+    this.isMutedFlag = muted;
+  }
+
+  public isMuted(): boolean {
+    return this.isMutedFlag;
   }
 
   public setWsBroadcaster(broadcaster: (event: string, data: any) => void) {
@@ -224,7 +233,7 @@ export class TtsService {
       options?.config?.pitch ||
       (voice.includes('Dmitry') ? '-5Hz' : '+0Hz');
     const playOnSpeaker =
-      options?.playOnSpeaker ?? options?.config?.play_on_speaker ?? true;
+      !this.isMutedFlag && (options?.playOnSpeaker ?? options?.config?.play_on_speaker ?? true);
 
     const filename = getPhraseFilename(text.trim(), voice, rate);
     const filePath = path.join(this.cacheDir, filename);
