@@ -20,6 +20,7 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const isStartingRef = useRef(false);
 
   const cleanupAudio = useCallback(() => {
     if (animFrameRef.current) {
@@ -39,11 +40,15 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
+    isStartingRef.current = false;
     setIsRecording(false);
     setVolumeLevel(0);
   }, []);
 
   const startRecording = useCallback(async () => {
+    if (isStartingRef.current || isRecording) return;
+    isStartingRef.current = true;
+
     try {
       cleanupAudio();
       audioChunksRef.current = [];

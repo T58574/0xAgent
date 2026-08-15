@@ -29,6 +29,7 @@ export function useSettingsState(
   const [ttsPitch, setTtsPitch] = useState('-5Hz');
   const [ttsPlayOnSpeaker, setTtsPlayOnSpeaker] = useState(true);
   const [ttsPlayInBrowser, setTtsPlayInBrowser] = useState(true);
+  const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
   const [proactiveCompanionEnabled, setProactiveCompanionEnabled] = useState(true);
 
   // Active theme state
@@ -94,6 +95,7 @@ export function useSettingsState(
         if (config.tts_config.pitch) setTtsPitch(config.tts_config.pitch);
         if (config.tts_config.play_on_speaker !== undefined) setTtsPlayOnSpeaker(config.tts_config.play_on_speaker);
         if (config.tts_config.play_in_browser !== undefined) setTtsPlayInBrowser(config.tts_config.play_in_browser);
+        if (config.tts_config.wake_word_enabled !== undefined) setWakeWordEnabled(config.tts_config.wake_word_enabled);
       }
       if (config.proactive_companion_enabled !== undefined && config.proactive_companion_enabled !== null) {
         setProactiveCompanionEnabled(config.proactive_companion_enabled);
@@ -169,6 +171,7 @@ export function useSettingsState(
             pitch: ttsPitch,
             play_on_speaker: ttsPlayOnSpeaker,
             play_in_browser: ttsPlayInBrowser,
+            wake_word_enabled: wakeWordEnabled,
           },
           proactive_companion_enabled: proactiveCompanionEnabled,
           active_theme: activeTheme,
@@ -298,6 +301,8 @@ export function useSettingsState(
     setTtsPlayOnSpeaker,
     ttsPlayInBrowser,
     setTtsPlayInBrowser,
+    wakeWordEnabled,
+    setWakeWordEnabled,
     proactiveCompanionEnabled,
     setProactiveCompanionEnabled,
     activeTheme,

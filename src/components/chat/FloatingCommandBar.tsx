@@ -117,14 +117,13 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
   // Hands-Free Continuous Wake Word Spotter ("Джарвис" -> start recording, "Стоп" -> send)
   const { isListeningForWake } = useWakeWord({
-    enabled: Boolean(config?.tts_config?.enabled),
+    enabled: Boolean(config?.tts_config?.enabled && config?.tts_config?.wake_word_enabled),
+    isRecordingActive: isRecording,
     onWakeDetected: async () => {
       try {
         await api.speak_category('listening');
       } catch {}
-      if (!isRecording) {
-        startRecording();
-      }
+      startRecording();
     },
     onStopDetected: () => {
       if (isRecording) {

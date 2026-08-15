@@ -116,6 +116,7 @@ export interface TtsConfig {
   volume?: number; // 0-100
   play_on_speaker?: boolean;
   play_in_browser?: boolean;
+  wake_word_enabled?: boolean;
 }
 
 export interface JarvisSparkProposal {

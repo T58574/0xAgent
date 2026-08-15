@@ -31,6 +31,8 @@ interface GeneralTabProps {
   setTtsPlayOnSpeaker?: (val: boolean) => void;
   ttsPlayInBrowser?: boolean;
   setTtsPlayInBrowser?: (val: boolean) => void;
+  wakeWordEnabled?: boolean;
+  setWakeWordEnabled?: (val: boolean) => void;
   proactiveCompanionEnabled?: boolean;
   setProactiveCompanionEnabled?: (val: boolean) => void;
 }
@@ -64,6 +66,8 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   setTtsPlayOnSpeaker,
   ttsPlayInBrowser = true,
   setTtsPlayInBrowser,
+  wakeWordEnabled = false,
+  setWakeWordEnabled,
   proactiveCompanionEnabled = true,
   setProactiveCompanionEnabled,
 }) => {
@@ -431,6 +435,16 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                   className="rounded border-[var(--theme-border)] text-sky-500 focus:ring-0"
                 />
                 <span>Воспроизводить в активной вкладке браузера</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] sm:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={wakeWordEnabled}
+                  onChange={(e) => setWakeWordEnabled && setWakeWordEnabled(e.target.checked)}
+                  className="rounded border-[var(--theme-border)] text-sky-500 focus:ring-0"
+                />
+                <span>Бесконтактная активация голосом (Wake-Word «Джарвис»)</span>
               </label>
             </div>
           </>

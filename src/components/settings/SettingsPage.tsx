@@ -141,6 +141,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setTtsPlayOnSpeaker={s.setTtsPlayOnSpeaker}
               ttsPlayInBrowser={s.ttsPlayInBrowser}
               setTtsPlayInBrowser={s.setTtsPlayInBrowser}
+              wakeWordEnabled={s.wakeWordEnabled}
+              setWakeWordEnabled={s.setWakeWordEnabled}
               proactiveCompanionEnabled={s.proactiveCompanionEnabled}
               setProactiveCompanionEnabled={s.setProactiveCompanionEnabled}
             />

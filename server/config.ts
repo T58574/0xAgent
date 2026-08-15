@@ -114,6 +114,7 @@ export function getDefaultConfig(): AppConfig {
       volume: 80,
       play_on_speaker: true,
       play_in_browser: true,
+      wake_word_enabled: false,
     },
     proactive_companion_enabled: true,
   };
