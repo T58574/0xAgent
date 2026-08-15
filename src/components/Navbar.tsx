@@ -32,7 +32,6 @@ interface NavbarProps {
   onStartServer?: () => Promise<void>;
   onModelChanged?: (newModelId: string) => void;
   onOpenJarvis?: () => void;
-  activeJulesCount?: number;
   onNewChat?: () => void;
   onOpenMemorySkills?: () => void;
 }
@@ -48,7 +47,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleLogs,
   onModelChanged: _onModelChanged,
   onOpenJarvis,
-  activeJulesCount,
   onNewChat: _onNewChat,
   onOpenMemorySkills,
 }) => {
@@ -194,15 +192,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onOpenJarvis}
               className="px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent"
-              title="Jarvis Orchestrator"
+              title="Jarvis Telemetry & Workspace"
             >
               <Bot size={13} />
               <span className="hidden lg:inline">Jarvis</span>
-              {activeJulesCount !== undefined && activeJulesCount > 0 && (
-                <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-white/20 text-[var(--theme-text)]">
-                  {activeJulesCount}
-                </span>
-              )}
             </button>
           )}
         </div>

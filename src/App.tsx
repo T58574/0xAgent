@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
-import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo, JulesSessionInfo, JarvisState, JarvisSparkProposal } from './types';
+import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo, JarvisState, JarvisSparkProposal } from './types';
 import { generateShortId } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -31,29 +31,20 @@ export default function App() {
   const [isWorkspacePickerOpen, setIsWorkspacePickerOpen] = useState<boolean>(false);
   const [isJarvisOpen, setIsJarvisOpen] = useState<boolean>(false);
   const [jarvisState, setJarvisState] = useState<JarvisState | null>(null);
-  const [julesSessions, setJulesSessions] = useState<JulesSessionInfo[]>([]);
 
-  const fetchJulesData = async () => {
+  const fetchJarvisData = async () => {
     try {
-      const s = await api.get_jules_sessions();
-      setJulesSessions(s);
       const jState = await api.get_jarvis_state();
       setJarvisState(jState);
     } catch {}
   };
 
   useEffect(() => {
-    fetchJulesData();
+    fetchJarvisData();
     const un1 = api.listen<JarvisState>('jarvis_state_update', (e) => {
       setJarvisState(e.payload);
     });
-    const un2 = api.listen('jules_session_updated', () => {
-      fetchJulesData();
-    });
-    const un3 = api.listen('jules_session_created', () => {
-      fetchJulesData();
-    });
-    return () => { un1(); un2(); un3(); };
+    return () => { un1(); };
   }, []);
 
 
@@ -792,11 +783,6 @@ export default function App() {
         onStartServer={handleStartServer}
         onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
         onOpenJarvis={() => setIsJarvisOpen(true)}
-        activeJulesCount={
-          julesSessions.filter(
-            (s) => s.status === 'EXECUTING' || s.status === 'WAITING_PLAN_APPROVAL' || s.status === 'PLANNING'
-          ).length
-        }
         onNewChat={() => handleCreateSession('Новый чат', config?.workspace_dir || null)}
         onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
       />
@@ -980,9 +966,24 @@ export default function App() {
         isOpen={isJarvisOpen}
         onClose={() => setIsJarvisOpen(false)}
         jarvisState={jarvisState}
-        julesSessions={julesSessions}
-        onRefresh={fetchJulesData}
-        config={config}
+        onRefresh={fetchJarvisData}
+        onAcceptSpark={async (spark: JarvisSparkProposal) => {
+          try {
+            await api.accept_spark(spark.id);
+            setActiveView('chat');
+            handleSendMessage(spark.suggestedAction || spark.description);
+          } catch (err: any) {
+            console.error('Failed to accept spark:', err);
+          }
+        }}
+        onDismissSpark={async (sparkId: string) => {
+          try {
+            await api.dismiss_spark(sparkId);
+            fetchJarvisData();
+          } catch (err: any) {
+            console.error('Failed to dismiss spark:', err);
+          }
+        }}
       />
 
       {/* JARVIS OLED MORPHIZM ASCII INTERCOM HUD */}

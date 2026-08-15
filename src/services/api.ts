@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse, KnowledgeEntry, KnowledgeQueryOptions, JulesSource, JulesSessionInfo, JarvisState } from '../types';
+import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse, KnowledgeEntry, KnowledgeQueryOptions, JarvisState } from '../types';
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
 export { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen };
@@ -557,54 +557,6 @@ export async function save_knowledge_entry(entry: {
 export async function delete_knowledge_entry(id: string): Promise<void> {
   const res = await authFetch(`${API_BASE}/knowledge/${encodeURIComponent(id)}`, {
     method: 'DELETE',
-  });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function get_jules_sources(): Promise<JulesSource[]> {
-  const res = await authFetch(`${API_BASE}/jules/sources`);
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.sources || [];
-}
-
-export async function get_jules_sessions(): Promise<JulesSessionInfo[]> {
-  const res = await authFetch(`${API_BASE}/jules/sessions`);
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.sessions || [];
-}
-
-export async function create_jules_session(payload: {
-  prompt: string;
-  source: string;
-  startingBranch?: string;
-  autoCreatePR?: boolean;
-  requirePlanApproval?: boolean;
-  title?: string;
-}): Promise<JulesSessionInfo> {
-  const res = await authFetch(`${API_BASE}/jules/sessions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.session;
-}
-
-export async function approve_jules_plan(sessionId: string): Promise<void> {
-  const res = await authFetch(`${API_BASE}/jules/sessions/${encodeURIComponent(sessionId)}/approve`, {
-    method: 'POST',
-  });
-  if (!res.ok) throw new Error(await res.text());
-}
-
-export async function send_jules_message(sessionId: string, prompt: string): Promise<void> {
-  const res = await authFetch(`${API_BASE}/jules/sessions/${encodeURIComponent(sessionId)}/message`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt }),
   });
   if (!res.ok) throw new Error(await res.text());
 }

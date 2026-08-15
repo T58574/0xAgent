@@ -15,9 +15,7 @@ import { hardwareRouter } from './routes/hardwareRoutes';
 import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes';
 import { createAgentRouter } from './routes/agentRoutes';
 import knowledgeRouter from './routes/knowledge';
-import { julesRouter } from './routes/julesRoutes';
 import { jarvisRouter } from './routes/jarvisRoutes';
-import { julesService } from './julesService';
 import { jarvisSupervisor } from './agent/jarvisSupervisor';
 
 const app = express();
@@ -85,8 +83,7 @@ function broadcast(event: string, payload: any): void {
   }
 }
 
-// Wire WS broadcaster to Jules & Jarvis
-julesService.setWsBroadcaster(broadcast);
+// Wire WS broadcaster to Jarvis
 jarvisSupervisor.setWsBroadcaster(broadcast);
 
 // Mount Router Modules
@@ -99,7 +96,6 @@ app.use('/api', workspaceRouter);
 app.use('/api', hardwareRouter);
 app.use('/api', createLlamaRouter(broadcast));
 app.use('/api', createAgentRouter(broadcast));
-app.use('/api', julesRouter);
 app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
 
@@ -111,7 +107,6 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // Graceful process exit handlers for 0xAgent backend node process
 const cleanupOnExit = () => {
-  julesService.stopPolling();
   jarvisSupervisor.stopLoop();
   stopLlamaServerProcess(broadcast);
 };

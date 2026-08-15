@@ -9,10 +9,6 @@ interface GeneralTabProps {
   setGroqApiKey: (val: string) => void;
   geminiApiKey?: string;
   setGeminiApiKey?: (val: string) => void;
-  julesApiKey?: string;
-  setJulesApiKey?: (val: string) => void;
-  julesDefaultRepo?: string;
-  setJulesDefaultRepo?: (val: string) => void;
   reasoningEnabled: boolean;
   setReasoningEnabled: (val: boolean) => void;
   autoSaveHistory: boolean;
@@ -44,10 +40,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   setGroqApiKey,
   geminiApiKey = '',
   setGeminiApiKey,
-  julesApiKey = '',
-  setJulesApiKey,
-  julesDefaultRepo = '',
-  setJulesDefaultRepo,
   reasoningEnabled,
   setReasoningEnabled,
   autoSaveHistory,
@@ -183,35 +175,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             />
           </div>
 
-          {/* Google Jules API Key */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--theme-text-muted)] flex items-center gap-1">
-              <Key size={12} />
-              <span>Google Jules API Key</span>
-            </label>
-            <input
-              type="password"
-              value={julesApiKey}
-              onChange={(e) => setJulesApiKey && setJulesApiKey(e.target.value)}
-              placeholder="jules_api_key..."
-              className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
-            />
-          </div>
-
-          {/* Jules Default Repository */}
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-medium text-[var(--theme-text-muted)] flex items-center gap-1">
-              <Globe size={12} />
-              <span>Jules Репозиторий</span>
-            </label>
-            <input
-              type="text"
-              value={julesDefaultRepo}
-              onChange={(e) => setJulesDefaultRepo && setJulesDefaultRepo(e.target.value)}
-              placeholder="sources/github/owner/repo"
-              className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
-            />
-          </div>
         </div>
       </div>
 

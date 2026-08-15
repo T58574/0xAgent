@@ -18,10 +18,6 @@ import {
   executeSaveKnowledge,
   executeSearchKnowledge,
   executeListKnowledge,
-  executeJulesDelegateTask,
-  executeJulesListSessions,
-  executeJulesApprovePlan,
-  executeJulesSendFeedback,
 } from '../tools';
 import { addOrUpdateMemory, queryMemories } from '../memory';
 import { listSkills, readSkill } from '../skills';
@@ -197,25 +193,6 @@ export async function dispatchToolExecution(
         return `Failed to spawn sub-agent: ${err.message || err}`;
       }
     }
-
-    case 'jules_delegate_task':
-      return await executeJulesDelegateTask({
-        prompt: tc.arguments.prompt,
-        repo: tc.arguments.repo,
-        startingBranch: tc.arguments.startingBranch || tc.arguments.starting_branch,
-      });
-
-    case 'jules_list_sessions':
-      return await executeJulesListSessions();
-
-    case 'jules_approve_plan':
-      return await executeJulesApprovePlan(tc.arguments.session_id || tc.arguments.sessionId || tc.arguments.id);
-
-    case 'jules_send_feedback':
-      return await executeJulesSendFeedback(
-        tc.arguments.session_id || tc.arguments.sessionId || tc.arguments.id,
-        tc.arguments.prompt
-      );
 
     case 'update_user_profile': {
       const trait = tc.arguments.trait || tc.arguments.content || tc.arguments.value || '';

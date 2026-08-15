@@ -1,5 +1,4 @@
-import { JarvisState, JarvisWorkerStatus, JarvisActivityLog } from '../../src/types';
-import { julesService } from '../julesService';
+import { JarvisState, JarvisActivityLog } from '../../src/types';
 import { proactiveCompanion } from './proactiveCompanion';
 import { processWatcher } from './processWatcher';
 import { ttsService } from '../ttsService';
@@ -15,7 +14,7 @@ export class JarvisSupervisor {
         name: 'Jarvis Core Supervisor',
         type: 'supervisor',
         status: 'idle',
-        currentTask: 'Monitoring system activity, companion sparks, and cloud workers',
+        currentTask: 'Monitoring system telemetry, companion sparks, and project health',
         updatedAt: Date.now(),
       },
     ],
@@ -47,34 +46,11 @@ export class JarvisSupervisor {
   }
 
   public getState(): JarvisState {
-    // Sync active Jules workers into activeWorkers list
-    const julesSessions = julesService.getCachedSessions();
-    const julesWorkers: JarvisWorkerStatus[] = julesSessions.map((s) => {
-      let status: JarvisWorkerStatus['status'] = 'running';
-      if (s.status === 'WAITING_PLAN_APPROVAL') status = 'waiting_approval';
-      if (s.status === 'PR_CREATED' || s.status === 'COMPLETED') status = 'completed';
-      if (s.status === 'FAILED') status = 'error';
-
-      const prUrl = s.outputs?.find((o) => o.pullRequest)?.pullRequest?.url;
-
-      return {
-        id: `jules-${s.id}`,
-        name: `Jules Cloud Worker (${s.title.slice(0, 25)})`,
-        type: 'jules',
-        status,
-        currentTask: s.prompt,
-        prUrl,
-        updatedAt: s.updatedAt,
-      };
-    });
-
-    const staticWorkers = this.state.activeWorkers.filter((w) => w.type !== 'jules');
     const osStatus = processWatcher.getStatus();
 
     return {
       ...this.state,
       supervisorStatus: osStatus.state === 'gaming' ? 'idle' : this.state.supervisorStatus,
-      activeWorkers: [...staticWorkers, ...julesWorkers],
       activeSparks: proactiveCompanion.getActiveSparks(),
       isSpeaking: ttsService.isSpeaking(),
       updatedAt: Date.now(),
@@ -129,26 +105,6 @@ export class JarvisSupervisor {
 
   private runSupervisorCycle() {
     try {
-      const sessions = julesService.getCachedSessions();
-      for (const s of sessions) {
-        if (s.status === 'PR_CREATED' && !this.state.recentActivities.some((a) => a.message.includes(s.id))) {
-          const prUrl = s.outputs?.find((o) => o.pullRequest)?.pullRequest?.url;
-          this.logActivity(
-            'Jules Cloud Worker',
-            `Pull Request successfully created for task "${s.title}"! ${prUrl ? `PR: ${prUrl}` : ''} [${s.id}]`,
-            'success'
-          );
-        } else if (
-          s.status === 'WAITING_PLAN_APPROVAL' &&
-          !this.state.recentActivities.some((a) => a.message.includes(`plan-${s.id}`))
-        ) {
-          this.logActivity(
-            'Jarvis Supervisor',
-            `Task "${s.title}" requires plan approval. Review plan in Jules widget. [plan-${s.id}]`,
-            'warning'
-          );
-        }
-      }
       this.broadcastState();
     } catch (err: any) {
       logger.error('JarvisSupervisor', `Loop cycle error: ${err?.message || err}`);
@@ -160,7 +116,7 @@ export class JarvisSupervisor {
       try {
         this.wsBroadcaster('jarvis_state_update', this.getState());
       } catch (err: any) {
-        logger.error('JarvisSupervisor', `Broadcast failed: ${err?.message || err}`);
+        logger.error('JarvisSupervisor', `WS broadcast error: ${err?.message || err}`);
       }
     }
   }

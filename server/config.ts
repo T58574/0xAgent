@@ -103,8 +103,6 @@ export function getDefaultConfig(): AppConfig {
       'gemini-3.5-flash',
       'gemini-3.5-flash-lite',
     ],
-    jules_api_key: null,
-    jules_default_repo: null,
     jarvis_model: 'gemini-3.5-flash-lite',
     tts_config: {
       enabled: true,

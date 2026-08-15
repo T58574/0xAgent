@@ -6,9 +6,6 @@ import { fffService } from './fffService';
 import { searxngService } from './searxngService';
 import { webReaderService } from './webReaderService';
 import { saveKnowledgeEntry, queryKnowledgeEntries, listKnowledgeCategories } from './knowledgeBase';
-import { julesService } from './julesService';
-import { jarvisSupervisor } from './agent/jarvisSupervisor';
-import { loadConfig } from './config';
 
 export function resolvePath(workspaceDir: string | null | undefined, pathStr: string): string {
   const root = workspaceDir && workspaceDir.trim().length > 0 ? workspaceDir : process.cwd();
@@ -614,99 +611,6 @@ export async function executeListKnowledge(category?: string): Promise<string> {
   const entriesList = results.slice(0, 20).map(e => `- [${e.category.toUpperCase()}] ${e.title} (ID: ${e.id})`).join('\n');
 
   return `[Knowledge Vault Overview]\n\nCategories:\n${catSummary}\n\nEntries (${results.length}):\n${entriesList || 'No entries yet.'}`;
-}
-
-export async function executeJulesDelegateTask(params: {
-  prompt: string;
-  repo?: string;
-  startingBranch?: string;
-}): Promise<string> {
-  if (!params.prompt) {
-    return '[Jules Error]: Task prompt is required.';
-  }
-
-  const config = loadConfig();
-  const repo = params.repo || config.jules_default_repo;
-  if (!repo) {
-    return '[Jules Error]: Target repository is required. Specify repo parameter or set jules_default_repo in Settings.';
-  }
-
-  try {
-    const session = await julesService.createSession({
-      prompt: params.prompt,
-      source: repo,
-      startingBranch: params.startingBranch || 'main',
-      autoCreatePR: true,
-    });
-
-    jarvisSupervisor.logActivity(
-      'Local Agent',
-      `Delegated cloud task to Jules: "${params.prompt.slice(0, 60)}..." (Session ID: ${session.id})`,
-      'info'
-    );
-
-    return `[Jules Cloud Task Started Successfully]
-Session ID: ${session.id}
-Title: ${session.title}
-Repository: ${repo}
-Branch: ${params.startingBranch || 'main'}
-Status: ${session.status}
-
-Jules is now executing this task asynchronously in Google Cloud and will automatically create a Pull Request upon completion. Track progress in the Jarvis Widget.`;
-  } catch (err: any) {
-    return `[Jules Error]: Failed to delegate task: ${err.message || err}`;
-  }
-}
-
-export async function executeJulesListSessions(): Promise<string> {
-  try {
-    const sessions = julesService.getCachedSessions();
-    if (sessions.length === 0) {
-      return '[Jules Sessions]: No active or recent Jules cloud sessions found.';
-    }
-
-    const lines = sessions.map((s, i) => {
-      const pr = s.outputs?.find((o) => o.pullRequest)?.pullRequest;
-      return `[${i + 1}] "${s.title}" (ID: ${s.id})
-    Status: ${s.status}
-    Prompt: ${s.prompt}
-    ${pr ? `Pull Request: ${pr.url}` : 'Pull Request: Pending completion'}`;
-    });
-
-    return `[Jules Active Cloud Sessions (${sessions.length})]:\n\n${lines.join('\n\n')}`;
-  } catch (err: any) {
-    return `[Jules Error]: Failed to list sessions: ${err.message || err}`;
-  }
-}
-
-export async function executeJulesApprovePlan(sessionId: string): Promise<string> {
-  if (!sessionId) return '[Jules Error]: sessionId is required.';
-  try {
-    await julesService.approvePlan(sessionId);
-    jarvisSupervisor.logActivity(
-      'Local Agent',
-      `Approved Jules plan for session ID ${sessionId}`,
-      'success'
-    );
-    return `[Jules]: Plan approved successfully for session ${sessionId}. Jules has resumed execution.`;
-  } catch (err: any) {
-    return `[Jules Error]: Failed to approve plan: ${err.message || err}`;
-  }
-}
-
-export async function executeJulesSendFeedback(sessionId: string, prompt: string): Promise<string> {
-  if (!sessionId || !prompt) return '[Jules Error]: sessionId and prompt are required.';
-  try {
-    await julesService.sendMessage(sessionId, prompt);
-    jarvisSupervisor.logActivity(
-      'Local Agent',
-      `Sent feedback to Jules for session ID ${sessionId}: "${prompt.slice(0, 50)}..."`,
-      'info'
-    );
-    return `[Jules]: Feedback sent successfully to Jules session ${sessionId}.`;
-  } catch (err: any) {
-    return `[Jules Error]: Failed to send feedback: ${err.message || err}`;
-  }
 }
 
 
