@@ -170,8 +170,15 @@ workspaceRouter.post('/write-file-raw', (req, res) => {
 workspaceRouter.post('/transcribe-audio', async (req, res) => {
   try {
     const { audioBase64, apiKey } = req.body;
-    if (!audioBase64 || !apiKey) {
-      res.status(400).json({ error: 'audioBase64 и apiKey обязательны' });
+    const config = loadConfig();
+    const effectiveKey = (apiKey || config.groq_api_key || process.env.GROQ_API_KEY || '').trim();
+
+    if (!audioBase64) {
+      res.status(400).json({ error: 'audioBase64 обязателен' });
+      return;
+    }
+    if (!effectiveKey) {
+      res.status(400).json({ error: 'Groq API ключ не задан в настройках' });
       return;
     }
 
@@ -179,16 +186,34 @@ workspaceRouter.post('/transcribe-audio', async (req, res) => {
     const formData = new FormData();
     const file = new File([audioBuffer], 'speech.webm', { type: 'audio/webm' });
     formData.append('file', file);
-    formData.append('model', 'whisper-large-v3');
+    formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('language', 'ru');
+    formData.append('response_format', 'json');
+    formData.append('temperature', '0.0');
 
     const groqEndpoint = process.env.GROQ_STT_ENDPOINT || 'https://api.groq.com/openai/v1/audio/transcriptions';
-    const groqRes = await fetch(groqEndpoint, {
+    let groqRes = await fetch(groqEndpoint, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey.trim()}`,
+        'Authorization': `Bearer ${effectiveKey}`,
       },
       body: formData,
     });
+
+    // Fallback to whisper-large-v3 if turbo model unavailable
+    if (!groqRes.ok && groqRes.status === 404) {
+      const fallbackData = new FormData();
+      fallbackData.append('file', new File([audioBuffer], 'speech.webm', { type: 'audio/webm' }));
+      fallbackData.append('model', 'whisper-large-v3');
+      fallbackData.append('language', 'ru');
+      groqRes = await fetch(groqEndpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${effectiveKey}`,
+        },
+        body: fallbackData,
+      });
+    }
 
     if (!groqRes.ok) {
       const errText = await groqRes.text();
@@ -196,9 +221,9 @@ workspaceRouter.post('/transcribe-audio', async (req, res) => {
     }
 
     const data: any = await groqRes.json();
-    res.json({ text: data.text || '' });
+    res.json({ text: (data.text || '').trim() });
   } catch (err: any) {
     console.error('Transcription error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || 'Ошибка транскрибации Groq' });
   }
 });

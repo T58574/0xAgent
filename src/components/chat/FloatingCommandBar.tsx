@@ -16,9 +16,11 @@ import {
   Volume2,
   Play,
   RefreshCw,
+  Mic,
 } from 'lucide-react';
 import { AppConfig, PersonaMetadata } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
+import { useAudioRecorder } from '../../hooks/useAudioRecorder';
 
 interface FloatingCommandBarProps {
   inputText: string;
@@ -91,6 +93,23 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     toggleServer,
     getDisplayTitle,
   } = useModelManager(config, onModelChanged);
+
+  // Voice Recording with Groq Whisper & Software Gain Boost (3.2x)
+  const {
+    isRecording,
+    isTranscribing,
+    volumeLevel,
+    toggleRecording,
+  } = useAudioRecorder({
+    groqApiKey: config?.groq_api_key,
+    gainBoost: 3.2,
+    onTranscribed: (text) => {
+      setInputText(inputText ? `${inputText} ${text}` : text);
+    },
+    onError: (err) => {
+      console.error('Audio recording error:', err);
+    },
+  });
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -386,6 +405,21 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
+      {/* Recording Waveform Active Banner */}
+      {isRecording && (
+        <div className="flex items-center justify-between px-4 py-1.5 mb-2 rounded-2xl bg-rose-950/50 border border-rose-500/30 text-rose-400 font-mono text-xs backdrop-blur-2xl animate-fadeIn shadow-lg shadow-rose-950/40">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+            <span className="font-bold tracking-wider uppercase text-[10px]">:: [MIC_ACTIVE]</span>
+            <span className="text-[10px] text-zinc-400">[Gain Boost 3.2x]</span>
+          </div>
+          <div className="text-xs font-bold select-none text-rose-300">
+            {volumeLevel > 0 ? `[${'|'.repeat(Math.min(10, Math.max(1, Math.round(volumeLevel / 10))))}]` : '[...]'}
+          </div>
+          <span className="text-[10px] text-zinc-400">Клик по микрофону для отправки</span>
+        </div>
+      )}
+
       {/* 1. Seamless ChatGPT-Style Capsule Input */}
       <form onSubmit={onSubmit}>
         <div className="bento-card rounded-3xl p-2 px-3.5 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-white/25 transition-all flex items-center gap-2.5 shadow-2xl">
@@ -410,6 +444,38 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             placeholder="Спросите что угодно или введите / для команд..."
             className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[13.5px] focus:outline-none resize-none min-h-[30px] max-h-[140px] py-1 px-1 leading-normal font-sans self-center"
           />
+
+          {/* Microphone Voice Input (Groq Whisper + Software Gain Boost) */}
+          <button
+            type="button"
+            onClick={toggleRecording}
+            disabled={isTranscribing}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 self-center relative ${
+              isRecording
+                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/50 scale-105'
+                : isTranscribing
+                ? 'bg-white/10 text-sky-400 cursor-wait animate-pulse'
+                : 'text-[var(--theme-text-muted)] hover:text-sky-400 hover:bg-white/10'
+            }`}
+            title={
+              isRecording
+                ? 'Идет запись... Клик — расшифровать через Groq'
+                : isTranscribing
+                ? 'Расшифровка Groq Whisper...'
+                : 'Голосовой ввод (Groq Whisper, Gain Boost 3.2x)'
+            }
+          >
+            {isRecording ? (
+              <>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60 pointer-events-none" />
+                <Square size={12} fill="currentColor" />
+              </>
+            ) : isTranscribing ? (
+              <RefreshCw size={14} className="animate-spin text-sky-400" />
+            ) : (
+              <Mic size={16} />
+            )}
+          </button>
 
           {/* Right Action Controls: Circular Send / Stop Button */}
           <div className="flex items-center shrink-0 self-center">

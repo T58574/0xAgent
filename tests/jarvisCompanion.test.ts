@@ -9,6 +9,7 @@ import { proactiveCompanion } from '../server/agent/proactiveCompanion';
 import { jarvisSupervisor } from '../server/agent/jarvisSupervisor';
 import { initPersonas, getPersonaDetail } from '../server/personas';
 import { logger } from '../server/logger';
+import { processWatcher } from '../server/agent/processWatcher';
 
 describe('Jarvis Companion & Voice Intercom Test Suite', () => {
 
@@ -167,6 +168,16 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
       assert.ok(detail.soul.includes('PUSH OVER PULL'), 'SOUL.md must enforce push over pull directive');
       assert.ok(detail.tools.length > 0, 'TOOLS.md must not be empty');
       assert.ok(detail.user.length > 0, 'USER.md must not be empty');
+    });
+  });
+
+  describe('5. OS Process & Focus Watcher (processWatcher)', () => {
+    it('should query OS process status without errors', async () => {
+      const status = await processWatcher.performScan();
+      assert.ok(status, 'Status must be defined');
+      assert.ok(['coding', 'gaming', 'browsing', 'idle'].includes(status.state), 'State must be one of allowed states');
+      assert.ok(typeof status.detectedApp === 'string');
+      assert.ok(status.lastScanTimestamp > 0);
     });
   });
 });

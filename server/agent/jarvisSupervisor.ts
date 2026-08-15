@@ -1,6 +1,7 @@
 import { JarvisState, JarvisWorkerStatus, JarvisActivityLog } from '../../src/types';
 import { julesService } from '../julesService';
 import { proactiveCompanion } from './proactiveCompanion';
+import { processWatcher } from './processWatcher';
 import { ttsService } from '../ttsService';
 import { logger } from '../logger';
 
@@ -68,9 +69,11 @@ export class JarvisSupervisor {
     });
 
     const staticWorkers = this.state.activeWorkers.filter((w) => w.type !== 'jules');
+    const osStatus = processWatcher.getStatus();
 
     return {
       ...this.state,
+      supervisorStatus: osStatus.state === 'gaming' ? 'idle' : this.state.supervisorStatus,
       activeWorkers: [...staticWorkers, ...julesWorkers],
       activeSparks: proactiveCompanion.getActiveSparks(),
       isSpeaking: ttsService.isSpeaking(),
