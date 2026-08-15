@@ -29,7 +29,8 @@
     "build:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-launcher.ps1",
     "preview": "vite preview",
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1",
-    "audit:security": "node ./scripts/security_audit.cjs"
+    "audit:security": "node ./scripts/security_audit.cjs",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@ff-labs/fff-node": "^0.10.3",
