@@ -105,6 +105,32 @@ export async function updateSessionWorkspace(id: string, workspace_dir: string |
   return session;
 }
 
+export async function rollbackSession(
+  id: string,
+  targetMessageId: string,
+  mode: 'to_user_edit' | 'to_assistant' = 'to_user_edit'
+): Promise<{ session: ChatSession; restoredContent: string }> {
+  const session = await loadSession(id);
+  const targetIndex = session.messages.findIndex((m) => m.id === targetMessageId);
+  if (targetIndex === -1) {
+    throw new Error(`Message with ID ${targetMessageId} not found in session.`);
+  }
+
+  let restoredContent = '';
+  if (mode === 'to_user_edit') {
+    restoredContent = session.messages[targetIndex].content || '';
+    // Truncate history before this user message so user can edit and resend
+    session.messages = session.messages.slice(0, targetIndex);
+  } else {
+    // Truncate history after this assistant message
+    session.messages = session.messages.slice(0, targetIndex + 1);
+  }
+
+  session.updated_at = Date.now();
+  await saveSession(session);
+  return { session, restoredContent };
+}
+
 export async function deleteSession(id: string): Promise<void> {
   const dir = await ensureSessionsDir();
   const filePath = path.join(dir, `${id}.json`);
@@ -114,4 +140,5 @@ export async function deleteSession(id: string): Promise<void> {
     // ignore if missing
   }
 }
+
 

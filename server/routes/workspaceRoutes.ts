@@ -10,6 +10,7 @@ import {
   deleteSession,
   createAutoWorkspaceDir,
   updateSessionWorkspace,
+  rollbackSession,
 } from '../session';
 import { forkSession } from '../agent/sessionEvents';
 import {
@@ -39,6 +40,20 @@ workspaceRouter.post('/sessions/:id/workspace', async (req, res) => {
     const { workspace_dir } = req.body || {};
     const updated = await updateSessionWorkspace(req.params.id, workspace_dir || null);
     res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rollback session context to specific message and restore prompt
+workspaceRouter.post('/sessions/:id/rollback', async (req, res) => {
+  try {
+    const { targetMessageId, mode } = req.body || {};
+    if (!targetMessageId) {
+      return res.status(400).json({ error: 'targetMessageId is required' });
+    }
+    const result = await rollbackSession(req.params.id, targetMessageId, mode || 'to_user_edit');
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

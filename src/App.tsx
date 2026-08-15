@@ -904,6 +904,25 @@ export default function App() {
     }
   };
 
+  const handleRollbackSession = async (
+    targetMessageId: string,
+    mode: 'to_user_edit' | 'to_assistant' = 'to_user_edit'
+  ): Promise<string> => {
+    if (!currentSession) return '';
+    try {
+      const res = await api.rollback_session(currentSession.id, targetMessageId, mode);
+      updateSessionState(res.session);
+      setSessions((prev) =>
+        prev.map((s) => (s.id === currentSession.id ? { ...s, messages: res.session.messages, updated_at: res.session.updated_at } : s))
+      );
+      addLog(`Session rolled back to message: ${targetMessageId}`);
+      return res.restoredContent || '';
+    } catch (err: any) {
+      addLog(`Failed to rollback session: ${err.message || err}`);
+      throw err;
+    }
+  };
+
   const isSplitMode = activeView === 'workspace' || (activeView === 'chat' && selectedFile !== null);
   const activeSessionWorkspace = currentSession?.workspace_dir !== undefined ? currentSession.workspace_dir : config?.workspace_dir;
 
@@ -915,6 +934,7 @@ export default function App() {
       onSendMessage={handleSendMessage}
       onRespondToTool={handleRespondToTool}
       onCancelAgent={handleCancelAgent}
+      onRollbackSession={handleRollbackSession}
       reasoningEnabled={config?.reasoning_enabled !== false}
       groqApiKey={config?.groq_api_key}
       liveTelemetry={liveTelemetry}

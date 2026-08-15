@@ -243,6 +243,20 @@ export async function fork_session(sessionId: string, fromMessageId?: string, ne
   return res.json();
 }
 
+export async function rollback_session(
+  sessionId: string,
+  targetMessageId: string,
+  mode: 'to_user_edit' | 'to_assistant' = 'to_user_edit'
+): Promise<{ session: ChatSession; restoredContent: string }> {
+  const res = await authFetch(`${API_BASE}/sessions/${sessionId}/rollback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targetMessageId, mode }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 export async function transcribe_audio(audioBase64: string, apiKey: string): Promise<string> {
   const res = await authFetch(`${API_BASE}/transcribe-audio`, {
     method: 'POST',

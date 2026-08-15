@@ -9,7 +9,7 @@ import {
   User,
   MessageSquare,
   Unlink,
-  GitBranch,
+  RotateCcw,
 } from 'lucide-react';
 import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata, JarvisSparkProposal, ChatSession, AskUserQuestionItem } from '../types';
 import {
@@ -41,6 +41,7 @@ interface ChatAreaProps {
   onSendMessage: (text: string, images?: string[]) => void;
   onRespondToTool: (toolId: string, approve: boolean | string) => void;
   onCancelAgent?: () => void;
+  onRollbackSession?: (targetMessageId: string, mode: 'to_user_edit' | 'to_assistant') => Promise<string>;
   reasoningEnabled?: boolean;
   groqApiKey?: string | null;
   liveTelemetry?: LiveTelemetry | null;
@@ -67,6 +68,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onSendMessage,
   onRespondToTool,
   onCancelAgent,
+  onRollbackSession,
   onAcceptSpark,
   reasoningEnabled = true,
   groqApiKey: _groqApiKey,
@@ -667,7 +669,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </div>
                         )}
 
-                        {/* Text & Inline Timestamp with Double Checkmarks and Fork Button */}
+                        {/* Text & Inline Timestamp with Double Checkmarks and Rollback Action */}
                         <div className="flex flex-wrap items-end justify-end gap-x-3 gap-y-1">
                           <span className="whitespace-pre-wrap flex-1 text-left">{text}</span>
                           <span className="text-[10px] text-[var(--theme-text-muted)] font-sans select-none shrink-0 inline-flex items-center gap-1.5 opacity-80">
@@ -679,16 +681,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                 onClick={async (e) => {
                                   e.stopPropagation();
                                   try {
-                                    const forked = await api.fork_session(currentSession.id, msg.id);
-                                    showToast(`Диалог ответвлен: ${forked.title}`, 'success');
+                                    if (onRollbackSession) {
+                                      const restored = await onRollbackSession(msg.id, 'to_user_edit');
+                                      setInputText(restored || msg.content || '');
+                                    } else {
+                                      const res = await api.rollback_session(currentSession.id, msg.id, 'to_user_edit');
+                                      setInputText(res.restoredContent || msg.content || '');
+                                    }
+                                    showToast('Контекст сброшен. Запрос загружен в строку ввода для редактирования', 'info');
                                   } catch (err: any) {
-                                    showToast(err.message || 'Ошибка ветвления', 'error');
+                                    showToast(err.message || 'Ошибка отката диалога', 'error');
                                   }
                                 }}
-                                className="p-0.5 hover:text-white transition-colors"
-                                title="Создать ветку с этого сообщения"
+                                className="px-1.5 py-0.5 rounded-md hover:bg-white/15 text-[var(--theme-text-muted)] hover:text-white transition-all inline-flex items-center gap-1 cursor-pointer"
+                                title="Откатить диалог сюда и отредактировать этот запрос"
                               >
-                                <GitBranch size={11} />
+                                <RotateCcw size={10} />
+                                <span className="text-[9.5px]">Изменить</span>
                               </button>
                             )}
                           </span>
@@ -710,7 +719,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </div>
                         )}
 
-                        {/* Assistant Text & Bottom Right Timestamp with Fork */}
+                        {/* Assistant Text & Bottom Right Timestamp with Rollback */}
                         {text && (
                           <div className="space-y-1">
                             <NotionMarkdown content={cleanContent(text)} />
@@ -724,16 +733,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                   onClick={async (e) => {
                                     e.stopPropagation();
                                     try {
-                                      const forked = await api.fork_session(currentSession.id, msg.id);
-                                      showToast(`Диалог ответвлен: ${forked.title}`, 'success');
+                                      if (onRollbackSession) {
+                                        await onRollbackSession(msg.id, 'to_assistant');
+                                      } else {
+                                        await api.rollback_session(currentSession.id, msg.id, 'to_assistant');
+                                      }
+                                      showToast('Контекст диалога сброшен до этого ответа', 'info');
                                     } catch (err: any) {
-                                      showToast(err.message || 'Ошибка ветвления', 'error');
+                                      showToast(err.message || 'Ошибка отката диалога', 'error');
                                     }
                                   }}
-                                  className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] p-0.5 transition-colors"
-                                  title="Создать ветку с этого ответа"
+                                  className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 px-1.5 py-0.5 rounded-md transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
+                                  title="Откатить контекст диалога до этого ответа"
                                 >
-                                  <GitBranch size={11} />
+                                  <RotateCcw size={10} />
+                                  <span>Откатить досюда</span>
                                 </button>
                               )}
                             </div>
