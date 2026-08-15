@@ -17,6 +17,9 @@
 
 ---
 
+<img width="1625" height="1049" alt="image" src="https://github.com/user-attachments/assets/ee144717-f865-470e-aa65-5b7b4b20c4cd" />
+
+
 ## 📖 Overview
 
 **0xAgent** is an open-source, full-stack autonomous AI developer platform that bridges the gap between lightweight local LLMs and professional IDE environments. Built on **React 19**, **Express**, and **llama.cpp**, it delivers end-to-end autonomous agent loops with strict workspace sandboxing, sub-millisecond file indexing, multi-chunk fuzzy code patching, live terminal command execution, and long-term memory recall.
