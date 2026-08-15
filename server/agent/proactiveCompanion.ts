@@ -10,9 +10,33 @@ export class ProactiveCompanion {
   private intervalTimer: NodeJS.Timeout | null = null;
   private wsBroadcaster: ((event: string, data: any) => void) | null = null;
   private isGeneratingSpark = false;
+  private lastErrorIncidentTime = 0;
 
   constructor() {
     this.startHeartbeat();
+    this.attachLogWatchdog();
+  }
+
+  private attachLogWatchdog() {
+    logger.onError((component, message) => {
+      // Ignore routine non-critical connection resets or internal logs
+      if (component === 'TtsService' || component === 'ProactiveCompanion' || message.includes('WebSocket')) return;
+
+      const now = Date.now();
+      // Debounce error alerts to once every 15 seconds
+      if (now - this.lastErrorIncidentTime < 15000) return;
+      this.lastErrorIncidentTime = now;
+
+      const cleanMsg = (message || '').replace(/\r?\n.*/s, '').slice(0, 150);
+
+      this.createSparkProposal({
+        title: `Сбой в модуле [${component}]`,
+        category: 'error_incident',
+        description: `В системных логах обнаружена ошибка: "${cleanMsg}". Я перехватил инцидент и готов локализовать причину.`,
+        suggestedAction: `Исправить ошибку в ${component}: ${cleanMsg}`,
+        voicePhrase: `Сэр, в логах зафиксирован сбой в модуле ${component}. Я перехватил ошибку.`,
+      }).catch(() => {});
+    });
   }
 
   public setWsBroadcaster(broadcaster: (event: string, data: any) => void) {

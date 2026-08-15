@@ -48,17 +48,34 @@ async function writeToLogFile(level: string, component: string, message: string,
   }
 }
 
+type ErrorListener = (component: string, message: string, extra?: any) => void;
+const errorListeners: ErrorListener[] = [];
+
 export const logger = {
   info(component: string, message: string, extra?: any) {
     console.log(`[${component}] ${message}`);
     writeToLogFile('INFO', component, message, extra);
   },
   warn(component: string, message: string, extra?: any) {
-    console.warn(`[${component}] ⚠️ ${message}`);
+    console.warn(`[${component}] [WARN] ${message}`);
     writeToLogFile('WARN', component, message, extra);
   },
   error(component: string, message: string, extra?: any) {
-    console.error(`[${component}] ❌ ${message}`);
+    console.error(`[${component}] [ERROR] ${message}`);
     writeToLogFile('ERROR', component, message, extra);
+    for (const listener of errorListeners) {
+      try {
+        listener(component, message, extra);
+      } catch {
+        // Safe listener execution
+      }
+    }
+  },
+  onError(listener: ErrorListener) {
+    errorListeners.push(listener);
+    return () => {
+      const idx = errorListeners.indexOf(listener);
+      if (idx !== -1) errorListeners.splice(idx, 1);
+    };
   },
 };

@@ -27,6 +27,8 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
         return 'Исследование';
       case 'friendly_checkin':
         return 'Напарник';
+      case 'error_incident':
+        return 'Перехват ошибки';
       default:
         return 'Предложение';
     }
@@ -42,6 +44,8 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
         return 'explore';
       case 'friendly_checkin':
         return 'support_agent';
+      case 'error_incident':
+        return 'bug_report';
       default:
         return 'lightbulb';
     }

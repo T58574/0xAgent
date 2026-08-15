@@ -142,16 +142,35 @@ export const JarvisIntercomHud: React.FC<JarvisIntercomHudProps> = ({
         </div>
       )}
 
-      {/* 2. Proactive Spark Toast Alert */}
+      {/* 2. Proactive Spark / Error Toast Alert */}
       {latestSpark && !isSpeaking && (
-        <div className="pointer-events-auto overflow-hidden rounded-2xl border border-sky-500/20 bg-[#070c16]/95 backdrop-blur-2xl p-3.5 shadow-2xl shadow-sky-950/50 font-mono text-xs">
+        <div
+          className={`pointer-events-auto overflow-hidden rounded-2xl border p-3.5 shadow-2xl font-mono text-xs backdrop-blur-2xl transition-all ${
+            latestSpark.category === 'error_incident'
+              ? 'border-rose-500/40 bg-[#14080a]/95 shadow-rose-950/60'
+              : 'border-sky-500/20 bg-[#070c16]/95 shadow-sky-950/50'
+          }`}
+        >
           <div className="flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-white/5">
             <div className="flex items-center gap-2">
-              <span className="w-5 h-5 rounded-md bg-sky-500/20 text-sky-400 flex items-center justify-center border border-sky-500/30">
-                <MaterialIcon name="bolt" className="text-xs" />
+              <span
+                className={`w-5 h-5 rounded-md flex items-center justify-center border ${
+                  latestSpark.category === 'error_incident'
+                    ? 'bg-rose-500/20 text-rose-400 border-rose-500/30'
+                    : 'bg-sky-500/20 text-sky-400 border-sky-500/30'
+                }`}
+              >
+                <MaterialIcon
+                  name={latestSpark.category === 'error_incident' ? 'bug_report' : 'bolt'}
+                  className="text-xs"
+                />
               </span>
-              <span className="text-[11px] font-bold tracking-wider text-sky-400 uppercase">
-                :: [JARVIS_SPARK]
+              <span
+                className={`text-[11px] font-bold tracking-wider uppercase ${
+                  latestSpark.category === 'error_incident' ? 'text-rose-400' : 'text-sky-400'
+                }`}
+              >
+                {latestSpark.category === 'error_incident' ? ':: [LOG_ERROR_INTERCEPTED]' : ':: [JARVIS_SPARK]'}
               </span>
             </div>
 

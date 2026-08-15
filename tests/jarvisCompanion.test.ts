@@ -8,6 +8,7 @@ import { ttsService, getPhraseFilename, PRESET_PHRASES } from '../server/ttsServ
 import { proactiveCompanion } from '../server/agent/proactiveCompanion';
 import { jarvisSupervisor } from '../server/agent/jarvisSupervisor';
 import { initPersonas, getPersonaDetail } from '../server/personas';
+import { logger } from '../server/logger';
 
 describe('Jarvis Companion & Voice Intercom Test Suite', () => {
 
@@ -127,6 +128,19 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
       assert.doesNotThrow(() => {
         proactiveCompanion.recordUserActivity();
       });
+    });
+
+    it('should intercept server error logs and create an error_incident spark', async () => {
+      logger.error('DatabaseModule', 'Connection pool exhausted: simulated test failure');
+      
+      // Allow async hook to create spark
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      const sparks = proactiveCompanion.getActiveSparks();
+      const errorSpark = sparks.find((s) => s.category === 'error_incident');
+      assert.ok(errorSpark, 'Error watchdog must create an error_incident spark on logger.error');
+      assert.ok(errorSpark.title.includes('DatabaseModule'));
+      assert.equal(errorSpark.status, 'pending');
     });
   });
 

@@ -121,7 +121,7 @@ export interface TtsConfig {
 export interface JarvisSparkProposal {
   id: string;
   title: string;
-  category: 'feature_spark' | 'code_polish' | 'exploration' | 'friendly_checkin';
+  category: 'feature_spark' | 'code_polish' | 'exploration' | 'friendly_checkin' | 'error_incident';
   description: string;
   suggestedAction?: string;
   previewDiff?: string;
