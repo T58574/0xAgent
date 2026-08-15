@@ -1,5 +1,7 @@
 import { JarvisState, JarvisWorkerStatus, JarvisActivityLog } from '../../src/types';
 import { julesService } from '../julesService';
+import { proactiveCompanion } from './proactiveCompanion';
+import { ttsService } from '../ttsService';
 import { logger } from '../logger';
 
 export class JarvisSupervisor {
@@ -12,7 +14,7 @@ export class JarvisSupervisor {
         name: 'Jarvis Core Supervisor',
         type: 'supervisor',
         status: 'idle',
-        currentTask: 'Monitoring system activity and cloud workers',
+        currentTask: 'Monitoring system activity, companion sparks, and cloud workers',
         updatedAt: Date.now(),
       },
     ],
@@ -21,10 +23,12 @@ export class JarvisSupervisor {
         id: 'init-1',
         timestamp: Date.now(),
         agent: 'Jarvis Supervisor',
-        message: 'Jarvis Supervisor initialized and monitoring background workers.',
+        message: 'Jarvis Proactive Companion initialized and standing by.',
         type: 'info',
       },
     ],
+    activeSparks: [],
+    isSpeaking: false,
     updatedAt: Date.now(),
   };
 
@@ -37,6 +41,8 @@ export class JarvisSupervisor {
 
   public setWsBroadcaster(broadcaster: (event: string, data: any) => void) {
     this.wsBroadcaster = broadcaster;
+    proactiveCompanion.setWsBroadcaster(broadcaster);
+    ttsService.setWsBroadcaster(broadcaster);
   }
 
   public getState(): JarvisState {
@@ -66,6 +72,8 @@ export class JarvisSupervisor {
     return {
       ...this.state,
       activeWorkers: [...staticWorkers, ...julesWorkers],
+      activeSparks: proactiveCompanion.getActiveSparks(),
+      isSpeaking: ttsService.isSpeaking(),
       updatedAt: Date.now(),
     };
   }

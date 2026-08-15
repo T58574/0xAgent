@@ -104,6 +104,30 @@ export interface AppConfig {
   jules_api_key?: string | null;
   jules_default_repo?: string | null;
   jarvis_model?: string | null;
+  tts_config?: TtsConfig | null;
+  proactive_companion_enabled?: boolean | null;
+}
+
+export interface TtsConfig {
+  enabled: boolean;
+  voice: 'ru-RU-SvetlanaNeural' | 'ru-RU-DmitryNeural' | string;
+  rate: string; // e.g. "+20%", "+0%"
+  pitch: string; // e.g. "+0Hz", "-5Hz"
+  volume?: number; // 0-100
+  play_on_speaker?: boolean;
+  play_in_browser?: boolean;
+}
+
+export interface JarvisSparkProposal {
+  id: string;
+  title: string;
+  category: 'feature_spark' | 'code_polish' | 'exploration' | 'friendly_checkin';
+  description: string;
+  suggestedAction?: string;
+  previewDiff?: string;
+  voicePhrase?: string;
+  timestamp: number;
+  status: 'pending' | 'accepted' | 'dismissed';
 }
 
 export interface CloudModelItem {
@@ -351,6 +375,8 @@ export interface JarvisState {
   supervisorStatus: 'active' | 'idle' | 'analyzing' | 'error';
   activeWorkers: JarvisWorkerStatus[];
   recentActivities: JarvisActivityLog[];
+  activeSparks?: JarvisSparkProposal[];
+  isSpeaking?: boolean;
   updatedAt: number;
 }
 

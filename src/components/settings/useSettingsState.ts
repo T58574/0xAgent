@@ -23,6 +23,13 @@ export function useSettingsState(
   const [autoSaveHistory, setAutoSaveHistory] = useState(true);
   const [soundNotifications, setSoundNotifications] = useState(true);
   const [compactChat, setCompactChat] = useState(false);
+  const [ttsVoiceEnabled, setTtsVoiceEnabled] = useState(true);
+  const [ttsVoice, setTtsVoice] = useState('ru-RU-SvetlanaNeural');
+  const [ttsRate, setTtsRate] = useState('+20%');
+  const [ttsPitch, setTtsPitch] = useState('+0Hz');
+  const [ttsPlayOnSpeaker, setTtsPlayOnSpeaker] = useState(true);
+  const [ttsPlayInBrowser, setTtsPlayInBrowser] = useState(true);
+  const [proactiveCompanionEnabled, setProactiveCompanionEnabled] = useState(true);
 
   // Active theme state
   const [activeTheme, setActiveTheme] = useState<AppTheme>('obsidian');
@@ -79,6 +86,18 @@ export function useSettingsState(
       if (config.auto_save_history !== undefined && config.auto_save_history !== null) setAutoSaveHistory(config.auto_save_history);
       if (config.sound_notifications !== undefined && config.sound_notifications !== null) setSoundNotifications(config.sound_notifications);
       if (config.compact_chat !== undefined && config.compact_chat !== null) setCompactChat(config.compact_chat);
+
+      if (config.tts_config) {
+        if (config.tts_config.enabled !== undefined && config.tts_config.enabled !== null) setTtsVoiceEnabled(config.tts_config.enabled);
+        if (config.tts_config.voice) setTtsVoice(config.tts_config.voice);
+        if (config.tts_config.rate) setTtsRate(config.tts_config.rate);
+        if (config.tts_config.pitch) setTtsPitch(config.tts_config.pitch);
+        if (config.tts_config.play_on_speaker !== undefined) setTtsPlayOnSpeaker(config.tts_config.play_on_speaker);
+        if (config.tts_config.play_in_browser !== undefined) setTtsPlayInBrowser(config.tts_config.play_in_browser);
+      }
+      if (config.proactive_companion_enabled !== undefined && config.proactive_companion_enabled !== null) {
+        setProactiveCompanionEnabled(config.proactive_companion_enabled);
+      }
 
       const theme = (config.active_theme as AppTheme) || 'obsidian';
       setActiveTheme(theme);
@@ -143,6 +162,15 @@ export function useSettingsState(
           auto_save_history: autoSaveHistory,
           sound_notifications: soundNotifications,
           compact_chat: compactChat,
+          tts_config: {
+            enabled: ttsVoiceEnabled,
+            voice: ttsVoice,
+            rate: ttsRate,
+            pitch: ttsPitch,
+            play_on_speaker: ttsPlayOnSpeaker,
+            play_in_browser: ttsPlayInBrowser,
+          },
+          proactive_companion_enabled: proactiveCompanionEnabled,
           active_theme: activeTheme,
           local_server: {
             exe_path: exePath.trim() || null,
@@ -258,6 +286,20 @@ export function useSettingsState(
     setSoundNotifications,
     compactChat,
     setCompactChat,
+    ttsVoiceEnabled,
+    setTtsVoiceEnabled,
+    ttsVoice,
+    setTtsVoice,
+    ttsRate,
+    setTtsRate,
+    ttsPitch,
+    setTtsPitch,
+    ttsPlayOnSpeaker,
+    setTtsPlayOnSpeaker,
+    ttsPlayInBrowser,
+    setTtsPlayInBrowser,
+    proactiveCompanionEnabled,
+    setProactiveCompanionEnabled,
     activeTheme,
     handleSelectTheme,
     exePath,

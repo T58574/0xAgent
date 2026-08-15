@@ -16,6 +16,7 @@ import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes'
 import { createAgentRouter } from './routes/agentRoutes';
 import knowledgeRouter from './routes/knowledge';
 import { julesRouter } from './routes/julesRoutes';
+import { jarvisRouter } from './routes/jarvisRoutes';
 import { julesService } from './julesService';
 import { jarvisSupervisor } from './agent/jarvisSupervisor';
 
@@ -99,6 +100,7 @@ app.use('/api', hardwareRouter);
 app.use('/api', createLlamaRouter(broadcast));
 app.use('/api', createAgentRouter(broadcast));
 app.use('/api', julesRouter);
+app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
 
 // Global JSON Error Handler

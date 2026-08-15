@@ -21,6 +21,18 @@ interface GeneralTabProps {
   setSoundNotifications: (val: boolean) => void;
   compactChat: boolean;
   setCompactChat: (val: boolean) => void;
+  ttsVoiceEnabled?: boolean;
+  setTtsVoiceEnabled?: (val: boolean) => void;
+  ttsVoice?: string;
+  setTtsVoice?: (val: string) => void;
+  ttsRate?: string;
+  setTtsRate?: (val: string) => void;
+  ttsPlayOnSpeaker?: boolean;
+  setTtsPlayOnSpeaker?: (val: boolean) => void;
+  ttsPlayInBrowser?: boolean;
+  setTtsPlayInBrowser?: (val: boolean) => void;
+  proactiveCompanionEnabled?: boolean;
+  setProactiveCompanionEnabled?: (val: boolean) => void;
 }
 
 export const GeneralTab: React.FC<GeneralTabProps> = ({
@@ -42,6 +54,18 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   setSoundNotifications,
   compactChat,
   setCompactChat,
+  ttsVoiceEnabled = true,
+  setTtsVoiceEnabled,
+  ttsVoice = 'ru-RU-SvetlanaNeural',
+  setTtsVoice,
+  ttsRate = '+20%',
+  setTtsRate,
+  ttsPlayOnSpeaker = true,
+  setTtsPlayOnSpeaker,
+  ttsPlayInBrowser = true,
+  setTtsPlayInBrowser,
+  proactiveCompanionEnabled = true,
+  setProactiveCompanionEnabled,
 }) => {
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -279,6 +303,138 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* 3. Jarvis Voice Intercom & Proactive Companion */}
+      <div className="p-4 rounded-xl bento-card space-y-4">
+        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-text)]">
+            <Volume2 size={15} className="text-[var(--theme-accent)]" />
+            <span>Голосовой интерком Jarvis и автономный напарник</span>
+          </div>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+            :: Push-Driven Engine
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Voice Intercom Toggle */}
+          <div
+            onClick={() => setTtsVoiceEnabled && setTtsVoiceEnabled(!ttsVoiceEnabled)}
+            className="p-3 rounded-lg bento-card flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors"
+          >
+            <div>
+              <div className="text-xs font-medium text-[var(--theme-text)]">Голосовой интерком (Edge-TTS)</div>
+              <div className="text-[11px] text-[var(--theme-text-muted)]">Короткие реплики вслух через динамики</div>
+            </div>
+            <div
+              className={`w-9 h-5 rounded-md p-0.5 flex items-center transition-colors ${
+                ttsVoiceEnabled ? 'bg-sky-500/80' : 'bg-white/10'
+              }`}
+            >
+              <div className={`w-4 h-4 rounded-sm bg-white transition-transform ${ttsVoiceEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+          </div>
+
+          {/* Proactive Companion Sparks Toggle */}
+          <div
+            onClick={() => setProactiveCompanionEnabled && setProactiveCompanionEnabled(!proactiveCompanionEnabled)}
+            className="p-3 rounded-lg bento-card flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors"
+          >
+            <div>
+              <div className="text-xs font-medium text-[var(--theme-text)]">Автономный генератор искр (Sparks)</div>
+              <div className="text-[11px] text-[var(--theme-text-muted)]">Zero-pressure предложения без шейминга</div>
+            </div>
+            <div
+              className={`w-9 h-5 rounded-md p-0.5 flex items-center transition-colors ${
+                proactiveCompanionEnabled ? 'bg-sky-500/80' : 'bg-white/10'
+              }`}
+            >
+              <div className={`w-4 h-4 rounded-sm bg-white transition-transform ${proactiveCompanionEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+          </div>
+        </div>
+
+        {/* Voice Parameters */}
+        {ttsVoiceEnabled && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--theme-border)]">
+              <div>
+                <label className="text-[11px] font-medium text-[var(--theme-text-muted)] block mb-1.5 font-mono">
+                  Голос (Edge-TTS)
+                </label>
+                <select
+                  value={ttsVoice}
+                  onChange={(e) => setTtsVoice && setTtsVoice(e.target.value)}
+                  className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-sky-500"
+                >
+                  <option value="ru-RU-SvetlanaNeural">Светлана (Женский, четкий)</option>
+                  <option value="ru-RU-DmitryNeural">Дмитрий (Мужской, глубокий)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-medium text-[var(--theme-text-muted)] block mb-1.5 font-mono">
+                  Скорость речи
+                </label>
+                <select
+                  value={ttsRate}
+                  onChange={(e) => setTtsRate && setTtsRate(e.target.value)}
+                  className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-sky-500"
+                >
+                  <option value="+0%">Стандартная (+0%)</option>
+                  <option value="+15%">Быстрая (+15%)</option>
+                  <option value="+20%">Оптимальная (+20%)</option>
+                  <option value="+30%">Ультра (+30%)</option>
+                </select>
+              </div>
+
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await api.speak_text('На связи, сэр. Все системы активны.', {
+                        voice: ttsVoice,
+                        rate: ttsRate,
+                        playOnSpeaker: ttsPlayOnSpeaker,
+                        category: 'greeting',
+                      });
+                    } catch (err: any) {
+                      console.error('Voice test failed:', err);
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs text-[var(--theme-text)] transition-colors active:scale-95 cursor-pointer"
+                >
+                  <Volume2 size={13} className="text-sky-400" />
+                  <span>Тест голоса</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--theme-border)]">
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]">
+                <input
+                  type="checkbox"
+                  checked={ttsPlayOnSpeaker}
+                  onChange={(e) => setTtsPlayOnSpeaker && setTtsPlayOnSpeaker(e.target.checked)}
+                  className="rounded border-[var(--theme-border)] text-sky-500 focus:ring-0"
+                />
+                <span>Воспроизводить через системные динамики (MCI)</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]">
+                <input
+                  type="checkbox"
+                  checked={ttsPlayInBrowser}
+                  onChange={(e) => setTtsPlayInBrowser && setTtsPlayInBrowser(e.target.checked)}
+                  className="rounded border-[var(--theme-border)] text-sky-500 focus:ring-0"
+                />
+                <span>Воспроизводить в активной вкладке браузера</span>
+              </label>
+            </div>
+          </>
+        )}
       </div>
 
       {/* 3. Password & Session Security */}

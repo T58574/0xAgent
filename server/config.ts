@@ -106,6 +106,16 @@ export function getDefaultConfig(): AppConfig {
     jules_api_key: null,
     jules_default_repo: null,
     jarvis_model: 'gemini-3.5-flash-lite',
+    tts_config: {
+      enabled: true,
+      voice: 'ru-RU-SvetlanaNeural',
+      rate: '+20%',
+      pitch: '+0Hz',
+      volume: 80,
+      play_on_speaker: true,
+      play_in_browser: true,
+    },
+    proactive_companion_enabled: true,
   };
 }
 

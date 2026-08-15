@@ -610,11 +610,55 @@ export async function send_jules_message(sessionId: string, prompt: string): Pro
 }
 
 export async function get_jarvis_state(): Promise<JarvisState> {
-  const res = await authFetch(`${API_BASE}/jarvis/state`);
+  const res = await authFetch(`${API_BASE}/jarvis/status`);
   if (!res.ok) throw new Error(await res.text());
-  const data = await res.json();
-  return data.state;
+  return res.json();
 }
+
+export async function speak_text(
+  text: string,
+  options?: { voice?: string; rate?: string; pitch?: string; playOnSpeaker?: boolean; category?: string }
+): Promise<{ success: boolean; audioBase64?: string; cached: boolean }> {
+  const res = await authFetch(`${API_BASE}/jarvis/speak`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, ...options }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function speak_category(category: string): Promise<{ success: boolean; phrase: string | null }> {
+  const res = await authFetch(`${API_BASE}/jarvis/speak-category`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function stop_voice(): Promise<void> {
+  await authFetch(`${API_BASE}/jarvis/stop-voice`, { method: 'POST' });
+}
+
+export async function generate_spark(): Promise<{ success: boolean; spark: any }> {
+  const res = await authFetch(`${API_BASE}/jarvis/spark/generate`, { method: 'POST' });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function accept_spark(id: string): Promise<{ success: boolean; spark: any }> {
+  const res = await authFetch(`${API_BASE}/jarvis/spark/${encodeURIComponent(id)}/accept`, { method: 'POST' });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function dismiss_spark(id: string): Promise<void> {
+  const res = await authFetch(`${API_BASE}/jarvis/spark/${encodeURIComponent(id)}/dismiss`, { method: 'POST' });
+  if (!res.ok) throw new Error(await res.text());
+}
+
 
 
 

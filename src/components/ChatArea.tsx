@@ -4,7 +4,7 @@ import {
   Sparkles,
   CheckCheck,
 } from 'lucide-react';
-import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata } from '../types';
+import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata, JarvisSparkProposal } from '../types';
 import {
   cleanContent,
   extractThinkingFromContent,
@@ -19,6 +19,7 @@ import { MaterialIcon } from './common/MaterialIcon';
 import { FloatingCommandBar } from './chat/FloatingCommandBar';
 import { ReasoningViewer } from './chat/ReasoningViewer';
 import { ChatTimelineScrubber } from './chat/ChatTimelineScrubber';
+import { JarvisSparkCard } from './chat/JarvisSparkCard';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -79,6 +80,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Personas
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersona, setActivePersona] = useState<PersonaMetadata | null>(null);
+
+  // Jarvis Proactive Sparks
+  const [activeSparks, setActiveSparks] = useState<JarvisSparkProposal[]>([]);
 
   // ASCII thinking animation frames
   const ASCII_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -144,13 +148,45 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       }, 3500);
     });
 
+    // Jarvis Proactive Sparks & Voice Intercom listeners
+    const u4 = api.listen<JarvisSparkProposal>('jarvis_spark_proposal', (e) => {
+      setActiveSparks((prev) => [e.payload, ...prev.filter((s) => s.id !== e.payload.id)]);
+    });
+
+    const u5 = api.listen<JarvisSparkProposal>('jarvis_spark_updated', (e) => {
+      if (e.payload.status !== 'pending') {
+        setActiveSparks((prev) => prev.filter((s) => s.id !== e.payload.id));
+      } else {
+        setActiveSparks((prev) => prev.map((s) => (s.id === e.payload.id ? e.payload : s)));
+      }
+    });
+
+    const u6 = api.listen<{ text: string; audioBase64?: string }>('jarvis_speak', (e) => {
+      if (config?.tts_config?.play_in_browser && e.payload.audioBase64) {
+        try {
+          const audio = new Audio(e.payload.audioBase64);
+          audio.play().catch(() => {});
+        } catch {}
+      }
+    });
+
+    // Load existing pending sparks
+    api.get_jarvis_state().then((st) => {
+      if (st?.activeSparks) {
+        setActiveSparks(st.activeSparks.filter((s) => s.status === 'pending'));
+      }
+    }).catch(() => {});
+
     return () => {
       if (sumTimer) clearTimeout(sumTimer);
       u1();
       u2();
       u3();
+      u4();
+      u5();
+      u6();
     };
-  }, []);
+  }, [config?.tts_config?.play_in_browser]);
 
   const handleChatScroll = () => {
     if (!chatContainerRef.current) return;
@@ -237,6 +273,36 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     }
   };
 
+  const handleAcceptSpark = async (spark: JarvisSparkProposal) => {
+    try {
+      await api.accept_spark(spark.id);
+      setActiveSparks((prev) => prev.filter((s) => s.id !== spark.id));
+      onSendMessage(spark.suggestedAction || spark.description);
+    } catch (err: any) {
+      showToast(`Ошибка запуска: ${err.message || err}`, 'error');
+    }
+  };
+
+  const handleDismissSpark = async (sparkId: string) => {
+    try {
+      await api.dismiss_spark(sparkId);
+      setActiveSparks((prev) => prev.filter((s) => s.id !== sparkId));
+    } catch (err: any) {
+      console.error('Failed to dismiss spark:', err);
+    }
+  };
+
+  const handleSpeakPhrase = async (text: string) => {
+    try {
+      await api.speak_text(text, {
+        voice: config?.tts_config?.voice,
+        rate: config?.tts_config?.rate,
+      });
+    } catch (err: any) {
+      console.error('Failed to speak phrase:', err);
+    }
+  };
+
 
 
 
@@ -266,6 +332,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 interactive
               />
             </div>
+
+            {/* Proactive Sparks in Empty State */}
+            {activeSparks.length > 0 && (
+              <div className="w-full max-w-xl mx-auto space-y-2 text-left">
+                {activeSparks.map((spark) => (
+                  <JarvisSparkCard
+                    key={spark.id}
+                    spark={spark}
+                    onAccept={handleAcceptSpark}
+                    onDismiss={handleDismissSpark}
+                    onSpeak={handleSpeakPhrase}
+                  />
+                ))}
+              </div>
+            )}
 
             {/* Bottom Floating Command Bar for Empty State */}
             <div className="pt-2 w-full max-w-xl mx-auto">
@@ -531,6 +612,21 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
           {/* Bottom Floating Command Bar for Active Chat */}
           <div className="p-3 sm:p-4 shrink-0 max-w-3xl mx-auto w-full">
+            {/* Proactive Sparks Stream */}
+            {activeSparks.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {activeSparks.map((spark) => (
+                  <JarvisSparkCard
+                    key={spark.id}
+                    spark={spark}
+                    onAccept={handleAcceptSpark}
+                    onDismiss={handleDismissSpark}
+                    onSpeak={handleSpeakPhrase}
+                  />
+                ))}
+              </div>
+            )}
+
             <FloatingCommandBar
               inputText={inputText}
               setInputText={setInputText}

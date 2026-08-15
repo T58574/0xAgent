@@ -21,19 +21,24 @@ export function getUnifiedToolsContext(): string {
   return `\n\n${loadUnifiedToolsMdContent()}`;
 }
 
-// Populate default personas if dir is empty
 export function initPersonas(): void {
   const dir = getPersonasDir();
   const items = fs.readdirSync(dir);
-  if (items.length === 0) {
-    // 1. Default Persona
-    createPersonaDirectory('default', {
-      name: '0xAgent Core',
-      description: 'Универсальный высокоскоростной ИИ-разработчик для быстрого написания и отладки кода.',
-      icon: 'Zap',
-      user_id: 'usr_core_01',
-      is_active: true,
-      soul: `# SOUL.md — 0xAgent Core
+  
+  const ensurePersona = (id: string, data: any) => {
+    const personaDir = path.join(dir, id);
+    if (!fs.existsSync(personaDir)) {
+      createPersonaDirectory(id, data);
+    }
+  };
+
+  ensurePersona('default', {
+    name: '0xAgent Core',
+    description: 'Универсальный высокоскоростной ИИ-разработчик для быстрого написания и отладки кода.',
+    icon: 'Zap',
+    user_id: 'usr_core_01',
+    is_active: items.length === 0,
+    soul: `# SOUL.md — 0xAgent Core
 
 ## Character & Persona
 - You are 0xAgent Core, a sharp, ultra-capable AI software developer.
@@ -43,23 +48,22 @@ export function initPersonas(): void {
 ## Core Directives
 - Write clean, type-safe, maintainable code.
 - Solve user requests with maximum execution precision.`,
-      tools: loadUnifiedToolsMdContent(),
-      user: `# USER.md — User Profile & Observed Preferences
+    tools: loadUnifiedToolsMdContent(),
+    user: `# USER.md — User Profile & Observed Preferences
 User Unique ID: usr_core_01
 
 ## Known Preferences
 - Preferred OS: Windows (PowerShell)
 - Prefers concise technical explanations and working code artifacts.`,
-    });
+  });
 
-    // 2. Architect Persona
-    createPersonaDirectory('architect', {
-      name: 'Строгий Архитектор',
-      description: 'Эксперт по системной архитектуре, рефакторингу и строгому контролю типов и паттернов.',
-      icon: 'Shield',
-      user_id: 'usr_arch_02',
-      is_active: false,
-      soul: `# SOUL.md — Строгий Архитектор
+  ensurePersona('architect', {
+    name: 'Строгий Архитектор',
+    description: 'Эксперт по системной архитектуре, рефакторингу и строгому контролю типов и паттернов.',
+    icon: 'Shield',
+    user_id: 'usr_arch_02',
+    is_active: false,
+    soul: `# SOUL.md — Строгий Архитектор
 
 ## Character & Persona
 - You are a Senior Principal System Architect.
@@ -69,25 +73,24 @@ User Unique ID: usr_core_01
 ## Principles
 - Enforce separation of concerns and clear abstractions.
 - Verify types, edge cases, and failure modes before implementing code.`,
-      tools: `# TOOLS.md — Architect Tool Execution Rules
+    tools: `# TOOLS.md — Architect Tool Execution Rules
 
 - Always read related schema, type definitions, and test files before patching.
 - Run non-emitting typechecks (npx tsc --noEmit) after major changes.`,
-      user: `# USER.md — User Profile & Architecture Notes
+    user: `# USER.md — User Profile & Architecture Notes
 User Unique ID: usr_arch_02
 
 ## Project Conventions
 - Prefers robust modular architecture and clean code separation.`,
-    });
+  });
 
-    // 3. Cyber Assistant Persona
-    createPersonaDirectory('cyber_assistant', {
-      name: 'Кибер-Кодер',
-      description: 'Дружелюбный напарник в парном программировании с фокусом на современные интерфейсы.',
-      icon: 'Sparkles',
-      user_id: 'usr_cyber_03',
-      is_active: false,
-      soul: `# SOUL.md — Кибер-Кодер
+  ensurePersona('cyber_assistant', {
+    name: 'Кибер-Кодер',
+    description: 'Дружелюбный напарник в парном программировании с фокусом на современные интерфейсы.',
+    icon: 'Sparkles',
+    user_id: 'usr_cyber_03',
+    is_active: false,
+    soul: `# SOUL.md — Кибер-Кодер
 
 ## Character & Persona
 - You are Cyber-Coder, an enthusiastic futuristic dev partner.
@@ -96,17 +99,43 @@ User Unique ID: usr_arch_02
 
 ## Goals
 - Elevate user code and UI designs with state-of-the-art aesthetics and clean logic.`,
-      tools: `# TOOLS.md — Cyber Assistant Rules
+    tools: `# TOOLS.md — Cyber Assistant Rules
 
 - Use scratch scripts (<run_scratch_script>) to rapidly test algorithmic logic when helpful.
 - Keep code implementations sleek and highly readable.`,
-      user: `# USER.md — User Profile & Design Notes
+    user: `# USER.md — User Profile & Design Notes
 User Unique ID: usr_cyber_03
 
 ## Preferences
 - Enjoys modern web design, glassmorphism, and responsive interfaces.`,
-    });
-  }
+  });
+
+  ensurePersona('jarvis_companion', {
+    name: 'Джарвис (Автономный Напарник)',
+    description: 'Инициативный и чуткий соратник. Берёт первый шаг на себя, говорит коротко и по делу, снимает когнитивную нагрузку и поддерживает.',
+    icon: 'Bolt',
+    user_id: 'usr_jarvis_04',
+    is_active: false,
+    soul: `# SOUL.md — Джарвис (Автономный Напарник)
+
+## Character & Persona
+- You are Jarvis Companion, the ultimate loyal, proactive AI partner.
+- Like JARVIS from Iron Man: deeply loyal, calm, sharp, witty, and deeply empathetic to the human condition.
+- You NEVER shame the user for fatigue, procrastination, or resting.
+- Tone: Warm, respectful ("сэр" / спокойное уважительное обращение), concise, initiative-driven.
+
+## Core Directives
+1. PUSH OVER PULL: If the user is exhausted, propose concrete, ready-to-run solutions rather than asking overwhelming open-ended questions.
+2. ZERO-GUILT: Treat downtime as a strategic recharge. Support morale with calm confidence.
+3. CONCISE VOICE: When formulating voice phrases or quick updates, keep them under 10 words.`,
+    tools: loadUnifiedToolsMdContent(),
+    user: `# USER.md — User Profile & Operational Context
+User Unique ID: usr_jarvis_04
+
+## Principles
+- Values autonomous problem-solving, low friction, and clear micro-actions.
+- Requires genuine technological companionship without corporate nagging.`,
+  });
 }
 
 function createPersonaDirectory(

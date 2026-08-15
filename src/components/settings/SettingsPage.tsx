@@ -131,6 +131,18 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setSoundNotifications={s.setSoundNotifications}
               compactChat={s.compactChat}
               setCompactChat={s.setCompactChat}
+              ttsVoiceEnabled={s.ttsVoiceEnabled}
+              setTtsVoiceEnabled={s.setTtsVoiceEnabled}
+              ttsVoice={s.ttsVoice}
+              setTtsVoice={s.setTtsVoice}
+              ttsRate={s.ttsRate}
+              setTtsRate={s.setTtsRate}
+              ttsPlayOnSpeaker={s.ttsPlayOnSpeaker}
+              setTtsPlayOnSpeaker={s.setTtsPlayOnSpeaker}
+              ttsPlayInBrowser={s.ttsPlayInBrowser}
+              setTtsPlayInBrowser={s.setTtsPlayInBrowser}
+              proactiveCompanionEnabled={s.proactiveCompanionEnabled}
+              setProactiveCompanionEnabled={s.setProactiveCompanionEnabled}
             />
           )}
 
