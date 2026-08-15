@@ -10,6 +10,7 @@ import { jarvisSupervisor } from '../server/agent/jarvisSupervisor';
 import { initPersonas, getPersonaDetail } from '../server/personas';
 import { logger } from '../server/logger';
 import { processWatcher } from '../server/agent/processWatcher';
+import { voiceDaemonManager } from '../server/agent/voiceDaemonManager';
 
 describe('Jarvis Companion & Voice Intercom Test Suite', () => {
   before(() => {
@@ -193,6 +194,24 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
       assert.ok(['coding', 'gaming', 'browsing', 'idle'].includes(status.state), 'State must be one of allowed states');
       assert.ok(typeof status.detectedApp === 'string');
       assert.ok(status.lastScanTimestamp > 0);
+    });
+  });
+
+  describe('6. Native Desktop Voice Daemon (voiceDaemonManager)', () => {
+    it('should report correct initial daemon state and allow broadcast updates', () => {
+      assert.equal(typeof voiceDaemonManager.isRunning(), 'boolean');
+      assert.doesNotThrow(() => {
+        voiceDaemonManager.broadcastState('idle');
+      });
+    });
+
+    it('should find python voice_daemon script on disk', () => {
+      const scriptPath = path.resolve(process.cwd(), 'scripts/voice_daemon.py');
+      assert.ok(fs.existsSync(scriptPath), 'voice_daemon.py script must exist in scripts/ directory');
+      const content = fs.readFileSync(scriptPath, 'utf-8');
+      assert.ok(content.includes('VoiceDaemon'), 'Script must define VoiceDaemon class');
+      assert.ok(content.includes('WAKE_WORDS'), 'Script must define wake words');
+      assert.ok(content.includes('GAIN_BOOST'), 'Script must define gain boost');
     });
   });
 });

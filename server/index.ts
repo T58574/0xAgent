@@ -17,6 +17,7 @@ import { createAgentRouter } from './routes/agentRoutes';
 import knowledgeRouter from './routes/knowledge';
 import { jarvisRouter } from './routes/jarvisRoutes';
 import { jarvisSupervisor } from './agent/jarvisSupervisor';
+import { voiceDaemonManager } from './agent/voiceDaemonManager';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -83,8 +84,10 @@ function broadcast(event: string, payload: any): void {
   }
 }
 
-// Wire WS broadcaster to Jarvis
+// Wire WS broadcaster to Jarvis & Voice Daemon
 jarvisSupervisor.setWsBroadcaster(broadcast);
+voiceDaemonManager.setWsBroadcaster(broadcast);
+voiceDaemonManager.autoStartIfEnabled();
 
 // Mount Router Modules
 app.use('/api', authRouter);
@@ -107,6 +110,7 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // Graceful process exit handlers for 0xAgent backend node process
 const cleanupOnExit = () => {
+  voiceDaemonManager.stop();
   jarvisSupervisor.stopLoop();
   stopLlamaServerProcess(broadcast);
 };

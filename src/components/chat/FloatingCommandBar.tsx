@@ -21,7 +21,6 @@ import {
 import { AppConfig, PersonaMetadata } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
 import { useAudioRecorder } from '../../hooks/useAudioRecorder';
-import { useWakeWord } from '../../hooks/useWakeWord';
 import * as api from '../../services/api';
 
 interface FloatingCommandBarProps {
@@ -101,8 +100,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     isRecording,
     isTranscribing,
     volumeLevel,
-    startRecording,
-    stopRecording,
     toggleRecording,
   } = useAudioRecorder({
     groqApiKey: config?.groq_api_key,
@@ -115,22 +112,31 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     },
   });
 
-  // Hands-Free Continuous Wake Word Spotter ("Джарвис" -> start recording, "Стоп" -> send)
-  const { isListeningForWake } = useWakeWord({
-    enabled: Boolean(config?.tts_config?.enabled && config?.tts_config?.wake_word_enabled),
-    isRecordingActive: isRecording,
-    onWakeDetected: async () => {
-      try {
-        await api.speak_category('listening');
-      } catch {}
-      startRecording();
-    },
-    onStopDetected: () => {
-      if (isRecording) {
-        stopRecording();
+  const [daemonVoiceState, setDaemonVoiceState] = useState<'idle' | 'recording' | 'processing' | 'stopped'>('idle');
+  const isListeningForWake = Boolean(config?.tts_config?.wake_word_enabled);
+  const inputTextRef = useRef(inputText);
+  inputTextRef.current = inputText;
+
+  // Subscribe to native desktop Voice Daemon events
+  useEffect(() => {
+    const un1 = api.listen<{ text: string }>('jarvis_voice_transcribed', (e) => {
+      if (e.payload?.text) {
+        const cur = inputTextRef.current;
+        setInputText(cur ? `${cur} ${e.payload.text}` : e.payload.text);
       }
-    },
-  });
+    });
+
+    const un2 = api.listen<{ state: 'idle' | 'recording' | 'processing' | 'stopped' }>('jarvis_voice_state', (e) => {
+      if (e.payload?.state) {
+        setDaemonVoiceState(e.payload.state);
+      }
+    });
+
+    return () => {
+      un1();
+      un2();
+    };
+  }, [setInputText]);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -472,30 +478,30 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             onClick={toggleRecording}
             disabled={isTranscribing}
             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 self-center relative ${
-              isRecording
+              isRecording || daemonVoiceState === 'recording'
                 ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/50 scale-105'
-                : isTranscribing
+                : isTranscribing || daemonVoiceState === 'processing'
                 ? 'bg-white/10 text-sky-400 cursor-wait animate-pulse'
                 : isListeningForWake
                 ? 'text-sky-400 hover:bg-white/10'
                 : 'text-[var(--theme-text-muted)] hover:text-sky-400 hover:bg-white/10'
             }`}
             title={
-              isRecording
-                ? 'Идет запись... Клик — расшифровать через Groq'
-                : isTranscribing
+              isRecording || daemonVoiceState === 'recording'
+                ? 'Идет запись речи... (Скажите "Стоп" или кликните)'
+                : isTranscribing || daemonVoiceState === 'processing'
                 ? 'Расшифровка Groq Whisper...'
                 : isListeningForWake
-                ? 'Голосовой ввод активен (Скажите "Джарвис" или кликните)'
+                ? 'Голосовой фоновый демон активен (Скажите "Джарвис" или кликните)'
                 : 'Голосовой ввод (Groq Whisper, Gain Boost 3.2x)'
             }
           >
-            {isRecording ? (
+            {isRecording || daemonVoiceState === 'recording' ? (
               <>
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60 pointer-events-none" />
                 <Square size={12} fill="currentColor" />
               </>
-            ) : isTranscribing ? (
+            ) : isTranscribing || daemonVoiceState === 'processing' ? (
               <RefreshCw size={14} className="animate-spin text-sky-400" />
             ) : (
               <>
