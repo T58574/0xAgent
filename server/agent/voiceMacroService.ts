@@ -7,6 +7,12 @@ export interface MacroResult {
 }
 
 export class VoiceMacroService {
+  private dryRun = process.env.NODE_ENV === 'test';
+
+  public setDryRun(enabled: boolean) {
+    this.dryRun = enabled;
+  }
+
   /**
    * Evaluates text command against Windows system voice macros.
    * Returns handled=true if executed directly, false if should pass to AI agent.
@@ -62,17 +68,17 @@ export class VoiceMacroService {
 
     // 3. Window & Desktop Management
     if (t.includes('сверни все окна') || t.includes('свернуть все окна') || t.includes('покажи рабочий стол') || t.includes('чистый стол')) {
-      exec('powershell -NoProfile -Command "(New-Object -ComObject Shell.Application).MinimizeAll()"');
+      this.safeExec('powershell -NoProfile -Command "(New-Object -ComObject Shell.Application).MinimizeAll()"');
       return { handled: true, action: 'minimize_all', description: 'Рабочий стол: Свернуть все окна' };
     }
 
     if (t.includes('восстанови все окна') || t.includes('верни окна') || t.includes('разверни окна')) {
-      exec('powershell -NoProfile -Command "(New-Object -ComObject Shell.Application).UndoMinimizeALL()"');
+      this.safeExec('powershell -NoProfile -Command "(New-Object -ComObject Shell.Application).UndoMinimizeALL()"');
       return { handled: true, action: 'restore_all', description: 'Рабочий стол: Развернуть окна' };
     }
 
     if (t.includes('заблокируй компьютер') || t.includes('заблокируй пк') || t.includes('заблокируй экран')) {
-      exec('rundll32.exe user32.dll,LockWorkStation');
+      this.safeExec('rundll32.exe user32.dll,LockWorkStation');
       return { handled: true, action: 'lock_pc', description: 'Безопасность: Блокировка ПК' };
     }
 
@@ -108,7 +114,15 @@ export class VoiceMacroService {
     return { handled: false, action: '', description: '' };
   }
 
+  private safeExec(cmd: string) {
+    if (this.dryRun || process.env.NODE_ENV === 'test') return;
+    try {
+      exec(cmd);
+    } catch {}
+  }
+
   private safeSpawn(cmd: string, args: string[] = []) {
+    if (this.dryRun || process.env.NODE_ENV === 'test') return;
     try {
       const proc = spawn(cmd, args, { detached: true, stdio: 'ignore' });
       proc.on('error', () => {});
@@ -116,11 +130,13 @@ export class VoiceMacroService {
   }
 
   private sendKey(vkCode: number) {
+    if (this.dryRun || process.env.NODE_ENV === 'test') return;
     const py = `import ctypes; ctypes.windll.user32.keybd_event(${vkCode}, 0, 0, 0); ctypes.windll.user32.keybd_event(${vkCode}, 0, 2, 0)`;
     this.safeSpawn('python', ['-c', py]);
   }
 
   private sendKeyRepeated(vkCode: number, count: number) {
+    if (this.dryRun || process.env.NODE_ENV === 'test') return;
     const py = `import ctypes, time
 for _ in range(${count}):
     ctypes.windll.user32.keybd_event(${vkCode}, 0, 0, 0)

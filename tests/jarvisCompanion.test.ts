@@ -1,3 +1,5 @@
+process.env.NODE_ENV = 'test';
+
 import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -16,7 +18,9 @@ import { jarvisDiagnostics } from '../server/agent/jarvisDiagnostics';
 
 describe('Jarvis Companion & Voice Intercom Test Suite', () => {
   before(() => {
+    process.env.NODE_ENV = 'test';
     ttsService.setMuted(true);
+    voiceMacroService.setDryRun(true);
   });
 
   after(() => {
