@@ -63,8 +63,8 @@ export const PRESET_PHRASES: Record<string, string[]> = {
 
 export function getPhraseFilename(
   phrase: string,
-  voice = 'ru-RU-SvetlanaNeural',
-  rate = '+20%'
+  voice = 'ru-RU-DmitryNeural',
+  rate = '+15%'
 ): string {
   const hash = crypto
     .createHash('md5')
@@ -143,8 +143,8 @@ export class TtsService {
       return { success: false, cached: false, phrase: text };
     }
 
-    const voice = options?.voice || options?.config?.voice || 'ru-RU-SvetlanaNeural';
-    const rate = options?.rate || options?.config?.rate || '+20%';
+    const voice = options?.voice || options?.config?.voice || 'ru-RU-DmitryNeural';
+    const rate = options?.rate || options?.config?.rate || '+15%';
     const pitch =
       options?.pitch ||
       options?.config?.pitch ||

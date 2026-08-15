@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
-import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo, JulesSessionInfo, JarvisState } from './types';
+import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, ToolCallInfo, JulesSessionInfo, JarvisState, JarvisSparkProposal } from './types';
 import { generateShortId } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -14,6 +14,7 @@ import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { KnowledgeVault } from './components/KnowledgeVault';
 import { LockScreen } from './components/LockScreen';
 import { JarvisWidget } from './components/JarvisWidget';
+import { JarvisIntercomHud } from './components/chat/JarvisIntercomHud';
 import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
 
 export default function App() {
@@ -982,6 +983,26 @@ export default function App() {
         julesSessions={julesSessions}
         onRefresh={fetchJulesData}
         config={config}
+      />
+
+      {/* JARVIS OLED MORPHIZM ASCII INTERCOM HUD */}
+      <JarvisIntercomHud
+        onAcceptSpark={async (spark: JarvisSparkProposal) => {
+          try {
+            await api.accept_spark(spark.id);
+            setActiveView('chat');
+            handleSendMessage(spark.suggestedAction || spark.description);
+          } catch (err: any) {
+            console.error('Failed to accept spark from HUD:', err);
+          }
+        }}
+        onDismissSpark={async (sparkId) => {
+          try {
+            await api.dismiss_spark(sparkId);
+          } catch (err: any) {
+            console.error('Failed to dismiss spark from HUD:', err);
+          }
+        }}
       />
 
       {(!isAuthenticated || !isPasswordSet) && (

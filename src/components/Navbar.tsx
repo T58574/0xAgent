@@ -17,6 +17,7 @@ import {
 import { AppConfig } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { MaterialIcon } from './common/MaterialIcon';
 
 interface NavbarProps {
   sidebarOpen?: boolean;
@@ -41,7 +42,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onToggleSidebar: _onToggleSidebar,
   activeView,
   onChangeView,
-  config: _config,
+  config,
   onSelectWorkspace: _onSelectWorkspace,
   has0xAgentMd: _has0xAgentMd = false,
   onToggleLogs,
@@ -205,6 +206,25 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
         </div>
+
+        {/* Voice Intercom Quick Trigger */}
+        {config?.tts_config?.enabled && (
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await api.speak_category('greeting');
+              } catch (err) {
+                console.error(err);
+              }
+            }}
+            className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-sky-400 hover:border-sky-500/30 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono"
+            title="Голосовой интерком Jarvis (Дмитрий, Edge-TTS). Клик — проверить связь."
+          >
+            <MaterialIcon name="volume_up" size={14} className="text-sky-400" />
+            <span className="hidden xl:inline text-[10px]">:: [VOICE]</span>
+          </button>
+        )}
 
         {/* LAN Wi-Fi Sharing */}
         <div className="relative" ref={lanRef}>

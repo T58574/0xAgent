@@ -39,8 +39,9 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
     it('should synthesize and cache speech with base64 audio output', async () => {
       const testPhrase = 'Тест автономного модуля Джарвис';
       const result = await ttsService.speakText(testPhrase, {
-        voice: 'ru-RU-SvetlanaNeural',
-        rate: '+20%',
+        voice: 'ru-RU-DmitryNeural',
+        rate: '+15%',
+        pitch: '-5Hz',
         playOnSpeaker: false, // Do not play sound in automated CI/test run
       });
 
@@ -52,8 +53,9 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
 
       // Second call must hit disk cache
       const cachedResult = await ttsService.speakText(testPhrase, {
-        voice: 'ru-RU-SvetlanaNeural',
-        rate: '+20%',
+        voice: 'ru-RU-DmitryNeural',
+        rate: '+15%',
+        pitch: '-5Hz',
         playOnSpeaker: false,
       });
       assert.equal(cachedResult.success, true);

@@ -108,9 +108,9 @@ export function getDefaultConfig(): AppConfig {
     jarvis_model: 'gemini-3.5-flash-lite',
     tts_config: {
       enabled: true,
-      voice: 'ru-RU-SvetlanaNeural',
-      rate: '+20%',
-      pitch: '+0Hz',
+      voice: 'ru-RU-DmitryNeural',
+      rate: '+15%',
+      pitch: '-5Hz',
       volume: 80,
       play_on_speaker: true,
       play_in_browser: true,

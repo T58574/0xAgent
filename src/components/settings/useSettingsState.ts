@@ -24,9 +24,9 @@ export function useSettingsState(
   const [soundNotifications, setSoundNotifications] = useState(true);
   const [compactChat, setCompactChat] = useState(false);
   const [ttsVoiceEnabled, setTtsVoiceEnabled] = useState(true);
-  const [ttsVoice, setTtsVoice] = useState('ru-RU-SvetlanaNeural');
-  const [ttsRate, setTtsRate] = useState('+20%');
-  const [ttsPitch, setTtsPitch] = useState('+0Hz');
+  const [ttsVoice, setTtsVoice] = useState('ru-RU-DmitryNeural');
+  const [ttsRate, setTtsRate] = useState('+15%');
+  const [ttsPitch, setTtsPitch] = useState('-5Hz');
   const [ttsPlayOnSpeaker, setTtsPlayOnSpeaker] = useState(true);
   const [ttsPlayInBrowser, setTtsPlayInBrowser] = useState(true);
   const [proactiveCompanionEnabled, setProactiveCompanionEnabled] = useState(true);
