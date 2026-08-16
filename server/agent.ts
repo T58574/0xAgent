@@ -109,6 +109,7 @@ export async function runAgentLoop(
         messages,
         assistantMessageId,
         sessionId,
+        session,
         activeCancelTokens,
         broadcast
       );
@@ -404,6 +405,20 @@ export async function runAgentLoop(
 
       broadcast('agent-status-changed', { sessionId, status: 'thinking' });
     }
+  } catch (err: any) {
+    console.error(`[agent] Unhandled error in runAgentLoop for session ${sessionId}:`, err);
+    let errMsg = `[!] **Системная ошибка выполнения Агента:**\n\`\`\`\n${err?.message || err}\n\`\`\``;
+    if (
+      err?.name === 'TimeoutError' ||
+      String(err?.message).includes('timeout') ||
+      String(err?.message).includes('aborted')
+    ) {
+      errMsg = `[!] **Таймаут ожидания ответа LLM сервера!**\n\nМодель не успела сформировать ответ за отведенное время (длинная prefill фаза или высокая нагрузка на систему).\n\n[›] **Рекомендации:**\n1. Увеличьте размер таймаута в **Настройки -> Основные (API Timeout)**.\n2. Для локальных 27B/31B моделей убедитесь, что в параметрах сервера включен Flash Attention (\`-fa on\`) и квантованный KV-кэш (\`-ctk q8_0 -ctv q8_0\`).`;
+    }
+    try {
+      const sess = await loadSession(sessionId);
+      handleAgentError(sess, sessionId, broadcast, errMsg);
+    } catch {}
   } finally {
     activeRunningLoops.delete(sessionId);
     loopBreaker.reset(sessionId);

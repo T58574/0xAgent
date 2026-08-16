@@ -12,6 +12,8 @@ export class VoiceDaemonManager {
   private isRunningFlag = false;
   private wsBroadcaster: ((event: string, data: any) => void) | null = null;
   private scriptPath: string;
+  private deviceErrorCooldownUntil = 0;
+  private consecutiveFailures = 0;
 
   constructor() {
     this.scriptPath = path.resolve(process.cwd(), 'scripts/voice_daemon.py');
@@ -28,6 +30,10 @@ export class VoiceDaemonManager {
   public start(): boolean {
     if (this.isRunningFlag && this.process) {
       return true;
+    }
+
+    if (Date.now() < this.deviceErrorCooldownUntil) {
+      return false;
     }
 
     if (!fs.existsSync(this.scriptPath)) {
@@ -55,6 +61,9 @@ export class VoiceDaemonManager {
         const str = data.toString().trim();
         if (str) {
           logger.info('VoiceDaemon', str);
+          if (str.includes('[OK]')) {
+            this.consecutiveFailures = 0;
+          }
         }
       });
 
@@ -62,6 +71,13 @@ export class VoiceDaemonManager {
         const str = data.toString().trim();
         if (str && !str.includes('LOG (VoskAPI')) {
           logger.warn('VoiceDaemon', str);
+          if (str.includes('Fatal audio stream error') || str.includes('Error opening InputStream') || str.includes('PaErrorCode')) {
+            this.consecutiveFailures++;
+            if (this.consecutiveFailures >= 2) {
+              this.deviceErrorCooldownUntil = Date.now() + 60_000;
+              logger.warn('VoiceDaemonManager', 'Microphone audio stream is unavailable. Voice daemon auto-restart cooldown set to 60s.');
+            }
+          }
         }
       });
 

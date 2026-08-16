@@ -48,7 +48,11 @@ export async function fetchLlmResponse(
 
   const configuredEffort = config.reasoning_effort || config.local_server?.reasoning_effort || 'auto';
   const isReasoningOff = config.reasoning_enabled === false || configuredEffort === 'off';
-  const requestTimeoutMs = Math.max(15, config.api_timeout_sec || 90) * 1000;
+
+  // For local models (27B/31B GGUF), prefill on large prompts can take 2-4 minutes.
+  // We allocate at least 300s (5 min) for the initial connection/prefill response.
+  const baseTimeoutSec = config.api_timeout_sec || (isLocalModel ? 300 : 90);
+  const requestTimeoutMs = Math.max(isLocalModel ? 180 : 30, baseTimeoutSec) * 1000;
 
   if (isLocalModel && (selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf'))) {
     const localHost = config.local_server?.host || '127.0.0.1';
@@ -76,7 +80,7 @@ export async function fetchLlmResponse(
     }
 
     let attempts = 0;
-    const maxAttempts = 6;
+    const maxAttempts = 4;
     while (attempts < maxAttempts) {
       attempts++;
       try {
@@ -106,7 +110,10 @@ export async function fetchLlmResponse(
           await new Promise((r) => setTimeout(r, 1500));
           continue;
         }
-        const errMsg = `[!] **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n[›] **Решение:** Нажмите кнопку **[Запустить LLM Сервер]** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
+        const isTimeout = err?.name === 'TimeoutError' || String(err?.message).includes('timeout') || String(err?.message).includes('aborted');
+        const errMsg = isTimeout
+          ? `[!] **Превышен таймаут ожидания локального LLM сервера (${Math.round(requestTimeoutMs / 1000)}с)!**\nЛокальная модель не ответила за отведенное время (длинная фаза prefill или зависание llama-server).\n\n[›] **Решение:**\n1. В **Настройках -> Сервер LLM** убедитесь, что включен Flash Attention (\`-fa on\`) и квантованный KV-кэш (\`-ctk q8_0 -ctv q8_0\`).\n2. Увеличьте параметр **API Timeout** в основных настройках.`
+          : `[!] **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n[›] **Решение:** Нажмите кнопку **[Запустить LLM Сервер]** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
         handleAgentError(session, sessionId, broadcast, errMsg);
         return null;
       }
@@ -239,6 +246,7 @@ export async function readLlmStream(
   messages: { role: string; content: string | any[] }[],
   assistantMessageId: string,
   sessionId: string,
+  session: any,
   activeCancelTokens: Set<string>,
   broadcast: (event: string, payload: any) => void
 ): Promise<LlmStreamResult | null> {
@@ -323,44 +331,64 @@ export async function readLlmStream(
     }
   };
 
-  while (!isStreamDone) {
-    if (activeCancelTokens.has(sessionId)) {
-      broadcast('agent-status-changed', { sessionId, status: 'idle' });
-      return null;
-    }
+  try {
+    while (!isStreamDone) {
+      if (activeCancelTokens.has(sessionId)) {
+        await reader.cancel().catch(() => {});
+        broadcast('agent-status-changed', { sessionId, status: 'idle' });
+        return null;
+      }
 
-    const { value, done } = await reader.read();
-    if (done) {
-      isStreamDone = true;
-      if (buffer.trim()) {
-        const lines = buffer.split('\n');
-        buffer = '';
-        for (const rawLine of lines) {
-          const line = rawLine.trim();
-          if (line.startsWith('data:')) {
-            const data = line.slice(5).trim();
-            if (data === '[DONE]') break;
-            processJsonData(data);
+      const { value, done } = await reader.read();
+      if (done) {
+        isStreamDone = true;
+        if (buffer.trim()) {
+          const lines = buffer.split('\n');
+          buffer = '';
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (line.startsWith('data:')) {
+              const data = line.slice(5).trim();
+              if (data === '[DONE]') break;
+              processJsonData(data);
+            }
           }
         }
+        break;
       }
-      break;
-    }
 
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
 
-    for (const rawLine of lines) {
-      const line = rawLine.trim();
-      if (line.startsWith('data:')) {
-        const data = line.slice(5).trim();
-        if (data === '[DONE]') {
-          isStreamDone = true;
-          break;
+      for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (line.startsWith('data:')) {
+          const data = line.slice(5).trim();
+          if (data === '[DONE]') {
+            isStreamDone = true;
+            break;
+          }
+          processJsonData(data);
         }
-        processJsonData(data);
       }
+    }
+  } catch (streamErr: any) {
+    await reader.cancel().catch(() => {});
+    const isTimeout =
+      streamErr?.name === 'TimeoutError' ||
+      String(streamErr?.message).includes('timeout') ||
+      String(streamErr?.message).includes('aborted');
+
+    if (isTimeout && tokenCount > 0) {
+      console.warn(`[agent] Stream interrupted by timeout after ${tokenCount} tokens generated.`);
+      // If we already generated partial tokens, salvage what we have
+    } else {
+      const errMsg = isTimeout
+        ? `[!] **Таймаут стриминга ответа LLM сервера!**\nГенерация была прервана из-за превышения времени ожидания чанков.\n\n[›] **Решение:** Увеличьте **API Timeout** в Настройках или используйте меньший размер контекста.`
+        : `[!] **Сбой потока чтения ответа LLM:**\n\`\`\`\n${streamErr?.message || streamErr}\n\`\`\``;
+      handleAgentError(session, sessionId, broadcast, errMsg);
+      return null;
     }
   }
 
