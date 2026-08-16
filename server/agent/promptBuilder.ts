@@ -18,7 +18,8 @@ export function buildFullSystemPrompt(config: AppConfig): string {
 - OS: Windows (${process.platform})
 - Shell: PowerShell
 - Workspace: ${config.workspace_dir || process.cwd()}
-- Direct PowerShell commands only. Do not wrap in 'powershell -Command' or 'cd'. Do not run blocking background dev-servers.`;
+- Direct PowerShell commands only. Do not wrap in 'powershell -Command' or 'cd'. Do not run blocking background dev-servers.
+- ALWAYS use compact relative paths (e.g. 'src/App.tsx', 'server/agent.ts', '.') in tool calls and commands. Avoid redundant absolute drive paths ('C:\\Users\\...').`;
 
   const isPlanningMode = config.planning_mode !== false;
   const planningContext = isPlanningMode
@@ -43,9 +44,10 @@ ${activePersona.user}
   const toolExecutionDirective = `\n\n# TOOL EXECUTION & ENVIRONMENT INTERACTION PROTOCOL
 1. Provide a brief explanation before emitting XML tool calls.
 2. ALWAYS use <patch_file> with concise SEARCH/REPLACE blocks (3-8 lines) for existing files. Reserve <write_file> strictly for new files.
-3. Close all XML tool tags properly.
-4. STOP GENERATING immediately after emitting tool tags. The execution engine runs the tool in the real OS environment and returns the real result in a <tool_response name="...">...</tool_response> message.
-5. NEVER fabricate, simulate, or hallucinate tool outputs yourself (such as writing "[Tool ... output:]" or "<tool_response>" in your response). You only output the tool CALL tag and wait for the real environment response.`;
+3. Use compact relative paths for path attributes (e.g. path="src/index.ts" or path=".").
+4. Close all XML tool tags properly.
+5. STOP GENERATING immediately after emitting tool tags. The execution engine runs the tool in the real OS environment and returns the real result in a <tool_response name="...">...</tool_response> message.
+6. NEVER fabricate, simulate, or hallucinate tool outputs yourself (such as writing "[Tool ... output:]" or "<tool_response>" in your response). You only output the tool CALL tag and wait for the real environment response.`;
 
   const gemmaToolDirective = isGemmaModel
     ? `\n\n# JSON TOOL FORMAT (Gemma 4)\nYou may also call tools in JSON format wrapped in <tool_call> tags.`
