@@ -20,7 +20,7 @@ import { strip_ai_reasoning_fluff, stripToolCallTags } from './agent/fluffSaniti
 import { detectRepetitionLoop } from './agent/contextManager';
 import { buildFullSystemPrompt } from './agent/promptBuilder';
 import { dispatchToolExecution } from './agent/toolDispatcher';
-import { parseToolCalls } from './agent/toolParser';
+import { parseToolCalls, detectToolOutputHallucination, stripHallucinatedToolOutput } from './agent/toolParser';
 import { loopBreaker } from './agent/loopBreaker';
 import { handleOutputSpill } from './agent/outputSpiller';
 import { evaluateToolPermission } from './agent/permissionGuard';
@@ -65,6 +65,7 @@ export async function runAgentLoop(
 
     broadcast('agent-status-changed', { sessionId, status: 'thinking' });
     let loopRetryCount = 0;
+    let truncationRetryCount = 0;
     const contextMax = config.local_server?.ctx_size || config.max_tokens || 16384;
 
   while (true) {
@@ -172,12 +173,15 @@ export async function runAgentLoop(
 
       for (const candidateModel of modelCandidates) {
         activeModelName = candidateModel;
+        const baseMaxTokens = config.max_tokens ?? 16384;
+        const effectiveMaxTokens = (!isReasoningOff && baseMaxTokens < 16384) ? 16384 : baseMaxTokens;
+
         const requestBody: any = {
           model: candidateModel,
           messages,
           stream: true,
           temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
-          max_tokens: config.max_tokens ?? 8192,
+          max_tokens: effectiveMaxTokens,
         };
 
         if (configuredEffort && configuredEffort !== 'auto' && !isReasoningOff) {
@@ -338,11 +342,18 @@ export async function runAgentLoop(
     let buffer = '';
     let isStreamDone = false;
     let isInReasoning = false;
+    let streamFinishReason = '';
 
     const processJsonData = (data: string) => {
       try {
         const parsed = JSON.parse(data);
         const delta = parsed.choices?.[0]?.delta;
+        const finishReason = parsed.choices?.[0]?.finish_reason;
+
+        if (finishReason) {
+          streamFinishReason = finishReason;
+        }
+
         const reasoningChunk = delta?.reasoning_content || delta?.reasoning || delta?.thought;
         const contentChunk = delta?.content || parsed.choices?.[0]?.text;
 
@@ -472,9 +483,61 @@ export async function runAgentLoop(
 
     // Parse tools from assistant response content
     const parsedCalls = parseToolCalls(assistantMessage.content);
+
+    // Handle max_tokens truncation: if response was cut off and no tool calls parsed, auto-retry
+    if (parsedCalls.length === 0 && streamFinishReason === 'length' && truncationRetryCount < 2) {
+      truncationRetryCount++;
+      console.warn(`[agent] Response truncated by max_tokens (finish_reason=length). Auto-retry ${truncationRetryCount}/2...`);
+
+      session.messages.push({
+        id: uuidv4(),
+        role: 'user',
+        content: '[SYSTEM DIRECTIVE: Ваш предыдущий ответ был обрезан по лимиту max_tokens! Не повторяйте уже написанный текст и рассуждения. Сократите блок мыслей до минимума. Сразу переходите к исполнению XML инструментов (<read_file>, <grep_search>, <list_dir>, <patch_file>, <execute_command>). Минимум текста — максимум действий.]',
+        timestamp: Date.now(),
+      });
+      session.updated_at = Date.now();
+      await saveSession(session);
+
+      broadcast('agent-error', {
+        sessionId,
+        message: '[!] Ответ модели обрезан по лимиту токенов (max_tokens). Автоматическое продолжение с директивой сокращения рассуждений...',
+      });
+      continue;
+    }
+
     if (parsedCalls.length === 0) {
+      // Check if model hallucinated tool output directly in its response text instead of calling the tool
+      if (detectToolOutputHallucination(assistantMessage.content)) {
+        console.warn(`[agent] Hallucinated tool output detected in response text without parsed calls. Auto-recovering...`);
+        assistantMessage.content = stripHallucinatedToolOutput(assistantMessage.content);
+        await saveSession(session);
+
+        if (loopRetryCount < 2) {
+          loopRetryCount++;
+          session.messages.push({
+            id: uuidv4(),
+            role: 'user',
+            content: '[SYSTEM DIRECTIVE: Вы попытались написать вывод инструмента самостоятельно! Запрещено симулировать вывод в тексте. Вызывайте инструменты исключительно через XML-теги (например, <list_dir path="." /> или <read_file path="..." />). Реальный вывод будет предоставлен исполняющей средой.]',
+            timestamp: Date.now(),
+          });
+          session.updated_at = Date.now();
+          await saveSession(session);
+
+          broadcast('agent-error', {
+            sessionId,
+            message: '[!] Модель попыталась сымитировать вывод инструмента вместо его вызова. Автоматический перезапуск с корректирующей директивой...',
+          });
+          continue;
+        }
+      }
+
       broadcast('agent-status-changed', { sessionId, status: 'idle' });
       break;
+    }
+
+    // Clean any hallucinated output trailing blocks if tools were parsed
+    if (detectToolOutputHallucination(assistantMessage.content)) {
+      assistantMessage.content = stripHallucinatedToolOutput(assistantMessage.content);
     }
 
     // We have tool calls
@@ -489,7 +552,9 @@ export async function runAgentLoop(
     const lastMsg = session.messages[session.messages.length - 1];
     if (lastMsg) {
       lastMsg.tool_calls = toolCallsInfo;
-      lastMsg.content = stripToolCallTags(lastMsg.content);
+      // Do NOT destructively strip XML tags from session.messages.content!
+      // Preserving XML tags in assistant history ensures LLM context stays consistent
+      // and prevents Qwen/Gemma from role confusion / hallucinating tool outputs.
     }
     await saveSession(session);
 
@@ -527,7 +592,7 @@ export async function runAgentLoop(
         toolResults.push({
           id: uuidv4(),
           role: 'tool',
-          content: `Tool ${tc.name} [${tc.id}] output:\n${output}`,
+          content: `<tool_response name="${tc.name}" id="${tc.id}">\n${output}\n</tool_response>`,
           timestamp: Date.now(),
         });
         if (lastMsg && lastMsg.tool_calls) {
@@ -620,7 +685,7 @@ export async function runAgentLoop(
       toolResults.push({
         id: uuidv4(),
         role: 'tool',
-        content: `Tool ${tc.name} [${tc.id}] output:\n${output}`,
+        content: `<tool_response name="${tc.name}" id="${tc.id}">\n${output}\n</tool_response>`,
         timestamp: Date.now(),
       });
 

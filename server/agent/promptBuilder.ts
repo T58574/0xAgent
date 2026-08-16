@@ -40,10 +40,12 @@ ${activePersona.user}
 - Only call <update_user_profile> when the user explicitly requests to remember personal preferences.
 - Never write USER.md or SOUL.md to workspace directory.`;
 
-  const toolExecutionDirective = `\n\n# TOOL EXECUTION RULES
+  const toolExecutionDirective = `\n\n# TOOL EXECUTION & ENVIRONMENT INTERACTION PROTOCOL
 1. Provide a brief explanation before emitting XML tool calls.
 2. ALWAYS use <patch_file> with concise SEARCH/REPLACE blocks (3-8 lines) for existing files. Reserve <write_file> strictly for new files.
-3. Close all XML tool tags properly.`;
+3. Close all XML tool tags properly.
+4. STOP GENERATING immediately after emitting tool tags. The execution engine runs the tool in the real OS environment and returns the real result in a <tool_response name="...">...</tool_response> message.
+5. NEVER fabricate, simulate, or hallucinate tool outputs yourself (such as writing "[Tool ... output:]" or "<tool_response>" in your response). You only output the tool CALL tag and wait for the real environment response.`;
 
   const gemmaToolDirective = isGemmaModel
     ? `\n\n# JSON TOOL FORMAT (Gemma 4)\nYou may also call tools in JSON format wrapped in <tool_call> tags.`
@@ -72,6 +74,52 @@ ${activePersona.user}
 
 export function formatMessageContent(m: ChatMessage, isHistoryAssistant: boolean = false): string | any[] {
   let content = m.content || '';
+
+  // If this assistant message executed tools but its content lost raw tags (e.g. legacy session),
+  // reconstruct the XML tags so the LLM context clearly sees what the assistant requested.
+  if (isHistoryAssistant && m.tool_calls && m.tool_calls.length > 0) {
+    const hasExistingTags = /<(?:read_file|readfile|write_file|writefile|patch_file|patchfile|list_dir|listdir|grep_search|grepsearch|fff_search|fffsearch|web_search|websearch|read_web_page|readwebpage|execute_command|executecommand|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|spawn_subagent|tool_?call|code_run|todo_write|update_?user_?profile|update_?persona_?file)\b/i.test(content);
+    if (!hasExistingTags) {
+      const reconstructedTags = m.tool_calls.map((tc) => {
+        let argsObj: any = {};
+        try {
+          argsObj = typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments || {};
+        } catch {
+          argsObj = {};
+        }
+        if (tc.name === 'list_dir' || tc.name === 'listdir') {
+          return `<list_dir path="${argsObj.path || '.'}" />`;
+        }
+        if (tc.name === 'read_file' || tc.name === 'readfile') {
+          return `<read_file path="${argsObj.path || ''}" />`;
+        }
+        if (tc.name === 'grep_search' || tc.name === 'grepsearch') {
+          return `<grep_search pattern="${argsObj.pattern || ''}" path="${argsObj.path || '.'}" />`;
+        }
+        if (tc.name === 'fff_search' || tc.name === 'fffsearch') {
+          return `<fff_search query="${argsObj.query || ''}" />`;
+        }
+        if (tc.name === 'web_search' || tc.name === 'websearch') {
+          return `<web_search query="${argsObj.query || ''}" />`;
+        }
+        if (tc.name === 'read_web_page' || tc.name === 'readwebpage') {
+          return `<read_web_page url="${argsObj.url || ''}" />`;
+        }
+        if (tc.name === 'execute_command' || tc.name === 'executecommand') {
+          return `<execute_command command="${argsObj.command || ''}" />`;
+        }
+        if (tc.name === 'write_file' || tc.name === 'writefile') {
+          return `<write_file path="${argsObj.path || ''}">\n${argsObj.content || ''}\n</write_file>`;
+        }
+        if (tc.name === 'patch_file' || tc.name === 'patchfile') {
+          return `<patch_file path="${argsObj.path || ''}">\n${argsObj.content || ''}\n</patch_file>`;
+        }
+        return `<${tc.name}>\n${JSON.stringify(argsObj)}\n</${tc.name}>`;
+      }).join('\n');
+
+      content = content ? `${content}\n\n${reconstructedTags}` : reconstructedTags;
+    }
+  }
 
   // Google DeepMind Gemma 4 Multi-Turn Conversation Rule:
   // "In multi-turn conversations, the historical model output should only include the final response.

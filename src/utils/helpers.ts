@@ -45,11 +45,17 @@ export function cleanContent(content: string): string {
   
   // Single self-closing tags
   cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|fff_search|web_search|read_web_page|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|search_knowledge|list_knowledge|ask_user|spawn_subagent|update_?user_?profile)\s+[^>]*\/?>/gi, "");
+
+  // Block-format grep_search: <grep_search>...</grep_search>
+  cleaned = cleaned.replace(/<grep_search\s*>[\s\S]*?<\/grep_search>/gi, "");
   
   // 3. Strip any orphaned SEARCH / REPLACE diff blocks leaked outside XML tags
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, "");
 
-  // 4. Remove empty code fences and excess vertical spacing
+  // 4. Remove orphaned standalone closing tags
+  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|spawn_subagent|tool_?call|code_run|todo_write|update_?user_?profile|update_?persona_?file)\s*>/gi, "");
+
+  // 5. Remove empty code fences and excess vertical spacing
   cleaned = cleaned.replace(/```[a-z]*\s*```/gi, "");
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n");
 
@@ -336,6 +342,93 @@ export function extractThoughtSteps(thinkingText: string): ThoughtStep[] {
     },
   ];
 }
+
+/**
+ * Formats a chat session into a comprehensive, readable Markdown log
+ * suitable for debugging, AI review, and developer support.
+ */
+export function exportSessionLogAsText(session: any, modelName?: string): string {
+  if (!session) return 'No active session data.';
+
+  const s = session as any;
+  const lines: string[] = [];
+  lines.push(`==================================================`);
+  lines.push(`0xAGENT SESSION LOG: "${s.title || 'Untitled Session'}"`);
+  lines.push(`==================================================`);
+  lines.push(`Session ID:  ${s.id}`);
+  lines.push(`Model:       ${modelName || s.model_name || 'default'}`);
+  lines.push(`Workspace:   ${s.workspace_dir || 'General (No folder bound)'}`);
+  lines.push(`Created:     ${new Date(s.created_at || Date.now()).toLocaleString()}`);
+  lines.push(`Updated:     ${new Date(s.updated_at || Date.now()).toLocaleString()}`);
+  lines.push(`Messages:    ${(s.messages || []).length}`);
+
+  if (s.active_todos && s.active_todos.length > 0) {
+    lines.push(`\nActive Todos / Live Plan:`);
+    for (const t of s.active_todos) {
+      const statusMark = t.status === 'completed' ? '[x]' : t.status === 'in_progress' ? '[>]' : '[ ]';
+      lines.push(`  ${statusMark} ${t.task} (${t.status})`);
+    }
+  }
+
+  lines.push(`\n=================== DIALOGUE TRANSCRIPT ===================\n`);
+
+  for (let idx = 0; idx < (s.messages || []).length; idx++) {
+    const msg = s.messages[idx];
+    const timestamp = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString() : '';
+    const roleUpper = (msg.role || 'unknown').toUpperCase();
+
+    lines.push(`--------------------------------------------------`);
+    lines.push(`[${idx + 1}] ${roleUpper} ${timestamp ? `(${timestamp})` : ''}`);
+    lines.push(`--------------------------------------------------`);
+
+    if (msg.role === 'assistant') {
+      const { thinking, text } = extractThinkingFromContent(msg.content || '');
+      if (thinking) {
+        lines.push(`\n<THINKING>\n${thinking}\n</THINKING>\n`);
+      }
+      if (text) {
+        lines.push(text);
+      }
+
+      if (msg.tool_calls && msg.tool_calls.length > 0) {
+        lines.push(`\nTOOL CALLS (${msg.tool_calls.length}):`);
+        for (const tc of msg.tool_calls) {
+          lines.push(`  - Tool: [${tc.name}] (ID: ${tc.id}, Status: ${tc.status})`);
+          lines.push(`    Arguments: ${tc.arguments}`);
+          if (tc.output) {
+            const preview = tc.output.length > 500 ? tc.output.slice(0, 500) + `\n    ... [truncated ${tc.output.length} chars]` : tc.output;
+            lines.push(`    Output Preview:\n    ${preview.replace(/\n/g, '\n    ')}`);
+          }
+        }
+      }
+
+      if (msg.metrics) {
+        lines.push(`\n[Metrics: ${msg.metrics.tokensPerSec || 0} tok/s | Total: ${msg.metrics.totalTokens || 0} tokens | Duration: ${msg.metrics.evalDurationMs || 0}ms]`);
+      }
+    } else if (msg.role === 'tool') {
+      lines.push(`[TOOL RESPONSE]\n${msg.content || ''}`);
+    } else {
+      lines.push(msg.content || '');
+      if (msg.images && msg.images.length > 0) {
+        lines.push(`[Attached Images: ${msg.images.length}]`);
+      }
+    }
+
+    lines.push('');
+  }
+
+  lines.push(`=================== END OF LOG ===================\n`);
+  return lines.join('\n');
+}
+
+/**
+ * Returns raw pretty-printed JSON of the session object
+ */
+export function exportSessionJson(session: any): string {
+  if (!session) return '{}';
+  return JSON.stringify(session, null, 2);
+}
+
 
 
 

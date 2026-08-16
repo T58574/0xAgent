@@ -10,29 +10,59 @@ export interface ParsedToolCall {
 function parseFileToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
   let match: RegExpExecArray | null;
 
-  // 1. Read File
-  const reRead = /<read_file\s+path=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reRead.exec(text)) !== null) {
-    toolCalls.push({
-      id: `read_${uuidv4().substring(0, 8)}`,
-      name: 'read_file',
-      arguments: { path: match[1] },
-      raw_content: match[0],
-    });
+  // 1. Read File: <read_file path="..." />, <readfile path="..." />, <read_file path="..."></read_file>, <read_file>path</read_file>
+  const reReadAttr = /<(?:read_file|readfile)\s+path=["']([^"']+)["']\s*(?:\/>|>([\s\S]*?)<\/(?:read_file|readfile)>|>)/gi;
+  while ((match = reReadAttr.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `read_${uuidv4().substring(0, 8)}`,
+        name: 'read_file',
+        arguments: { path: match[1] },
+        raw_content: raw,
+      });
+    }
   }
 
-  // 2. Write File
-  const reWrite = /<write_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)<\/write_file>/gs;
+  const reReadBody = /<(?:read_file|readfile)\s*>([\s\S]*?)<\/(?:read_file|readfile)>/gi;
+  while ((match = reReadBody.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      const body = match[1].trim();
+      let targetPath = body;
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed.path) targetPath = parsed.path;
+      } catch {
+        const pathMatch = /path\s*[:=]\s*["']([^"']+)["']/i.exec(body);
+        if (pathMatch) targetPath = pathMatch[1];
+      }
+      if (targetPath) {
+        toolCalls.push({
+          id: `read_${uuidv4().substring(0, 8)}`,
+          name: 'read_file',
+          arguments: { path: targetPath },
+          raw_content: raw,
+        });
+      }
+    }
+  }
+
+  // 2. Write File: <write_file path="...">content</write_file>, <writefile path="...">content</writefile>
+  const reWrite = /<(?:write_file|writefile)\s+path=["']([^"']+)["']\s*>([\s\S]*?)<\/(?:write_file|writefile)>/gi;
   while ((match = reWrite.exec(text)) !== null) {
-    toolCalls.push({
-      id: `write_${uuidv4().substring(0, 8)}`,
-      name: 'write_file',
-      arguments: { path: match[1], content: match[2] },
-      raw_content: match[0],
-    });
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `write_${uuidv4().substring(0, 8)}`,
+        name: 'write_file',
+        arguments: { path: match[1], content: match[2] },
+        raw_content: raw,
+      });
+    }
   }
 
-  const reWriteFallback = /<write_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)(?:<\/write_file>|(?=<write_file|<patch_file|<read_file|<execute_command|$))/gi;
+  const reWriteFallback = /<(?:write_file|writefile)\s+path=["']([^"']+)["']\s*>([\s\S]*?)(?:<\/(?:write_file|writefile)>|(?=<write_file|<writefile|<patch_file|<patchfile|<read_file|<readfile|<execute_command|<executecommand|$))/gi;
   while ((match = reWriteFallback.exec(text)) !== null) {
     const raw = match[0];
     if (!toolCalls.some((tc) => tc.raw_content === raw || (tc.name === 'write_file' && tc.arguments.path === match![1]))) {
@@ -45,18 +75,21 @@ function parseFileToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
     }
   }
 
-  // 3. Patch File
-  const rePatch = /<patch_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)<\/patch_file>/gs;
+  // 3. Patch File: <patch_file path="...">...</patch_file>, <patchfile path="...">...</patchfile>
+  const rePatch = /<(?:patch_file|patchfile)\s+path=["']([^"']+)["']\s*>([\s\S]*?)<\/(?:patch_file|patchfile)>/gi;
   while ((match = rePatch.exec(text)) !== null) {
-    toolCalls.push({
-      id: `patch_${uuidv4().substring(0, 8)}`,
-      name: 'patch_file',
-      arguments: { path: match[1], content: match[2] },
-      raw_content: match[0],
-    });
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `patch_${uuidv4().substring(0, 8)}`,
+        name: 'patch_file',
+        arguments: { path: match[1], content: match[2] },
+        raw_content: raw,
+      });
+    }
   }
 
-  const rePatchFallback = /<patch_file\s+path=["']([^"']+)["']\s*>([\s\S]*?)(?:<\/patch_file>|(?=<patch_file|<write_file|<read_file|<execute_command|$))/gi;
+  const rePatchFallback = /<(?:patch_file|patchfile)\s+path=["']([^"']+)["']\s*>([\s\S]*?)(?:<\/(?:patch_file|patchfile)>|(?=<patch_file|<patchfile|<write_file|<writefile|<read_file|<readfile|<execute_command|<executecommand|$))/gi;
   while ((match = rePatchFallback.exec(text)) !== null) {
     const raw = match[0];
     if (!toolCalls.some((tc) => tc.raw_content === raw || (tc.name === 'patch_file' && tc.arguments.path === match![1]))) {
@@ -77,43 +110,109 @@ function parseFileToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
 function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
   let match: RegExpExecArray | null;
 
-  // List Dir
-  const reList = /<list_dir\s+path=["']([^"']+)["']\s*\/?>/gs;
-  while ((match = reList.exec(text)) !== null) {
-    toolCalls.push({
-      id: `list_${uuidv4().substring(0, 8)}`,
-      name: 'list_dir',
-      arguments: { path: match[1] },
-      raw_content: match[0],
-    });
+  // 1. List Dir: <list_dir path="..." />, <listdir path="..." />, <list_directory path="..." />, <list_dir>path</list_dir>, <list_dir />
+  const reListAttr = /<(?:list_dir|listdir|list_directory)(?:\s+path=["']([^"']*)["'])?\s*(?:\/>|>([\s\S]*?)<\/(?:list_dir|listdir|list_directory)>|>)/gi;
+  while ((match = reListAttr.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      let targetPath = match[1] || (match[2] ? match[2].trim() : '') || '.';
+      targetPath = targetPath.replace(/^["']|["']$/g, '').trim() || '.';
+      toolCalls.push({
+        id: `list_${uuidv4().substring(0, 8)}`,
+        name: 'list_dir',
+        arguments: { path: targetPath },
+        raw_content: raw,
+      });
+    }
   }
 
-  // Grep Search
-  const reGrep1 = /<grep_search\s+pattern=["']([^"']+)["']\s+path=["']([^"']+)["']\s*\/?>/gs;
+  // List Dir body format: <list_dir>path</list_dir> or <listdir>.</listdir>
+  const reListBody = /<(?:list_dir|listdir|list_directory)\s*>([\s\S]*?)<\/(?:list_dir|listdir|list_directory)>/gi;
+  while ((match = reListBody.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      const body = match[1].trim();
+      let targetPath = body || '.';
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed.path) targetPath = parsed.path;
+      } catch {
+        const pathMatch = /path\s*[:=]\s*["']([^"']+)["']/i.exec(body);
+        if (pathMatch) targetPath = pathMatch[1];
+      }
+      toolCalls.push({
+        id: `list_${uuidv4().substring(0, 8)}`,
+        name: 'list_dir',
+        arguments: { path: targetPath.trim() || '.' },
+        raw_content: raw,
+      });
+    }
+  }
+
+  // 2. Grep Search: <grep_search pattern="..." path="..." />, <grepsearch ... />
+  const reGrep1 = /<(?:grep_search|grepsearch)\s+pattern=["']([^"']+)["'](?:\s+path=["']([^"']*)["'])?\s*\/?>/gi;
   while ((match = reGrep1.exec(text)) !== null) {
-    toolCalls.push({
-      id: `grep_${uuidv4().substring(0, 8)}`,
-      name: 'grep_search',
-      arguments: { pattern: match[1], path: match[2] },
-      raw_content: match[0],
-    });
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `grep_${uuidv4().substring(0, 8)}`,
+        name: 'grep_search',
+        arguments: { pattern: match[1], path: match[2] || '.' },
+        raw_content: raw,
+      });
+    }
   }
 
-  const reGrep2 = /<grep_search\s+path=["']([^"']+)["']\s+pattern=["']([^"']+)["']\s*\/?>/gs;
+  const reGrep2 = /<(?:grep_search|grepsearch)\s+path=["']([^"']*)["']\s+pattern=["']([^"']+)["']\s*\/?>/gi;
   while ((match = reGrep2.exec(text)) !== null) {
     const raw = match[0];
     if (!toolCalls.some((tc) => tc.raw_content === raw)) {
       toolCalls.push({
         id: `grep_${uuidv4().substring(0, 8)}`,
         name: 'grep_search',
-        arguments: { pattern: match[2], path: match[1] },
+        arguments: { pattern: match[2], path: match[1] || '.' },
         raw_content: raw,
       });
     }
   }
 
-  // Search Session History
-  const reSearchHist = /<search_session_history\s+query=["']([^"']+)["']\s*\/?>/gs;
+  // Grep Search (body format: <grep_search>...content...</grep_search>)
+  const reGrepBody = /<(?:grep_search|grepsearch)\s*>([\s\S]*?)<\/(?:grep_search|grepsearch)>/gi;
+  while ((match = reGrepBody.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      const body = match[1].trim();
+      let grepPattern = '';
+      let grepPath = '.';
+
+      try {
+        const parsed = JSON.parse(body);
+        grepPattern = parsed.pattern || '';
+        grepPath = parsed.path || '.';
+      } catch {
+        const patternMatch = /pattern\s*[:=]\s*["']([^"']+)["']/i.exec(body);
+        const pathMatch = /path\s*[:=]\s*["']([^"']+)["']/i.exec(body);
+        grepPattern = patternMatch?.[1] || '';
+        grepPath = pathMatch?.[1] || '.';
+
+        if (!grepPattern && body && !body.includes('\n')) {
+          grepPattern = body;
+        }
+      }
+
+      if (grepPattern) {
+        toolCalls.push({
+          id: `grep_${uuidv4().substring(0, 8)}`,
+          name: 'grep_search',
+          arguments: { pattern: grepPattern, path: grepPath },
+          raw_content: raw,
+        });
+      }
+    }
+  }
+
+  // 3. Search Session History
+  const reSearchHist = /<search_session_history\s+query=["']([^"']+)["']\s*\/?>/gi;
   while ((match = reSearchHist.exec(text)) !== null) {
     toolCalls.push({
       id: `search_hist_${uuidv4().substring(0, 8)}`,
@@ -123,41 +222,63 @@ function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): 
     });
   }
 
-  // FFF Fast File Search
-  const reFff = /<fff_search\s+query=["']([^"']+)["']\s*\/?>/gs;
+  // 4. FFF Fast File Search: <fff_search query="..." />, <fffsearch ... />
+  const reFff = /<(?:fff_search|fffsearch)\s+query=["']([^"']+)["']\s*\/?>/gi;
   while ((match = reFff.exec(text)) !== null) {
-    toolCalls.push({
-      id: `fff_${uuidv4().substring(0, 8)}`,
-      name: 'fff_search',
-      arguments: { query: match[1] },
-      raw_content: match[0],
-    });
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `fff_${uuidv4().substring(0, 8)}`,
+        name: 'fff_search',
+        arguments: { query: match[1] },
+        raw_content: raw,
+      });
+    }
   }
 
-  // Web Search
-  const reWeb = /<web_search\s+query=["']([^"']+)["']\s*\/?>/gs;
+  const reFffBody = /<(?:fff_search|fffsearch)\s*>([\s\S]*?)<\/(?:fff_search|fffsearch)>/gi;
+  while ((match = reFffBody.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `fff_${uuidv4().substring(0, 8)}`,
+        name: 'fff_search',
+        arguments: { query: match[1].trim() },
+        raw_content: raw,
+      });
+    }
+  }
+
+  // 5. Web Search: <web_search query="..." />, <websearch ... />
+  const reWeb = /<(?:web_search|websearch)\s+query=["']([^"']+)["']\s*\/?>/gi;
   while ((match = reWeb.exec(text)) !== null) {
-    toolCalls.push({
-      id: `web_${uuidv4().substring(0, 8)}`,
-      name: 'web_search',
-      arguments: { query: match[1] },
-      raw_content: match[0],
-    });
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `web_${uuidv4().substring(0, 8)}`,
+        name: 'web_search',
+        arguments: { query: match[1] },
+        raw_content: raw,
+      });
+    }
   }
 
-  // Read Web Page
-  const reReadWeb = /<read_web_page\s+url=["']([^"']+)["']\s*\/?>/gs;
+  // 6. Read Web Page: <read_web_page url="..." />, <readwebpage ... />
+  const reReadWeb = /<(?:read_web_page|readwebpage)\s+url=["']([^"']+)["']\s*\/?>/gi;
   while ((match = reReadWeb.exec(text)) !== null) {
-    toolCalls.push({
-      id: `readweb_${uuidv4().substring(0, 8)}`,
-      name: 'read_web_page',
-      arguments: { url: match[1] },
-      raw_content: match[0],
-    });
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `readweb_${uuidv4().substring(0, 8)}`,
+        name: 'read_web_page',
+        arguments: { url: match[1] },
+        raw_content: raw,
+      });
+    }
   }
 
-  // Save Knowledge
-  const reSaveKb = /<save_knowledge\s+title=["']([^"']+)["'](?:\s+category=["']([^"']+)["'])?(?:\s+tags=["']([^"']+)["'])?(?:\s+summary=["']([^"']+)["'])?\s*>([\s\S]*?)<\/save_knowledge>/gs;
+  // 7. Save Knowledge
+  const reSaveKb = /<save_knowledge\s+title=["']([^"']+)["'](?:\s+category=["']([^"']+)["'])?(?:\s+tags=["']([^"']+)["'])?(?:\s+summary=["']([^"']+)["'])?\s*>([\s\S]*?)<\/save_knowledge>/gi;
   while ((match = reSaveKb.exec(text)) !== null) {
     toolCalls.push({
       id: `savekb_${uuidv4().substring(0, 8)}`,
@@ -165,7 +286,7 @@ function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): 
       arguments: {
         title: match[1],
         category: match[2] || 'general',
-        tags: match[3] ? match[3].split(',').map(t => t.trim()) : [],
+        tags: match[3] ? match[3].split(',').map((t) => t.trim()) : [],
         summary: match[4] || '',
         content: match[5].trim(),
       },
@@ -173,8 +294,8 @@ function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): 
     });
   }
 
-  // Search Knowledge
-  const reSearchKb = /<search_knowledge(?:\s+query=["']([^"']+)["'])?(?:\s+category=["']([^"']+)["'])?(?:\s+tag=["']([^"']+)["'])?\s*\/?>/gs;
+  // 8. Search Knowledge
+  const reSearchKb = /<search_knowledge(?:\s+query=["']([^"']+)["'])?(?:\s+category=["']([^"']+)["'])?(?:\s+tag=["']([^"']+)["'])?\s*\/?>/gi;
   while ((match = reSearchKb.exec(text)) !== null) {
     toolCalls.push({
       id: `searchkb_${uuidv4().substring(0, 8)}`,
@@ -188,8 +309,8 @@ function parseSearchAndDirToolCalls(text: string, toolCalls: ParsedToolCall[]): 
     });
   }
 
-  // List Knowledge
-  const reListKb = /<list_knowledge(?:\s+category=["']([^"']+)["'])?\s*\/?>/gs;
+  // 9. List Knowledge
+  const reListKb = /<list_knowledge(?:\s+category=["']([^"']+)["'])?\s*\/?>/gi;
   while ((match = reListKb.exec(text)) !== null) {
     toolCalls.push({
       id: `listkb_${uuidv4().substring(0, 8)}`,
@@ -206,8 +327,6 @@ function parsePersonaAndProfileToolCalls(text: string, toolCalls: ParsedToolCall
   let match: RegExpExecArray | null;
 
   // 1. update_user_profile / updateuserprofile
-  // Matches: <update_user_profile trait="..." category="..." />, <updateuserprofile trait="Любит" category="preferences" />
-  // Supports both self-closing (/>) and block formats
   const reProfile = /<update_?user_?profile\b([^>]*?)(?:\/>|>([\s\S]*?)<\/update_?user_?profile>|>)/gi;
   while ((match = reProfile.exec(text)) !== null) {
     const raw = match[0];
@@ -221,7 +340,7 @@ function parsePersonaAndProfileToolCalls(text: string, toolCalls: ParsedToolCall
       let trait = traitMatch ? traitMatch[1] : bodyStr.trim();
       let category = catMatch ? catMatch[1] : 'profile';
 
-      if (trait !== undefined && trait !== null) {
+      if (trait !== undefined && trait !== null && trait.trim()) {
         toolCalls.push({
           id: `profile_${uuidv4().substring(0, 8)}`,
           name: 'update_user_profile',
@@ -233,8 +352,6 @@ function parsePersonaAndProfileToolCalls(text: string, toolCalls: ParsedToolCall
   }
 
   // 2. update_persona_file / updatepersonafile
-  // Matches: <update_persona_file file="SOUL.md">content</update_persona_file>
-  // <updatepersonafile file="SOUL.md">...</updatepersonafile>
   const rePersona = /<update_?persona_?file\b(?:\s+file=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/update_?persona_?file>/gi;
   while ((match = rePersona.exec(text)) !== null) {
     const raw = match[0];
@@ -254,29 +371,35 @@ function parsePersonaAndProfileToolCalls(text: string, toolCalls: ParsedToolCall
 function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
   let match: RegExpExecArray | null;
 
-  // Execute Command
-  const reExec = /<execute_command\s+command=["']([^"']+)["']\s*\/?>/gs;
+  // 1. Execute Command: <execute_command command="..." />, <executecommand ... />, <run_command ... />, body format
+  const reExec = /<(?:execute_command|executecommand|run_command|runcommand)\s+command=["']([^"']+)["']\s*\/?>/gi;
   while ((match = reExec.exec(text)) !== null) {
-    toolCalls.push({
-      id: `exec_${uuidv4().substring(0, 8)}`,
-      name: 'execute_command',
-      arguments: { command: match[1] },
-      raw_content: match[0],
-    });
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `exec_${uuidv4().substring(0, 8)}`,
+        name: 'execute_command',
+        arguments: { command: match[1] },
+        raw_content: raw,
+      });
+    }
   }
 
-  const reExecBody = /<execute_command\s*>([\s\S]*?)<\/execute_command>/gs;
+  const reExecBody = /<(?:execute_command|executecommand|run_command|runcommand)\s*>([\s\S]*?)<\/(?:execute_command|executecommand|run_command|runcommand)>/gi;
   while ((match = reExecBody.exec(text)) !== null) {
-    toolCalls.push({
-      id: `exec_${uuidv4().substring(0, 8)}`,
-      name: 'execute_command',
-      arguments: { command: match[1].trim() },
-      raw_content: match[0],
-    });
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `exec_${uuidv4().substring(0, 8)}`,
+        name: 'execute_command',
+        arguments: { command: match[1].trim() },
+        raw_content: raw,
+      });
+    }
   }
 
-  // Ask User
-  const reAsk = /<ask_user\s+question=["']([^"']+)["'](?:\s+options=["']([^"']+)["'])?\s*\/?>/gs;
+  // 2. Ask User
+  const reAsk = /<ask_user\s+question=["']([^"']+)["'](?:\s+options=["']([^"']+)["'])?\s*\/?>/gi;
   while ((match = reAsk.exec(text)) !== null) {
     let options: string[] | undefined = undefined;
     if (match[2]) {
@@ -290,8 +413,56 @@ function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCal
     });
   }
 
-  // Run Scratch Script
-  const reScratch = /<run_scratch_script\s+language=["']([^"']+)["']\s*>([\s\S]*?)<\/run_scratch_script>/gs;
+  // 3. Ask User Question (Interactive structured card)
+  const reAskQ = /<ask_user_question\s*>([\s\S]*?)<\/ask_user_question>/gi;
+  while ((match = reAskQ.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      try {
+        const parsed = JSON.parse(match[1].trim());
+        toolCalls.push({
+          id: `askq_${uuidv4().substring(0, 8)}`,
+          name: 'ask_user_question',
+          arguments: parsed,
+          raw_content: raw,
+        });
+      } catch {}
+    }
+  }
+
+  // 4. Todo Write
+  const reTodo = /<(?:todo_write|todowrite)\s*>([\s\S]*?)<\/(?:todo_write|todowrite)>/gi;
+  while ((match = reTodo.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      try {
+        const parsed = JSON.parse(match[1].trim());
+        toolCalls.push({
+          id: `todo_${uuidv4().substring(0, 8)}`,
+          name: 'todo_write',
+          arguments: parsed,
+          raw_content: raw,
+        });
+      } catch {}
+    }
+  }
+
+  // 5. Code Run (Sandbox VM)
+  const reCode = /<(?:code_run|coderun)\s*>([\s\S]*?)<\/(?:code_run|coderun)>/gi;
+  while ((match = reCode.exec(text)) !== null) {
+    const raw = match[0];
+    if (!toolCalls.some((tc) => tc.raw_content === raw)) {
+      toolCalls.push({
+        id: `code_${uuidv4().substring(0, 8)}`,
+        name: 'code_run',
+        arguments: { script: match[1].trim() },
+        raw_content: raw,
+      });
+    }
+  }
+
+  // 6. Run Scratch Script
+  const reScratch = /<run_scratch_script\s+language=["']([^"']+)["']\s*>([\s\S]*?)<\/run_scratch_script>/gi;
   while ((match = reScratch.exec(text)) !== null) {
     toolCalls.push({
       id: `scratch_${uuidv4().substring(0, 8)}`,
@@ -301,8 +472,8 @@ function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCal
     });
   }
 
-  // Spawn Subagent
-  const reSpawn = /<spawn_subagent\s+task=["']([^"']+)["'](?:\s+role=["']([^"']+)["'])?\s*\/?>/gs;
+  // 7. Spawn Subagent
+  const reSpawn = /<spawn_subagent\s+task=["']([^"']+)["'](?:\s+role=["']([^"']+)["'])?\s*\/?>/gi;
   while ((match = reSpawn.exec(text)) !== null) {
     toolCalls.push({
       id: `subagent_${uuidv4().substring(0, 8)}`,
@@ -346,6 +517,11 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
     'remember_fact': 'remember_fact',
     'recall_memories': 'recall_memories',
     'ask_user': 'ask_user',
+    'ask_user_question': 'ask_user_question',
+    'todo_write': 'todo_write',
+    'todowrite': 'todo_write',
+    'code_run': 'code_run',
+    'coderun': 'code_run',
     'fff_search': 'fff_search',
     'fffsearch': 'fff_search',
     'fff': 'fff_search',
@@ -383,12 +559,11 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
       name = parsed.name || parsed.function || '';
       args = parsed.arguments || parsed.parameters || {};
     } catch {
-      // 2. Fallback: Parse malformed JSON mixed with XML attributes (e.g. {"name": "readfile" path="src/ChatArea.tsx"} or {"readfile path="..."})
+      // 2. Fallback: Parse malformed JSON mixed with XML attributes
       const nameMatch = /["']?name["']?\s*[:=]\s*["']([^"']+)["']/i.exec(raw);
       if (nameMatch) {
         name = nameMatch[1];
       } else {
-        // Scan raw string for known tool names (e.g. readfile, patchfile, writefile, fffsearch, etc.)
         for (const candidateKey of Object.keys(toolNameMap)) {
           if (new RegExp(`\\b${candidateKey}\\b`, 'i').test(raw)) {
             name = candidateKey;
@@ -397,8 +572,8 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
         }
       }
 
-      // Extract attributes: path="...", query="...", command="...", url="...", trait="...", category="...", file="..."
       const pathMatch = /path=["']([^"']+)["']/i.exec(raw);
+      const patternMatch = /pattern=["']([^"']+)["']/i.exec(raw);
       const queryMatch = /query=["']([^"']+)["']/i.exec(raw);
       const urlMatch = /url=["']([^"']+)["']/i.exec(raw);
       const commandMatch = /command=["']([^"']+)["']/i.exec(raw);
@@ -408,6 +583,7 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
       const fileMatch = /file=["']([^"']+)["']/i.exec(raw);
 
       if (pathMatch) args.path = pathMatch[1];
+      if (patternMatch) args.pattern = patternMatch[1];
       if (queryMatch) args.query = queryMatch[1];
       if (urlMatch) args.url = urlMatch[1];
       if (commandMatch) args.command = commandMatch[1];
@@ -417,7 +593,6 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
       if (fileMatch) args.file = fileMatch[1];
     }
 
-    // Secondary fallback: if name is still empty after JSON parse, check toolNameMap against raw string
     if (!name) {
       for (const candidateKey of Object.keys(toolNameMap)) {
         if (new RegExp(`\\b${candidateKey}\\b`, 'i').test(raw)) {
@@ -452,4 +627,27 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
   parseExecAndInteractiveToolCalls(sanitizedText, toolCalls);
   parseGemmaToolCalls(sanitizedText, toolCalls);
   return toolCalls;
+}
+
+/**
+ * Detects if the LLM hallucinated/simulated tool outputs directly in its text response
+ * e.g., "[Tool list_dir output: ...]" or "<tool_response name=..." or "Tool listdir [...] output:"
+ */
+export function detectToolOutputHallucination(text: string): boolean {
+  if (!text) return false;
+  const pattern = /(?:\[Tool\s+[a-z_]+\s*(?:\[[^\]]*\])?\s*output:|<tool_response\b|\[TOOL_RESULT\b|Tool\s+[a-z_]+\s*\[[a-z0-9_-]+\]\s*output:)/i;
+  return pattern.test(text);
+}
+
+/**
+ * Strips hallucinated tool output blocks from the text so they don't pollute the conversation
+ */
+export function stripHallucinatedToolOutput(text: string): string {
+  if (!text) return text;
+  let cleaned = text;
+  cleaned = cleaned.replace(/\[Tool\s+[a-z_]+[\s\S]*?(?:\](?=\s*(?:\[Tool|<|$))|(?=\[Tool|<|$))/gi, '');
+  cleaned = cleaned.replace(/<tool_response\b[\s\S]*?(?:<\/tool_response>|$)/gi, '');
+  cleaned = cleaned.replace(/\[TOOL_RESULT\b[\s\S]*?(?:\[\/TOOL_RESULT\]|$)/gi, '');
+  cleaned = cleaned.replace(/Tool\s+[a-z_]+\s*\[[a-z0-9_-]+\]\s*output:[\s\S]*?(?=(?:Tool\s+[a-z_]+\s*\[|<|$))/gi, '');
+  return cleaned.trim();
 }

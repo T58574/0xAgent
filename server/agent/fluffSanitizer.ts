@@ -101,6 +101,9 @@ export function stripToolCallTags(text: string): string {
   // Remove leaked standalone SEARCH/REPLACE markers
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, '');
 
+  // Remove orphaned standalone closing tags (not part of matched open+close blocks)
+  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|tool_?call|code_run|todo_write|update_?user_?profile|update_?persona_?file|search_sessions|remember_fact|recall_memories)\s*>/gi, '');
+
   // Clean orphaned ```xml, ```html, ```json fences
   cleaned = cleaned.replace(/```(?:xml|html|json|tsx|ts|bash|sh)?\s*$/gim, '');
   cleaned = cleaned.replace(/```(?:xml|html|json)\s*```/gim, '');

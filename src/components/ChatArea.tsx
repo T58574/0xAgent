@@ -10,6 +10,8 @@ import {
   MessageSquare,
   Unlink,
   RotateCcw,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata, JarvisSparkProposal, ChatSession, AskUserQuestionItem } from '../types';
 import {
@@ -20,6 +22,8 @@ import {
   formatTime,
   getWorkspaceBaseName,
   isAutoWorkspace,
+  exportSessionLogAsText,
+  exportSessionJson,
 } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
@@ -97,6 +101,32 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const historyEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUpRef = useRef<boolean>(false);
+
+  // Session copy state
+  const [copiedLog, setCopiedLog] = useState(false);
+
+  const handleCopySessionLog = (e: React.MouseEvent) => {
+    if (!currentSession) {
+      showToast('Нет активной сессии для копирования', 'info');
+      return;
+    }
+    try {
+      const isAltOrShift = e.altKey || e.shiftKey;
+      const textToCopy = isAltOrShift
+        ? exportSessionJson(currentSession)
+        : exportSessionLogAsText(currentSession, config?.model_name);
+
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedLog(true);
+      showToast(
+        isAltOrShift ? 'Сырой JSON сессии скопирован в буфер' : 'Лог сессии скопирован в буфер обмена',
+        'success'
+      );
+      setTimeout(() => setCopiedLog(false), 2000);
+    } catch (err: any) {
+      showToast(`Ошибка копирования: ${err.message || err}`, 'error');
+    }
+  };
 
   // Summarization state
   const [isSummarizing, setIsSummarizing] = useState(false);
@@ -478,8 +508,33 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         </div>
 
-        {/* Right: Active Persona pill */}
+        {/* Right: Copy Session Log button & Active Persona pill */}
         <div className="flex items-center gap-2">
+          {currentSession && (
+            <button
+              type="button"
+              onClick={handleCopySessionLog}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-all cursor-pointer text-[11px] font-mono select-none ${
+                copiedLog
+                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40 shadow-sm'
+                  : 'bg-white/5 hover:bg-white/15 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
+              }`}
+              title="Скопировать лог диалога для отладки (Shift/Alt для JSON)"
+            >
+              {copiedLog ? (
+                <>
+                  <Check size={12} className="text-emerald-400" />
+                  <span className="hidden sm:inline text-[10px] text-emerald-400 font-semibold">Скопировано!</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={12} className="text-[var(--theme-text-muted)]" />
+                  <span className="hidden sm:inline text-[10px]">Копировать лог</span>
+                </>
+              )}
+            </button>
+          )}
+
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 border border-[var(--theme-border)] text-[10px] text-[var(--theme-text-muted)]">
             <User size={11} className="text-[var(--theme-text-muted)]" />
             <span className="truncate max-w-[100px] text-[var(--theme-text)] font-semibold">{currentPersona.name}</span>
