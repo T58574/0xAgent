@@ -740,15 +740,10 @@ export async function runAgentLoop(
     const cleanExplanationText = stripToolCallTags(assistantMessage.content).trim();
     const hasSubstantialText = cleanExplanationText.length >= 25;
 
-    // 1. If all tools were silent background tools (e.g. updating profile/persona/memory), finish immediately
+    // If all tools were purely silent background metadata tools (e.g. updating profile/persona/memory)
+    // and the assistant already gave its substantial explanation, finish turn immediately.
     const isAllSilentTools = parsedCalls.every((tc) => SILENT_BACKGROUND_TOOLS.includes(tc.name));
     if (isAllSilentTools && hasSubstantialText) {
-      broadcast('agent-status-changed', { sessionId, status: 'idle' });
-      break;
-    }
-
-    // 2. If all tools were action/modifying tools without errors and assistant already gave its complete answer
-    if (!hasInvestigativeTools && hasSubstantialText && !hasErrors) {
       broadcast('agent-status-changed', { sessionId, status: 'idle' });
       break;
     }
