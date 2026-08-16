@@ -26,6 +26,29 @@ export interface LlmStreamResult {
   modelName: string;
 }
 
+async function fetchWithHeaderTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort(new DOMException(`Connection timed out after ${Math.round(timeoutMs / 1000)}s`, 'TimeoutError'));
+  }, timeoutMs);
+
+  try {
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    return res;
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
 export async function fetchLlmResponse(
   config: AppConfig,
   messages: { role: string; content: string | any[] }[],
@@ -84,12 +107,15 @@ export async function fetchLlmResponse(
     while (attempts < maxAttempts) {
       attempts++;
       try {
-        response = await fetch(apiEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(requestBody),
-          signal: AbortSignal.timeout(requestTimeoutMs),
-        });
+        response = await fetchWithHeaderTimeout(
+          apiEndpoint,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(requestBody),
+          },
+          requestTimeoutMs
+        );
         if (response.status === 503 && attempts < maxAttempts) {
           await new Promise((r) => setTimeout(r, 2000));
           continue;
@@ -97,12 +123,15 @@ export async function fetchLlmResponse(
         if (response.status === 400 && requestBody.chat_template_kwargs) {
           delete requestBody.chat_template_kwargs;
           delete requestBody.reasoning_effort;
-          response = await fetch(apiEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(requestTimeoutMs),
-          });
+          response = await fetchWithHeaderTimeout(
+            apiEndpoint,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody),
+            },
+            requestTimeoutMs
+          );
         }
         break;
       } catch (err: any) {
@@ -110,7 +139,7 @@ export async function fetchLlmResponse(
           await new Promise((r) => setTimeout(r, 1500));
           continue;
         }
-        const isTimeout = err?.name === 'TimeoutError' || String(err?.message).includes('timeout') || String(err?.message).includes('aborted');
+        const isTimeout = err?.name === 'TimeoutError' || String(err?.message).includes('timed out') || String(err?.message).includes('aborted');
         const errMsg = isTimeout
           ? `[!] **Превышен таймаут ожидания локального LLM сервера (${Math.round(requestTimeoutMs / 1000)}с)!**\nЛокальная модель не ответила за отведенное время (длинная фаза prefill или зависание llama-server).\n\n[›] **Решение:**\n1. В **Настройках -> Сервер LLM** убедитесь, что включен Flash Attention (\`-fa on\`) и квантованный KV-кэш (\`-ctk q8_0 -ctv q8_0\`).\n2. Увеличьте параметр **API Timeout** в основных настройках.`
           : `[!] **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n[›] **Решение:** Нажмите кнопку **[Запустить LLM Сервер]** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
@@ -166,15 +195,18 @@ export async function fetchLlmResponse(
 
       while (rateLimitAttempts <= maxRateLimitRetries) {
         try {
-          let res = await fetch(cloudEndpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${apiKey}`,
+          let res = await fetchWithHeaderTimeout(
+            cloudEndpoint,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify(requestBody),
             },
-            body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(requestTimeoutMs),
-          });
+            requestTimeoutMs
+          );
 
           if (res.status === 429 && rateLimitAttempts < maxRateLimitRetries) {
             rateLimitAttempts++;
@@ -189,15 +221,18 @@ export async function fetchLlmResponse(
             const fallbackBody = { ...requestBody, messages: strippedMessages };
             delete fallbackBody.reasoning_effort;
             delete fallbackBody.chat_template_kwargs;
-            const retryRes = await fetch(cloudEndpoint, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${apiKey}`,
+            const retryRes = await fetchWithHeaderTimeout(
+              cloudEndpoint,
+              {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify(fallbackBody),
               },
-              body: JSON.stringify(fallbackBody),
-              signal: AbortSignal.timeout(requestTimeoutMs),
-            });
+              requestTimeoutMs
+            );
             if (retryRes.ok) {
               res = retryRes;
             }
@@ -332,6 +367,8 @@ export async function readLlmStream(
   };
 
   try {
+    const CHUNK_INACTIVITY_TIMEOUT_MS = 120_000;
+
     while (!isStreamDone) {
       if (activeCancelTokens.has(sessionId)) {
         await reader.cancel().catch(() => {});
@@ -339,7 +376,34 @@ export async function readLlmStream(
         return null;
       }
 
-      const { value, done } = await reader.read();
+      let timeoutTimer: any;
+      const timeoutPromise = new Promise<{ value: Uint8Array | undefined; done: boolean; timedOut: boolean }>((resolve) => {
+        timeoutTimer = setTimeout(() => {
+          resolve({ value: undefined, done: true, timedOut: true });
+        }, CHUNK_INACTIVITY_TIMEOUT_MS);
+      });
+
+      const readPromise = reader.read().then((res) => {
+        clearTimeout(timeoutTimer);
+        return { ...res, timedOut: false };
+      }).catch((err) => {
+        clearTimeout(timeoutTimer);
+        throw err;
+      });
+
+      const { value, done, timedOut } = await Promise.race([readPromise, timeoutPromise]);
+
+      if (timedOut) {
+        console.warn(`[agent] Stream chunk inactivity timeout (${CHUNK_INACTIVITY_TIMEOUT_MS / 1000}s) reached.`);
+        await reader.cancel().catch(() => {});
+        if (tokenCount === 0) {
+          const errMsg = `[!] **Таймаут стриминга ответа LLM сервера!**\nСервер не прислал ни одного чанка в течение ${CHUNK_INACTIVITY_TIMEOUT_MS / 1000} секунд.\n\n[›] **Решение:** Проверьте доступность локального сервера и загрузку VRAM.`;
+          handleAgentError(session, sessionId, broadcast, errMsg);
+          return null;
+        }
+        break; // Salvage already received tokens
+      }
+
       if (done) {
         isStreamDone = true;
         if (buffer.trim()) {
@@ -357,19 +421,21 @@ export async function readLlmStream(
         break;
       }
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      if (value) {
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (line.startsWith('data:')) {
-          const data = line.slice(5).trim();
-          if (data === '[DONE]') {
-            isStreamDone = true;
-            break;
+        for (const rawLine of lines) {
+          const line = rawLine.trim();
+          if (line.startsWith('data:')) {
+            const data = line.slice(5).trim();
+            if (data === '[DONE]') {
+              isStreamDone = true;
+              break;
+            }
+            processJsonData(data);
           }
-          processJsonData(data);
         }
       }
     }

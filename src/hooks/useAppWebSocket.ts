@@ -164,6 +164,7 @@ export function useAppWebSocket({
       addLog(`Agent status changed [${sid || 'system'}]: ${statusStr}`);
 
       if (statusStr === 'idle') {
+        flushPendingTokens();
         if (sid === currentSessionIdRef.current) {
           setLiveTelemetry(null);
         }
@@ -304,6 +305,11 @@ export function useAppWebSocket({
     );
 
     return () => {
+      if (streamThrottleTimerRef.current) {
+        clearTimeout(streamThrottleTimerRef.current);
+        streamThrottleTimerRef.current = null;
+      }
+      flushPendingTokens();
       un1();
       un2();
       un3();
