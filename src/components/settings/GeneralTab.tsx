@@ -1,6 +1,67 @@
 import React, { useState } from 'react';
-import { Sliders, Shield, Volume2, Save, LayoutGrid, Globe, Key, KeyRound, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Sliders, Shield, Volume2, Save, LayoutGrid, Globe, Key, KeyRound, LogOut, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
 import * as api from '../../services/api';
+
+interface SettingToggleCardProps {
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  active: boolean;
+  onToggle: () => void;
+}
+
+const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
+  icon,
+  title,
+  desc,
+  active,
+  onToggle,
+}) => (
+  <div
+    onClick={onToggle}
+    className={`p-3.5 rounded-xl bento-card flex items-center justify-between cursor-pointer transition-all border ${
+      active
+        ? 'bg-white/10 border-white/20 text-[var(--theme-text)]'
+        : 'bg-black/20 border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:border-white/15'
+    }`}
+  >
+    <div className="flex items-center gap-3 min-w-0 pr-2">
+      <div
+        className={`p-2 rounded-lg shrink-0 transition-colors ${
+          active ? 'bg-white/15 text-white' : 'bg-white/5 text-[var(--theme-text-muted)]'
+        }`}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-[var(--theme-text)] truncate">{title}</span>
+          <span
+            className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-colors ${
+              active
+                ? 'bg-white/15 text-white font-bold border border-white/20'
+                : 'bg-white/5 text-zinc-500 border border-white/5'
+            }`}
+          >
+            {active ? '[ВКЛ]' : '[ВЫКЛ]'}
+          </span>
+        </div>
+        <div className="text-[11px] text-[var(--theme-text-muted)] leading-tight mt-0.5">{desc}</div>
+      </div>
+    </div>
+    <div
+      className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors shrink-0 ${
+        active ? 'bg-white' : 'bg-white/15'
+      }`}
+    >
+      <div
+        className={`w-4 h-4 rounded-full transition-transform ${
+          active ? 'translate-x-4 bg-black shadow-sm' : 'translate-x-0 bg-white/70'
+        }`}
+      />
+    </div>
+  </div>
+);
 
 interface GeneralTabProps {
   apiUrl: string;
@@ -180,95 +241,48 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
 
       {/* 2. UI & Behavior Toggles */}
       <div className="p-4 rounded-xl bento-card space-y-3">
-        <div className="text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 border-b border-[var(--theme-border)] pb-2">
-          <Sliders size={13} className="text-[var(--theme-text-muted)]" />
-          <span>Поведение и интерфейс</span>
+        <div className="text-xs font-medium text-[var(--theme-text)] flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
+          <div className="flex items-center gap-1.5">
+            <Sliders size={14} className="text-[var(--theme-text-muted)]" />
+            <span>Поведение и интерфейс</span>
+          </div>
+          <span className="text-[10px] font-mono text-[var(--theme-text-muted)] opacity-70">
+            :: Preferences
+          </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-          {/* Reasoning Toggle */}
-          <div
-            onClick={() => setReasoningEnabled(!reasoningEnabled)}
-            className="p-3 rounded-lg bento-card flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors"
-          >
-            <div className="flex items-center gap-2.5">
-              <Shield size={16} className="text-[var(--theme-text-muted)]" />
-              <div>
-                <div className="text-xs font-medium text-[var(--theme-text)]">Отображать цепочку рассуждений</div>
-                <div className="text-[11px] text-[var(--theme-text-muted)]">Показывать блок мыслей CoT в ответах</div>
-              </div>
-            </div>
-            <div
-              className={`w-9 h-5 rounded-md p-0.5 flex items-center transition-colors ${
-                reasoningEnabled ? 'bg-white/30' : 'bg-white/10'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-sm bg-white transition-transform ${reasoningEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-            </div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <SettingToggleCard
+            icon={<Shield size={16} />}
+            title="Цепочка рассуждений"
+            desc="Отображать блок мыслей <think> в ответах"
+            active={reasoningEnabled}
+            onToggle={() => setReasoningEnabled(!reasoningEnabled)}
+          />
 
-          {/* Auto-Save History */}
-          <div
-            onClick={() => setAutoSaveHistory(!autoSaveHistory)}
-            className="p-3 rounded-lg bento-card flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors"
-          >
-            <div className="flex items-center gap-2.5">
-              <Save size={16} className="text-[var(--theme-text-muted)]" />
-              <div>
-                <div className="text-xs font-medium text-[var(--theme-text)]">Автосохранение истории диалогов</div>
-                <div className="text-[11px] text-[var(--theme-text-muted)]">Синхронизация сессий на локальный диск</div>
-              </div>
-            </div>
-            <div
-              className={`w-9 h-5 rounded-md p-0.5 flex items-center transition-colors ${
-                autoSaveHistory ? 'bg-white/30' : 'bg-white/10'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-sm bg-white transition-transform ${autoSaveHistory ? 'translate-x-4' : 'translate-x-0'}`} />
-            </div>
-          </div>
+          <SettingToggleCard
+            icon={<Save size={16} />}
+            title="Автосохранение истории"
+            desc="Синхронизация истории диалогов на диск"
+            active={autoSaveHistory}
+            onToggle={() => setAutoSaveHistory(!autoSaveHistory)}
+          />
 
-          {/* Sound Notifications */}
-          <div
-            onClick={() => setSoundNotifications(!soundNotifications)}
-            className="p-3 rounded-lg bento-card flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors"
-          >
-            <div className="flex items-center gap-2.5">
-              <Volume2 size={16} className="text-[var(--theme-text-muted)]" />
-              <div>
-                <div className="text-xs font-medium text-[var(--theme-text)]">Звуковые сигналы</div>
-                <div className="text-[11px] text-[var(--theme-text-muted)]">Звук по завершению генерации ответа</div>
-              </div>
-            </div>
-            <div
-              className={`w-9 h-5 rounded-md p-0.5 flex items-center transition-colors ${
-                soundNotifications ? 'bg-white/30' : 'bg-white/10'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-sm bg-white transition-transform ${soundNotifications ? 'translate-x-4' : 'translate-x-0'}`} />
-            </div>
-          </div>
+          <SettingToggleCard
+            icon={<Volume2 size={16} />}
+            title="Звуковые сигналы"
+            desc="Звук по завершению генерации ответа"
+            active={soundNotifications}
+            onToggle={() => setSoundNotifications(!soundNotifications)}
+          />
 
-          {/* Compact Chat Mode */}
-          <div
-            onClick={() => setCompactChat(!compactChat)}
-            className="p-3 rounded-lg bento-card flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors"
-          >
-            <div className="flex items-center gap-2.5">
-              <LayoutGrid size={16} className="text-[var(--theme-text-muted)]" />
-              <div>
-                <div className="text-xs font-medium text-[var(--theme-text)]">Компактный вид чата</div>
-                <div className="text-[11px] text-[var(--theme-text-muted)]">Уменьшенные отступы в сообщениях</div>
-              </div>
-            </div>
-            <div
-              className={`w-9 h-5 rounded-md p-0.5 flex items-center transition-colors ${
-                compactChat ? 'bg-white/30' : 'bg-white/10'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-sm bg-white transition-transform ${compactChat ? 'translate-x-4' : 'translate-x-0'}`} />
-            </div>
-          </div>
+          <SettingToggleCard
+            icon={<LayoutGrid size={16} />}
+            title="Компактный вид чата"
+            desc="Уменьшенные отступы в сообщениях диалога"
+            active={compactChat}
+            onToggle={() => setCompactChat(!compactChat)}
+          />
         </div>
       </div>
 
@@ -276,50 +290,30 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
       <div className="p-4 rounded-xl bento-card space-y-4">
         <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
           <div className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-text)]">
-            <Volume2 size={15} className="text-[var(--theme-accent)]" />
+            <Volume2 size={14} className="text-[var(--theme-text-muted)]" />
             <span>Голосовой интерком Jarvis и автономный напарник</span>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
             :: Push-Driven Engine
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {/* Voice Intercom Toggle */}
-          <div
-            onClick={() => setTtsVoiceEnabled && setTtsVoiceEnabled(!ttsVoiceEnabled)}
-            className="p-3 rounded-lg bento-card flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors"
-          >
-            <div>
-              <div className="text-xs font-medium text-[var(--theme-text)]">Голосовой интерком (Edge-TTS)</div>
-              <div className="text-[11px] text-[var(--theme-text-muted)]">Короткие реплики вслух через динамики</div>
-            </div>
-            <div
-              className={`w-9 h-5 rounded-md p-0.5 flex items-center transition-colors ${
-                ttsVoiceEnabled ? 'bg-sky-500/80' : 'bg-white/10'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-sm bg-white transition-transform ${ttsVoiceEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-            </div>
-          </div>
+          <SettingToggleCard
+            icon={<Volume2 size={16} />}
+            title="Голосовой интерком (Edge-TTS)"
+            desc="Короткие реплики вслух через системные динамики"
+            active={Boolean(ttsVoiceEnabled)}
+            onToggle={() => setTtsVoiceEnabled && setTtsVoiceEnabled(!ttsVoiceEnabled)}
+          />
 
-          {/* Proactive Companion Sparks Toggle */}
-          <div
-            onClick={() => setProactiveCompanionEnabled && setProactiveCompanionEnabled(!proactiveCompanionEnabled)}
-            className="p-3 rounded-lg bento-card flex items-center justify-between cursor-pointer hover:border-white/20 transition-colors"
-          >
-            <div>
-              <div className="text-xs font-medium text-[var(--theme-text)]">Автономный генератор искр (Sparks)</div>
-              <div className="text-[11px] text-[var(--theme-text-muted)]">Zero-pressure предложения без шейминга</div>
-            </div>
-            <div
-              className={`w-9 h-5 rounded-md p-0.5 flex items-center transition-colors ${
-                proactiveCompanionEnabled ? 'bg-sky-500/80' : 'bg-white/10'
-              }`}
-            >
-              <div className={`w-4 h-4 rounded-sm bg-white transition-transform ${proactiveCompanionEnabled ? 'translate-x-4' : 'translate-x-0'}`} />
-            </div>
-          </div>
+          <SettingToggleCard
+            icon={<Sparkles size={16} />}
+            title="Фоновый напарник Jarvis (Sparks)"
+            desc="Генерация идей, аудит и предложения без спама"
+            active={Boolean(proactiveCompanionEnabled)}
+            onToggle={() => setProactiveCompanionEnabled && setProactiveCompanionEnabled(!proactiveCompanionEnabled)}
+          />
         </div>
 
         {/* Voice Parameters */}
@@ -333,10 +327,10 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                 <select
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice && setTtsVoice(e.target.value)}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-sky-500"
+                  className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-white/40"
                 >
-                  <option value="ru-RU-SvetlanaNeural">Светлана (Женский, четкий)</option>
-                  <option value="ru-RU-DmitryNeural">Дмитрий (Мужской, глубокий)</option>
+                  <option value="ru-RU-SvetlanaNeural" className="bg-black">Светлана (Женский, четкий)</option>
+                  <option value="ru-RU-DmitryNeural" className="bg-black">Дмитрий (Мужской, глубокий)</option>
                 </select>
               </div>
 
@@ -347,12 +341,12 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                 <select
                   value={ttsRate}
                   onChange={(e) => setTtsRate && setTtsRate(e.target.value)}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-sky-500"
+                  className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-white/40"
                 >
-                  <option value="+0%">Стандартная (+0%)</option>
-                  <option value="+15%">Быстрая (+15%)</option>
-                  <option value="+20%">Оптимальная (+20%)</option>
-                  <option value="+30%">Ультра (+30%)</option>
+                  <option value="+0%" className="bg-black">Стандартная (+0%)</option>
+                  <option value="+15%" className="bg-black">Быстрая (+15%)</option>
+                  <option value="+20%" className="bg-black">Оптимальная (+20%)</option>
+                  <option value="+30%" className="bg-black">Ультра (+30%)</option>
                 </select>
               </div>
 
@@ -371,41 +365,41 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                       console.error('Voice test failed:', err);
                     }
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs text-[var(--theme-text)] transition-colors active:scale-95 cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs text-[var(--theme-text)] transition-colors active:scale-95 cursor-pointer font-medium"
                 >
-                  <Volume2 size={13} className="text-sky-400" />
+                  <Volume2 size={13} className="text-[var(--theme-text)]" />
                   <span>Тест голоса</span>
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--theme-border)]">
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none">
                 <input
                   type="checkbox"
                   checked={ttsPlayOnSpeaker}
                   onChange={(e) => setTtsPlayOnSpeaker && setTtsPlayOnSpeaker(e.target.checked)}
-                  className="rounded border-[var(--theme-border)] text-sky-500 focus:ring-0"
+                  className="rounded border-[var(--theme-border)] bg-black/40 text-white focus:ring-0 cursor-pointer"
                 />
                 <span>Воспроизводить через системные динамики (MCI)</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none">
                 <input
                   type="checkbox"
                   checked={ttsPlayInBrowser}
                   onChange={(e) => setTtsPlayInBrowser && setTtsPlayInBrowser(e.target.checked)}
-                  className="rounded border-[var(--theme-border)] text-sky-500 focus:ring-0"
+                  className="rounded border-[var(--theme-border)] bg-black/40 text-white focus:ring-0 cursor-pointer"
                 />
                 <span>Воспроизводить в активной вкладке браузера</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] sm:col-span-2">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] sm:col-span-2 select-none">
                 <input
                   type="checkbox"
                   checked={wakeWordEnabled}
                   onChange={(e) => setWakeWordEnabled && setWakeWordEnabled(e.target.checked)}
-                  className="rounded border-[var(--theme-border)] text-sky-500 focus:ring-0"
+                  className="rounded border-[var(--theme-border)] bg-black/40 text-white focus:ring-0 cursor-pointer"
                 />
                 <span>Бесконтактная активация голосом (Wake-Word «Джарвис»)</span>
               </label>

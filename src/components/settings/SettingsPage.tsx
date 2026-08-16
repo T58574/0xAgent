@@ -1,24 +1,29 @@
 import React from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User } from 'lucide-react';
+import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User, Sparkles } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { GeneralTab } from './GeneralTab';
 import { PersonasTab } from './PersonasTab';
 import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
+import { CustomizationsTab } from './CustomizationsTab';
 import { useSettingsState } from './useSettingsState';
 
 interface SettingsPageProps {
   config: AppConfig | null;
   onSaveConfig: (updated: AppConfig) => Promise<void>;
   onCancel: () => void;
+  initialSubtab?: 'general' | 'personas' | 'customizations' | 'themes' | 'local_server';
+  currentSessionId?: string | null;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = ({
   config,
   onSaveConfig,
   onCancel,
+  initialSubtab,
+  currentSessionId,
 }) => {
-  const s = useSettingsState(config, onSaveConfig);
+  const s = useSettingsState(config, onSaveConfig, initialSubtab);
 
   return (
     <div className="w-full h-full bg-[var(--theme-bg)] text-[var(--theme-text)] flex flex-col overflow-hidden font-sans select-text">
@@ -67,6 +72,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           >
             <Sliders size={14} className="text-[var(--theme-text-muted)]" />
             <span>Основные</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => s.setActiveSubtab('customizations')}
+            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
+              s.activeSubtab === 'customizations'
+                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+            }`}
+          >
+            <Sparkles size={14} className="text-cyan-400" />
+            <span>Кастомизации & Токены</span>
           </button>
 
           <button
@@ -141,6 +159,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setWakeWordEnabled={s.setWakeWordEnabled}
               proactiveCompanionEnabled={s.proactiveCompanionEnabled}
               setProactiveCompanionEnabled={s.setProactiveCompanionEnabled}
+            />
+          )}
+
+          {s.activeSubtab === 'customizations' && (
+            <CustomizationsTab
+              config={config}
+              currentSessionId={currentSessionId}
             />
           )}
 

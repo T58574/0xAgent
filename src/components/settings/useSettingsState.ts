@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { AppConfig, AppTheme } from '../../types';
+import { AppConfig, AppTheme, ReasoningEffortLevel } from '../../types';
 
 export function useSettingsState(
   config: AppConfig | null,
-  onSaveConfig: (updated: AppConfig) => Promise<void>
+  onSaveConfig: (updated: AppConfig) => Promise<void>,
+  initialSubtab?: 'general' | 'personas' | 'customizations' | 'themes' | 'local_server'
 ) {
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'themes' | 'local_server'>('general');
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'customizations' | 'themes' | 'local_server'>(initialSubtab || 'general');
 
   // General state
   const [apiUrl, setApiUrl] = useState('');
@@ -14,6 +15,7 @@ export function useSettingsState(
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [modelsPath, setModelsPath] = useState('');
   const [reasoningEnabled, setReasoningEnabled] = useState(true);
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortLevel>('auto');
   const [planningEnabled, setPlanningEnabled] = useState(true);
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(8192);
@@ -76,6 +78,7 @@ export function useSettingsState(
       setGeminiApiKey(config.gemini_api_key || '');
       setModelsPath(config.models_path || '');
       setReasoningEnabled(config.reasoning_enabled !== false);
+      if (config.reasoning_effort) setReasoningEffort(config.reasoning_effort as ReasoningEffortLevel);
       setPlanningEnabled(config.planning_mode !== false);
       if (config.temperature !== undefined && config.temperature !== null) setTemperature(config.temperature);
       if (config.max_tokens) setMaxTokens(config.max_tokens);
@@ -151,6 +154,7 @@ export function useSettingsState(
           gemini_api_key: geminiApiKey.trim() || null,
           models_path: modelsPath.trim() || null,
           reasoning_enabled: reasoningEnabled,
+          reasoning_effort: reasoningEffort,
           planning_mode: planningEnabled,
           temperature,
           max_tokens: maxTokens,
@@ -211,12 +215,22 @@ export function useSettingsState(
     geminiApiKey,
     modelsPath,
     reasoningEnabled,
+    reasoningEffort,
+    planningEnabled,
     temperature,
     maxTokens,
     apiTimeoutSec,
     autoSaveHistory,
     soundNotifications,
     compactChat,
+    ttsVoiceEnabled,
+    ttsVoice,
+    ttsRate,
+    ttsPitch,
+    ttsPlayOnSpeaker,
+    ttsPlayInBrowser,
+    wakeWordEnabled,
+    proactiveCompanionEnabled,
     activeTheme,
     exePath,
     modelPath,
@@ -265,6 +279,8 @@ export function useSettingsState(
     setModelsPath,
     reasoningEnabled,
     setReasoningEnabled,
+    reasoningEffort,
+    setReasoningEffort,
     planningEnabled,
     setPlanningEnabled,
     temperature,

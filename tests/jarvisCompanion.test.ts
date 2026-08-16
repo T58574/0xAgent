@@ -15,12 +15,18 @@ import { processWatcher } from '../server/agent/processWatcher';
 import { voiceDaemonManager } from '../server/agent/voiceDaemonManager';
 import { voiceMacroService } from '../server/agent/voiceMacroService';
 import { jarvisDiagnostics } from '../server/agent/jarvisDiagnostics';
+import { loadConfig, saveConfig } from '../server/config';
 
 describe('Jarvis Companion & Voice Intercom Test Suite', () => {
   before(() => {
     process.env.NODE_ENV = 'test';
     ttsService.setMuted(true);
     voiceMacroService.setDryRun(true);
+    try {
+      const cfg = loadConfig();
+      cfg.proactive_companion_enabled = true;
+      saveConfig(cfg);
+    } catch {}
   });
 
   after(() => {
@@ -161,10 +167,11 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
     });
 
     it('should intercept server error logs and create an error_incident spark', async () => {
+      proactiveCompanion.resetErrorIncidentThrottle();
       logger.error('DatabaseModule', 'Connection pool exhausted: simulated test failure');
       
       // Allow async hook to create spark
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 80));
 
       const sparks = proactiveCompanion.getActiveSparks();
       const errorSpark = sparks.find((s) => s.category === 'error_incident');

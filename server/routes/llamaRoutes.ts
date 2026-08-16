@@ -294,7 +294,7 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         for (const sDir of searchDirs) {
           if (fs.existsSync(sDir)) {
             const files = fs.readdirSync(sDir);
-            const gguf = files.find((f) => f.endsWith('.gguf'));
+            const gguf = files.find((f) => f.endsWith('.gguf') && !/mmproj|projector|clip/i.test(f));
             if (gguf) {
               targetModel = path.join(sDir, gguf);
               break;
@@ -319,6 +319,47 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
 
       const ls = cfg.local_server || {};
       const args: string[] = ['-m', targetModel, '--host', host, '--port', String(port)];
+
+      // Auto-detect multimodal projector (mmproj) for Vision / Audio support
+      let mmprojTarget = body.mmprojPath || ls.mmproj_path;
+      if (!mmprojTarget || !fs.existsSync(mmprojTarget)) {
+        const candidateDirs = [
+          path.dirname(targetModel),
+          path.join(os.homedir(), '.0xagent', 'models'),
+          path.join(process.cwd(), 'models'),
+          ...(cfg.workspace_dir ? [path.join(cfg.workspace_dir, 'models')] : []),
+        ];
+
+        const modelBaseLower = path.basename(targetModel).toLowerCase();
+        let bestMmproj: string | null = null;
+
+        for (const cDir of candidateDirs) {
+          if (fs.existsSync(cDir)) {
+            try {
+              const files = fs.readdirSync(cDir);
+              const mmprojFiles = files.filter((f) => f.endsWith('.gguf') && /mmproj|projector|clip/i.test(f));
+              if (mmprojFiles.length > 0) {
+                // Priority: mmproj matching model family name (e.g. qwen, minicpm, llava)
+                const modelTokens = modelBaseLower.replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter((t) => t.length > 2);
+                const matched = mmprojFiles.find((f) => {
+                  const fLower = f.toLowerCase();
+                  return modelTokens.some((tok) => fLower.includes(tok));
+                });
+                bestMmproj = path.join(cDir, matched || mmprojFiles[0]);
+                break;
+              }
+            } catch {}
+          }
+        }
+        if (bestMmproj && fs.existsSync(bestMmproj)) {
+          mmprojTarget = bestMmproj;
+        }
+      }
+
+      if (mmprojTarget && fs.existsSync(mmprojTarget)) {
+        args.push('--mmproj', mmprojTarget);
+        appendServerLog(`[MMPROJ] Автоматически подключен проектор зрения/аудио: ${path.basename(mmprojTarget)}`);
+      }
 
       const ctxSize = body.ctxSize !== undefined ? body.ctxSize : ls.ctx_size;
       if (ctxSize) args.push('-c', String(ctxSize));

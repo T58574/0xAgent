@@ -35,6 +35,7 @@ export default function App() {
   const [isWorkspacePickerOpen, setIsWorkspacePickerOpen] = useState<boolean>(false);
   const [isJarvisOpen, setIsJarvisOpen] = useState<boolean>(false);
   const [jarvisState, setJarvisState] = useState<JarvisState | null>(null);
+  const [settingsSubtab, setSettingsSubtab] = useState<'general' | 'personas' | 'customizations' | 'themes' | 'local_server' | undefined>(undefined);
 
   const fetchJarvisData = async () => {
     try {
@@ -341,10 +342,12 @@ export default function App() {
       }
 
       const newSess = await api.create_session(name || `Session ${sessions.length + 1}`, targetWs);
-      setSessions((prev) => [newSess, ...prev]);
-      setCurrentSessionId(newSess.id);
+      activeSessionsMapRef.current.set(newSess.id, newSess);
       currentSessionIdRef.current = newSess.id;
-      updateSessionState(newSess);
+      currentSessionRef.current = newSess;
+      setCurrentSessionId(newSess.id);
+      setCurrentSession(newSess);
+      setSessions((prev) => [newSess, ...prev.filter((s) => s.id !== newSess.id)]);
 
       if (newSess.workspace_dir) {
         loadWorkspaceTree(newSess.workspace_dir);
@@ -484,7 +487,9 @@ export default function App() {
 
   // 7. Chat Send message logic
   const handleSendMessage = async (text: string, images?: string[]) => {
-    if (!currentSession) return;
+    const activeSessionId = currentSessionIdRef.current || currentSession?.id;
+    const activeSess = (activeSessionId ? activeSessionsMapRef.current.get(activeSessionId) : null) || currentSessionRef.current || currentSession;
+    if (!activeSess) return;
 
     const userMsg: ChatMessage = {
       id: generateShortId(),
@@ -494,9 +499,9 @@ export default function App() {
       timestamp: Date.now(),
     };
 
-    let title = currentSession.title;
+    let title = activeSess.title;
     if (
-      currentSession.messages.length === 0 ||
+      activeSess.messages.length === 0 ||
       title.startsWith('Чат (') ||
       title === 'Новый чат' ||
       title === 'Default Session'
@@ -508,22 +513,22 @@ export default function App() {
     }
 
     const updatedSession = {
-      ...currentSession,
+      ...activeSess,
       title,
-      messages: [...currentSession.messages, userMsg],
+      messages: [...activeSess.messages, userMsg],
       updated_at: Date.now(),
     };
 
     updateSessionState(updatedSession);
     setSessions((prev) =>
-      prev.map((s) => (s.id === currentSession.id ? { ...s, title, updated_at: updatedSession.updated_at } : s))
+      prev.map((s) => (s.id === activeSess.id ? { ...s, title, updated_at: updatedSession.updated_at } : s))
     );
 
     try {
       await api.save_session(updatedSession);
       addLog(`Prompt submitted: "${text.substring(0, 30)}..."`);
       
-      await api.send_message(currentSession.id);
+      await api.send_message(activeSess.id);
     } catch (err: any) {
       addLog(`Failed to execute completions: ${err.message || err}`);
       const errText = `**Системная ошибка подключения:** ${err.message || err}`;
@@ -952,6 +957,10 @@ export default function App() {
       personas={personas}
       activePersonaId={activePersonaId}
       onSelectPersona={handleSelectPersona}
+      onOpenCustomizations={() => {
+        setSettingsSubtab('customizations');
+        setActiveView('settings');
+      }}
     />
   );
 
@@ -1018,6 +1027,8 @@ export default function App() {
                 config={config}
                 onSaveConfig={handleSaveConfig}
                 onCancel={() => setActiveView('chat')}
+                initialSubtab={settingsSubtab}
+                currentSessionId={currentSessionId}
               />
             </div>
           )}

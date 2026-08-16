@@ -86,6 +86,10 @@ export async function runAgentLoop(
     let lastErrorText = '';
     let lastStatusCode = 500;
 
+    const configuredEffort = config.reasoning_effort || config.local_server?.reasoning_effort || 'auto';
+    const isReasoningOff = config.reasoning_enabled === false || configuredEffort === 'off';
+    const requestTimeoutMs = Math.max(15, config.api_timeout_sec || 90) * 1000;
+
     if (isLocalModel && (selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf'))) {
       // Route local model to llama.cpp local server
       const localHost = config.local_server?.host || '127.0.0.1';
@@ -100,6 +104,18 @@ export async function runAgentLoop(
         presence_penalty: config.local_server?.presence_penalty ?? 0.1,
       };
 
+      if (configuredEffort !== 'auto' && !isReasoningOff) {
+        requestBody.chat_template_kwargs = {
+          reasoning_effort: configuredEffort,
+          enable_thinking: true,
+        };
+      } else if (isReasoningOff) {
+        requestBody.chat_template_kwargs = {
+          enable_thinking: false,
+          reasoning_effort: 'off',
+        };
+      }
+
       let attempts = 0;
       const maxAttempts = 6;
       while (attempts < maxAttempts) {
@@ -109,10 +125,22 @@ export async function runAgentLoop(
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody),
+            signal: AbortSignal.timeout(requestTimeoutMs),
           });
           if (response.status === 503 && attempts < maxAttempts) {
             await new Promise((r) => setTimeout(r, 2000));
             continue;
+          }
+          // If llama-server returns 400 (e.g. unknown chat_template_kwargs), retry with vanilla body
+          if (response.status === 400 && requestBody.chat_template_kwargs) {
+            delete requestBody.chat_template_kwargs;
+            delete requestBody.reasoning_effort;
+            response = await fetch(apiEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(requestBody),
+              signal: AbortSignal.timeout(requestTimeoutMs),
+            });
           }
           break;
         } catch (err: any) {
@@ -152,6 +180,11 @@ export async function runAgentLoop(
           max_tokens: config.max_tokens ?? 8192,
         };
 
+        if (configuredEffort && configuredEffort !== 'auto' && !isReasoningOff) {
+          const cloudEffort = configuredEffort === 'xhigh' ? 'high' : configuredEffort;
+          requestBody.reasoning_effort = cloudEffort;
+        }
+
         let rateLimitAttempts = 0;
         const maxRateLimitRetries = 2;
 
@@ -164,6 +197,7 @@ export async function runAgentLoop(
                 'Authorization': `Bearer ${apiKey}`,
               },
               body: JSON.stringify(requestBody),
+              signal: AbortSignal.timeout(requestTimeoutMs),
             });
 
             // Handle HTTP 429 Rate Limit with exponential backoff retry
@@ -174,11 +208,13 @@ export async function runAgentLoop(
               continue;
             }
 
-            // HTTP 400 Fallback (for models/endpoints not supporting systemInstruction)
+            // HTTP 400 Fallback (for models not supporting reasoning_effort or systemInstruction)
             if (res.status === 400) {
-              console.warn(`[agent] Model ${candidateModel} returned 400 (possible systemInstruction issue). Retrying without system instruction...`);
+              console.warn(`[agent] Model ${candidateModel} returned 400. Retrying without reasoning_effort/systemInstruction...`);
               const strippedMessages = messages.filter((m) => m.role !== 'system');
               const fallbackBody = { ...requestBody, messages: strippedMessages };
+              delete fallbackBody.reasoning_effort;
+              delete fallbackBody.chat_template_kwargs;
               const retryRes = await fetch(cloudEndpoint, {
                 method: 'POST',
                 headers: {
@@ -186,6 +222,7 @@ export async function runAgentLoop(
                   'Authorization': `Bearer ${apiKey}`,
                 },
                 body: JSON.stringify(fallbackBody),
+                signal: AbortSignal.timeout(requestTimeoutMs),
               });
               if (retryRes.ok) {
                 res = retryRes;
@@ -310,20 +347,30 @@ export async function runAgentLoop(
         const contentChunk = delta?.content || parsed.choices?.[0]?.text;
 
         if (reasoningChunk) {
+          const rawReasoning = String(reasoningChunk);
           if (!isInReasoning) {
-            emitToken('<think>' + reasoningChunk);
+            if (rawReasoning.startsWith('<think>')) {
+              emitToken(rawReasoning);
+            } else {
+              emitToken('<think>' + rawReasoning);
+            }
             isInReasoning = true;
           } else {
-            emitToken(reasoningChunk);
+            emitToken(rawReasoning);
           }
         }
 
         if (contentChunk) {
+          const rawContent = String(contentChunk);
           if (isInReasoning) {
-            emitToken('</think>' + contentChunk);
+            if (rawContent.startsWith('</think>')) {
+              emitToken(rawContent);
+            } else {
+              emitToken('</think>' + rawContent);
+            }
             isInReasoning = false;
           } else {
-            emitToken(contentChunk);
+            emitToken(rawContent);
           }
         }
       } catch {

@@ -633,14 +633,42 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
               />
             </div>
 
-            {/* GGUF Model Metadata Card */}
+            {/* GGUF Model Metadata Card with Reasoning Specs */}
             {modelMeta && (
-              <div className="p-3 rounded-lg bg-black/40 border border-[var(--theme-border)] text-xs space-y-1 font-mono">
-                <div className="flex items-center justify-between text-[var(--theme-text)] font-semibold border-b border-[var(--theme-border)] pb-1">
-                  <span className="truncate">{modelMeta.architecture} ({modelMeta.modelName || 'GGUF'})</span>
-                  <span className="px-1.5 py-0.2 rounded-md bg-white/10 text-[var(--theme-text-muted)] text-[10px]">
+              <div className="p-3 rounded-lg bg-black/40 border border-[var(--theme-border)] text-xs space-y-2 font-mono">
+                <div className="flex items-center justify-between text-[var(--theme-text)] font-semibold border-b border-[var(--theme-border)] pb-1.5">
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="truncate">{modelMeta.cleanTitle || modelMeta.modelName || modelMeta.architecture}</span>
+                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] text-white/80">
+                      {modelMeta.quantization}
+                    </span>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[var(--theme-text-muted)] text-[10px] shrink-0">
                     {modelMeta.fileSizeFormatted}
                   </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                  <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
+                    <span>Семейство:</span>
+                    <span className="text-[var(--theme-text)] font-medium uppercase">{modelMeta.family || 'GGUF'}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
+                    <span>Контекст обучения:</span>
+                    <span className="text-[var(--theme-text)] font-medium">{modelMeta.contextLength.toLocaleString()} tok</span>
+                  </div>
+                  <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
+                    <span>Рассуждения &lt;think&gt;:</span>
+                    <span className={modelMeta.supportsReasoning ? 'text-sky-400 font-medium' : 'text-zinc-400'}>
+                      {modelMeta.supportsReasoning ? 'Поддерживается' : 'Instruct / Direct'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
+                    <span>Реком. режим:</span>
+                    <span className="text-white font-medium uppercase">
+                      {modelMeta.recommendedReasoningEffort || 'AUTO'}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}

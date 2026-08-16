@@ -1,4 +1,4 @@
-import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse, KnowledgeEntry, KnowledgeQueryOptions, JarvisState } from '../types';
+import { AppConfig, ChatSession, FileNode, GgufMetadata, HardwareInfo, MemoryItem, SkillInfo, ServerStatusInfo, PersonaMetadata, PersonaDetail, ToolsState, AvailableModelsResponse, KnowledgeEntry, KnowledgeQueryOptions, JarvisState, ContextBreakdownReport } from '../types';
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
 export { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen };
@@ -695,6 +695,14 @@ export async function stop_voice_daemon_recording(): Promise<{ success: boolean;
   if (!res.ok) throw new Error(await res.text());
   return res.json();
 }
+
+export async function get_context_breakdown(sessionId?: string | null): Promise<ContextBreakdownReport> {
+  const url = sessionId ? `${API_BASE}/context/breakdown?sessionId=${encodeURIComponent(sessionId)}` : `${API_BASE}/context/breakdown`;
+  const res = await authFetch(url);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
 
 
 

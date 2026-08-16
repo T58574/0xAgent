@@ -59,6 +59,7 @@ interface ChatAreaProps {
   personas?: PersonaMetadata[];
   activePersonaId?: string;
   onSelectPersona?: (id: string) => void;
+  onOpenCustomizations?: () => void;
 }
 
 export const ChatArea: React.FC<ChatAreaProps> = ({
@@ -86,6 +87,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   personas: personasProp = [],
   activePersonaId: activePersonaIdProp,
   onSelectPersona: onSelectPersonaProp,
+  onOpenCustomizations,
 }) => {
   const { showToast } = useToast();
   const [inputText, setInputText] = useState('');
@@ -501,7 +503,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
 
             {/* Proactive Sparks in Empty State */}
-            {activeSparks.length > 0 && (
+            {config?.proactive_companion_enabled !== false && activeSparks.length > 0 && (
               <div className="w-full max-w-xl mx-auto space-y-2 text-left">
                 {activeSparks.map((spark) => (
                   <JarvisSparkCard
@@ -853,10 +855,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     </span>
                   )}
                   {liveTelemetry.contextUsed !== undefined && (
-                    <span className="flex items-center gap-1 hidden sm:flex text-[var(--theme-text-muted)]">
+                    <button
+                      type="button"
+                      onClick={onOpenCustomizations}
+                      className="flex items-center gap-1 hidden sm:flex text-[var(--theme-text-muted)] hover:text-sky-400 transition-colors cursor-pointer"
+                      title="Нажмите, чтобы открыть детальный анализ токенов и кастомизаций"
+                    >
                       <MaterialIcon name="storage" size={12} />
                       <span>{liveTelemetry.contextUsed.toLocaleString()}{liveTelemetry.contextMax ? ` / ${liveTelemetry.contextMax.toLocaleString()}` : ''}</span>
-                    </span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -868,7 +875,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           {/* Bottom Floating Command Bar for Active Chat */}
           <div className="p-3 sm:p-4 shrink-0 max-w-3xl mx-auto w-full">
             {/* Proactive Sparks Stream */}
-            {activeSparks.length > 0 && (
+            {config?.proactive_companion_enabled !== false && activeSparks.length > 0 && (
               <div className="space-y-2 mb-3">
                 {activeSparks.map((spark) => (
                   <JarvisSparkCard

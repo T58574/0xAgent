@@ -8,53 +8,12 @@ export type { SkillInfo };
 const APP_DIR = path.join(os.homedir(), '.0xagent');
 const SKILLS_DIR = path.join(APP_DIR, 'skills');
 
-const UNIT_TEST_SKILL = `# Unit Test Creator Skill
-Description: Automatically generates unit tests with high coverage for target code files.
-
-## Instructions
-1. Inspect target source file and identify public functions, methods, and edge cases.
-2. Choose appropriate testing framework (Vitest, Jest, PyTest, etc.).
-3. Write clean unit tests covering success paths and boundary conditions.
-4. Execute tests and verify zero failures.`;
-
-const AUDIT_SECURITY_SKILL = `# Security Auditor Skill
-Description: Audits codebase for vulnerabilities, SQL injection, XSS, and hardcoded secrets.
-
-## Instructions
-1. Perform grep search for common sensitive patterns (API keys, credentials, raw query strings).
-2. Inspect input validation and sanitization.
-3. Generate detailed security report with severity levels and exact fix patches.`;
-
-const REFACTOR_HELPER_SKILL = `# Code Refactoring Helper Skill
-Description: Refactors monolithic or messy functions into modular, typed, clean components.
-
-## Instructions
-1. Read target module and decompose complex functions (>50 lines) into focused helpers.
-2. Enforce strict TypeScript typing and error handling.
-3. Verify backward compatibility with automated builds.`;
-
 function ensureSkillsDir(): void {
   if (!fs.existsSync(APP_DIR)) {
     fs.mkdirSync(APP_DIR, { recursive: true });
   }
   if (!fs.existsSync(SKILLS_DIR)) {
     fs.mkdirSync(SKILLS_DIR, { recursive: true });
-  }
-
-  // Populate starter skills
-  const testSkill = path.join(SKILLS_DIR, 'unit_test_creator.md');
-  if (!fs.existsSync(testSkill)) {
-    fs.writeFileSync(testSkill, UNIT_TEST_SKILL, 'utf-8');
-  }
-
-  const auditSkill = path.join(SKILLS_DIR, 'security_auditor.md');
-  if (!fs.existsSync(auditSkill)) {
-    fs.writeFileSync(auditSkill, AUDIT_SECURITY_SKILL, 'utf-8');
-  }
-
-  const refactorSkill = path.join(SKILLS_DIR, 'refactor_helper.md');
-  if (!fs.existsSync(refactorSkill)) {
-    fs.writeFileSync(refactorSkill, REFACTOR_HELPER_SKILL, 'utf-8');
   }
 }
 

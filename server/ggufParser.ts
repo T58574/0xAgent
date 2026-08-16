@@ -1,25 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { GgufMetadata, ReasoningEffortLevel } from '../src/types';
 
-export interface GgufMetadata {
-  filePath: string;
-  fileName: string;
-  fileSizeFormatted: string;
-  fileSizeBytes: number;
-  magicValid: boolean;
-  version: number;
-  architecture: string;
-  modelName: string;
-  quantization: string;
-  blockCount: number; // Layer count
-  contextLength: number; // Max trained context size (n_ctx_train)
-  expertCount: number; // MoE expert count
-  isMmproj: boolean; // Vision projector flag
-  cleanTitle?: string;
-  sizeGB?: string;
-  formattedName?: string;
-  rawKv: Record<string, any>;
-}
+export type { GgufMetadata };
 
 enum GgufValueType {
   UINT8 = 0,
@@ -74,6 +57,114 @@ function formatModelTitle(modelName: string, fileName: string): string {
     .trim();
   if (!cleanTitle) cleanTitle = fileName.replace(/\.gguf$/i, '');
   return cleanTitle;
+}
+
+export function detectModelReasoningCapabilities(
+  modelName: string,
+  fileName: string,
+  architecture: string = '',
+  _rawKv: Record<string, any> = {}
+): {
+  family: 'qwen' | 'gemma' | 'deepseek' | 'phi' | 'llama' | 'mistral' | 'unknown';
+  supportsReasoning: boolean;
+  recommendedReasoningEffort: ReasoningEffortLevel;
+  supportedReasoningLevels: ReasoningEffortLevel[];
+} {
+  const combined = `${modelName} ${fileName} ${architecture}`.toLowerCase();
+
+  // 1. Qwen 3 / Qwen 3.8 / Qwen 3.5 Series
+  if (combined.includes('qwen3') || combined.includes('qwen-3') || combined.includes('qwen_3') || combined.includes('qwen 3')) {
+    return {
+      family: 'qwen',
+      supportsReasoning: true,
+      recommendedReasoningEffort: 'xhigh',
+      supportedReasoningLevels: ['off', 'low', 'medium', 'xhigh'],
+    };
+  }
+
+  // 2. DeepSeek R1 / Distill models
+  if (combined.includes('deepseek-r1') || combined.includes('r1-distill') || combined.includes('deepseek_r1') || combined.includes('r1_distill')) {
+    return {
+      family: 'deepseek',
+      supportsReasoning: true,
+      recommendedReasoningEffort: 'high',
+      supportedReasoningLevels: ['off', 'low', 'medium', 'high'],
+    };
+  }
+
+  // 3. Gemma 4 / Gemma 3 Series
+  if (
+    combined.includes('gemma-4') ||
+    combined.includes('gemma4') ||
+    combined.includes('gemma 4') ||
+    combined.includes('gemma-3') ||
+    combined.includes('gemma3')
+  ) {
+    return {
+      family: 'gemma',
+      supportsReasoning: true,
+      recommendedReasoningEffort: 'medium',
+      supportedReasoningLevels: ['off', 'low', 'medium', 'high'],
+    };
+  }
+
+  // 4. Gemma 2 Series
+  if (combined.includes('gemma-2') || combined.includes('gemma2') || combined.includes('gemma')) {
+    return {
+      family: 'gemma',
+      supportsReasoning: false,
+      recommendedReasoningEffort: 'off',
+      supportedReasoningLevels: ['off', 'low', 'medium'],
+    };
+  }
+
+  // 5. Phi-4 Series
+  if (combined.includes('phi-4') || combined.includes('phi4') || combined.includes('phi_4')) {
+    return {
+      family: 'phi',
+      supportsReasoning: true,
+      recommendedReasoningEffort: 'medium',
+      supportedReasoningLevels: ['off', 'low', 'medium', 'high'],
+    };
+  }
+
+  // 6. Qwen 2.5 Coder / Qwen 2.5
+  if (combined.includes('qwen2.5') || combined.includes('qwen-2.5') || combined.includes('qwen')) {
+    return {
+      family: 'qwen',
+      supportsReasoning: false,
+      recommendedReasoningEffort: 'off',
+      supportedReasoningLevels: ['off', 'low', 'medium'],
+    };
+  }
+
+  // 7. Mistral / Codestral / Pixtral
+  if (combined.includes('mistral') || combined.includes('codestral') || combined.includes('pixtral') || combined.includes('devstral')) {
+    return {
+      family: 'mistral',
+      supportsReasoning: false,
+      recommendedReasoningEffort: 'off',
+      supportedReasoningLevels: ['off', 'low', 'medium'],
+    };
+  }
+
+  // 8. Llama 3 / 3.1 / 3.3
+  if (combined.includes('llama')) {
+    return {
+      family: 'llama',
+      supportsReasoning: false,
+      recommendedReasoningEffort: 'off',
+      supportedReasoningLevels: ['off', 'low', 'medium'],
+    };
+  }
+
+  // Default Fallback
+  return {
+    family: 'unknown',
+    supportsReasoning: false,
+    recommendedReasoningEffort: 'auto',
+    supportedReasoningLevels: ['auto', 'off', 'low', 'medium', 'high'],
+  };
 }
 
 export function parseGgufMetadata(filePath: string): GgufMetadata {
@@ -147,6 +238,12 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
       } catch {}
     }
   }
+
+  const reasoningCaps = detectModelReasoningCapabilities(result.modelName, fileName, result.architecture, result.rawKv);
+  result.family = reasoningCaps.family;
+  result.supportsReasoning = reasoningCaps.supportsReasoning;
+  result.recommendedReasoningEffort = reasoningCaps.recommendedReasoningEffort;
+  result.supportedReasoningLevels = reasoningCaps.supportedReasoningLevels;
 
   const sizeGBNum = fileSizeBytes / (1024 * 1024 * 1024);
   const sizeGB = `${sizeGBNum.toFixed(2)} GB`;

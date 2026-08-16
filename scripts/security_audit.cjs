@@ -2,8 +2,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const IGNORE_DIRS = new Set(['.git', 'node_modules', 'dist', 'models', 'logs']);
-const IGNORE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.ico', '.gguf', '.exe', '.tsbuildinfo', '.zip', '.tar', '.gz']);
+const IGNORE_DIRS = new Set(['.git', 'node_modules', 'dist', 'models', 'logs', '__pycache__', '.pytest_cache']);
+const IGNORE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.ico', '.gguf', '.exe', '.tsbuildinfo', '.zip', '.tar', '.gz', '.pyc', '.pyo']);
 
 const PATTERNS = [
   { name: 'Google API Key', regex: /AIza[0-9A-Za-z-_]{35}/g },

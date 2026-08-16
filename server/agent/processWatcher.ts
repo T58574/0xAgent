@@ -2,6 +2,7 @@ import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
 import { logger } from '../logger';
+import { loadConfig } from '../config';
 import { proactiveCompanion } from './proactiveCompanion';
 
 const execAsync = promisify(exec);
@@ -150,6 +151,11 @@ export class ProcessWatcher {
         now - this.lastSparkGeneratedTime > 30 * 60 * 1000
       ) {
         this.lastSparkGeneratedTime = now;
+        const config = loadConfig();
+        if (config.proactive_companion_enabled === false) {
+          return this.getStatus();
+        }
+
         logger.info('ProcessWatcher', `User in ${detectedState} mode for ${durationMinutes}m. Proposing proactive momentum spark.`);
 
         proactiveCompanion.createSparkProposal({

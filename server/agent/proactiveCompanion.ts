@@ -56,6 +56,9 @@ export class ProactiveCompanion {
     logger.onError((component, message) => {
       if (component === 'TtsService' || component === 'ProactiveCompanion' || message.includes('WebSocket')) return;
 
+      const config = loadConfig();
+      if (config.proactive_companion_enabled === false) return;
+
       const now = Date.now();
       if (now - this.lastErrorIncidentTime < 15000) return;
       this.lastErrorIncidentTime = now;
@@ -91,6 +94,10 @@ export class ProactiveCompanion {
 
   public recordUserActivity() {
     this.lastActivityTimestamp = Date.now();
+  }
+
+  public resetErrorIncidentThrottle(): void {
+    this.lastErrorIncidentTime = 0;
   }
 
   public getActiveSparks(): JarvisSparkProposal[] {

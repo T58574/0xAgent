@@ -14,6 +14,7 @@ import { workspaceRouter } from './routes/workspaceRoutes';
 import { hardwareRouter } from './routes/hardwareRoutes';
 import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes';
 import { createAgentRouter } from './routes/agentRoutes';
+import { contextRouter } from './routes/contextRoutes';
 import knowledgeRouter from './routes/knowledge';
 import { jarvisRouter } from './routes/jarvisRoutes';
 import { jarvisSupervisor } from './agent/jarvisSupervisor';
@@ -121,6 +122,7 @@ app.use('/api', workspaceRouter);
 app.use('/api', hardwareRouter);
 app.use('/api', createLlamaRouter(broadcast));
 app.use('/api', createAgentRouter(broadcast));
+app.use('/api', contextRouter);
 app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
 

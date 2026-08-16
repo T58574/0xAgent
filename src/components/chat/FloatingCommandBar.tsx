@@ -18,8 +18,9 @@ import {
   RefreshCw,
   Mic,
   Shield,
+  Sparkles,
 } from 'lucide-react';
-import { AppConfig, PersonaMetadata, PermissionPreset } from '../../types';
+import { AppConfig, PersonaMetadata, PermissionPreset, ReasoningEffortLevel } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
 import * as api from '../../services/api';
 
@@ -77,9 +78,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   onModelChanged,
 }) => {
   // Single active popup state - prevents any double opening
-  const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash' | 'permission'>('none');
+  const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash' | 'permission' | 'reasoning'>('none');
   const [permissionPreset, setPermissionPreset] = useState<PermissionPreset>(
     (config?.permission_preset as PermissionPreset) || 'prompt'
+  );
+  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortLevel>(
+    (config?.reasoning_effort as ReasoningEffortLevel) || 'auto'
   );
   const [slashFilter, setSlashFilter] = useState('');
   const [selectedSlashIndex, setSelectedSlashIndex] = useState(0);
@@ -90,12 +94,32 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     }
   }, [config?.permission_preset]);
 
+  useEffect(() => {
+    if (config?.reasoning_effort) {
+      setReasoningEffort(config.reasoning_effort as ReasoningEffortLevel);
+    }
+  }, [config?.reasoning_effort]);
+
   const handleSelectPreset = async (preset: PermissionPreset) => {
     setPermissionPreset(preset);
     setOpenMenu('none');
     try {
       if (config) {
         await api.save_config({ ...config, permission_preset: preset });
+      }
+    } catch {}
+  };
+
+  const handleSelectReasoningEffort = async (effort: ReasoningEffortLevel) => {
+    setReasoningEffort(effort);
+    setOpenMenu('none');
+    try {
+      if (config) {
+        await api.save_config({
+          ...config,
+          reasoning_effort: effort,
+          reasoning_enabled: effort !== 'off',
+        });
       }
     } catch {}
   };
@@ -113,6 +137,33 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     toggleServer,
     getDisplayTitle,
   } = useModelManager(config, onModelChanged);
+
+  // Determine current active model's reasoning capabilities & recommendations
+  const activeModelLower = (activeModelId || '').toLowerCase();
+  const currentLocalMeta = isLocalActive
+    ? modelsData?.local?.find((m) => m.filePath === activeModelId || m.fileName === activeModelId || m.title === activeModelId)
+    : null;
+
+  const supportsReasoning = Boolean(
+    currentLocalMeta?.supportsReasoning ||
+    activeModelLower.includes('qwen3') ||
+    activeModelLower.includes('gemma-4') ||
+    activeModelLower.includes('deepseek-r1') ||
+    activeModelLower.includes('r1-distill') ||
+    activeModelLower.includes('phi-4') ||
+    activeModelLower.includes('thinking') ||
+    activeModelLower.includes('gemini-3.6')
+  );
+
+  const recommendedEffort: ReasoningEffortLevel =
+    currentLocalMeta?.recommendedReasoningEffort ||
+    (activeModelLower.includes('qwen3')
+      ? 'xhigh'
+      : activeModelLower.includes('deepseek')
+      ? 'high'
+      : activeModelLower.includes('gemma') || activeModelLower.includes('gemini') || activeModelLower.includes('phi')
+      ? 'medium'
+      : 'off');
 
   const [daemonVoiceState, setDaemonVoiceState] = useState<'idle' | 'recording' | 'processing' | 'stopped'>('idle');
   const [voicePhraseNotification, setVoicePhraseNotification] = useState<string | null>(null);
@@ -468,6 +519,49 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
+      {/* 5. Reasoning Effort Popover */}
+      {openMenu === 'reasoning' && (
+        <div className="absolute bottom-full mb-3 left-64 sm:left-80 w-80 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
+          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
+            <span>Степень рассуждений &lt;think&gt;</span>
+            <Sparkles size={12} className="opacity-60 text-sky-400" />
+          </div>
+          <div className="space-y-1">
+            {[
+              {
+                id: 'auto',
+                title: `Авто (Рекомендовано: ${recommendedEffort.toUpperCase()})`,
+                desc: supportsReasoning
+                  ? `Авто-подбор под модель (${recommendedEffort.toUpperCase()})`
+                  : 'Модель без глубокого CoT (прямой ответ)',
+              },
+              { id: 'off', title: 'Отключено (Off)', desc: 'Прямой быстрый ответ без генерации мыслей <think>' },
+              { id: 'low', title: 'Низкая (Low)', desc: 'Лаконичный ход мыслей, экономия токенов и времени' },
+              { id: 'medium', title: 'Средняя (Medium)', desc: 'Сбалансированное мышление (Gemma 4 / Gemini standard)' },
+              { id: 'high', title: 'Высокая (High)', desc: 'Глубокий анализ задач и алгоритмов (DeepSeek-R1 standard)' },
+              { id: 'xhigh', title: 'Максимальная (X-High)', desc: 'Максимальная глубина рассуждений (Qwen 3.8 default)' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleSelectReasoningEffort(item.id as ReasoningEffortLevel)}
+                className={`w-full flex items-start justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                  reasoningEffort === item.id
+                    ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                }`}
+              >
+                <div className="min-w-0 pr-2">
+                  <div className="font-medium text-xs text-[var(--theme-text)]">{item.title}</div>
+                  <div className="text-[10px] text-[var(--theme-text-muted)] leading-tight">{item.desc}</div>
+                </div>
+                {reasoningEffort === item.id && <Check size={13} className="text-[var(--theme-text)] shrink-0 mt-0.5" />}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Attached Images Previews */}
       {attachedImages.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-2 px-2">
@@ -683,6 +777,29 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 : permissionPreset === 'unrestricted'
                 ? 'Full Auto'
                 : 'Prompt'}
+            </span>
+          </button>
+
+          {/* Reasoning Effort Selector below input */}
+          <button
+            type="button"
+            onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all cursor-pointer border ${
+              openMenu === 'reasoning'
+                ? 'text-[var(--theme-text)] bg-white/15 border-[var(--theme-border)] shadow-sm font-semibold'
+                : reasoningEffort !== 'off'
+                ? 'text-sky-400 hover:text-sky-300 hover:bg-white/5 border-transparent'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+            }`}
+            title={`Степень рассуждений <think>: ${reasoningEffort.toUpperCase()} (Рекомендовано: ${recommendedEffort.toUpperCase()})`}
+          >
+            <Sparkles size={13} className={reasoningEffort !== 'off' ? 'text-sky-400' : 'opacity-60'} />
+            <span className="truncate max-w-[110px]">
+              {reasoningEffort === 'auto'
+                ? `Auto (${recommendedEffort.toUpperCase()})`
+                : reasoningEffort === 'off'
+                ? 'Think: Off'
+                : `Think: ${reasoningEffort.toUpperCase()}`}
             </span>
           </button>
         </div>

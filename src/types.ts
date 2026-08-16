@@ -15,6 +15,8 @@ export interface PromptFileInfo {
   updated_at: number;
 }
 
+export type ReasoningEffortLevel = 'off' | 'low' | 'medium' | 'high' | 'xhigh' | 'auto';
+
 export interface LocalServerConfig {
   exe_path?: string | null;
   model_path?: string | null;
@@ -45,6 +47,7 @@ export interface LocalServerConfig {
   cache_reuse?: number | null;
   slot_save_path?: string | null;
   custom_args?: string | null;
+  reasoning_effort?: ReasoningEffortLevel | null;
 }
 
 export interface PersonaMetadata {
@@ -92,6 +95,7 @@ export interface AppConfig {
   theme_colors?: ThemeColors | null;
   models_path?: string | null;
   reasoning_enabled?: boolean | null;
+  reasoning_effort?: ReasoningEffortLevel | null;
   planning_mode?: boolean | null;
   temperature?: number | null;
   max_tokens?: number | null;
@@ -155,6 +159,9 @@ export interface LocalModelItem {
   formattedName: string;
   isMmproj?: boolean;
   contextLength?: number;
+  supportsReasoning?: boolean;
+  recommendedReasoningEffort?: ReasoningEffortLevel;
+  family?: string;
 }
 
 export interface AvailableModelsResponse {
@@ -256,6 +263,13 @@ export interface GgufMetadata {
   expertCount: number;
   isMmproj: boolean;
   rawKv?: Record<string, any>;
+  cleanTitle?: string;
+  sizeGB?: string;
+  formattedName?: string;
+  supportsReasoning?: boolean;
+  recommendedReasoningEffort?: ReasoningEffortLevel;
+  supportedReasoningLevels?: ReasoningEffortLevel[];
+  family?: 'qwen' | 'gemma' | 'deepseek' | 'phi' | 'llama' | 'mistral' | 'unknown';
 }
 
 export interface HardwareInfo {
@@ -415,3 +429,39 @@ export interface SessionEvent {
   payload: any;
 }
 
+export interface TokenBreakdownDetailItem {
+  id: string;
+  name: string;
+  tokens: number;
+  description?: string;
+  scope?: 'Global' | 'Workspace';
+  enabled?: boolean;
+  preview?: string;
+}
+
+export interface TokenBreakdownItem {
+  id: string;
+  name: string;
+  category: 'tools' | 'persona' | 'user_profile' | 'environment' | 'planning' | 'workspace_rules' | 'skills' | 'memory' | 'chat_history';
+  tokens: number;
+  percentage: number;
+  shareOfUsed: number;
+  color: string;
+  description?: string;
+  scope?: 'Global' | 'Workspace';
+  contentPreview?: string;
+  details?: TokenBreakdownDetailItem[];
+}
+
+export interface ContextBreakdownReport {
+  totalBudget: number;
+  totalUsed: number;
+  availableTokens: number;
+  availablePercentage: number;
+  usedPercentage: number;
+  systemPromptTokens: number;
+  chatMessagesTokens: number;
+  categories: TokenBreakdownItem[];
+  modelName: string;
+  sessionId?: string | null;
+}
