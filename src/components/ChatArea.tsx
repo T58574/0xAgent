@@ -620,20 +620,23 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         {msg.tool_calls && msg.tool_calls.length > 0 && (
                           <div className="space-y-2 pt-1 w-full">
                             {msg.tool_calls.map((tool) => {
-                              if (tool.name === 'ask_user_question' && tool.status === 'pending') {
+                              if (tool.name === 'ask_user_question') {
                                 let questions: AskUserQuestionItem[] = [];
                                 try {
-                                  const parsed = JSON.parse(tool.arguments);
-                                  questions = Array.isArray(parsed.questions)
+                                  const parsed = typeof tool.arguments === 'string' ? JSON.parse(tool.arguments) : tool.arguments;
+                                  questions = Array.isArray(parsed?.questions)
                                     ? parsed.questions
                                     : Array.isArray(parsed)
                                     ? parsed
-                                    : [parsed];
+                                    : parsed?.question
+                                    ? [parsed]
+                                    : [];
                                 } catch {}
                                 return (
                                   <InteractiveQuestionCard
                                     key={tool.id}
                                     toolCallId={tool.id}
+                                    disabled={tool.status !== 'pending'}
                                     questions={
                                       questions.length > 0
                                         ? questions

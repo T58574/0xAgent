@@ -77,13 +77,20 @@ export const InteractiveQuestionCard: React.FC<InteractiveQuestionCardProps> = (
   return (
     <div className="w-full my-3 p-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl shadow-2xl animate-fadeIn text-xs font-sans select-none">
       {/* Header */}
-      <div className="flex items-center gap-2 pb-3 border-b border-[var(--theme-border)]/50">
-        <span className="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-mono font-semibold text-[var(--theme-text)] border border-white/10">
-          :: ВОПРОС АГЕНТА
-        </span>
-        <span className="text-[11px] text-[var(--theme-text-muted)]">
-          Агенту требуется ваше уточнение для продолжения задачи
-        </span>
+      <div className="flex items-center justify-between pb-3 border-b border-[var(--theme-border)]/50">
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-mono font-semibold text-[var(--theme-text)] border border-white/10">
+            :: ВОПРОС АГЕНТА
+          </span>
+          <span className="text-[11px] text-[var(--theme-text-muted)]">
+            {disabled ? 'Вопрос завершен' : 'Агенту требуется ваше уточнение для продолжения задачи'}
+          </span>
+        </div>
+        {disabled && (
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+            [OK] ОТВЕЧЕНО
+          </span>
+        )}
       </div>
 
       {/* Question Items */}

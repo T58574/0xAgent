@@ -94,8 +94,14 @@ export function stripToolCallTags(text: string): string {
   cleaned = cleaned.replace(/<update_?persona_?file[\s\S]*?(?:<\/update_?persona_?file>|\/>|>|$)/gi, '');
   cleaned = cleaned.replace(/<execute_command[\s\S]*?(?:<\/execute_command>|$)/gi, '');
   cleaned = cleaned.replace(/<run_scratch_script[\s\S]*?(?:<\/run_scratch_script>|$)/gi, '');
-  cleaned = cleaned.replace(/<ask_user[\s\S]*?(?:<\/ask_user>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<ask_?user_?questions?[\s\S]*?(?:<\/ask_?user_?questions?>|\/>|>|$)/gi, '');
+  cleaned = cleaned.replace(/<ask_user[\s\S]*?(?:<\/ask_user>|\/>|>|$)/gi, '');
+  cleaned = cleaned.replace(/<todo_?write[\s\S]*?(?:<\/todo_?write>|\/>|>|$)/gi, '');
+  cleaned = cleaned.replace(/<code_?run[\s\S]*?(?:<\/code_?run>|\/>|>|$)/gi, '');
   cleaned = cleaned.replace(/<spawn_subagent[\s\S]*?(?:<\/spawn_subagent>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<send_subagent_message[\s\S]*?(?:<\/send_subagent_message>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<interrupt_subagent[\s\S]*?(?:<\/interrupt_subagent>|\/>|$)/gi, '');
+  cleaned = cleaned.replace(/<list_subagents[\s\S]*?(?:<\/list_subagents>|\/>|$)/gi, '');
   cleaned = cleaned.replace(/<tool_?call[\s\S]*?(?:<\/tool_?call>|$)/gi, '');
 
   // Remove leaked standalone SEARCH/REPLACE markers

@@ -413,51 +413,137 @@ function parseExecAndInteractiveToolCalls(text: string, toolCalls: ParsedToolCal
     });
   }
 
-  // 3. Ask User Question (Interactive structured card)
-  const reAskQ = /<ask_user_question\s*>([\s\S]*?)<\/ask_user_question>/gi;
+  // 3. Ask User Question (Interactive structured card: body JSON, attribute questions, or question/options attrs)
+  const reAskQ = /<ask_?user_?questions?\b([^>]*?)(?:\/>|>([\s\S]*?)<\/ask_?user_?questions?>|>)/gi;
   while ((match = reAskQ.exec(text)) !== null) {
     const raw = match[0];
     if (!toolCalls.some((tc) => tc.raw_content === raw)) {
-      try {
-        const parsed = JSON.parse(match[1].trim());
+      const attrStr = match[1] || '';
+      const bodyStr = match[2] || '';
+
+      let parsedArgs: any = null;
+
+      // 3a. Body JSON
+      if (bodyStr.trim()) {
+        try {
+          const bodyJson = JSON.parse(bodyStr.trim());
+          parsedArgs = Array.isArray(bodyJson) ? { questions: bodyJson } : bodyJson;
+        } catch {
+          if (!attrStr.includes('questions=') && !attrStr.includes('question=')) {
+            parsedArgs = { questions: [{ id: 'q1', question: bodyStr.trim() }] };
+          }
+        }
+      }
+
+      // 3b. Attribute: questions='[...]' or questions="[...]"
+      if (!parsedArgs) {
+        const questionsAttrMatch = /questions=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr);
+        const questionsRaw = questionsAttrMatch ? (questionsAttrMatch[1] || questionsAttrMatch[2]) : null;
+        if (questionsRaw) {
+          try {
+            const parsed = JSON.parse(questionsRaw);
+            parsedArgs = Array.isArray(parsed) ? { questions: parsed } : parsed;
+          } catch {}
+        }
+      }
+
+      // 3c. Attribute: question="..." and optional options="..."
+      if (!parsedArgs) {
+        const qMatch = /question=["']([^"']*)["']/i.exec(attrStr);
+        const optMatch = /options=["']([^"']*)["']/i.exec(attrStr);
+        if (qMatch) {
+          let opts: any[] = [];
+          if (optMatch) {
+            try {
+              const parsedOpts = JSON.parse(optMatch[1]);
+              opts = Array.isArray(parsedOpts) ? parsedOpts : [parsedOpts];
+            } catch {
+              opts = optMatch[1].split(',').map((o) => ({ label: o.trim() })).filter((o) => o.label);
+            }
+          }
+          parsedArgs = {
+            questions: [
+              {
+                id: 'q1',
+                question: qMatch[1],
+                options: opts.length > 0 ? opts : undefined,
+              },
+            ],
+          };
+        }
+      }
+
+      if (parsedArgs) {
         toolCalls.push({
           id: `askq_${uuidv4().substring(0, 8)}`,
           name: 'ask_user_question',
-          arguments: parsed,
+          arguments: parsedArgs,
           raw_content: raw,
         });
-      } catch {}
+      }
     }
   }
 
-  // 4. Todo Write
-  const reTodo = /<(?:todo_write|todowrite)\s*>([\s\S]*?)<\/(?:todo_write|todowrite)>/gi;
+  // 4. Todo Write: body JSON or attribute todos='[...]'
+  const reTodo = /<(?:todo_write|todowrite|todo_items)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:todo_write|todowrite|todo_items)>|>)/gi;
   while ((match = reTodo.exec(text)) !== null) {
     const raw = match[0];
     if (!toolCalls.some((tc) => tc.raw_content === raw)) {
-      try {
-        const parsed = JSON.parse(match[1].trim());
+      const attrStr = match[1] || '';
+      const bodyStr = match[2] || '';
+      let parsedTodos: any = null;
+
+      if (bodyStr.trim()) {
+        try {
+          parsedTodos = JSON.parse(bodyStr.trim());
+        } catch {}
+      }
+
+      if (!parsedTodos) {
+        const todosAttrMatch = /todos=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr);
+        const todosRaw = todosAttrMatch ? (todosAttrMatch[1] || todosAttrMatch[2]) : null;
+        if (todosRaw) {
+          try {
+            parsedTodos = JSON.parse(todosRaw);
+          } catch {}
+        }
+      }
+
+      if (parsedTodos) {
         toolCalls.push({
           id: `todo_${uuidv4().substring(0, 8)}`,
           name: 'todo_write',
-          arguments: parsed,
+          arguments: Array.isArray(parsedTodos) ? { todos: parsedTodos } : parsedTodos,
           raw_content: raw,
         });
-      } catch {}
+      }
     }
   }
 
-  // 5. Code Run (Sandbox VM)
-  const reCode = /<(?:code_run|coderun)\s*>([\s\S]*?)<\/(?:code_run|coderun)>/gi;
+  // 5. Code Run (Sandbox VM): body or script attribute
+  const reCode = /<(?:code_run|coderun)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:code_run|coderun)>|>)/gi;
   while ((match = reCode.exec(text)) !== null) {
     const raw = match[0];
     if (!toolCalls.some((tc) => tc.raw_content === raw)) {
-      toolCalls.push({
-        id: `code_${uuidv4().substring(0, 8)}`,
-        name: 'code_run',
-        arguments: { script: match[1].trim() },
-        raw_content: raw,
-      });
+      const attrStr = match[1] || '';
+      const bodyStr = match[2] || '';
+      let script = bodyStr.trim();
+
+      if (!script) {
+        const scriptMatch = /script=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr);
+        if (scriptMatch) {
+          script = (scriptMatch[1] || scriptMatch[2] || '').trim();
+        }
+      }
+
+      if (script) {
+        toolCalls.push({
+          id: `code_${uuidv4().substring(0, 8)}`,
+          name: 'code_run',
+          arguments: { script },
+          raw_content: raw,
+        });
+      }
     }
   }
 

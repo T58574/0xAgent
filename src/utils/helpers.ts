@@ -36,15 +36,23 @@ export function cleanContent(content: string): string {
   // 2. Strip closed & unclosed tool tags for all tools
   cleaned = cleaned.replace(/<write_file\s+path=["'][^"']*["']\s*>([\s\S]*?)(?:<\/write_file>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<patch_file\s+path=["'][^"']*["']\s*>([\s\S]*?)(?:<\/patch_file>|(?=<[a-z_]+|$))/gi, "");
-  cleaned = cleaned.replace(/<execute_command\s*>([\s\S]*?)(?:<\/execute_command>|(?=<[a-z_]+|$))/gi, "");
-  cleaned = cleaned.replace(/<run_scratch_script\s+language=["'][^"']*["']\s*>([\s\S]*?)(?:<\/run_scratch_script>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<execute_command[\s\S]*?(?:<\/execute_command>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<run_scratch_script[\s\S]*?(?:<\/run_scratch_script>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<save_knowledge[\s\S]*?(?:<\/save_knowledge>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<update_?persona_?file[\s\S]*?(?:<\/update_?persona_?file>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<update_?user_?profile[\s\S]*?(?:<\/update_?user_?profile>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<ask_?user_?questions?[\s\S]*?(?:<\/ask_?user_?questions?>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<ask_user[\s\S]*?(?:<\/ask_user>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<todo_?write[\s\S]*?(?:<\/todo_?write>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<code_?run[\s\S]*?(?:<\/code_?run>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<spawn_subagent[\s\S]*?(?:<\/spawn_subagent>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<send_subagent_message[\s\S]*?(?:<\/send_subagent_message>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<interrupt_subagent[\s\S]*?(?:<\/interrupt_subagent>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<list_subagents[\s\S]*?(?:<\/list_subagents>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<tool_?call[\s\S]*?(?:<\/tool_?call>|(?=<[a-z_]+|$))/gi, "");
   
   // Single self-closing tags
-  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|fff_search|web_search|read_web_page|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|search_knowledge|list_knowledge|ask_user|spawn_subagent|update_?user_?profile)\s+[^>]*\/?>/gi, "");
+  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|fff_search|web_search|read_web_page|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|search_knowledge|list_knowledge|ask_user|ask_?user_?questions?|todo_?write|code_?run|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|update_?user_?profile)\s+[^>]*\/?>/gi, "");
 
   // Block-format grep_search: <grep_search>...</grep_search>
   cleaned = cleaned.replace(/<grep_search\s*>[\s\S]*?<\/grep_search>/gi, "");
@@ -53,7 +61,7 @@ export function cleanContent(content: string): string {
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, "");
 
   // 4. Remove orphaned standalone closing tags
-  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|spawn_subagent|tool_?call|code_run|todo_write|update_?user_?profile|update_?persona_?file)\s*>/gi, "");
+  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|ask_?user_?questions?|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|tool_?call|code_run|todo_write|update_?user_?profile|update_?persona_?file)\s*>/gi, "");
 
   // 5. Remove empty code fences and excess vertical spacing
   cleaned = cleaned.replace(/```[a-z]*\s*```/gi, "");
