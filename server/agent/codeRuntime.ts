@@ -19,6 +19,7 @@ import {
 import { addOrUpdateMemory, queryMemories } from '../memory';
 import { listSkills, readSkill } from '../skills';
 import { listSessions, loadSession } from '../session';
+import { getActivePersona, appendSilentUserTrait, updatePersonaFile } from '../personas';
 
 export interface CodeRuntimeOptions {
   timeoutMs?: number;
@@ -60,12 +61,12 @@ export async function executeCodeProgram(
     },
     write_file: async (args: any) => {
       const p = args?.path;
-      const c = args?.content;
+      const c = args?.content !== undefined ? args.content : args?.text || '';
       return await executeWriteFile(config.workspace_dir, p, c);
     },
     patch_file: async (args: any) => {
       const p = args?.path;
-      const c = args?.content;
+      const c = args?.content !== undefined ? args.content : args?.patch || '';
       return await executePatchFile(config.workspace_dir, p, c);
     },
     create_directory: async (args: any) => {
@@ -109,6 +110,28 @@ export async function executeCodeProgram(
     },
     list_knowledge: async (args: any) => {
       return await executeListKnowledge(args?.category);
+    },
+    update_user_profile: async (args: any) => {
+      const activePersona = getActivePersona();
+      const trait = typeof args === 'string' ? args : args?.trait || args?.content || args?.value || '';
+      const category = (typeof args === 'object' && args?.category) || 'profile';
+      if (!trait.trim()) return 'Error: trait content cannot be empty.';
+      appendSilentUserTrait(activePersona.metadata.id, `[${category}] ${trait.trim()}`);
+      addOrUpdateMemory(`user_${category}`, trait.trim(), category);
+      return `[OK] Profile updated in USER.md: [${category}] ${trait.trim()}`;
+    },
+    update_persona_file: async (args: any) => {
+      const activePersona = getActivePersona();
+      const filename = (args?.file || args?.filename || 'USER.md') as 'SOUL.md' | 'TOOLS.md' | 'USER.md';
+      const content = args?.content || '';
+      if (!['SOUL.md', 'TOOLS.md', 'USER.md'].includes(filename)) {
+        return `Error: Invalid persona filename '${filename}'. Allowed: SOUL.md, TOOLS.md, USER.md`;
+      }
+      updatePersonaFile(activePersona.metadata.id, filename, content);
+      return `[OK] File ${filename} updated in persona ${activePersona.metadata.id}`;
+    },
+    todo_write: async (_args: any) => {
+      return `[OK] Todo write registered.`;
     },
     recall_memories: async (args: any) => {
       const q = typeof args === 'string' ? args : args?.query || '';

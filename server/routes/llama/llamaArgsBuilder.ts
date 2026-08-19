@@ -213,6 +213,17 @@ export function buildLlamaServerArgs(params: BuildLlamaArgsParams): { args: stri
   const flashAttn = body.flashAttn !== undefined ? body.flashAttn : ls.flash_attn;
   if (flashAttn) args.push('-fa', 'on');
 
+  // KV-Cache Quantization: -ctk and -ctv (e.g. q8_0, q4_0, f16)
+  const ctk = body.ctk || ls.ctk;
+  if (ctk && typeof ctk === 'string' && ctk.trim() && ctk !== 'f16' && ctk !== 'default') {
+    args.push('-ctk', ctk.trim());
+  }
+
+  const ctv = body.ctv || ls.ctv;
+  if (ctv && typeof ctv === 'string' && ctv.trim() && ctv !== 'f16' && ctv !== 'default') {
+    args.push('-ctv', ctv.trim());
+  }
+
   const mmap = body.mmap !== undefined ? body.mmap : ls.mmap;
   if (mmap === false) args.push('--no-mmap');
 

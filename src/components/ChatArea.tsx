@@ -201,7 +201,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     if (chatContainerRef.current && !isUserScrolledUpRef.current) {
       chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [messages, agentStatus, liveTelemetry]);
+  }, [messages, agentStatus]);
 
   const processImageFiles = (files: FileList | File[]) => {
     Array.from(files).forEach((file) => {

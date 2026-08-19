@@ -210,6 +210,7 @@ export interface MessageMetrics {
   tokensPerSec?: number;
   promptTokens?: number;
   completionTokens?: number;
+  tokenCount?: number;
   totalTokens?: number;
   contextUsed?: number;
   contextMax?: number;

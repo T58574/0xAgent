@@ -41,11 +41,42 @@ export async function listSessions(): Promise<ChatSession[]> {
   }
 }
 
+let activeStreamGetter: ((sessionId: string) => any) | null = null;
+export function setActiveStreamGetter(fn: (sessionId: string) => any): void {
+  activeStreamGetter = fn;
+}
+
 export async function loadSession(id: string): Promise<ChatSession> {
   const dir = await ensureSessionsDir();
   const filePath = path.join(dir, `${id}.json`);
   const data = await fs.promises.readFile(filePath, 'utf-8');
-  return JSON.parse(data) as ChatSession;
+  const session = JSON.parse(data) as ChatSession;
+
+  if (activeStreamGetter) {
+    const activeStream = activeStreamGetter(id);
+    if (activeStream && activeStream.content) {
+      const existingIdx = session.messages.findIndex((m) => m.id === activeStream.assistantMessageId);
+      if (existingIdx !== -1) {
+        session.messages[existingIdx].content = activeStream.content;
+      } else {
+        session.messages.push({
+          id: activeStream.assistantMessageId,
+          role: 'assistant',
+          content: activeStream.content,
+          timestamp: activeStream.startTime || Date.now(),
+          metrics: {
+            tokensPerSec: activeStream.tokensPerSec || 0,
+            tokenCount: activeStream.tokenCount || 0,
+            contextUsed: activeStream.contextUsed || 0,
+            contextMax: activeStream.contextMax || 16384,
+            modelName: activeStream.modelName || 'agent',
+          },
+        });
+      }
+    }
+  }
+
+  return session;
 }
 
 export async function saveSession(session: ChatSession): Promise<void> {

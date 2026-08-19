@@ -43,8 +43,12 @@ ${activePersona.user}
 
   const toolExecutionDirective = `\n\n# ПРОТОКОЛ ВЫЗОВА ИНСТРУМЕНТОВ
 1. Давай краткое пояснение перед вызовом XML-тегов инструментов.
-2. ВСЕГДА используй <patch_file> с компактными SEARCH/REPLACE блоками (3-8 строк) для существующих файлов. Инструмент <write_file> используй только для новых файлов.
-3. Используй относительные пути (напр. path="src/index.ts" или path=".").
+2. ПРИОРИТЕТ АТОМАРНЫХ ИНСТРУМЕНТОВ:
+   - Для создания файлов ВСЕГДА используй <write_file path="...">...</write_file> (родительские директории создаются автоматически).
+   - Для модификации существующих файлов ВСЕГДА используй <patch_file path="..."> с компактными SEARCH/REPLACE блоками (3-8 строк).
+   - Для базы знаний используй <save_knowledge>, для профиля пользователя — <update_user_profile>.
+   - Инструмент <code_run> используй ТОЛЬКО для алгоритмических расчетов, парсинга данных или сложных пакетных операций. НЕ оборачивай простое создание 1-2 файлов в громоздкие JS-скрипты.
+3. Используй относительные пути (напр. path="src/index.ts" или path="notes/profiles/identity.md").
 4. Закрывай все XML-теги инструментов корректно.
 5. ОСТАНАВЛИВАЙ ГЕНЕРАЦИЮ сразу после закрывающего тега инструмента. Среда исполнит команду в реальной ОС и вернет ответ в <tool_response name="...">...</tool_response>.
 6. НИКОГДА не выдумывай и не симулируй результаты инструментов самостоятельно.`;
@@ -55,8 +59,10 @@ ${activePersona.user}
 
   const reasoningDirective = !isReasoningExplicitlyOff && !isGemmaModel
     ? `\n\n# ИНСТРУКЦИИ ДЛЯ БЛОКА РАССУЖДЕНИЙ <THINK>
-- Веди весь процесс размышления, анализа задачи и формулирования плана ИСКЛЮЧИТЕЛЬНО НА РУССКОМ ЯЗЫКЕ.
-- Запрещено вести рассуждения на английском языке, чтобы исключить смешивание языков в итоговом ответе.`
+1. Веди весь процесс размышления, анализа задачи и формулирования плана ИСКЛЮЧИТЕЛЬНО НА РУССКОМ ЯЗЫКЕ.
+2. АРХИТЕКТУРНЫЙ ФОКУС: В блоке рассуждений формулируй стратегию, логику и выбор инструментов.
+3. ЗАПРЕТ ЧЕРНОВИКОВ ФАЙЛОВ В МЫСЛЯХ: Категорически запрещено прописывать полный текст файлов, шаблоны или длинные патчи внутри блока рассуждений. Текст файлов сразу пишется в тело целевого инструмента (<write_file>, <patch_file>, <save_knowledge>).
+4. ЭФФЕКТИВНОСТЬ: Избегай зацикливания и многократного повторения одних и тех же мыслей.`
     : '';
 
   const languageProtocolDirective = `\n\n# ГЛАВНЫЙ ЯЗЫКОВОЙ СТАНДАРТ (СТРОЖАЙШИЙ ЗАПРЕТ СМЕШИВАНИЯ ЯЗЫКОВ):
@@ -132,15 +138,15 @@ export function formatMessageContent(m: ChatMessage, isHistoryAssistant: boolean
     }
   }
 
-  // Google DeepMind Gemma 4 Multi-Turn Conversation Rule:
-  // "In multi-turn conversations, the historical model output should only include the final response.
-  // Thoughts from previous model turns must not be added before the next user turn begins,
-  // with the exception of tool call turns where thinking content should be preserved."
-  if (isHistoryAssistant && (!m.tool_calls || m.tool_calls.length === 0)) {
+  // Tier-2 CoT Compaction:
+  // In multi-turn conversations, historical assistant outputs must NOT retain large thinking blocks.
+  // Stripping past reasoning prevents context bloat, reduces KV cache memory consumption,
+  // and eliminates repetition traps on follow-up turns ("продолжи").
+  if (isHistoryAssistant) {
     content = content
-      .replace(/<(?:think|thought|\|thought\||\|start_thought\|)>[\s\S]*?<\/(?:think|thought|\|thought\||\|end_thought\|)>/gi, '')
-      .replace(/<\|?channel\|?>?thought[\s\S]*?<\|?(?:\/channel|channel\|?)>/gi, '')
-      .replace(/\[(?:think|thinking)\][\s\S]*?\[\/(?:think|thinking)\]/gi, '')
+      .replace(/<(?:think|thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?(?:<\/(?:think|thought|thinking|\|thought\||\|end_thought\|)>|$)/gi, '')
+      .replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?(?:\/channel|channel\|?)>|$)/gi, '')
+      .replace(/\[(?:think|thinking|thought)\][\s\S]*?(?:\[\/(?:think|thinking|thought)\]|$)/gi, '')
       .trim();
   }
 

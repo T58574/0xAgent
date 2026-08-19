@@ -118,7 +118,22 @@ export async function runAgentLoop(
         return;
       }
 
-      assistantMessage.content = streamResult.content;
+      // Auto-close unclosed tags to prevent DOM/context corruption
+      let finalContent = streamResult.content || '';
+      if (/<(?:think|thought|thinking)>[^<]*$/i.test(finalContent) || (/<(?:think|thought|thinking)>/i.test(finalContent) && !/<\/(?:think|thought|thinking)>/i.test(finalContent))) {
+        finalContent += '\n</think>';
+      }
+      if (/<code_run[^>]*>[\s\S]*$/i.test(finalContent) && !/<\/code_run>/i.test(finalContent)) {
+        finalContent += '\n</code_run>';
+      }
+      if (/<write_file[^>]*>[\s\S]*$/i.test(finalContent) && !/<\/write_file>/i.test(finalContent)) {
+        finalContent += '\n</write_file>';
+      }
+      if (/<patch_file[^>]*>[\s\S]*$/i.test(finalContent) && !/<\/patch_file>/i.test(finalContent)) {
+        finalContent += '\n</patch_file>';
+      }
+
+      assistantMessage.content = finalContent;
       assistantMessage.metrics = {
         tokensPerSec: streamResult.tokensPerSec,
         promptTokens: streamResult.promptTokens,
@@ -144,7 +159,7 @@ export async function runAgentLoop(
           session.messages.push({
             id: uuidv4(),
             role: 'user',
-            content: '[SYSTEM DIRECTIVE: Обнаружено зацикливание / повторение предыдущего ответа! Не повторяйте текст и не просите пользователя писать "продолжи". Сразу переходите к исполнению нужного XML инструмента (<read_file>, <write_file>, <patch_file>, <execute_command>) или завершите решение.]',
+            content: '[SYSTEM DIRECTIVE: Обнаружено зацикливание / повторение предыдущего ответа! Не повторяйте текст и не просите пользователя писать "продолжи". Сразу переходите к исполнению нужного XML инструмента (<read_file>, <write_file>, <patch_file>, <save_knowledge>, <execute_command>) или завершите решение.]',
             timestamp: Date.now(),
           });
           session.updated_at = Date.now();
@@ -169,7 +184,7 @@ export async function runAgentLoop(
         session.messages.push({
           id: uuidv4(),
           role: 'user',
-          content: '[SYSTEM DIRECTIVE: Ваш предыдущий ответ был обрезан по лимиту max_tokens! Не повторяйте уже написанный текст и рассуждения. Сократите блок мыслей до минимума. Сразу переходите к исполнению XML инструментов (<read_file>, <grep_search>, <list_dir>, <patch_file>, <execute_command>). Минимум текста — максимум действий.]',
+          content: '[SYSTEM DIRECTIVE: Предыдущий ответ был обрезан по лимиту длины (max_tokens)! Не продолжайте незаконченный текст с середины слова. Не дублируйте черновики файлов в мыслях. Сразу вызовите целевой инструмент (<write_file>, <patch_file>, <save_knowledge>, <execute_command>) целиком в корректных XML-тегах.]',
           timestamp: Date.now(),
         });
         session.updated_at = Date.now();
@@ -177,7 +192,7 @@ export async function runAgentLoop(
 
         broadcast('agent-error', {
           sessionId,
-          message: '[!] Ответ модели обрезан по лимиту токенов (max_tokens). Автоматическое продолжение с директивой сокращения рассуждений...',
+          message: '[!] Ответ модели обрезан по лимиту токенов (max_tokens). Автоматическое продолжение с директивой прямого вызова инструментов...',
         });
         continue;
       }

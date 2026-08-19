@@ -165,10 +165,15 @@ const DECLARATIVE_RULES: ToolRule[] = [
     },
   },
   {
-    regex: /<(?:code_run|coderun)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:code_run|coderun)>)/gi,
+    regex: /<(?:code_run|coderun)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:code_run|coderun)>|>([\s\S]*?)$)/gi,
     handler: (m) => {
-      const script = (m[2] || '').trim() || (/script=(?:'([^']*)'|"([^"]*)")/i.exec(m[1] || '')?.[1] || /script=(?:'([^']*)'|"([^"]*)")/i.exec(m[1] || '')?.[2] || '').trim();
-      return script ? { idPrefix: 'code', name: 'code_run', args: { script, code: script, program: script } } : null;
+      const script = (m[2] || m[3] || '').trim() || (/script=(?:'([^']*)'|"([^"]*)")/i.exec(m[1] || '')?.[1] || /script=(?:'([^']*)'|"([^"]*)")/i.exec(m[1] || '')?.[2] || '').trim();
+      return script ? {
+        idPrefix: 'code',
+        name: 'code_run',
+        args: { script, code: script, program: script },
+        customCondition: (calls, raw) => !calls.some((tc) => tc.name === 'code_run' && tc.raw_content === raw),
+      } : null;
     },
   },
   { regex: /<run_scratch_script\s+language=["']([^"']+)["']\s*>([\s\S]*?)<\/run_scratch_script>/gi, handler: (m) => ({ idPrefix: 'scratch', name: 'run_scratch_script', args: { language: m[1], code: m[2] } }) },
@@ -178,9 +183,9 @@ const DECLARATIVE_RULES: ToolRule[] = [
 function stripThinkingForToolParsing(text: string): string {
   if (!text) return '';
   return text
-    .replace(/<(?:think|thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?<\/(?:think|thought|thinking|\|thought\||\|end_thought\|)>/gi, '')
-    .replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>)/gi, '')
-    .replace(/\[(?:think|thinking|thought)\][\s\S]*?\[\/(?:think|thinking|thought)\]/gi, '')
+    .replace(/<(?:think|thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?(?:<\/(?:think|thought|thinking|\|thought\||\|end_thought\|)>|$)/gi, '')
+    .replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>|$)/gi, '')
+    .replace(/\[(?:think|thinking|thought)\][\s\S]*?(?:\[\/(?:think|thinking|thought)\]|$)/gi, '')
     .trim();
 }
 
@@ -221,10 +226,35 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
   }
 }
 
+function maskIllustrativeCodeBlocks(text: string): string {
+  const trimmed = text.trim();
+  // If the entire response is a single codeblock containing an XML tool
+  if (/^```(?:xml|html)?\s*\r?\n\s*<[a-z_]+/i.test(trimmed) && trimmed.endsWith('```')) {
+    return trimmed.replace(/^```(?:xml|html)?\s*\r?\n/i, '').replace(/\r?\n```$/i, '').trim();
+  }
+
+  // Preserve XML tag structures and patch blocks, while masking explanatory command examples
+  return text.replace(/(<(?:\w+)[^>]*>[\s\S]*?(?:<\/(?:\w+)>|$))|(```[\s\S]*?```)|(`[^`\n]+`)/g, (match, xmlBlock, codeBlock, inlineCode) => {
+    if (xmlBlock) {
+      return xmlBlock;
+    }
+    if (codeBlock) {
+      if (codeBlock.includes('<<<<<<< SEARCH') || codeBlock.includes('=======')) {
+        return codeBlock;
+      }
+      return '<!-- CODE_BLOCK_MASKED -->';
+    }
+    if (inlineCode) {
+      return '<!-- INLINE_CODE_MASKED -->';
+    }
+    return match;
+  });
+}
+
 export function parseToolCalls(text: string): ParsedToolCall[] {
   const toolCalls: ParsedToolCall[] = [];
   const textWithoutThinking = stripThinkingForToolParsing(text);
-  const sanitizedText = textWithoutThinking.replace(/```(?:xml|html|json|tsx|ts)?/gi, '').replace(/```$/gm, '');
+  const sanitizedText = maskIllustrativeCodeBlocks(textWithoutThinking);
 
   for (const rule of DECLARATIVE_RULES) {
     const re = new RegExp(rule.regex.source, rule.regex.flags);

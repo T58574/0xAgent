@@ -43,10 +43,10 @@ export function createAgentRouter(broadcast: BroadcastFn): Router {
     res.json({ success: true });
   });
 
-  router.post('/cancel-agent', (req, res) => {
+  router.post('/cancel-agent', async (req, res) => {
     const { sessionId } = req.body;
     if (sessionId) {
-      cancelAgentSession(sessionId);
+      await cancelAgentSession(sessionId);
     }
     res.json({ success: true });
   });

@@ -29,8 +29,8 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
   let thinkText = '';
   let bodyText = text;
 
-  // 1. Standard <think>...</think> or <thought>...</thought> (closed)
-  const thinkRegex = /<(?:think|thought)>([\s\S]*?)<\/(?:think|thought)>/i;
+  // 1. Standard <think>...</think>, <thought>...</thought>, <thinking>...</thinking> (closed)
+  const thinkRegex = /<(?:think|thought|thinking)>([\s\S]*?)<\/(?:think|thought|thinking)>/i;
   const thinkMatch = text.match(thinkRegex);
   if (thinkMatch) {
     thinkText = thinkMatch[1].trim();
@@ -38,7 +38,16 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
     return { thinkText, bodyText };
   }
 
-  // 2. Gemma 4 / Channel format: <|channel>thought ... <channel|> or <|channel|> or </channel> (closed)
+  // 2. Bracket style [think]...[/think], [thinking]...[/thinking] (closed)
+  const bracketThinkRegex = /\[(?:think|thinking|thought)\]([\s\S]*?)\[\/(?:think|thinking|thought)\]/i;
+  const bracketMatch = text.match(bracketThinkRegex);
+  if (bracketMatch) {
+    thinkText = bracketMatch[1].trim();
+    bodyText = text.replace(bracketThinkRegex, '').trim();
+    return { thinkText, bodyText };
+  }
+
+  // 3. Gemma 4 / Channel format: <|channel>thought ... <channel|> or <|channel|> or </channel> (closed)
   const gemmaThinkRegex = /<\|?channel\|?>?thought([\s\S]*?)(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>)/i;
   const gemmaMatch = text.match(gemmaThinkRegex);
   if (gemmaMatch) {
@@ -47,8 +56,8 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
     return { thinkText, bodyText };
   }
 
-  // 3. Standard <think> or <thought> (unclosed / streaming)
-  const openThinkMatch = text.match(/<(?:think|thought)>/i);
+  // 4. Standard <think>, <thought>, <thinking> (unclosed / streaming)
+  const openThinkMatch = text.match(/<(?:think|thought|thinking)>/i);
   if (openThinkMatch && openThinkMatch.index !== undefined) {
     const startIdx = openThinkMatch.index;
     const tagLen = openThinkMatch[0].length;
@@ -57,7 +66,7 @@ export function extractThinkingBlock(text: string): { thinkText: string; bodyTex
     return { thinkText, bodyText };
   }
 
-  // 4. Gemma 4 <|channel>thought (unclosed / streaming)
+  // 5. Gemma 4 <|channel>thought (unclosed / streaming)
   const gemmaOpenMatch = text.match(/<\|?channel\|?thought/i);
   if (gemmaOpenMatch && gemmaOpenMatch.index !== undefined) {
     const startIdx = gemmaOpenMatch.index;

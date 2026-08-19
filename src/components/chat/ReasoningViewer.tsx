@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LiveTelemetry } from '../../types';
 import { extractThoughtSteps, ThoughtStep } from '../../utils/helpers';
 import { MaterialIcon } from '../common/MaterialIcon';
@@ -13,7 +13,7 @@ interface ReasoningViewerProps {
 
 const ASCII_SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
 
-export const ReasoningViewer: React.FC<ReasoningViewerProps> = ({
+export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
   thinking,
   isLive = false,
   thinkingSeconds = 0,
@@ -26,12 +26,12 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = ({
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // ASCII Spinner interval for live thinking HUD
+  // ASCII Spinner interval for live thinking HUD only
   useEffect(() => {
     if (!isLive) return;
     const interval = setInterval(() => {
       setSpinnerFrame((prev) => (prev + 1) % ASCII_SPINNER_FRAMES.length);
-    }, 80);
+    }, 100);
     return () => clearInterval(interval);
   }, [isLive]);
 
@@ -42,20 +42,28 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = ({
     }
   }, [thinking, isLive, isOpen, autoScroll]);
 
-  // Extract structured steps or raw stream
-  const steps: ThoughtStep[] = extractThoughtSteps(thinking);
-  const wordCount = thinking.trim() ? thinking.trim().split(/\s+/).length : 0;
-
-  // Extract dynamic last thought line for live ticker preview while collapsed
-  const getLastThoughtSnippet = (raw: string): string => {
-    if (!raw.trim()) {
+  // Extract dynamic last thought line for live ticker preview while collapsed (memoized)
+  const lastThoughtSnippet = useMemo(() => {
+    if (!thinking || !thinking.trim()) {
       return isLive ? 'Инициализация контекста и генерация рассуждений...' : 'Ход мыслей модели';
     }
-    const lines = raw.trim().split('\n').filter((l) => l.trim().length > 0);
+    const lines = thinking.trim().split('\n');
     const lastLine = lines[lines.length - 1] || '';
     const clean = lastLine.replace(/^[-*#\d\.\)\s]+/, '').trim();
-    return clean.length > 75 ? `${clean.substring(0, 72)}...` : clean;
-  };
+    return clean.length > 75 ? `${clean.substring(0, 72)}...` : (clean || 'Анализ контекста и планирование действий...');
+  }, [thinking, isLive]);
+
+  // Extract structured steps lazily only when expanded or when short
+  const steps: ThoughtStep[] = useMemo(() => {
+    if (!isOpen && !isLive) return [];
+    if (!thinking.trim()) return [];
+    return extractThoughtSteps(thinking);
+  }, [thinking, isOpen, isLive]);
+
+  const wordCount = useMemo(() => {
+    if (!thinking.trim()) return 0;
+    return thinking.trim().split(/\s+/).length;
+  }, [thinking]);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -113,10 +121,10 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = ({
                 {isLive ? (
                   <span className="inline-flex items-center gap-1.5 text-[var(--theme-text)] font-medium">
                     <span className="text-[10px] font-bold text-sky-500">›</span>
-                    {getLastThoughtSnippet(thinking)}
+                    {lastThoughtSnippet}
                   </span>
                 ) : (
-                  getLastThoughtSnippet(thinking)
+                  lastThoughtSnippet
                 )}
               </span>
             )}
@@ -246,4 +254,4 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = ({
       )}
     </div>
   );
-};
+});

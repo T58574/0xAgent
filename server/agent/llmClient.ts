@@ -1,5 +1,10 @@
 import { AppConfig } from '../../src/types';
-import { handleAgentError } from './agentState';
+import {
+  handleAgentError,
+  registerActiveSessionStream,
+  updateActiveSessionStream,
+  removeActiveSessionStream,
+} from './agentState';
 import { strip_ai_reasoning_fluff } from './fluffSanitizer';
 import { estimatePromptTokens } from '../summarizer';
 
@@ -295,12 +300,32 @@ export async function readLlmStream(
 
   let assistantContent = '';
 
+  registerActiveSessionStream(sessionId, {
+    sessionId,
+    assistantMessageId,
+    content: '',
+    startTime: genStartTime,
+    tokensPerSec: 0,
+    tokenCount: 0,
+    contextUsed: estimatedPromptTokens,
+    contextMax,
+    modelName,
+  });
+
   const emitToken = (content: string) => {
     assistantContent += content;
     tokenCount++;
     const elapsedSec = (Date.now() - genStartTime) / 1000;
     const tokensPerSec = elapsedSec > 0.1 ? Math.round((tokenCount / elapsedSec) * 10) / 10 : 0;
     const contextUsed = estimatedPromptTokens + tokenCount;
+
+    updateActiveSessionStream(sessionId, content, {
+      tokensPerSec,
+      tokenCount,
+      contextUsed,
+      contextMax,
+      modelName,
+    });
 
     broadcast('agent-token-stream', {
       sessionId,
@@ -372,6 +397,7 @@ export async function readLlmStream(
     while (!isStreamDone) {
       if (activeCancelTokens.has(sessionId)) {
         await reader.cancel().catch(() => {});
+        removeActiveSessionStream(sessionId);
         broadcast('agent-status-changed', { sessionId, status: 'idle' });
         return null;
       }
@@ -469,6 +495,8 @@ export async function readLlmStream(
   const finalTokensPerSec =
     totalElapsedMs > 100 ? Math.round((tokenCount / (totalElapsedMs / 1000)) * 10) / 10 : 0;
   const finalContextUsed = estimatedPromptTokens + tokenCount;
+
+  removeActiveSessionStream(sessionId);
 
   return {
     content: assistantContent,
