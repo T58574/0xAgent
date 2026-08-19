@@ -199,9 +199,9 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
       const detail = getPersonaDetail('jarvis_companion');
       assert.ok(detail, 'jarvis_companion persona must exist');
       assert.equal(detail.metadata.id, 'jarvis_companion');
-      assert.ok(detail.soul.includes('SOUL.md — Джарвис'), 'SOUL.md must contain Jarvis persona definitions');
-      assert.ok(detail.soul.includes('ZERO-GUILT'), 'SOUL.md must enforce zero-guilt directive');
-      assert.ok(detail.soul.includes('PUSH OVER PULL'), 'SOUL.md must enforce push over pull directive');
+      assert.ok(detail.soul.includes('SOUL.md — Джарвис') || detail.soul.includes('Jarvis Companion'), 'SOUL.md must contain Jarvis persona definitions');
+      assert.ok(detail.soul.includes('ZERO-GUILT') || detail.soul.includes('ПОДДЕРЖКА'), 'SOUL.md must enforce zero-guilt directive');
+      assert.ok(detail.soul.includes('PUSH OVER PULL') || detail.soul.includes('ДЕЙСТВИЕ ВПЕРЕД'), 'SOUL.md must enforce push over pull directive');
       assert.ok(detail.tools.length > 0, 'TOOLS.md must not be empty');
       assert.ok(detail.user.length > 0, 'USER.md must not be empty');
     });

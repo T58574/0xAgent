@@ -131,14 +131,96 @@ export async function rollbackSession(
   return { session, restoredContent };
 }
 
+export function isAutoWorkspaceDir(dirPath?: string | null): boolean {
+  if (!dirPath) return false;
+  const normalized = path.resolve(dirPath).toLowerCase();
+  const workspacesRoot = path.resolve(path.join(getAppDir(), 'workspaces')).toLowerCase();
+  return normalized.startsWith(workspacesRoot) && normalized !== workspacesRoot;
+}
+
+export async function cleanupOrphanWorkspaces(): Promise<{ removed: string[]; retained: string[] }> {
+  const workspacesRoot = path.join(getAppDir(), 'workspaces');
+  const removed: string[] = [];
+  const retained: string[] = [];
+
+  if (!fs.existsSync(workspacesRoot)) {
+    return { removed, retained };
+  }
+
+  try {
+    const sessions = await listSessions();
+    const activeWorkspacePaths = new Set(
+      sessions
+        .map((s) => s.workspace_dir)
+        .filter(Boolean)
+        .map((p) => path.resolve(p!).toLowerCase())
+    );
+
+    const entries = await fs.promises.readdir(workspacesRoot);
+    for (const entry of entries) {
+      const fullPath = path.join(workspacesRoot, entry);
+      const normalized = path.resolve(fullPath).toLowerCase();
+
+      if (activeWorkspacePaths.has(normalized)) {
+        retained.push(entry);
+      } else {
+        try {
+          await fs.promises.rm(fullPath, { recursive: true, force: true });
+          removed.push(entry);
+        } catch (err) {
+          console.error(`Failed to clean up orphan workspace ${entry}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Failed to run cleanupOrphanWorkspaces:', err);
+  }
+
+  return { removed, retained };
+}
+
 export async function deleteSession(id: string): Promise<void> {
   const dir = await ensureSessionsDir();
   const filePath = path.join(dir, `${id}.json`);
+
+  try {
+    if (fs.existsSync(filePath)) {
+      const data = await fs.promises.readFile(filePath, 'utf-8');
+      const session: ChatSession = JSON.parse(data);
+
+      // Clean up auto-generated ephemeral sandbox workspace if tied to this session
+      if (session.workspace_dir && isAutoWorkspaceDir(session.workspace_dir)) {
+        if (fs.existsSync(session.workspace_dir)) {
+          await fs.promises.rm(session.workspace_dir, { recursive: true, force: true });
+        }
+      }
+    }
+  } catch (err) {
+    console.error(`Error reading session ${id} before deletion:`, err);
+  }
+
+  // Clean up any spilled tool output log files for this session
+  try {
+    const spillDir = path.join(getAppDir(), 'spill');
+    if (fs.existsSync(spillDir)) {
+      const files = await fs.promises.readdir(spillDir);
+      for (const f of files) {
+        if (f.startsWith(id) || f.includes(id)) {
+          await fs.promises.unlink(path.join(spillDir, f)).catch(() => {});
+        }
+      }
+    }
+  } catch {}
+
+  // Delete session file
   try {
     await fs.promises.unlink(filePath);
   } catch {
     // ignore if missing
   }
+
+  // Background cleanup of any lingering orphan sandbox folders
+  cleanupOrphanWorkspaces().catch(() => {});
 }
 
 

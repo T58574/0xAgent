@@ -11,6 +11,7 @@ import {
   createAutoWorkspaceDir,
   updateSessionWorkspace,
   rollbackSession,
+  cleanupOrphanWorkspaces,
 } from '../session';
 import { forkSession } from '../agent/sessionEvents';
 import {
@@ -29,6 +30,16 @@ workspaceRouter.post('/workspaces/create-auto', async (_req, res) => {
   try {
     const result = await createAutoWorkspaceDir();
     res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual / maintenance orphan workspaces cleanup (removes leftover sandboxes not tied to any active session)
+workspaceRouter.post('/workspaces/cleanup-orphans', async (_req, res) => {
+  try {
+    const result = await cleanupOrphanWorkspaces();
+    res.json({ success: true, ...result });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

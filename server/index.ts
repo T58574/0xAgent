@@ -19,6 +19,7 @@ import knowledgeRouter from './routes/knowledge';
 import { jarvisRouter } from './routes/jarvisRoutes';
 import { jarvisSupervisor } from './agent/jarvisSupervisor';
 import { voiceDaemonManager } from './agent/voiceDaemonManager';
+import { cleanupOrphanWorkspaces } from './session';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -167,4 +168,7 @@ process.on('uncaughtException', (err: any) => {
 server.listen(Number(PORT), HOST, () => {
   process.stdout.write(`[0xAgent] Local Server running at http://${HOST}:${PORT}\n`);
   process.stdout.write(`[WS] WebSocket server listening on ws://${HOST}:${PORT}/ws\n`);
+  
+  // Clean up any stale ephemeral sandbox workspaces left behind from previous sessions
+  cleanupOrphanWorkspaces().catch(() => {});
 });
