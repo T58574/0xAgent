@@ -56,13 +56,15 @@ export const ResizableSplitter: React.FC<ResizableSplitterProps> = ({
   return (
     <div
       onMouseDown={handleMouseDown}
-      className={`w-2.5 h-full relative cursor-col-resize select-none flex items-center justify-center shrink-0 z-20 group transition-colors ${
-        isDragging ? 'bg-white/20' : 'bg-black/40 hover:bg-white/10'
-      }`}
+      className={`w-3.5 h-full relative cursor-col-resize select-none flex items-center justify-center shrink-0 z-20 group transition-all my-auto px-0.5`}
       title="Потяните, чтобы изменить ширину окон"
     >
-      <div className="w-1 h-8 rounded-full bg-slate-600 group-hover:bg-[var(--theme-accent)] group-hover:scale-y-110 transition-all flex items-center justify-center">
-        <GripVertical size={10} className="text-slate-950 opacity-0 group-hover:opacity-100 transition-opacity" />
+      <div className={`w-1.5 h-12 rounded-full transition-all flex items-center justify-center border border-[var(--theme-border)] ${
+        isDragging
+          ? 'bg-[var(--theme-accent)] shadow-md scale-y-125'
+          : 'bg-[var(--theme-card-bg)] group-hover:bg-[var(--theme-accent)] group-hover:scale-y-115'
+      }`}>
+        <GripVertical size={10} className="text-[var(--theme-accent-text)] opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </div>
   );

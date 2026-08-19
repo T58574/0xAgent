@@ -90,17 +90,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   if (!isOpen) return null;
 
   return (
-    <aside className="relative w-64 md:w-68 h-full bg-[var(--theme-panel)]/95 border-r border-[var(--theme-border)] flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-2xl text-[var(--theme-text)]">
+    <aside className="relative w-64 md:w-68 h-full bg-[var(--theme-panel)]/95 border border-[var(--theme-border)] rounded-[26px] flex flex-col justify-between z-20 shrink-0 font-sans text-xs select-none backdrop-blur-2xl text-[var(--theme-text)] overflow-hidden shadow-sm">
       
       {/* Outer Edge Middle Collapse Arrow Button */}
       <button
         type="button"
         onClick={onToggleOpen}
-        className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-40 w-7 h-11 rounded-full bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-center shadow-md transition-all cursor-pointer group hover:scale-110 opacity-100"
+        className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-40 w-7 h-12 rounded-full bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-center shadow-lg transition-all cursor-pointer group hover:scale-110 opacity-100"
         style={{ backgroundColor: 'var(--theme-panel-solid)' }}
         title="Свернуть боковое меню"
       >
-        <ChevronLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
+        <ChevronLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
       </button>
 
       {/* 1. TOP HEADER: PROMINENT NEW CHAT & QUICK SEARCH */}

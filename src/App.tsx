@@ -719,9 +719,9 @@ export default function App() {
   );
 
   return (
-    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-theme-bg text-theme-text overflow-hidden font-sans">
+    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-hidden font-sans p-2 sm:p-2.5 gap-2 sm:gap-2.5">
       
-      {/* 1. TOP EDGE-TO-EDGE GLASS NAVBAR */}
+      {/* 1. TOP FLOATING SCI-FI CAPSULE NAVBAR */}
       <Navbar
         sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
@@ -740,7 +740,7 @@ export default function App() {
       />
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}
-      <div className="flex-1 w-full min-h-0 relative flex flex-row overflow-hidden">
+      <div className="flex-1 w-full min-h-0 relative flex flex-row overflow-hidden gap-2.5">
         
         {/* LEFT COLLAPSIBLE SIDEBAR */}
         <Sidebar
@@ -762,22 +762,22 @@ export default function App() {
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="fixed left-0 top-1/2 -translate-y-1/2 z-40 w-6 h-11 rounded-r-xl border-r border-y border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-center shadow-md transition-all cursor-pointer group hover:w-7.5"
+            className="fixed left-2 top-1/2 -translate-y-1/2 z-40 w-7 h-12 rounded-r-2xl border-r border-y border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-center shadow-lg transition-all cursor-pointer group hover:w-8"
             style={{ backgroundColor: 'var(--theme-panel-solid)' }}
             title="Развернуть боковое меню"
           >
-            <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+            <ChevronRight size={15} className="transition-transform group-hover:translate-x-0.5" />
           </button>
         )}
 
 
 
-        {/* CONTENT VIEWPORT */}
-        <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col">
+        {/* CONTENT VIEWPORT (Sci-Fi Island with rounded-[26px]) */}
+        <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col rounded-[26px] border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl shadow-sm">
           
           {/* SETTINGS VIEW */}
           {activeView === 'settings' && (
-            <div className="w-full h-full overflow-hidden bg-theme-bg">
+            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-[26px]">
               <SettingsPage
                 config={config}
                 onSaveConfig={handleSaveConfig}
@@ -790,7 +790,7 @@ export default function App() {
 
           {/* ANALYTICS VIEW */}
           {activeView === 'analytics' && (
-            <div className="w-full h-full overflow-hidden bg-theme-bg">
+            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-[26px]">
               <AnalyticsPage
                 sessions={sessions}
                 serverLogs={logs}

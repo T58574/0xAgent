@@ -95,11 +95,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, [lanOpen]);
 
   return (
-    <header className="h-13 border-b border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-xl px-4 flex items-center justify-between select-none z-30 shrink-0 font-sans shadow-sm">
+    <header className="h-14 border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl px-4 rounded-[22px] flex items-center justify-between select-none z-30 shrink-0 font-sans shadow-sm">
       
       {/* Left Section: 0xAGENT Brand Logo */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className="flex items-center gap-2 font-mono font-bold text-sm tracking-wider text-[var(--theme-text)]">
+        <div className="flex items-center gap-2 font-bold text-sm tracking-wider text-[var(--theme-text)]">
           <Terminal size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <span>0xAGENT</span>
         </div>
@@ -108,7 +108,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Right Section: View Switcher Bento Tabs + Utilities */}
       <div className="flex items-center gap-2.5">
         {/* View Switcher Bento Tabs */}
-        <div className="flex items-center bg-[var(--theme-card-bg)] p-1 rounded-xl border border-[var(--theme-border)] shadow-sm">
+        <div className="flex items-center bg-[var(--theme-card-bg)] p-1 rounded-full border border-[var(--theme-border)] shadow-sm">
           {[
             { id: 'chat', label: 'Чат', icon: MessageSquare },
             { id: 'workspace', label: 'Редактор', icon: Code },
@@ -123,7 +123,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => onChangeView(tab.id as any)}
-                className={`px-3.5 py-1.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer ${
                   isActive
                     ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
                     : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
@@ -140,7 +140,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenMemorySkills}
-              className="px-3.5 py-1.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
+              className="px-3.5 py-1.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
               title="Память & Скиллы ИИ"
             >
               <Brain size={14} />
@@ -152,7 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenJarvis}
-              className="px-3.5 py-1.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
+              className="px-3.5 py-1.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
               title="Jarvis Telemetry & Workspace"
             >
               <Bot size={14} />
