@@ -762,10 +762,11 @@ export default function App() {
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="fixed left-0 top-1/2 -translate-y-1/2 z-40 w-5 h-10 rounded-r-xl bg-[var(--theme-panel-solid,#0a0c12)] border-r border-y border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/15 flex items-center justify-center shadow-2xl transition-all cursor-pointer backdrop-blur-2xl group hover:w-6.5"
+            className="fixed left-0 top-1/2 -translate-y-1/2 z-40 w-6 h-11 rounded-r-xl border-r border-y border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-center shadow-md transition-all cursor-pointer group hover:w-7.5"
+            style={{ backgroundColor: 'var(--theme-panel-solid)' }}
             title="Развернуть боковое меню"
           >
-            <ChevronRight size={13} className="transition-transform group-hover:translate-x-0.5" />
+            <ChevronRight size={14} className="transition-transform group-hover:translate-x-0.5" />
           </button>
         )}
 

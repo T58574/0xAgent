@@ -96,10 +96,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <button
         type="button"
         onClick={onToggleOpen}
-        className="absolute -right-3 top-1/2 -translate-y-1/2 z-40 w-6 h-10 rounded-full bg-[var(--theme-panel-solid,#0a0c12)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/15 flex items-center justify-center shadow-2xl transition-all cursor-pointer backdrop-blur-2xl group hover:scale-110"
+        className="absolute -right-3.5 top-1/2 -translate-y-1/2 z-40 w-7 h-11 rounded-full bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-center shadow-md transition-all cursor-pointer group hover:scale-110 opacity-100"
+        style={{ backgroundColor: 'var(--theme-panel-solid)' }}
         title="Свернуть боковое меню"
       >
-        <ChevronLeft size={13} className="transition-transform group-hover:-translate-x-0.5" />
+        <ChevronLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
       </button>
 
       {/* 1. TOP HEADER: PROMINENT NEW CHAT & QUICK SEARCH */}

@@ -1,5 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, ChevronDown, ChevronRight, Copy, Check, Info, Layers, Wrench, Sparkles, BookOpen, Brain, Terminal, Shield, FileText } from 'lucide-react';
+import {
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Check,
+  Layers,
+  Wrench,
+  Sparkles,
+  BookOpen,
+  Brain,
+  Terminal,
+  Shield,
+  FileText,
+  MessageSquare,
+  HardDrive,
+} from 'lucide-react';
 import { ContextBreakdownReport, AppConfig } from '../../types';
 import * as api from '../../services/api';
 
@@ -14,7 +30,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
   const [showBreakdowns, setShowBreakdowns] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     skills: true,
-    tools: false,
+    tools: true,
     persona: false,
     workspace_rules: false,
     memory: false,
@@ -53,74 +69,116 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
   const getCategoryIcon = (category: string) => {
     switch (category) {
       case 'skills':
-        return <Sparkles size={14} className="text-cyan-400" />;
+        return <Sparkles size={15} className="text-cyan-500 shrink-0" />;
       case 'tools':
-        return <Wrench size={14} className="text-sky-400" />;
+        return <Wrench size={15} className="text-sky-500 shrink-0" />;
       case 'persona':
-        return <Layers size={14} className="text-purple-400" />;
+        return <Layers size={15} className="text-purple-500 shrink-0" />;
       case 'user_profile':
-        return <FileText size={14} className="text-pink-400" />;
+        return <FileText size={15} className="text-pink-500 shrink-0" />;
       case 'environment':
-        return <Terminal size={14} className="text-emerald-400" />;
+        return <Terminal size={15} className="text-emerald-500 shrink-0" />;
       case 'planning':
-        return <Shield size={14} className="text-amber-400" />;
+        return <Shield size={15} className="text-amber-500 shrink-0" />;
       case 'workspace_rules':
-        return <BookOpen size={14} className="text-indigo-400" />;
+        return <BookOpen size={15} className="text-indigo-500 shrink-0" />;
       case 'memory':
-        return <Brain size={14} className="text-lime-400" />;
+        return <Brain size={15} className="text-lime-500 shrink-0" />;
+      case 'history':
+        return <MessageSquare size={15} className="text-zinc-400 shrink-0" />;
       default:
-        return <Info size={14} className="text-gray-400" />;
+        return <HardDrive size={15} className="text-[var(--theme-text-muted)] shrink-0" />;
     }
   };
 
+  const translateCategoryName = (name: string, catKey: string) => {
+    if (name.toLowerCase().includes('спецификации инструментов') || catKey === 'tools') return 'Спецификации инструментов';
+    if (name.toLowerCase().includes('личность') || catKey === 'persona') return 'Личность и директивы (SOUL.md)';
+    if (name.toLowerCase().includes('профиль') || catKey === 'user_profile') return 'Профиль пользователя (USER.md)';
+    if (name.toLowerCase().includes('окружение') || catKey === 'environment') return 'Окружение ОС и PowerShell';
+    if (name.toLowerCase().includes('планирования') || catKey === 'planning') return 'Режим планирования (Planning Mode)';
+    if (name.toLowerCase().includes('правила проекта') || catKey === 'workspace_rules') return 'Правила проекта (.0xagent.md)';
+    if (name.toLowerCase().includes('память') || catKey === 'memory') return 'Долгосрочная память';
+    if (name.toLowerCase().includes('история') || catKey === 'history') return 'История сообщений диалога';
+    if (name.toLowerCase().includes('скиллы') || catKey === 'skills') return 'Скиллы и навыки';
+    return name;
+  };
+
+  const translateScope = (scope?: string) => {
+    if (!scope) return null;
+    const lower = scope.toLowerCase();
+    if (lower === 'global') return 'Глобально';
+    if (lower === 'workspace') return 'Проект';
+    return scope;
+  };
+
   return (
-    <div className="w-full h-full overflow-y-auto p-4 md:p-6 space-y-6 select-text">
-      {/* Top Title & Subtitle */}
-      <div className="flex items-center justify-between pb-2 border-b border-[var(--theme-border)]">
+    <div className="w-full h-full overflow-y-auto p-4 md:p-6 space-y-6 select-text font-sans">
+      {/* Top Title & Refresh */}
+      <div className="flex items-center justify-between pb-3 border-b border-[var(--theme-border)]">
         <div>
-          <h1 className="text-base md:text-lg font-semibold text-[var(--theme-text)]">
-            Customizations & Token Usage
+          <h1 className="text-base md:text-lg font-bold text-[var(--theme-text)]">
+            Кастомизации и Расход Токенов
           </h1>
           <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-            Configure default behaviors, skills, prompt directives, and analyze context consumption.
+            Настройка системного поведения, скиллов, промптов и детальный аудит расхода контекста ИИ.
           </p>
         </div>
         <button
           type="button"
           onClick={fetchBreakdown}
           disabled={loading}
-          className="p-2 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+          className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] text-xs font-bold transition-colors cursor-pointer flex items-center gap-2 shadow-sm"
           title="Обновить аналитику токенов"
         >
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+          <span>Обновить</span>
         </button>
       </div>
 
-      {/* Main Token Usage Bento Card (Inspired by Screenshot) */}
+      {/* Main Token Usage Infographic Card */}
       <div className="space-y-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--theme-text-muted)]">
-          Token Usage
+        <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--theme-text-muted)]">
+          Инфографика контекстного бюджета
         </h2>
 
         {report ? (
-          <div className="p-4 md:p-5 rounded-xl bento-card space-y-4 border border-[var(--theme-border)] bg-[var(--theme-panel)]/40">
-            {/* Explanatory text */}
+          <div className="p-5 rounded-2xl bento-card space-y-4 border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm">
             <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed">
-              The breakdown below shows token usage from customizations like skills, rules, and system prompt. If the budget is exceeded, large customizations will be truncated automatically.
+              Детализация расхода токенов на кастомизации и системные инструкции. При заполнении окна свыше 75% активируется фоновый 4-уровневый конвейер сжатия.
             </p>
 
-            {/* Availability Percentage Pill */}
-            <div className="text-xs font-medium text-[var(--theme-text)]">
-              <span className="text-sky-400 font-mono font-semibold">{report.availablePercentage}%</span> of the customization budget is available.
-              <span className="text-[11px] font-mono text-[var(--theme-text-muted)] ml-2">
-                ({report.totalUsed.toLocaleString()} / {report.totalBudget.toLocaleString()} tokens used)
-              </span>
+            {/* Availability Percentage & Quick Stats */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">Свободно</span>
+                <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
+                  {report.availablePercentage}%
+                </span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">от лимита контекста</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">Занято токенов</span>
+                <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
+                  {report.totalUsed.toLocaleString()} <span className="text-xs font-normal text-[var(--theme-text-muted)]">/ {report.totalBudget.toLocaleString()}</span>
+                </span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">системные инструкции</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
+                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">Категорий</span>
+                <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
+                  {report.categories.length}
+                </span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">активных директив</span>
+              </div>
             </div>
 
-            {/* Segmented Progress Bar */}
-            <div className="w-full h-2.5 rounded-full bg-white/5 overflow-hidden flex items-center p-0.5 border border-white/5">
+            {/* Segmented Color Progress Bar */}
+            <div className="w-full h-3 rounded-full bg-[var(--theme-input-bg)] overflow-hidden flex items-center p-0.5 border border-[var(--theme-border)]">
               {report.categories.map((cat) => {
-                const widthPercent = Math.max(0.5, (cat.tokens / report.totalBudget) * 100);
+                const widthPercent = Math.max(0.6, (cat.tokens / report.totalBudget) * 100);
                 return (
                   <div
                     key={cat.id}
@@ -128,25 +186,29 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                       width: `${widthPercent}%`,
                       backgroundColor: cat.color,
                     }}
-                    className="h-full first:rounded-l-full last:rounded-r-full transition-all duration-500 opacity-90 hover:opacity-100"
-                    title={`${cat.name}: ${cat.tokens} tok (${cat.percentage}%)`}
+                    className="h-full first:rounded-l-full last:rounded-r-full transition-all duration-500 hover:brightness-125"
+                    title={`${translateCategoryName(cat.name, cat.category)}: ${cat.tokens.toLocaleString()} токенов (${cat.percentage}%)`}
                   />
                 );
               })}
             </div>
 
-            {/* Legend & Breakdown Summary */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                {report.categories.slice(0, 5).map((cat) => (
-                  <div key={cat.id} className="flex items-center gap-1.5 text-xs text-[var(--theme-text)]">
+            {/* Legend Chips */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {report.categories.map((cat) => (
+                  <div
+                    key={cat.id}
+                    onClick={() => toggleCategory(cat.id)}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[var(--theme-input-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] cursor-pointer transition-colors"
+                  >
                     <span
                       className="w-2 h-2 rounded-full shrink-0"
                       style={{ backgroundColor: cat.color }}
                     />
-                    <span className="font-medium">{cat.category === 'skills' ? 'Skills' : cat.category === 'tools' ? 'Tools' : cat.name.split(':')[0]}</span>
-                    <span className="text-[11px] font-mono text-[var(--theme-text-muted)]">
-                      ({cat.percentage}%) {cat.tokens.toLocaleString()}
+                    <span className="font-semibold">{translateCategoryName(cat.name, cat.category).split(' ')[0]}</span>
+                    <span className="text-[10px] font-mono text-[var(--theme-text-muted)] font-bold">
+                      {cat.tokens.toLocaleString()} tok
                     </span>
                   </div>
                 ))}
@@ -155,147 +217,155 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
               <button
                 type="button"
                 onClick={() => setShowBreakdowns(!showBreakdowns)}
-                className="text-xs font-medium text-sky-400 hover:text-sky-300 transition-colors cursor-pointer flex items-center gap-1 shrink-0 ml-auto"
+                className="text-xs font-bold text-[var(--theme-text)] hover:underline transition-colors cursor-pointer flex items-center gap-1 shrink-0 ml-auto"
               >
-                <span>{showBreakdowns ? 'Hide breakdowns' : `Show ${report.categories.length} breakdowns`}</span>
+                <span>{showBreakdowns ? 'Свернуть категории' : `Показать все (${report.categories.length})`}</span>
                 <ChevronDown size={14} className={`transition-transform duration-200 ${showBreakdowns ? 'rotate-180' : ''}`} />
               </button>
             </div>
           </div>
         ) : (
-          <div className="p-8 rounded-xl bento-card text-center text-xs text-[var(--theme-text-muted)] flex items-center justify-center gap-2">
+          <div className="p-8 rounded-2xl bento-card text-center text-xs text-[var(--theme-text-muted)] flex items-center justify-center gap-2 border border-[var(--theme-border)]">
             <RefreshCw size={14} className="animate-spin" />
-            <span>Калькуляция токенов контекста...</span>
+            <span>Анализ контекста...</span>
           </div>
         )}
       </div>
 
       {/* Detailed Accordion Breakdown Sections */}
       {showBreakdowns && report && (
-        <div className="space-y-4">
-          {report.categories.map((cat) => {
-            const isExpanded = !!expandedCategories[cat.id];
-            const hasDetails = cat.details && cat.details.length > 0;
+        <div className="space-y-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--theme-text-muted)]">
+            Структура категорий
+          </h2>
 
-            return (
-              <div key={cat.id} className="rounded-xl bento-card border border-[var(--theme-border)] overflow-hidden transition-all">
-                {/* Accordion Header */}
-                <div
-                  onClick={() => toggleCategory(cat.id)}
-                  className="px-4 py-3 bg-[var(--theme-panel)]/60 flex items-center justify-between cursor-pointer hover:bg-[var(--theme-panel)] transition-colors select-none"
-                >
-                  <div className="flex items-center gap-2.5">
-                    {hasDetails || cat.contentPreview ? (
-                      isExpanded ? <ChevronDown size={15} className="text-[var(--theme-text-muted)]" /> : <ChevronRight size={15} className="text-[var(--theme-text-muted)]" />
-                    ) : (
-                      <div className="w-3.5" />
-                    )}
-                    {getCategoryIcon(cat.category)}
-                    <span className="text-xs font-semibold text-[var(--theme-text)]">
-                      {cat.name}
-                    </span>
-                    {cat.scope && (
-                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-white/5 text-[var(--theme-text-muted)] border border-white/10">
-                        {cat.scope}
+          <div className="space-y-2.5">
+            {report.categories.map((cat) => {
+              const isExpanded = !!expandedCategories[cat.id];
+              const hasDetails = cat.details && cat.details.length > 0;
+              const titleName = translateCategoryName(cat.name, cat.category);
+              const scopeName = translateScope(cat.scope);
+
+              return (
+                <div key={cat.id} className="rounded-2xl bento-card border border-[var(--theme-border)] overflow-hidden transition-all shadow-sm">
+                  {/* Accordion Header */}
+                  <div
+                    onClick={() => toggleCategory(cat.id)}
+                    className="px-4 py-3 bg-[var(--theme-card-bg)] flex items-center justify-between cursor-pointer hover:bg-[var(--theme-border-subtle)] transition-colors select-none"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      {hasDetails || cat.contentPreview ? (
+                        isExpanded ? <ChevronDown size={15} className="text-[var(--theme-text-muted)]" /> : <ChevronRight size={15} className="text-[var(--theme-text-muted)]" />
+                      ) : (
+                        <div className="w-3.5" />
+                      )}
+                      {getCategoryIcon(cat.category)}
+                      <span className="text-xs font-bold text-[var(--theme-text)]">
+                        {titleName}
                       </span>
-                    )}
+                      {scopeName && (
+                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)] font-bold">
+                          {scopeName}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-mono text-[var(--theme-text-muted)] font-semibold">
+                        {cat.tokens.toLocaleString()} токенов <span className="text-[10px] opacity-70">({cat.percentage}%)</span>
+                      </span>
+                      <div
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: cat.color }}
+                      />
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-mono text-[var(--theme-text-muted)]">
-                      {cat.tokens.toLocaleString()} tok <span className="text-[10px] text-sky-400/80">({cat.percentage}% budget)</span>
-                    </span>
-                    <div
-                      className="w-2.5 h-2.5 rounded-full"
-                      style={{ backgroundColor: cat.color }}
-                    />
-                  </div>
-                </div>
+                  {/* Accordion Body */}
+                  {isExpanded && (
+                    <div className="p-4 space-y-3 bg-[var(--theme-input-bg)] border-t border-[var(--theme-border)]">
+                      {cat.description && (
+                        <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                          {cat.description}
+                        </p>
+                      )}
 
-                {/* Accordion Body */}
-                {isExpanded && (
-                  <div className="p-4 space-y-3 bg-black/20 border-t border-[var(--theme-border)]/60">
-                    {cat.description && (
-                      <p className="text-[11px] text-[var(--theme-text-muted)]">
-                        {cat.description}
-                      </p>
-                    )}
-
-                    {/* Detailed Items List (e.g. Skills, Tools, Memory) */}
-                    {hasDetails && (
-                      <div className="space-y-2 pt-1">
-                        {cat.details!.map((detail) => (
-                          <div
-                            key={detail.id}
-                            className="p-3 rounded-lg bg-[var(--theme-panel)]/50 border border-[var(--theme-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-white/20 transition-all"
-                          >
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-medium text-[var(--theme-text)] font-mono">
-                                  {detail.name}
-                                </span>
-                                {detail.scope && (
-                                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                                    {detail.scope}
+                      {/* Detailed Items List (e.g. Skills, Tools) */}
+                      {hasDetails && (
+                        <div className="space-y-2 pt-1">
+                          {cat.details!.map((detail) => (
+                            <div
+                              key={detail.id}
+                              className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm"
+                            >
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold text-[var(--theme-text)] font-mono">
+                                    {detail.name}
                                   </span>
-                                )}
-                                {detail.enabled !== undefined && (
-                                  <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded ${detail.enabled ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                                    {detail.enabled ? '[АКТИВЕН]' : '[ВЫКЛ]'}
-                                  </span>
+                                  {detail.scope && (
+                                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)] font-bold">
+                                      {translateScope(detail.scope)}
+                                    </span>
+                                  )}
+                                  {detail.enabled !== undefined && (
+                                    <span className={`text-[9px] font-mono px-2 py-0.5 rounded-md font-bold ${detail.enabled ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'}`}>
+                                      {detail.enabled ? '[АКТИВЕН]' : '[ВЫКЛ]'}
+                                    </span>
+                                  )}
+                                </div>
+                                {detail.description && (
+                                  <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed">
+                                    {detail.description}
+                                  </p>
                                 )}
                               </div>
-                              {detail.description && (
-                                <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2">
-                                  {detail.description}
-                                </p>
-                              )}
-                            </div>
 
-                            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-white/5 text-[var(--theme-text)] border border-white/10">
-                                {detail.tokens.toLocaleString()} tok
-                              </span>
-                              {detail.preview && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleCopy(detail.id, detail.preview!)}
-                                  className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer"
-                                  title="Скопировать директиву"
-                                >
-                                  {copiedId === detail.id ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
-                                </button>
-                              )}
+                              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                                <span className="text-[11px] font-mono px-2.5 py-0.5 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text)] border border-[var(--theme-border)] font-bold">
+                                  {detail.tokens.toLocaleString()} tok
+                                </span>
+                                {detail.preview && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCopy(detail.id, detail.preview!)}
+                                    className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer border border-[var(--theme-border)]"
+                                    title="Скопировать директиву"
+                                  >
+                                    {copiedId === detail.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Raw Preview for Single Directives (e.g. SOUL, Environment) */}
-                    {!hasDetails && cat.contentPreview && (
-                      <div className="space-y-1.5 pt-1">
-                        <div className="flex items-center justify-between text-[10px] font-mono text-[var(--theme-text-muted)]">
-                          <span>ПРЕДПРОСМОТР СОДЕРЖИМОГО</span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopy(cat.id, cat.contentPreview!)}
-                            className="flex items-center gap-1 hover:text-[var(--theme-text)] cursor-pointer"
-                          >
-                            {copiedId === cat.id ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-                            <span>Копировать</span>
-                          </button>
+                          ))}
                         </div>
-                        <pre className="p-2.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-text-muted)] overflow-x-auto max-h-48 whitespace-pre-wrap">
-                          {cat.contentPreview}
-                        </pre>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                      )}
+
+                      {/* Raw Preview for Single Directives */}
+                      {!hasDetails && cat.contentPreview && (
+                        <div className="space-y-2 pt-1">
+                          <div className="flex items-center justify-between text-[10px] font-mono text-[var(--theme-text-muted)] font-bold">
+                            <span>ПРЕДПРОСМОТР СОДЕРЖИМОГО</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCopy(cat.id, cat.contentPreview!)}
+                              className="flex items-center gap-1 hover:text-[var(--theme-text)] cursor-pointer"
+                            >
+                              {copiedId === cat.id ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                              <span>Копировать</span>
+                            </button>
+                          </div>
+                          <pre className="p-3 rounded-xl bg-[var(--theme-code-bg)] border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-code-text)] overflow-x-auto max-h-48 whitespace-pre-wrap leading-relaxed">
+                            {cat.contentPreview}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

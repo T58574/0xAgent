@@ -32,17 +32,17 @@ export const NotionMarkdown: React.FC<NotionMarkdownProps> = ({ content }) => {
   const textParts = renderMathBlocks(content);
 
   return (
-    <div className="notion-markdown text-slate-100 font-sans leading-relaxed space-y-3 select-text">
+    <div className="notion-markdown text-[var(--theme-text)] font-sans leading-relaxed space-y-3 select-text">
       {textParts.map((part, idx) => {
         if (part.type === 'block-math') {
           return (
             <div
               key={idx}
-              className="my-3 p-3 rounded-lg border border-[var(--theme-border)] bg-black/40 text-[var(--theme-text)] font-mono text-xs sm:text-sm flex items-center justify-center overflow-x-auto"
+              className="my-3 p-3 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] font-mono text-xs sm:text-sm flex items-center justify-center overflow-x-auto shadow-sm"
             >
               <div className="flex items-center gap-2">
                 <span className="text-[var(--theme-text-muted)] font-mono text-xs select-none">∑ math</span>
-                <span className="select-all font-medium">{part.value}</span>
+                <span className="select-all font-semibold">{part.value}</span>
               </div>
             </div>
           );
@@ -84,31 +84,31 @@ const FormattedMarkdownSection: React.FC<{ rawText: string }> = ({ rawText }) =>
     const codeId = `code-block-${blockCount++}`;
 
     elements.push(
-      <div key={codeId} className="my-3 rounded-xl border border-[var(--theme-border)] bg-black/50 overflow-hidden font-mono shadow-md">
-        <div className="flex items-center justify-between px-3.5 py-1.5 bg-black/40 border-b border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] select-none">
-          <span className="text-[var(--theme-text)] font-medium lowercase flex items-center gap-1.5">
+      <div key={codeId} className="my-3 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-code-bg)] overflow-hidden font-mono shadow-sm">
+        <div className="flex items-center justify-between px-4 py-2 bg-[var(--theme-card-bg)] border-b border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] select-none">
+          <span className="text-[var(--theme-text)] font-bold lowercase flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] inline-block" />
             {lang}
           </span>
           <button
             type="button"
             onClick={() => handleCopy(codeContent, codeId)}
-            className="flex items-center gap-1 hover:text-[var(--theme-text)] transition-colors cursor-pointer text-[var(--theme-text-muted)] px-2 py-0.5 rounded hover:bg-white/5"
+            className="flex items-center gap-1.5 hover:text-[var(--theme-text)] transition-colors cursor-pointer text-[var(--theme-text-muted)] px-2.5 py-1 rounded-lg hover:bg-[var(--theme-border-subtle)] font-medium"
           >
             {copiedCodeId === codeId ? (
               <>
-                <Check size={12} className="text-emerald-400" />
-                <span className="text-emerald-400 font-sans">Скопировано!</span>
+                <Check size={13} className="text-emerald-500" />
+                <span className="text-emerald-600 dark:text-emerald-400 font-sans font-bold text-[10px]">Скопировано!</span>
               </>
             ) : (
               <>
-                <Copy size={12} />
-                <span className="font-sans">Копировать</span>
+                <Copy size={13} />
+                <span className="font-sans text-[10px]">Копировать</span>
               </>
             )}
           </button>
         </div>
-        <pre className="p-3.5 text-xs text-[var(--theme-text)] overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
+        <pre className="p-4 text-xs text-[var(--theme-code-text)] overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
           <code>{codeContent}</code>
         </pre>
       </div>
@@ -125,14 +125,14 @@ const FormattedMarkdownSection: React.FC<{ rawText: string }> = ({ rawText }) =>
       const codeContent = unclosedMatch[2];
       const codeId = `code-block-${blockCount++}`;
       elements.push(
-        <div key={codeId} className="my-3 rounded-xl border border-[var(--theme-accent)]/30 bg-black/50 overflow-hidden font-mono shadow-md">
-          <div className="flex items-center justify-between px-3.5 py-1.5 bg-black/40 border-b border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] select-none">
-            <span className="text-[var(--theme-accent)] font-medium lowercase flex items-center gap-1.5">
+        <div key={codeId} className="my-3 rounded-2xl border border-[var(--theme-accent)]/30 bg-[var(--theme-code-bg)] overflow-hidden font-mono shadow-sm">
+          <div className="flex items-center justify-between px-4 py-2 bg-[var(--theme-card-bg)] border-b border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] select-none">
+            <span className="text-[var(--theme-text)] font-bold lowercase flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] animate-pulse inline-block" />
               {lang} (генерация...)
             </span>
           </div>
-          <pre className="p-3.5 text-xs text-[var(--theme-text)] overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
+          <pre className="p-4 text-xs text-[var(--theme-code-text)] overflow-x-auto whitespace-pre leading-relaxed scrollbar-thin">
             <code>{codeContent}</code>
           </pre>
         </div>
@@ -190,7 +190,7 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
     }
     if (trimmed.startsWith('## ')) {
       renderedElements.push(
-        <h2 key={`h2-${index}`} className="text-sm sm:text-base font-semibold text-[var(--theme-text)] mt-3 mb-1.5 font-sans tracking-tight flex items-center gap-1.5">
+        <h2 key={`h2-${index}`} className="text-sm sm:text-base font-bold text-[var(--theme-text)] mt-3 mb-1.5 font-sans tracking-tight flex items-center gap-1.5">
           <span className="text-[var(--theme-accent)] font-bold font-mono">›</span>
           <span>{trimmed.substring(3)}</span>
         </h2>
@@ -199,7 +199,7 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
     }
     if (trimmed.startsWith('### ')) {
       renderedElements.push(
-        <h3 key={`h3-${index}`} className="text-xs sm:text-sm font-semibold text-[var(--theme-text-muted)] mt-2 mb-1 font-sans">
+        <h3 key={`h3-${index}`} className="text-xs sm:text-sm font-bold text-[var(--theme-text-muted)] mt-2 mb-1 font-sans">
           {trimmed.substring(4)}
         </h3>
       );
@@ -216,7 +216,7 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
             type="checkbox"
             checked={isChecked}
             readOnly
-            className="mt-0.5 rounded border-[var(--theme-border)] bg-black/40 text-[var(--theme-accent,#38bdf8)] focus:ring-0 cursor-default"
+            className="mt-0.5 rounded border-[var(--theme-border)] accent-[var(--theme-accent)] cursor-default"
           />
           <span className={isChecked ? 'line-through opacity-50' : ''}>
             <InlineFormattedText text={checkText} />
@@ -230,7 +230,7 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
     if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
       renderedElements.push(
         <div key={`bullet-${index}`} className="flex items-start gap-2 my-1 text-[13.5px] text-[var(--theme-text)] font-sans pl-2">
-          <span className="text-[var(--theme-accent,#38bdf8)] font-bold select-none">•</span>
+          <span className="text-[var(--theme-accent)] font-bold select-none">•</span>
           <span><InlineFormattedText text={trimmed.substring(2)} /></span>
         </div>
       );
@@ -245,7 +245,7 @@ const RenderTextParagraphs: React.FC<{ text: string }> = ({ text }) => {
 
     // Standard paragraph
     renderedElements.push(
-      <p key={`p-${index}`} className="my-1 text-[13.5px] text-[var(--theme-text)] leading-relaxed font-sans">
+      <p key={`p-${index}`} className="my-1 text-[13.5px] text-[var(--theme-text)] leading-relaxed font-sans font-normal">
         <InlineFormattedText text={line} />
       </p>
     );
@@ -269,7 +269,7 @@ const InlineFormattedText: React.FC<{ text: string }> = ({ text }) => {
           return (
             <code
               key={idx}
-              className="px-1.5 py-0.5 mx-0.5 rounded bg-slate-800 text-emerald-300 font-mono text-[11px] border border-white/10"
+              className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] font-mono text-[11px] border border-[var(--theme-border)] font-semibold"
             >
               {part.substring(1, part.length - 1)}
             </code>
@@ -279,7 +279,7 @@ const InlineFormattedText: React.FC<{ text: string }> = ({ text }) => {
           return (
             <span
               key={idx}
-              className="px-1.5 py-0.5 mx-0.5 rounded-md bg-white/10 text-[var(--theme-text)] font-mono text-xs border border-[var(--theme-border)]"
+              className="px-1.5 py-0.5 mx-0.5 rounded-md bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] font-mono text-xs border border-[var(--theme-border)] font-semibold"
             >
               {part.substring(1, part.length - 1)}
             </span>
@@ -306,7 +306,7 @@ const FormattedSubSpan: React.FC<{ subtext: string }> = ({ subtext }) => {
               href={linkMatch[2]}
               target="_blank"
               rel="noreferrer"
-              className="text-emerald-400 hover:text-emerald-300 underline font-medium cursor-pointer transition-colors"
+              className="text-[var(--theme-accent)] hover:underline font-bold cursor-pointer transition-colors"
             >
               {linkMatch[1]}
             </a>
@@ -315,7 +315,7 @@ const FormattedSubSpan: React.FC<{ subtext: string }> = ({ subtext }) => {
 
         if (sub.startsWith('**') && sub.endsWith('**') && sub.length >= 4) {
           return (
-            <strong key={i} className="font-semibold text-slate-100">
+            <strong key={i} className="font-bold text-[var(--theme-text)]">
               {sub.substring(2, sub.length - 2)}
             </strong>
           );
@@ -323,7 +323,7 @@ const FormattedSubSpan: React.FC<{ subtext: string }> = ({ subtext }) => {
 
         if (sub.startsWith('~~') && sub.endsWith('~~') && sub.length >= 4) {
           return (
-            <del key={i} className="line-through text-slate-400">
+            <del key={i} className="line-through text-[var(--theme-text-muted)] opacity-70">
               {sub.substring(2, sub.length - 2)}
             </del>
           );
@@ -334,7 +334,7 @@ const FormattedSubSpan: React.FC<{ subtext: string }> = ({ subtext }) => {
           sub.length >= 2
         ) {
           return (
-            <em key={i} className="italic text-slate-200">
+            <em key={i} className="italic text-[var(--theme-text)]">
               {sub.substring(1, sub.length - 1)}
             </em>
           );
@@ -368,17 +368,17 @@ const RenderNotionCallout: React.FC<{ line: string }> = ({ line }) => {
   }
 
   const styles = {
-    note: { border: 'border-[var(--theme-accent)]/40', bg: 'bg-[var(--theme-accent)]/10', text: 'text-[var(--theme-text)]', badge: '[NOTE]', badgeClass: 'text-[var(--theme-accent)] font-bold' },
-    tip: { border: 'border-[var(--theme-accent)]/40', bg: 'bg-[var(--theme-accent)]/10', text: 'text-[var(--theme-text)]', badge: '[TIP]', badgeClass: 'text-[var(--theme-accent)] font-bold' },
-    warning: { border: 'border-amber-500/40', bg: 'bg-amber-950/20', text: 'text-amber-200', badge: '[WARN]', badgeClass: 'text-amber-400 font-bold' },
-    important: { border: 'border-[var(--theme-accent)]/50', bg: 'bg-[var(--theme-accent)]/15', text: 'text-[var(--theme-text)]', badge: '[IMPORTANT]', badgeClass: 'text-[var(--theme-accent)] font-bold' },
-    caution: { border: 'border-red-500/40', bg: 'bg-red-950/20', text: 'text-red-200', badge: '[CAUTION]', badgeClass: 'text-red-400 font-bold' },
-    quote: { border: 'border-[var(--theme-border)]', bg: 'bg-black/30', text: 'text-[var(--theme-text-muted)]', badge: '[>]', badgeClass: 'text-[var(--theme-text-muted)]' },
+    note: { border: 'border-[var(--theme-accent)]/50', bg: 'bg-[var(--theme-accent)]/10', text: 'text-[var(--theme-text)]', badge: '[NOTE]', badgeClass: 'text-[var(--theme-text)] font-bold' },
+    tip: { border: 'border-emerald-500/50', bg: 'bg-emerald-500/10', text: 'text-[var(--theme-text)]', badge: '[TIP]', badgeClass: 'text-emerald-600 dark:text-emerald-400 font-bold' },
+    warning: { border: 'border-amber-500/50', bg: 'bg-amber-500/10', text: 'text-[var(--theme-text)]', badge: '[WARN]', badgeClass: 'text-amber-600 dark:text-amber-400 font-bold' },
+    important: { border: 'border-[var(--theme-accent)]', bg: 'bg-[var(--theme-accent)]/15', text: 'text-[var(--theme-text)]', badge: '[IMPORTANT]', badgeClass: 'text-[var(--theme-text)] font-bold' },
+    caution: { border: 'border-rose-500/50', bg: 'bg-rose-500/10', text: 'text-[var(--theme-text)]', badge: '[CAUTION]', badgeClass: 'text-rose-600 dark:text-rose-400 font-bold' },
+    quote: { border: 'border-[var(--theme-border)]', bg: 'bg-[var(--theme-input-bg)]', text: 'text-[var(--theme-text-muted)]', badge: '[>]', badgeClass: 'text-[var(--theme-text-muted)]' },
   }[type];
 
   return (
-    <div className={`my-2.5 p-3 rounded-xl border-l-4 ${styles.border} ${styles.bg} ${styles.text} text-xs sm:text-sm flex items-start gap-2.5 shadow-sm font-sans`}>
-      <span className={`px-1.5 py-0.5 rounded text-[10px] font-mono bg-black/40 border border-[var(--theme-border)] shrink-0 select-none ${styles.badgeClass}`}>
+    <div className={`my-2.5 p-3.5 rounded-2xl border-l-4 ${styles.border} ${styles.bg} ${styles.text} text-xs sm:text-sm flex items-start gap-3 shadow-sm font-sans`}>
+      <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono bg-[var(--theme-card-bg)] border border-[var(--theme-border)] shrink-0 select-none ${styles.badgeClass}`}>
         {styles.badge}
       </span>
       <div className="flex-1 whitespace-pre-wrap font-sans leading-relaxed">
@@ -405,22 +405,22 @@ const RenderNotionTable: React.FC<{ lines: string[] }> = ({ lines }) => {
     .map(parseRow);
 
   return (
-    <div className="my-3 overflow-x-auto rounded-xl border border-[var(--theme-border)] shadow-sm bg-black/30">
+    <div className="my-3 overflow-x-auto rounded-2xl border border-[var(--theme-border)] shadow-sm bg-[var(--theme-card-bg)]">
       <table className="w-full text-xs text-left border-collapse font-sans">
-        <thead className="bg-black/50 text-[var(--theme-text)] border-b border-[var(--theme-border)] font-semibold">
+        <thead className="bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border-b border-[var(--theme-border)] font-bold">
           <tr>
             {headerCells.map((cell, idx) => (
-              <th key={idx} className="px-3.5 py-2">
+              <th key={idx} className="px-4 py-2.5">
                 <InlineFormattedText text={cell} />
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[var(--theme-border)]/40 text-[var(--theme-text-muted)]">
+        <tbody className="divide-y divide-[var(--theme-border)] text-[var(--theme-text)]">
           {bodyRows.map((row, rIdx) => (
-            <tr key={rIdx} className="hover:bg-white/5 transition-colors">
+            <tr key={rIdx} className="hover:bg-[var(--theme-border-subtle)] transition-colors">
               {row.map((cell, cIdx) => (
-                <td key={cIdx} className="px-3.5 py-2">
+                <td key={cIdx} className="px-4 py-2.5">
                   <InlineFormattedText text={cell} />
                 </td>
               ))}

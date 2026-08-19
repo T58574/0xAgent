@@ -21,7 +21,6 @@ import {
   save_summarizer_prompt,
   get_tools_state,
   save_tools_toggles,
-  save_tools_md,
   listen,
 } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -40,9 +39,8 @@ export const PersonasTab: React.FC = () => {
 
   // Tools state
   const [toolsList, setToolsList] = useState<ToolDefinition[]>([]);
-  const [toolsMdContent, setToolsMdContent] = useState<string>('');
   const [isToolsSaving, setIsToolsSaving] = useState<boolean>(false);
-  const [toolsSaveSuccess, setToolsSaveSuccess] = useState<boolean>(false);
+  const [_toolsSaveSuccess, setToolsSaveSuccess] = useState<boolean>(false);
 
   // Persona file state (SOUL.md & USER.md)
   const [activeFileTab, setActiveFileTab] = useState<'soul' | 'user'>('soul');
@@ -54,7 +52,6 @@ export const PersonasTab: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
-  const [newIcon] = useState('User');
 
   const loadPersonas = async () => {
     try {
@@ -98,7 +95,6 @@ export const PersonasTab: React.FC = () => {
     try {
       const state = await get_tools_state();
       setToolsList(state.tools);
-      setToolsMdContent(state.content);
     } catch (err) {
       console.error('Failed to load tools state:', err);
     }
@@ -165,12 +161,12 @@ export const PersonasTab: React.FC = () => {
     e.preventDefault();
     if (!newName.trim()) return;
     try {
-      const created = await create_persona(newName.trim(), newDesc.trim(), newIcon);
+      const created = await create_persona(newName.trim(), newDesc.trim(), 'User');
+      setPersonas((prev) => [...prev, created.metadata]);
+      setSelectedPersonaId(created.metadata.id);
       setIsCreateOpen(false);
       setNewName('');
       setNewDesc('');
-      await loadPersonas();
-      setSelectedPersonaId(created.metadata.id);
       showToast(`Персона "${created.metadata.name}" создана!`, 'success');
     } catch (err: any) {
       showToast(`Ошибка создания: ${err.message}`, 'error');
@@ -179,31 +175,28 @@ export const PersonasTab: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (id === 'default') {
-      showToast('Базовая персона не может быть удалена!', 'info');
+      showToast('Нельзя удалить стандартную персону', 'error');
       return;
     }
     if (!confirm('Вы уверены, что хотите удалить эту персону?')) return;
     try {
       await delete_persona(id);
-      if (selectedPersonaId === id) {
-        setSelectedPersonaId('default');
-      }
-      await loadPersonas();
-      showToast('Персона удалена.', 'success');
+      setPersonas((prev) => prev.filter((p) => p.id !== id));
+      if (selectedPersonaId === id) setSelectedPersonaId('default');
+      showToast('Персона удалена', 'info');
     } catch (err: any) {
       showToast(`Ошибка удаления: ${err.message}`, 'error');
     }
   };
 
   const handleSavePersonaFile = async () => {
-    if (!selectedPersonaId) return;
+    if (!personaDetail) return;
+    const filename = activeFileTab === 'soul' ? 'SOUL.md' : 'USER.md';
     try {
       setIsSaving(true);
-      const filename = activeFileTab === 'soul' ? 'SOUL.md' : 'USER.md';
-      const updated = await save_persona_file(selectedPersonaId, filename, fileContent);
-      setPersonaDetail(updated);
+      await save_persona_file(personaDetail.metadata.id, filename, fileContent);
       setSaveSuccess(true);
-      showToast(`Файл ${filename} сохранен!`, 'success');
+      showToast(`${filename} успешно сохранен!`, 'success');
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err: any) {
       showToast(`Ошибка сохранения: ${err.message}`, 'error');
@@ -212,8 +205,8 @@ export const PersonasTab: React.FC = () => {
     }
   };
 
-  const handleToggleTool = async (id: string) => {
-    const updated = toolsList.map((t) => (t.id === id ? { ...t, enabled: !t.enabled } : t));
+  const handleToggleTool = async (toolId: string) => {
+    const updated = toolsList.map((t) => (t.id === toolId ? { ...t, enabled: !t.enabled } : t));
     setToolsList(updated);
 
     const togglesMap: Record<string, boolean> = {};
@@ -223,8 +216,7 @@ export const PersonasTab: React.FC = () => {
 
     try {
       setIsToolsSaving(true);
-      const state = await save_tools_toggles(togglesMap);
-      setToolsMdContent(state.content);
+      await save_tools_toggles(togglesMap);
       setToolsSaveSuccess(true);
       setTimeout(() => setToolsSaveSuccess(false), 1500);
     } catch (err: any) {
@@ -245,8 +237,7 @@ export const PersonasTab: React.FC = () => {
 
     try {
       setIsToolsSaving(true);
-      const state = await save_tools_toggles(togglesMap);
-      setToolsMdContent(state.content);
+      await save_tools_toggles(togglesMap);
       showToast(enabledState ? 'Все инструменты включены!' : 'Все инструменты отключены!', 'info');
     } catch (err: any) {
       showToast(`Ошибка группового изменения: ${err.message}`, 'error');
@@ -255,61 +246,46 @@ export const PersonasTab: React.FC = () => {
     }
   };
 
-  const handleSaveToolsMd = async () => {
-    try {
-      setIsToolsSaving(true);
-      const state = await save_tools_md(toolsMdContent);
-      setToolsMdContent(state.content);
-      setToolsSaveSuccess(true);
-      showToast('TOOLS.md успешно сохранен!', 'success');
-      setTimeout(() => setToolsSaveSuccess(false), 2000);
-    } catch (err: any) {
-      showToast(`Ошибка сохранения TOOLS.md: ${err.message}`, 'error');
-    } finally {
-      setIsToolsSaving(false);
-    }
-  };
-
   return (
-    <div className="w-full flex flex-col gap-4 font-sans text-[var(--theme-text)]">
+    <div className="w-full flex flex-col gap-5 font-sans text-[var(--theme-text)]">
       {/* Top Navigation Tabs */}
-      <div className="flex items-center gap-1.5 border-b border-[var(--theme-border)] pb-2 flex-wrap">
+      <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-3 flex-wrap">
         <button
           type="button"
           onClick={() => setSectionTab('personas')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
             sectionTab === 'personas'
-              ? 'bg-white/10 text-[var(--theme-text)] border-[var(--theme-border)] font-semibold shadow-sm'
-              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
+              : 'border-[var(--theme-border)] bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
           }`}
         >
-          <User size={14} className="text-[var(--theme-text-muted)]" />
-          <span>Персоны (Personas)</span>
+          <User size={14} />
+          <span>Персоны и роли</span>
         </button>
 
         <button
           type="button"
           onClick={() => setSectionTab('tools')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
             sectionTab === 'tools'
-              ? 'bg-white/10 text-[var(--theme-text)] border-[var(--theme-border)] font-semibold shadow-sm'
-              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
+              : 'border-[var(--theme-border)] bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
           }`}
         >
-          <Sliders size={14} className="text-[var(--theme-text-muted)]" />
+          <Sliders size={14} />
           <span>Инструменты (TOOLS.md)</span>
         </button>
 
         <button
           type="button"
           onClick={() => setSectionTab('summarizer')}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer border ${
+          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
             sectionTab === 'summarizer'
-              ? 'bg-white/10 text-[var(--theme-text)] border-[var(--theme-border)] font-semibold shadow-sm'
-              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
+              : 'border-[var(--theme-border)] bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
           }`}
         >
-          <Sparkles size={14} className="text-[var(--theme-text-muted)]" />
+          <Sparkles size={14} />
           <span>Суммаризатор (SUMMARIZER.md)</span>
         </button>
       </div>
@@ -317,20 +293,20 @@ export const PersonasTab: React.FC = () => {
       {/* 1. TOOLS MANAGEMENT TAB */}
       {sectionTab === 'tools' && (
         <div className="flex flex-col gap-4">
-          <div className="p-4 rounded-xl bento-card flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="p-4 rounded-2xl bento-card flex flex-col md:flex-row md:items-center justify-between gap-3 border border-[var(--theme-border)]">
             <div className="flex items-start gap-3">
-              <div className="p-2 rounded-lg bg-white/5 border border-[var(--theme-border)] text-[var(--theme-text-muted)] shrink-0">
+              <div className="p-2.5 rounded-xl bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] shrink-0">
                 <Sliders size={18} />
               </div>
               <div>
-                <h2 className="text-xs font-semibold text-[var(--theme-text)] flex items-center gap-2">
+                <h2 className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-2">
                   <span>Система инструментов Агента</span>
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-white/5 border border-[var(--theme-border)] text-[var(--theme-text-muted)]">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] font-semibold">
                     TOOLS.md
                   </span>
                 </h2>
                 <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 max-w-2xl">
-                  Управляйте активными инструментами ИИ. Отключение лишних функций сокращает системный промпт.
+                  Управляйте активными инструментами ИИ. Отключение лишних функций сокращает системный промпт и экономит контекст.
                 </p>
               </div>
             </div>
@@ -339,14 +315,16 @@ export const PersonasTab: React.FC = () => {
               <button
                 type="button"
                 onClick={() => handleBulkToggleAll(true)}
-                className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--theme-text)] text-xs font-medium border border-[var(--theme-border)] transition-colors cursor-pointer"
+                disabled={isToolsSaving}
+                className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] text-xs font-bold border border-[var(--theme-border)] transition-colors cursor-pointer"
               >
                 Включить все
               </button>
               <button
                 type="button"
                 onClick={() => handleBulkToggleAll(false)}
-                className="px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] text-xs font-medium border border-[var(--theme-border)] transition-colors cursor-pointer"
+                disabled={isToolsSaving}
+                className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] text-xs font-bold border border-[var(--theme-border)] transition-colors cursor-pointer"
               >
                 Отключить все
               </button>
@@ -354,98 +332,79 @@ export const PersonasTab: React.FC = () => {
           </div>
 
           {/* Tools Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {toolsList.map((tool) => (
               <div
                 key={tool.id}
                 onClick={() => handleToggleTool(tool.id)}
-                className={`p-3.5 rounded-xl bento-card cursor-pointer transition-all flex flex-col justify-between gap-2.5 border ${
+                className={`p-4 rounded-2xl bento-card cursor-pointer transition-all flex flex-col justify-between gap-3 border ${
                   tool.enabled
-                    ? 'bg-white/10 border-[var(--theme-border)]'
-                    : 'opacity-50 hover:opacity-80 border-transparent bg-white/5'
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-card-bg)]'
+                    : 'opacity-60 hover:opacity-90 border-[var(--theme-border)] bg-[var(--theme-card-bg)]'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-semibold text-[var(--theme-text)]">&lt;{tool.name}&gt;</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-white/10 text-[var(--theme-text-muted)] font-mono">
+                      <span className="font-mono text-xs font-bold text-[var(--theme-text)]">&lt;{tool.name}&gt;</span>
+                      <span className="text-[9px] px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] font-mono border border-[var(--theme-border)]">
                         {tool.requiresApproval ? 'Подтверждение' : 'Авто'}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--theme-text-muted)] mt-1">{tool.description}</p>
+                    <p className="text-xs text-[var(--theme-text-muted)] mt-1.5 leading-relaxed">{tool.description}</p>
                   </div>
 
                   <div
-                    className={`w-8 h-4.5 rounded-md p-0.5 flex items-center shrink-0 transition-colors ${
-                      tool.enabled ? 'bg-white/30' : 'bg-white/10'
+                    className={`w-9 h-5 rounded-full p-0.5 flex items-center shrink-0 transition-colors border ${
+                      tool.enabled
+                        ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] justify-end'
+                        : 'bg-[var(--theme-input-bg)] border-[var(--theme-border)] justify-start'
                     }`}
                   >
-                    <div className={`w-3.5 h-3.5 rounded-sm bg-white transition-transform ${tool.enabled ? 'translate-x-3.5' : 'translate-x-0'}`} />
+                    <div
+                      className={`w-3.5 h-3.5 rounded-full transition-transform ${
+                        tool.enabled ? 'bg-[var(--theme-accent-text)]' : 'bg-[var(--theme-text-muted)]'
+                      }`}
+                    />
                   </div>
                 </div>
               </div>
             ))}
           </div>
-
-          {/* Editor of global TOOLS.md */}
-          <div className="p-4 rounded-xl bento-card flex flex-col gap-2.5">
-            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
-              <div className="flex items-center gap-2">
-                <FileText size={14} className="text-[var(--theme-text-muted)]" />
-                <span className="text-xs font-medium text-[var(--theme-text)]">Редактирование TOOLS.md</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleSaveToolsMd}
-                disabled={isToolsSaving}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
-              >
-                {toolsSaveSuccess ? <Check size={13} /> : <Save size={13} />}
-                <span>{toolsSaveSuccess ? 'Сохранено' : 'Сохранить'}</span>
-              </button>
-            </div>
-            <textarea
-              value={toolsMdContent}
-              onChange={(e) => setToolsMdContent(e.target.value)}
-              rows={12}
-              className="w-full p-3 rounded-lg bento-card font-mono text-xs text-[var(--theme-text)] focus:outline-none resize-y"
-            />
-          </div>
         </div>
       )}
 
-      {/* 2. SUMMARIZER PROMPT TAB */}
+      {/* 2. SUMMARIZER TAB */}
       {sectionTab === 'summarizer' && (
         <div className="flex flex-col gap-4">
-          <div className="p-4 rounded-xl bento-card flex items-start gap-3">
-            <div className="p-2 rounded-lg bg-white/5 border border-[var(--theme-border)] text-[var(--theme-text-muted)] shrink-0">
+          <div className="p-4 rounded-2xl bento-card flex items-start gap-3 border border-[var(--theme-border)]">
+            <div className="p-2.5 rounded-xl bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] shrink-0">
               <Sparkles size={18} />
             </div>
             <div>
-              <h2 className="text-xs font-semibold text-[var(--theme-text)] flex items-center gap-2">
+              <h2 className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-2">
                 <span>Системный суммаризатор контекста</span>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-white/5 border border-[var(--theme-border)] text-[var(--theme-text-muted)]">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] font-semibold">
                   SUMMARIZER.md
                 </span>
               </h2>
-              <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
+              <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 leading-relaxed">
                 Этот промпт используется при фоновом сжатии контекста диалога при переполнении контекстного окна.
               </p>
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bento-card flex flex-col gap-2.5">
-            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
+          <div className="p-4 rounded-2xl bento-card flex flex-col gap-3 border border-[var(--theme-border)]">
+            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
               <div className="flex items-center gap-2">
                 <FileText size={14} className="text-[var(--theme-text-muted)]" />
-                <span className="text-xs font-medium text-[var(--theme-text)]">Промпт сжатия</span>
+                <span className="text-xs font-bold text-[var(--theme-text)]">Промпт сжатия</span>
               </div>
               <button
                 type="button"
                 onClick={handleSaveSummarizer}
                 disabled={isSaving}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+                className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
               >
                 {saveSuccess ? <Check size={13} /> : <Save size={13} />}
                 <span>{saveSuccess ? 'Сохранено' : 'Сохранить'}</span>
@@ -455,7 +414,7 @@ export const PersonasTab: React.FC = () => {
               value={summarizerPrompt}
               onChange={(e) => setSummarizerPrompt(e.target.value)}
               rows={16}
-              className="w-full p-3 rounded-lg bento-card font-mono text-xs text-[var(--theme-text)] focus:outline-none resize-y"
+              className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none resize-y"
             />
           </div>
         </div>
@@ -463,24 +422,24 @@ export const PersonasTab: React.FC = () => {
 
       {/* 3. PERSONAS LIST & EDITOR TAB */}
       {sectionTab === 'personas' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Personas List Column */}
-          <div className="lg:col-span-4 space-y-2.5">
+          <div className="lg:col-span-4 space-y-3">
             <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-medium text-[var(--theme-text-muted)] uppercase tracking-wider">
+              <span className="text-xs font-bold text-[var(--theme-text-muted)] uppercase tracking-wider">
                 Список персон ({personas.length})
               </span>
               <button
                 type="button"
                 onClick={() => setIsCreateOpen(true)}
-                className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1 cursor-pointer transition-colors"
+                className="px-2.5 py-1 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
               >
                 <Plus size={13} />
                 <span>Создать</span>
               </button>
             </div>
 
-            <div className="space-y-1.5 max-h-[500px] overflow-y-auto pr-1">
+            <div className="space-y-2">
               {personas.map((p) => {
                 const isSelected = p.id === selectedPersonaId;
                 const isActive = p.id === activePersonaId;
@@ -488,24 +447,24 @@ export const PersonasTab: React.FC = () => {
                   <div
                     key={p.id}
                     onClick={() => setSelectedPersonaId(p.id)}
-                    className={`p-3 rounded-xl bento-card cursor-pointer transition-all flex flex-col gap-1.5 border ${
+                    className={`p-3.5 rounded-2xl bento-card cursor-pointer transition-all flex flex-col gap-1.5 border ${
                       isSelected
-                        ? 'bg-white/10 border-[var(--theme-border)] shadow-sm'
-                        : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                        ? 'border-[var(--theme-accent)] bg-[var(--theme-border-subtle)] ring-1 ring-[var(--theme-accent)]'
+                        : 'border-[var(--theme-border)] bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <User size={14} className="text-[var(--theme-text-muted)]" />
-                        <span className="font-semibold text-xs text-[var(--theme-text)]">{p.name}</span>
+                        <span className="font-bold text-xs text-[var(--theme-text)]">{p.name}</span>
                       </div>
                       {isActive && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-md bg-white/10 text-[var(--theme-text)]">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--theme-accent)] text-[var(--theme-accent-text)]">
                           активна
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-1">{p.description}</p>
+                    <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed">{p.description}</p>
                   </div>
                 );
               })}
@@ -515,11 +474,11 @@ export const PersonasTab: React.FC = () => {
           {/* Persona Details Column */}
           <div className="lg:col-span-8 space-y-3">
             {personaDetail ? (
-              <div className="p-4 rounded-xl bento-card space-y-3">
+              <div className="p-4.5 rounded-2xl bento-card space-y-4 border border-[var(--theme-border)]">
                 <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-[var(--theme-text)]">{personaDetail.metadata.name}</h3>
-                    <p className="text-xs text-[var(--theme-text-muted)]">{personaDetail.metadata.description}</p>
+                    <h3 className="text-sm font-bold text-[var(--theme-text)]">{personaDetail.metadata.name}</h3>
+                    <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">{personaDetail.metadata.description}</p>
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -527,7 +486,7 @@ export const PersonasTab: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleActivate(personaDetail.metadata.id)}
-                        className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] cursor-pointer transition-colors"
+                        className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold cursor-pointer transition-colors shadow-sm"
                       >
                         Активировать
                       </button>
@@ -536,10 +495,10 @@ export const PersonasTab: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => handleDelete(personaDetail.metadata.id)}
-                        className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer transition-colors"
+                        className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 cursor-pointer transition-colors"
                         title="Удалить персону"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={15} />
                       </button>
                     )}
                   </div>
@@ -547,13 +506,13 @@ export const PersonasTab: React.FC = () => {
 
                 {/* File Subtabs */}
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-[var(--theme-border)]">
+                  <div className="flex items-center bg-[var(--theme-input-bg)] p-1 rounded-xl border border-[var(--theme-border)]">
                     <button
                       type="button"
                       onClick={() => setActiveFileTab('soul')}
-                      className={`px-3 py-1 rounded-md text-xs font-medium cursor-pointer transition-all ${
+                      className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
                         activeFileTab === 'soul'
-                          ? 'bg-white/15 text-[var(--theme-text)] border border-[var(--theme-border)]'
+                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
                           : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                       }`}
                     >
@@ -562,9 +521,9 @@ export const PersonasTab: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setActiveFileTab('user')}
-                      className={`px-3 py-1 rounded-md text-xs font-medium cursor-pointer transition-all ${
+                      className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
                         activeFileTab === 'user'
-                          ? 'bg-white/15 text-[var(--theme-text)] border border-[var(--theme-border)]'
+                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
                           : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                       }`}
                     >
@@ -576,7 +535,7 @@ export const PersonasTab: React.FC = () => {
                     type="button"
                     onClick={handleSavePersonaFile}
                     disabled={isSaving}
-                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
+                    className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
                   >
                     {saveSuccess ? <Check size={13} /> : <Save size={13} />}
                     <span>{saveSuccess ? 'Сохранено' : 'Сохранить'}</span>
@@ -587,11 +546,11 @@ export const PersonasTab: React.FC = () => {
                   value={fileContent}
                   onChange={(e) => setFileContent(e.target.value)}
                   rows={14}
-                  className="w-full p-3 rounded-lg bento-card font-mono text-xs text-[var(--theme-text)] focus:outline-none resize-y"
+                  className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none resize-y"
                 />
               </div>
             ) : (
-              <div className="p-8 rounded-xl bento-card text-center text-xs text-[var(--theme-text-muted)]">
+              <div className="p-8 rounded-2xl bento-card text-center text-xs text-[var(--theme-text-muted)] border border-[var(--theme-border)] font-medium">
                 Выберите персону для редактирования
               </div>
             )}
@@ -602,44 +561,44 @@ export const PersonasTab: React.FC = () => {
       {/* Modal for Creating New Persona */}
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="w-full max-w-md p-5 rounded-xl bento-card bg-[var(--theme-panel)] border border-[var(--theme-border)] shadow-2xl space-y-4">
-            <h3 className="text-sm font-semibold text-[var(--theme-text)]">Новая персона</h3>
-            <form onSubmit={handleCreate} className="space-y-3">
+          <div className="w-full max-w-md p-6 rounded-2xl bento-card bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] shadow-xl space-y-4">
+            <h3 className="text-sm font-bold text-[var(--theme-text)]">Новая персона</h3>
+            <form onSubmit={handleCreate} className="space-y-3.5">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[var(--theme-text-muted)]">Имя персоны</label>
+                <label className="text-xs font-bold text-[var(--theme-text-muted)]">Имя персоны</label>
                 <input
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
                   placeholder="Например: Архитектор"
-                  className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none"
+                  className="w-full px-3.5 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] focus:outline-none"
                   required
                   autoFocus
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[var(--theme-text-muted)]">Краткое описание</label>
+                <label className="text-xs font-bold text-[var(--theme-text-muted)]">Краткое описание</label>
                 <input
                   type="text"
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
                   placeholder="Например: Эксперт по чистому коду и паттернам"
-                  className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none"
+                  className="w-full px-3.5 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] focus:outline-none"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2.5 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateOpen(false)}
-                  className="px-3 py-1.5 rounded-lg bento-card text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
                 >
                   Отмена
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] cursor-pointer transition-colors"
+                  className="px-4 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold cursor-pointer transition-colors shadow-sm"
                 >
                   Создать
                 </button>
