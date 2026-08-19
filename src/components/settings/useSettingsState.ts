@@ -61,6 +61,14 @@ export function useSettingsState(
   const [cacheReuse, setCacheReuse] = useState(256);
   const [slotSavePath, setSlotSavePath] = useState('');
   const [customArgs, setCustomArgs] = useState('');
+  const [specDraftModel, setSpecDraftModel] = useState('');
+  const [specType, setSpecType] = useState('draft-mtp');
+  const [specDraftNgl, setSpecDraftNgl] = useState(99);
+  const [specDraftNMax, setSpecDraftNMax] = useState(3);
+  const [specDraftPMin, setSpecDraftPMin] = useState(0);
+  const [jinja, setJinja] = useState(true);
+  const [reasoningPreserve, setReasoningPreserve] = useState(true);
+  const [reasoningFormat, setReasoningFormat] = useState('deepseek');
 
   const [serverStatus, setServerStatus] = useState<'stopped' | 'running' | 'checking'>('stopped');
   const [serverLogs, setServerLogs] = useState<string[]>([]);
@@ -131,6 +139,14 @@ export function useSettingsState(
         if (ls.cache_reuse !== undefined && ls.cache_reuse !== null) setCacheReuse(ls.cache_reuse);
         if (ls.slot_save_path !== undefined && ls.slot_save_path !== null) setSlotSavePath(ls.slot_save_path);
         if (ls.custom_args !== undefined && ls.custom_args !== null) setCustomArgs(ls.custom_args);
+        if (ls.spec_draft_model !== undefined && ls.spec_draft_model !== null) setSpecDraftModel(ls.spec_draft_model);
+        if (ls.spec_type !== undefined && ls.spec_type !== null) setSpecType(ls.spec_type);
+        if (ls.spec_draft_ngl !== undefined && ls.spec_draft_ngl !== null) setSpecDraftNgl(Number(ls.spec_draft_ngl) || 99);
+        if (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null) setSpecDraftNMax(Number(ls.spec_draft_n_max) || 3);
+        if (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null) setSpecDraftPMin(Number(ls.spec_draft_p_min) || 0);
+        if (ls.jinja !== undefined && ls.jinja !== null) setJinja(ls.jinja);
+        if (ls.reasoning_preserve !== undefined && ls.reasoning_preserve !== null) setReasoningPreserve(ls.reasoning_preserve);
+        if (ls.reasoning_format !== undefined && ls.reasoning_format !== null) setReasoningFormat(ls.reasoning_format);
       }
     }
   }, [config]);
@@ -199,6 +215,14 @@ export function useSettingsState(
             cache_reuse: cacheReuse,
             slot_save_path: slotSavePath.trim() || null,
             custom_args: customArgs.trim() || null,
+            spec_draft_model: specDraftModel.trim() || null,
+            spec_type: specType.trim() || 'draft-mtp',
+            spec_draft_ngl: specDraftNgl,
+            spec_draft_n_max: specDraftNMax,
+            spec_draft_p_min: specDraftPMin,
+            jinja,
+            reasoning_preserve: reasoningPreserve,
+            reasoning_format: reasoningFormat.trim() || null,
           },
         });
         setSaveStatus('saved');
@@ -257,6 +281,14 @@ export function useSettingsState(
     cacheReuse,
     slotSavePath,
     customArgs,
+    specDraftModel,
+    specType,
+    specDraftNgl,
+    specDraftNMax,
+    specDraftPMin,
+    jinja,
+    reasoningPreserve,
+    reasoningFormat,
   ]);
 
   const handleSelectTheme = (theme: AppTheme) => {
@@ -363,6 +395,22 @@ export function useSettingsState(
     setSlotSavePath,
     customArgs,
     setCustomArgs,
+    specDraftModel,
+    setSpecDraftModel,
+    specType,
+    setSpecType,
+    specDraftNgl,
+    setSpecDraftNgl,
+    specDraftNMax,
+    setSpecDraftNMax,
+    specDraftPMin,
+    setSpecDraftPMin,
+    jinja,
+    setJinja,
+    reasoningPreserve,
+    setReasoningPreserve,
+    reasoningFormat,
+    setReasoningFormat,
     serverStatus,
     setServerStatus,
     serverLogs,

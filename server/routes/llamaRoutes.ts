@@ -361,6 +361,96 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         appendServerLog(`[MMPROJ] Автоматически подключен проектор зрения/аудио: ${path.basename(mmprojTarget)}`);
       }
 
+      // Auto-detect / configure FastMTP and Speculative Decoding draft models
+      let specDraftTarget = body.specDraftModel !== undefined ? body.specDraftModel : ls.spec_draft_model;
+      const isDraftDisabled = specDraftTarget === 'none' || specDraftTarget === 'disabled' || specDraftTarget === false;
+
+      if (!isDraftDisabled) {
+        if (!specDraftTarget || !fs.existsSync(specDraftTarget)) {
+          const candidateDirs = [
+            path.dirname(targetModel),
+            path.join(os.homedir(), '.0xagent', 'models'),
+            path.join(process.cwd(), 'models'),
+            ...(cfg.workspace_dir ? [path.join(cfg.workspace_dir, 'models')] : []),
+          ];
+
+          const modelBaseLower = path.basename(targetModel).toLowerCase();
+          const isQwenModel = /qwen3|qwen-3|qwen_3|qwen 3|qwen3.8/i.test(modelBaseLower);
+          let bestDraft: string | null = null;
+
+          for (const cDir of candidateDirs) {
+            if (fs.existsSync(cDir)) {
+              try {
+                const files = fs.readdirSync(cDir);
+                const draftFiles = files.filter((f) => f.endsWith('.gguf') && /fastmtp|mtp|draft/i.test(f) && !/mmproj|projector|clip/i.test(f));
+                if (draftFiles.length > 0) {
+                  if (isQwenModel) {
+                    const qwenDraft = draftFiles.find((f) => /qwen3.*fastmtp|fastmtp.*qwen3|fastmtp/i.test(f));
+                    if (qwenDraft) {
+                      bestDraft = path.join(cDir, qwenDraft);
+                      break;
+                    }
+                  }
+                  bestDraft = path.join(cDir, draftFiles[0]);
+                  break;
+                }
+              } catch {}
+            }
+          }
+          if (bestDraft && fs.existsSync(bestDraft)) {
+            specDraftTarget = bestDraft;
+          }
+        }
+
+        if (specDraftTarget && fs.existsSync(specDraftTarget)) {
+          args.push('--spec-draft-model', specDraftTarget);
+
+          const specType = body.specType || ls.spec_type || 'draft-mtp';
+          args.push('--spec-type', specType);
+
+          const specDraftNgl = body.specDraftNgl !== undefined && body.specDraftNgl !== null ? body.specDraftNgl : (ls.spec_draft_ngl !== undefined && ls.spec_draft_ngl !== null ? ls.spec_draft_ngl : 'all');
+          if (specDraftNgl !== undefined && specDraftNgl !== null) {
+            args.push('--spec-draft-ngl', String(specDraftNgl));
+          }
+
+          const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : 3);
+          if (specDraftNMax !== undefined && specDraftNMax !== null) {
+            args.push('--spec-draft-n-max', String(specDraftNMax));
+          }
+
+          const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : 0);
+          if (specDraftPMin !== undefined && specDraftPMin !== null) {
+            args.push('--spec-draft-p-min', String(specDraftPMin));
+          }
+
+          appendServerLog(`[FASTMTP] Автоматически подключен Speculative MTP сайдкар: ${path.basename(specDraftTarget)} (тип: ${specType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
+        }
+      }
+
+      const modelNameLower = path.basename(targetModel).toLowerCase();
+      const isQwen3 = /qwen3|qwen-3|qwen_3|qwen 3|qwen3.8/i.test(modelNameLower);
+
+      // Jinja and Reasoning template flags for Qwen 3.8 / local reasoning models
+      const jinja = body.jinja !== undefined ? body.jinja : ls.jinja;
+      if (jinja || (jinja === undefined && isQwen3)) {
+        args.push('--jinja');
+      }
+
+      const reasoningPreserve = body.reasoningPreserve !== undefined ? body.reasoningPreserve : ls.reasoning_preserve;
+      if (reasoningPreserve || (reasoningPreserve === undefined && isQwen3)) {
+        args.push('--reasoning-preserve');
+      }
+
+      const reasoningFormat = body.reasoningFormat || ls.reasoning_format || (isQwen3 ? 'deepseek' : null);
+      if (reasoningFormat) {
+        args.push('--reasoning-format', reasoningFormat);
+      }
+
+      const reasoningEffort = body.reasoningEffort || ls.reasoning_effort || (isQwen3 ? 'xhigh' : null);
+      if (reasoningEffort && reasoningEffort !== 'off' && reasoningEffort !== 'auto') {
+        args.push('--reasoning', 'on', '--reasoning-effort', reasoningEffort);
+      }
+
       const ctxSize = body.ctxSize !== undefined ? body.ctxSize : ls.ctx_size;
       if (ctxSize) args.push('-c', String(ctxSize));
 
@@ -434,7 +524,12 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
 
       const handleLogData = (data: Buffer) => {
         const cleanStr = stripAnsiCodes(data.toString()).trim();
-        if (cleanStr) appendServerLog(cleanStr);
+        if (cleanStr) {
+          appendServerLog(cleanStr);
+          if (cleanStr.includes('expected   5120, 248320, got   5120,  32768') || cleanStr.includes('expected 5120, 248320, got 5120, 32768')) {
+            appendServerLog('[FASTMTP DIAGNOSTIC] Сайдкар FastMTP требует пропатченный бинарник llama.cpp (HauhauCS-FastMTP-llama.cpp.patch). Исполняемый файл ожидает полный словарь Qwen 3.8.');
+          }
+        }
       };
 
       activeLlamaProcess.stdout?.on('data', handleLogData);

@@ -449,12 +449,14 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
           </div>
 
           <div className="max-h-40 overflow-y-auto space-y-0.5 scrollbar-thin">
-            {modelsData.local.length === 0 ? (
+            {modelsData.local.filter((m) => !m.isDraft && !m.isMmproj).length === 0 ? (
               <div className="text-[10px] text-[var(--theme-text-muted)] italic py-1 px-2.5 font-mono">
                 нет файлов в ~/.0xagent/models/
               </div>
             ) : (
-              modelsData.local.map((m) => {
+              modelsData.local
+                .filter((m) => !m.isDraft && !m.isMmproj)
+                .map((m) => {
                 const isActive =
                   activeModelId === m.id || activeModelId === m.fileName || activeModelId === `local:${m.fileName}`;
                 return (

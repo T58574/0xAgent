@@ -124,6 +124,14 @@ export function useModelManager(
             gpuLayers: ls?.gpu_layers,
             threads: ls?.threads,
             flashAttn: ls?.flash_attn,
+            specDraftModel: ls?.spec_draft_model,
+            specType: ls?.spec_type,
+            specDraftNgl: ls?.spec_draft_ngl,
+            specDraftNMax: ls?.spec_draft_n_max,
+            specDraftPMin: ls?.spec_draft_p_min,
+            jinja: ls?.jinja,
+            reasoningPreserve: ls?.reasoning_preserve,
+            reasoningFormat: ls?.reasoning_format,
           });
           setServerStatus((prev) => ({
             ...prev,
@@ -170,6 +178,14 @@ export function useModelManager(
           gpuLayers: ls?.gpu_layers,
           threads: ls?.threads,
           flashAttn: ls?.flash_attn,
+          specDraftModel: ls?.spec_draft_model,
+          specType: ls?.spec_type,
+          specDraftNgl: ls?.spec_draft_ngl,
+          specDraftNMax: ls?.spec_draft_n_max,
+          specDraftPMin: ls?.spec_draft_p_min,
+          jinja: ls?.jinja,
+          reasoningPreserve: ls?.reasoning_preserve,
+          reasoningFormat: ls?.reasoning_format,
         });
         if (res?.success) {
           setServerStatus((prev) => ({ ...prev, running: true }));

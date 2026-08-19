@@ -187,6 +187,9 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
     contextLength: 4096,
     expertCount: 0,
     isMmproj: /mmproj|projector|clip/i.test(fileName),
+    isDraft: /fastmtp|mtp|draft/i.test(fileName),
+    isFastMtp: /fastmtp/i.test(fileName),
+    supportsFastMtp: false,
     rawKv: {},
   };
 
@@ -244,6 +247,7 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
   result.supportsReasoning = reasoningCaps.supportsReasoning;
   result.recommendedReasoningEffort = reasoningCaps.recommendedReasoningEffort;
   result.supportedReasoningLevels = reasoningCaps.supportedReasoningLevels;
+  result.supportsFastMtp = (result.family === 'qwen' || /qwen3/i.test(fileName) || /qwen/i.test(result.modelName)) && !result.isDraft && !result.isMmproj;
 
   const sizeGBNum = fileSizeBytes / (1024 * 1024 * 1024);
   const sizeGB = `${sizeGBNum.toFixed(2)} GB`;

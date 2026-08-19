@@ -48,6 +48,14 @@ export interface LocalServerConfig {
   slot_save_path?: string | null;
   custom_args?: string | null;
   reasoning_effort?: ReasoningEffortLevel | null;
+  spec_draft_model?: string | null;
+  spec_type?: string | null;
+  spec_draft_ngl?: number | string | null;
+  spec_draft_n_max?: number | null;
+  spec_draft_p_min?: number | null;
+  jinja?: boolean | null;
+  reasoning_preserve?: boolean | null;
+  reasoning_format?: string | null;
 }
 
 export interface PersonaMetadata {
@@ -158,6 +166,8 @@ export interface LocalModelItem {
   sizeGB: string;
   formattedName: string;
   isMmproj?: boolean;
+  isDraft?: boolean;
+  isFastMtp?: boolean;
   contextLength?: number;
   supportsReasoning?: boolean;
   recommendedReasoningEffort?: ReasoningEffortLevel;
@@ -262,6 +272,9 @@ export interface GgufMetadata {
   contextLength: number;
   expertCount: number;
   isMmproj: boolean;
+  isDraft?: boolean;
+  isFastMtp?: boolean;
+  supportsFastMtp?: boolean;
   rawKv?: Record<string, any>;
   cleanTitle?: string;
   sizeGB?: string;

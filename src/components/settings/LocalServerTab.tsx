@@ -59,6 +59,22 @@ interface LocalServerTabProps {
   setSlotSavePath: (val: string) => void;
   customArgs: string;
   setCustomArgs: (val: string) => void;
+  specDraftModel: string;
+  setSpecDraftModel: (val: string) => void;
+  specType: string;
+  setSpecType: (val: string) => void;
+  specDraftNgl: number;
+  setSpecDraftNgl: (val: number) => void;
+  specDraftNMax: number;
+  setSpecDraftNMax: (val: number) => void;
+  specDraftPMin: number;
+  setSpecDraftPMin: (val: number) => void;
+  jinja: boolean;
+  setJinja: (val: boolean) => void;
+  reasoningPreserve: boolean;
+  setReasoningPreserve: (val: boolean) => void;
+  reasoningFormat: string;
+  setReasoningFormat: (val: string) => void;
   serverStatus: 'stopped' | 'running' | 'checking';
   setServerStatus: (val: 'stopped' | 'running' | 'checking') => void;
   serverLogs: string[];
@@ -119,6 +135,22 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   setSlotSavePath,
   customArgs,
   setCustomArgs,
+  specDraftModel,
+  setSpecDraftModel,
+  specType,
+  setSpecType,
+  specDraftNgl,
+  setSpecDraftNgl,
+  specDraftNMax,
+  setSpecDraftNMax,
+  specDraftPMin,
+  setSpecDraftPMin,
+  jinja,
+  setJinja,
+  reasoningPreserve,
+  setReasoningPreserve,
+  reasoningFormat,
+  setReasoningFormat,
   serverStatus,
   setServerStatus,
   serverLogs,
@@ -265,7 +297,9 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   // Log Inspection Crash Adviser
   useEffect(() => {
     const logsStr = serverLogs.join('\n');
-    if (logsStr.includes('pinned memory') || logsStr.includes('CUDA error') || logsStr.includes('out of memory')) {
+    if (logsStr.includes('expected   5120, 248320') || logsStr.includes('expected 5120, 248320') || logsStr.includes('check_tensor_dims: tensor \'output.weight\'')) {
+      setCrashAdvice('Советчик FastMTP: Сайдкар FastMTP для Qwen 3.8 требует пропатченный бинарник llama-server (HauhauCS-FastMTP-llama.cpp.patch для d2t trim). Для запуска без драфта выберите "[x] Отключить" в выпадающем списке Draft/FastMTP модели.');
+    } else if (logsStr.includes('pinned memory') || logsStr.includes('CUDA error') || logsStr.includes('out of memory')) {
       if (!mmap) {
         setCrashAdvice('Советчик: Падение вызвано опцией --no-mmap. Включите Mmap обратно или уменьшите число GPU слоев.');
       } else {
@@ -319,6 +353,15 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       if (file) setModelPath(file);
     } catch (err) {
       console.error('Failed to select GGUF model:', err);
+    }
+  };
+
+  const handleSelectDraftModel = async () => {
+    try {
+      const file = await api.select_file_native("GGUF Draft/MTP Files (*.gguf)|*.gguf|All Files (*.*)|*.*");
+      if (file) setSpecDraftModel(file);
+    } catch (err) {
+      console.error('Failed to select Draft/MTP model:', err);
     }
   };
 
@@ -449,9 +492,42 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     showToast('Применен быстрый пресет (Flash Attention + Q8 KV + 1 слот)!', 'success');
   };
 
+  const handleApplyFastMtpPreset = () => {
+    setSpecType('draft-mtp');
+    setSpecDraftNMax(3);
+    setSpecDraftNgl(99);
+    setSpecDraftPMin(0);
+    setJinja(true);
+    setReasoningPreserve(true);
+    setReasoningFormat('deepseek');
+    setGpuLayers(99);
+    setThreads(0);
+    setBatchSize(2048);
+    setUbatchSize(512);
+    setFlashAttn(true);
+    setMmap(false);
+    setTopK(20);
+    setTopP(0.95);
+    setTemp(1.0);
+    setMinP(0);
+    setRepeatPenalty(1.0);
+    setParallelSlots(1);
+    setCtxSize(32768);
+
+    // Auto-locate FastMTP draft model if present in scanned models
+    const draftModel = scannedLocalModels.find((m) => /fastmtp|qwen3.*mtp/i.test(m.fileName));
+    if (draftModel) {
+      setSpecDraftModel(draftModel.filePath);
+    }
+    showToast('Применен пресет FastMTP для Qwen 3.8 (до 3x ускорения текста и 1.9x рассуждений)!', 'success');
+  };
+
   const isSelectedVersionInstalled = installedVersions.some(
     (v) => v.tag.toLowerCase() === selectedTag.toLowerCase()
   );
+
+  const mainLocalModels = scannedLocalModels.filter((m) => !m.isDraft && !m.isMmproj);
+  const draftLocalModels = scannedLocalModels.filter((m) => m.isDraft || /fastmtp|mtp|draft/i.test(m.fileName));
 
   return (
     <div className="space-y-4 font-sans text-[var(--theme-text)] max-w-full">
@@ -485,7 +561,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       {/* Crash Advisory Alert Box */}
       {crashAdvice && (
         <div className="p-3 rounded-xl bento-card border border-[var(--theme-border)] text-xs flex items-start gap-2 animate-fadeIn bg-white/5">
-          <AlertTriangle size={15} className="shrink-0 mt-0.5 text-[var(--theme-text-muted)]" />
+          <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-400" />
           <span>{crashAdvice}</span>
         </div>
       )}
@@ -600,7 +676,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
               {/* Local GGUF Scanned Dropdown */}
               <select
                 value={
-                  scannedLocalModels.find(
+                  mainLocalModels.find(
                     (m) => m.filePath.toLowerCase() === modelPath.toLowerCase() || m.fileName.toLowerCase() === modelPath.toLowerCase()
                   )?.filePath || (modelPath ? 'custom' : '')
                 }
@@ -613,12 +689,12 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none cursor-pointer"
               >
                 <option value="" className="bg-black">-- Выберите локальную GGUF модель из ~/.0xagent/models/ --</option>
-                {scannedLocalModels.map((m) => (
+                {mainLocalModels.map((m) => (
                   <option key={m.id || m.filePath} value={m.filePath} className="bg-black">
                     {m.title || m.fileName} ({m.quantization} • {m.sizeGB})
                   </option>
                 ))}
-                {modelPath && !scannedLocalModels.some((m) => m.filePath.toLowerCase() === modelPath.toLowerCase()) && (
+                {modelPath && !mainLocalModels.some((m) => m.filePath.toLowerCase() === modelPath.toLowerCase()) && (
                   <option value="custom" className="bg-black">Пользовательский путь: {modelPath}</option>
                 )}
               </select>
@@ -670,6 +746,15 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                     </span>
                   </div>
                 </div>
+
+                {modelMeta.supportsFastMtp && (
+                  <div className="flex items-center justify-between text-[11px] border-t border-[var(--theme-border)] pt-1.5 mt-1">
+                    <span className="text-sky-300">FastMTP Ускорение:</span>
+                    <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold">
+                      СОВМЕСТИМО (3x Speed)
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -722,8 +807,27 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             setSlotSavePath={setSlotSavePath}
             customArgs={customArgs}
             setCustomArgs={setCustomArgs}
+            specDraftModel={specDraftModel}
+            setSpecDraftModel={setSpecDraftModel}
+            specType={specType}
+            setSpecType={setSpecType}
+            specDraftNgl={specDraftNgl}
+            setSpecDraftNgl={setSpecDraftNgl}
+            specDraftNMax={specDraftNMax}
+            setSpecDraftNMax={setSpecDraftNMax}
+            specDraftPMin={specDraftPMin}
+            setSpecDraftPMin={setSpecDraftPMin}
+            jinja={jinja}
+            setJinja={setJinja}
+            reasoningPreserve={reasoningPreserve}
+            setReasoningPreserve={setReasoningPreserve}
+            reasoningFormat={reasoningFormat}
+            setReasoningFormat={setReasoningFormat}
+            scannedDraftModels={draftLocalModels}
+            onSelectDraftModelFile={handleSelectDraftModel}
             onSelectSlotSavePath={handleSelectSlotSavePath}
             onApplyFastPreset={handleApplyFastPreset}
+            onApplyFastMtpPreset={handleApplyFastMtpPreset}
           />
         </div>
 

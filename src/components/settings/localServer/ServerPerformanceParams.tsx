@@ -1,5 +1,6 @@
 import React from 'react';
-import { Zap, Folder } from 'lucide-react';
+import { Zap, Folder, Sparkles, Cpu } from 'lucide-react';
+import { LocalModelItem } from '../../../types';
 
 interface ServerPerformanceParamsProps {
   host: string;
@@ -48,8 +49,27 @@ interface ServerPerformanceParamsProps {
   setSlotSavePath: (val: string) => void;
   customArgs: string;
   setCustomArgs: (val: string) => void;
+  specDraftModel: string;
+  setSpecDraftModel: (val: string) => void;
+  specType: string;
+  setSpecType: (val: string) => void;
+  specDraftNgl: number;
+  setSpecDraftNgl: (val: number) => void;
+  specDraftNMax: number;
+  setSpecDraftNMax: (val: number) => void;
+  specDraftPMin: number;
+  setSpecDraftPMin: (val: number) => void;
+  jinja: boolean;
+  setJinja: (val: boolean) => void;
+  reasoningPreserve: boolean;
+  setReasoningPreserve: (val: boolean) => void;
+  reasoningFormat: string;
+  setReasoningFormat: (val: string) => void;
+  scannedDraftModels?: LocalModelItem[];
+  onSelectDraftModelFile?: () => void;
   onSelectSlotSavePath: () => void;
   onApplyFastPreset: () => void;
+  onApplyFastMtpPreset?: () => void;
 }
 
 export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = ({
@@ -99,11 +119,32 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
   setSlotSavePath,
   customArgs,
   setCustomArgs,
+  specDraftModel,
+  setSpecDraftModel,
+  specType,
+  setSpecType,
+  specDraftNgl,
+  setSpecDraftNgl,
+  specDraftNMax,
+  setSpecDraftNMax,
+  specDraftPMin,
+  setSpecDraftPMin,
+  jinja,
+  setJinja,
+  reasoningPreserve,
+  setReasoningPreserve,
+  reasoningFormat,
+  setReasoningFormat,
+  scannedDraftModels = [],
+  onSelectDraftModelFile,
   onSelectSlotSavePath,
   onApplyFastPreset,
+  onApplyFastMtpPreset,
 }) => {
   const toggleItems = [
     { label: 'Flash Attention (-fa)', value: flashAttn, toggle: () => setFlashAttn(!flashAttn) },
+    { label: 'Jinja Template (--jinja)', value: jinja, toggle: () => setJinja(!jinja) },
+    { label: 'Preserve Reasoning', value: reasoningPreserve, toggle: () => setReasoningPreserve(!reasoningPreserve) },
     { label: 'Prompt Cache', value: promptCache, toggle: () => setPromptCache(!promptCache) },
     { label: 'Use Memory Map (--mmap)', value: mmap, toggle: () => setMmap(!mmap) },
     { label: 'Lock Memory (--mlock)', value: mlock, toggle: () => setMlock(!mlock) },
@@ -115,14 +156,27 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
     <div className="p-4 rounded-xl bento-card space-y-4 font-sans text-[var(--theme-text)]">
       <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
         <span className="text-xs font-semibold text-[var(--theme-text)]">Параметры производительности</span>
-        <button
-          type="button"
-          onClick={onApplyFastPreset}
-          className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors"
-        >
-          <Zap size={12} className="text-[var(--theme-text-muted)]" />
-          <span>Быстрый пресет (50+ t/s)</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {onApplyFastMtpPreset && (
+            <button
+              type="button"
+              onClick={onApplyFastMtpPreset}
+              className="px-2.5 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 border border-sky-500/40 text-xs font-medium text-sky-300 flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Применить оптимизированный пресет для Qwen 3.8 + HauhauCS FastMTP (до 3x ускорения)"
+            >
+              <Sparkles size={12} className="text-sky-300" />
+              <span>FastMTP Qwen3.8 (3x)</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onApplyFastPreset}
+            className="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors"
+          >
+            <Zap size={12} className="text-[var(--theme-text-muted)]" />
+            <span>Быстрый пресет (50+ t/s)</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -336,6 +390,156 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           placeholder="~/.0xagent/slots or C:\path\to\slots"
           className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
         />
+      </div>
+
+      {/* Speculative Decoding & Custom FastMTP Section */}
+      <div className="p-3.5 rounded-xl bento-card space-y-3 border border-sky-500/30 bg-sky-950/10">
+        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
+          <div className="flex items-center gap-2">
+            <Sparkles size={14} className="text-sky-400" />
+            <span className="text-xs font-semibold text-sky-200">
+              Спекулятивное декодирование / FastMTP (Custom MTP)
+            </span>
+          </div>
+          <span className="text-[10px] font-mono text-sky-400/80 bg-sky-500/10 px-2 py-0.5 rounded border border-sky-500/20">
+            Qwen 3.8 MTP / Draft Support
+          </span>
+        </div>
+
+        {/* Draft Model GGUF Selector */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-[11px] font-medium text-[var(--theme-text-muted)] flex items-center gap-1.5">
+              <Cpu size={12} className="text-sky-400" />
+              <span>Draft / FastMTP Модель (--spec-draft-model)</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setSpecDraftModel('')}
+                className="text-[10px] text-[var(--theme-text-muted)] hover:text-sky-300 transition-colors cursor-pointer"
+                title="Автоматический поиск MTP сайдкара в папке models/"
+              >
+                [Авто-поиск]
+              </button>
+              {onSelectDraftModelFile && (
+                <button
+                  type="button"
+                  onClick={onSelectDraftModelFile}
+                  className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-normal"
+                >
+                  <Folder size={12} />
+                  <span>Обзор...</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          <select
+            value={
+              scannedDraftModels.find(
+                (m) => m.filePath.toLowerCase() === specDraftModel.toLowerCase() || m.fileName.toLowerCase() === specDraftModel.toLowerCase()
+              )?.filePath || (specDraftModel ? 'custom' : '')
+            }
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val && val !== 'custom') {
+                setSpecDraftModel(val);
+              } else if (!val) {
+                setSpecDraftModel('');
+              }
+            }}
+            className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none cursor-pointer"
+          >
+            <option value="" className="bg-black">-- Авто-детект FastMTP сайдкара (по умолчанию) --</option>
+            <option value="none" className="bg-black">[x] Отключить спекулятивное декодирование (--spec-type none)</option>
+            {scannedDraftModels.map((m) => (
+              <option key={m.id || m.filePath} value={m.filePath} className="bg-black">
+                {m.fileName} ({m.quantization || 'GGUF'} • {m.sizeGB})
+              </option>
+            ))}
+            {specDraftModel && specDraftModel !== 'none' && !scannedDraftModels.some((m) => m.filePath.toLowerCase() === specDraftModel.toLowerCase()) && (
+              <option value="custom" className="bg-black">Пользовательский путь: {specDraftModel}</option>
+            )}
+          </select>
+
+          {specDraftModel && specDraftModel !== 'none' && (
+            <input
+              type="text"
+              value={specDraftModel}
+              onChange={(e) => setSpecDraftModel(e.target.value)}
+              placeholder="~/.0xagent/models/Qwen3.8-27B-FastMTP-32K.gguf"
+              className="w-full px-3 py-1.5 rounded-lg bento-card text-[11px] font-mono text-[var(--theme-text-muted)] bg-black/40 focus:outline-none focus:text-[var(--theme-text)]"
+            />
+          )}
+        </div>
+
+        {/* Spec Type & Draft Depth & GPU Layers & Min P & Reasoning Format */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 pt-1">
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-[var(--theme-text-muted)]">Режим (--spec-type)</label>
+            <select
+              value={specType}
+              onChange={(e) => setSpecType(e.target.value)}
+              className="w-full px-2.5 py-1.5 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none cursor-pointer"
+            >
+              <option value="draft-mtp" className="bg-black">draft-mtp (FastMTP)</option>
+              <option value="draft-simple" className="bg-black">draft-simple</option>
+              <option value="draft-eagle3" className="bg-black">draft-eagle3</option>
+              <option value="none" className="bg-black">none (выкл)</option>
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <div className="flex justify-between items-center text-[10px]">
+              <label className="font-medium text-[var(--theme-text-muted)]">Draft Depth</label>
+              <span className="font-mono text-sky-400">n={specDraftNMax}</span>
+            </div>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={specDraftNMax}
+              onChange={(e) => setSpecDraftNMax(Number(e.target.value))}
+              className="w-full px-2.5 py-1.5 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-[var(--theme-text-muted)]">Draft GPU (-ngld)</label>
+            <input
+              type="number"
+              value={specDraftNgl}
+              onChange={(e) => setSpecDraftNgl(Number(e.target.value))}
+              placeholder="99"
+              className="w-full px-2.5 py-1.5 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-[var(--theme-text-muted)]">Min Prob (-p-min)</label>
+            <input
+              type="number"
+              step="0.05"
+              value={specDraftPMin}
+              onChange={(e) => setSpecDraftPMin(Number(e.target.value))}
+              className="w-full px-2.5 py-1.5 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-medium text-[var(--theme-text-muted)]">Формат мыслей</label>
+            <select
+              value={reasoningFormat}
+              onChange={(e) => setReasoningFormat(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none cursor-pointer"
+            >
+              <option value="deepseek" className="bg-black">deepseek (Qwen 3.8)</option>
+              <option value="chatml" className="bg-black">chatml</option>
+              <option value="" className="bg-black">auto / default</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Extra CLI Arguments */}

@@ -118,6 +118,12 @@ configRouter.get('/models', (_req, res) => {
                 sizeGB: meta.sizeGB || meta.fileSizeFormatted,
                 formattedName: meta.formattedName || `${meta.modelName} [${meta.quantization}] (${meta.fileSizeFormatted})`,
                 isMmproj: meta.isMmproj,
+                isDraft: meta.isDraft,
+                isFastMtp: meta.isFastMtp,
+                supportsFastMtp: meta.supportsFastMtp,
+                supportsReasoning: meta.supportsReasoning,
+                recommendedReasoningEffort: meta.recommendedReasoningEffort,
+                family: meta.family,
                 contextLength: meta.contextLength,
               });
             }
