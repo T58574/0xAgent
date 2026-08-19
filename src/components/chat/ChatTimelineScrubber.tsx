@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage } from '../../types';
-import { formatTimeDetailed, formatTime } from '../../utils/helpers';
+import { formatTime } from '../../utils/helpers';
 
 interface ChatTimelineScrubberProps {
   messages: ChatMessage[];
@@ -27,30 +27,51 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
 }) => {
   const [hoveredMarker, setHoveredMarker] = useState<HoveredMarkerInfo | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number>(messages.length - 1);
+  const [scrollProgress, setScrollProgress] = useState<number>(1);
+  const [hasScrollableContent, setHasScrollableContent] = useState<boolean>(false);
   const railRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
   // Filter messages that have timestamps
   const validMessages = messages.filter((m) => !!m.timestamp);
 
-  // Track active message index on container scroll
+  // Check if chat container actually has scrollable overflow
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const handleScroll = () => {
-      if (validMessages.length === 0) return;
-      const { scrollTop, scrollHeight, clientHeight } = container;
-      const scrollRatio = scrollHeight > clientHeight ? scrollTop / (scrollHeight - clientHeight) : 0;
-      const targetIndex = Math.min(
-        validMessages.length - 1,
-        Math.max(0, Math.floor(scrollRatio * validMessages.length))
-      );
-      setActiveMessageIndex(targetIndex);
+    const checkScrollable = () => {
+      const { scrollHeight, clientHeight, scrollTop } = container;
+      const isScrollable = scrollHeight > clientHeight + 35;
+      setHasScrollableContent(isScrollable);
+
+      if (isScrollable && scrollHeight > clientHeight) {
+        const progress = Math.max(0, Math.min(1, scrollTop / (scrollHeight - clientHeight)));
+        setScrollProgress(progress);
+
+        if (validMessages.length > 0) {
+          const targetIndex = Math.min(
+            validMessages.length - 1,
+            Math.max(0, Math.floor(progress * validMessages.length))
+          );
+          setActiveMessageIndex(targetIndex);
+        }
+      }
     };
 
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
+    checkScrollable();
+    container.addEventListener('scroll', checkScrollable, { passive: true });
+    window.addEventListener('resize', checkScrollable);
+
+    // MutationObserver to detect new messages height changes
+    const observer = new MutationObserver(checkScrollable);
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      container.removeEventListener('scroll', checkScrollable);
+      window.removeEventListener('resize', checkScrollable);
+      observer.disconnect();
+    };
   }, [validMessages.length, containerRef]);
 
   const scrollToMessage = (msgId: string, index: number) => {
@@ -59,14 +80,12 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
       // Apply pulse highlight animation
       el.classList.remove('highlight-pulse');
-      // Trigger reflow to restart animation
       void el.offsetWidth;
       el.classList.add('highlight-pulse');
       setTimeout(() => {
         el.classList.remove('highlight-pulse');
       }, 1500);
     } else if (containerRef.current) {
-      // Fallback ratio scroll
       const ratio = validMessages.length > 1 ? index / (validMessages.length - 1) : 1;
       containerRef.current.scrollTo({
         top: ratio * (containerRef.current.scrollHeight - containerRef.current.clientHeight),
@@ -102,42 +121,49 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
     const relativeY = Math.max(0, Math.min(rect.height, clientY - rect.top));
     const ratio = rect.height > 0 ? relativeY / rect.height : 0;
     
-    const targetIdx = Math.min(
-      validMessages.length - 1,
-      Math.max(0, Math.floor(ratio * validMessages.length))
-    );
-    
-    const targetMsg = validMessages[targetIdx];
-    if (targetMsg) {
-      scrollToMessage(targetMsg.id || `${targetIdx}`, targetIdx);
+    if (containerRef.current) {
+      containerRef.current.scrollTop = ratio * (containerRef.current.scrollHeight - containerRef.current.clientHeight);
     }
   };
 
-  if (validMessages.length < 2) return null;
+  // Only render scrubber when there is actual scrollable overflow
+  if (!hasScrollableContent || validMessages.length < 2) return null;
+
+  // Dynamic rail height scaled with conversation message count
+  const railHeight = Math.min(420, Math.max(140, validMessages.length * 26));
 
   return (
-    <div className="absolute right-1 sm:right-2.5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center select-none pointer-events-auto font-mono">
-      {/* 1. JUMP TO TOP BUTTON (ASCII) */}
+    <div className="absolute right-2 sm:right-3.5 top-1/2 -translate-y-1/2 z-30 flex flex-col items-center select-none pointer-events-auto font-sans animate-fadeIn">
+      
+      {/* 1. JUMP TO TOP BUTTON */}
       <button
         type="button"
         onClick={onScrollToTop}
-        className="w-6 h-6 rounded-full bg-[var(--theme-panel-solid,#0a0c12)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-accent)] flex items-center justify-center shadow-lg transition-all mb-2 cursor-pointer backdrop-blur-xl group hover:scale-110 text-[10px] font-bold"
+        className="w-7 h-7 rounded-full bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-accent)] hover:text-[var(--theme-accent-text)] flex items-center justify-center shadow-md transition-all mb-2 cursor-pointer backdrop-blur-2xl group hover:scale-110 text-xs font-bold"
         title="К началу диалога"
       >
         ▲
       </button>
 
-      {/* 2. VERTICAL TIMELINE RAIL */}
+      {/* 2. VERTICAL SCI-FI TIMELINE RAIL */}
       <div
         ref={railRef}
         onMouseDown={handleRailMouseDown}
-        className="relative w-4 py-3 flex flex-col items-center justify-between cursor-pointer rounded-full bg-black/30 hover:bg-black/50 border border-[var(--theme-border)]/40 backdrop-blur-md transition-colors"
-        style={{ height: `${Math.min(320, Math.max(120, validMessages.length * 28))}px` }}
+        className="relative w-5 py-3 flex flex-col items-center justify-between cursor-pointer rounded-full bg-[var(--theme-card-bg)] border border-[var(--theme-border)] backdrop-blur-2xl shadow-lg transition-colors hover:border-[var(--theme-accent)]"
+        style={{ height: `${railHeight}px` }}
       >
-        {/* Track Line */}
-        <div className="absolute top-2 bottom-2 left-1/2 -translate-x-1/2 w-[2px] bg-white/10 rounded-full pointer-events-none" />
+        {/* Track Center Guide Line */}
+        <div className="absolute top-3 bottom-3 left-1/2 -translate-x-1/2 w-[2px] bg-[var(--theme-border)] rounded-full pointer-events-none" />
 
-        {/* Message Markers */}
+        {/* Dynamic Sliding Capsule Thumb Indicator */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 w-3.5 h-6 rounded-full bg-[var(--theme-accent)] shadow-md pointer-events-none transition-all duration-75 border border-[var(--theme-accent)]"
+          style={{
+            top: `${Math.max(4, Math.min(railHeight - 28, scrollProgress * (railHeight - 28)))}px`,
+          }}
+        />
+
+        {/* Message Anchor Points */}
         {validMessages.map((msg, idx) => {
           const isUser = msg.role === 'user';
           const isSystem = msg.role === 'system';
@@ -145,11 +171,11 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
           
           let dotColorClass = 'bg-[var(--theme-text-muted)] opacity-60';
           if (isUser) {
-            dotColorClass = 'bg-[var(--theme-accent)] ring-1 ring-[var(--theme-accent)]/40';
+            dotColorClass = 'bg-[var(--theme-accent)]';
           } else if (isSystem) {
-            dotColorClass = 'bg-[var(--theme-text-muted)]';
+            dotColorClass = 'bg-[var(--theme-text-muted)] opacity-40';
           } else {
-            dotColorClass = 'bg-[var(--theme-text)] opacity-90';
+            dotColorClass = 'bg-[var(--theme-text)]';
           }
 
           return (
@@ -168,11 +194,11 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
                 e.stopPropagation();
                 scrollToMessage(msg.id || `${idx}`, idx);
               }}
-              className="relative z-10 flex items-center justify-center p-1 group cursor-pointer"
+              className="relative z-10 flex items-center justify-center p-0.5 group cursor-pointer"
             >
               <div
                 className={`w-1.5 h-1.5 rounded-full transition-all duration-200 ${dotColorClass} ${
-                  isActive ? 'scale-150 ring-2 ring-[var(--theme-accent)] shadow-[0_0_8px_var(--theme-accent-glow)]' : 'group-hover:scale-125 opacity-70 group-hover:opacity-100'
+                  isActive ? 'scale-150 ring-2 ring-[var(--theme-accent)]' : 'group-hover:scale-125 opacity-70 group-hover:opacity-100'
                 }`}
               />
             </div>
@@ -180,62 +206,39 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
         })}
       </div>
 
-      {/* 3. JUMP TO BOTTOM BUTTON (ASCII WITH BOUNCE ON GENERATING) */}
+      {/* 3. JUMP TO BOTTOM BUTTON */}
       <button
         type="button"
         onClick={onScrollToBottom}
-        className={`w-6 h-6 rounded-full bg-[var(--theme-panel-solid,#0a0c12)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-accent)] flex items-center justify-center shadow-lg transition-all mt-2 cursor-pointer backdrop-blur-xl group hover:scale-110 text-[10px] font-bold relative ${
-          isScrolledUp && isGenerating ? 'ring-2 ring-[var(--theme-accent)] animate-bounce text-[var(--theme-accent)]' : ''
+        className={`w-7 h-7 rounded-full bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-accent)] hover:text-[var(--theme-accent-text)] flex items-center justify-center shadow-md transition-all mt-2 cursor-pointer backdrop-blur-2xl group hover:scale-110 text-xs font-bold relative ${
+          isScrolledUp && isGenerating ? 'ring-2 ring-[var(--theme-accent)] animate-bounce' : ''
         }`}
         title="Вниз к новым сообщениям"
       >
         ▼
         {isScrolledUp && isGenerating && (
-          <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-[var(--theme-accent)] animate-ping" />
+          <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--theme-accent)] animate-ping" />
         )}
       </button>
 
-      {/* 4. FLOATING RICH HOVER PREVIEW TOOLTIP */}
+      {/* 4. FLOATING HOVER PREVIEW TOOLTIP */}
       {hoveredMarker && (
         <div
-          className="fixed right-12 z-50 pointer-events-none transition-all duration-150 animate-fadeIn font-mono"
-          style={{ top: `${hoveredMarker.yPos - 36}px` }}
+          className="fixed right-12 z-50 rounded-2xl bento-card p-3 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl text-xs max-w-xs animate-fadeIn space-y-1.5 pointer-events-none"
+          style={{ top: `${hoveredMarker.yPos - 35}px` }}
         >
-          <div className="w-64 p-2.5 rounded-xl bg-[var(--theme-panel-solid,#0a0c12)]/95 border border-[var(--theme-border)] shadow-2xl backdrop-blur-2xl text-[var(--theme-text)] space-y-1.5 font-mono">
-            {/* Header: Role & Timestamp */}
-            <div className="flex items-center justify-between text-[11px] pb-1 border-b border-[var(--theme-border)]">
-              <div className="flex items-center gap-1.5 font-semibold">
-                {hoveredMarker.message.role === 'user' ? (
-                  <>
-                    <span className="px-1 py-0.2 rounded bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] text-[9px] font-bold">[USR]</span>
-                    <span className="text-[var(--theme-accent)]">Вы</span>
-                  </>
-                ) : hoveredMarker.message.role === 'system' ? (
-                  <>
-                    <span className="px-1 py-0.2 rounded bg-white/10 text-[var(--theme-text-muted)] text-[9px] font-bold">[SYS]</span>
-                    <span className="text-[var(--theme-text-muted)]">Система</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="px-1 py-0.2 rounded bg-[var(--theme-border)] text-[var(--theme-text)] text-[9px] font-bold">[AI]</span>
-                    <span className="text-[var(--theme-text)]">0xAgent</span>
-                  </>
-                )}
-              </div>
-              <span className="text-[10px] text-[var(--theme-text-muted)]">
-                {formatTimeDetailed(hoveredMarker.message.timestamp) || formatTime(hoveredMarker.message.timestamp)}
-              </span>
-            </div>
-
-            {/* Message Preview Text */}
-            <p className="text-[11px] text-[var(--theme-text-muted)] leading-tight line-clamp-2 select-none">
-              {hoveredMarker.message.content
-                ? hoveredMarker.message.content.replace(/<[^>]*>/g, '').trim() || 'Содержит вложения / вызовы...'
-                : 'Сообщение...'}
-            </p>
+          <div className="flex items-center justify-between gap-3 text-[11px] border-b border-[var(--theme-border)] pb-1 font-semibold text-[var(--theme-text-muted)]">
+            <span className="capitalize text-[var(--theme-text)]">
+              {hoveredMarker.message.role === 'user' ? 'Пользователь' : 'Ассистент'}
+            </span>
+            <span>{formatTime(hoveredMarker.message.timestamp)}</span>
           </div>
+          <p className="line-clamp-3 text-[var(--theme-text)] text-xs leading-relaxed font-normal">
+            {hoveredMarker.message.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() || '(Действие инструмента)'}
+          </p>
         </div>
       )}
+
     </div>
   );
 };

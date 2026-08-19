@@ -19,6 +19,8 @@ import {
   Mic,
   Shield,
   Sparkles,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react';
 import { AppConfig, PersonaMetadata, PermissionPreset, ReasoningEffortLevel } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
@@ -208,6 +210,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     };
   }, [setInputText]);
 
+  const [isExpanded, setIsExpanded] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -220,10 +223,15 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(160, Math.max(30, textareaRef.current.scrollHeight))}px`;
+      if (isExpanded) {
+        textareaRef.current.style.height = '280px';
+      } else {
+        textareaRef.current.style.height = 'auto';
+        const newHeight = Math.min(220, Math.max(34, textareaRef.current.scrollHeight));
+        textareaRef.current.style.height = `${newHeight}px`;
+      }
     }
-  }, [inputText]);
+  }, [inputText, isExpanded]);
 
   useEffect(() => {
     if (inputText.startsWith('/')) {
@@ -617,19 +625,19 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
       {/* 1. Seamless Capsule Input */}
       <form onSubmit={onSubmit}>
-        <div className="bento-card rounded-3xl p-2 px-4 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-[var(--theme-accent)] transition-all flex items-center gap-3 shadow-xl">
+        <div className={`bento-card rounded-3xl p-2 px-4 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-[var(--theme-accent)] transition-all flex items-end gap-3 shadow-xl ${isExpanded ? 'ring-1 ring-[var(--theme-accent)]/30' : ''}`}>
           
           {/* Plus Attach File Button */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center"
+            className="p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5"
             title="Прикрепить изображение"
           >
             <Plus size={19} />
           </button>
 
-          {/* Centered Message Textarea with enlarged 15px font size */}
+          {/* Centered Message Textarea with auto-scaling and expand capability */}
           <textarea
             ref={textareaRef}
             value={inputText}
@@ -637,15 +645,27 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Спросите что угодно или введите / для команд..."
-            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[15px] focus:outline-none resize-none min-h-[32px] max-h-[140px] py-1.5 px-1 leading-normal font-sans self-center font-medium"
+            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[15px] focus:outline-none resize-none min-h-[34px] max-h-[300px] py-1.5 px-1 leading-normal font-sans font-medium scrollbar-thin"
           />
+
+          {/* Expand / Collapse 1-Click Toggle for Long Prompts */}
+          {inputText.length > 30 && (
+            <button
+              type="button"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5"
+              title={isExpanded ? 'Свернуть поле ввода в компактный вид' : 'Развернуть поле ввода для удобного просмотра текста'}
+            >
+              {isExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
+          )}
 
           {/* Microphone Voice Input (Groq Whisper + Native OS Voice Daemon) */}
           <button
             type="button"
             onClick={handleMicClick}
             disabled={daemonVoiceState === 'processing'}
-            className={`w-9.5 h-9.5 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 self-center relative ${
+            className={`w-9.5 h-9.5 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 self-center mb-0.5 relative ${
               daemonVoiceState === 'recording'
                 ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/50 scale-105 animate-pulse'
                 : daemonVoiceState === 'processing'
