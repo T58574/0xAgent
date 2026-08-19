@@ -403,48 +403,27 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         }
 
         if (specDraftTarget && fs.existsSync(specDraftTarget)) {
-          const isFastMtpDraft = /fastmtp/i.test(path.basename(specDraftTarget));
-          
-          // Check for specialized patched llama-server-fastmtp.exe binary
-          const fastMtpCandidates = [
-            path.join(path.dirname(targetExe), 'llama-server-fastmtp.exe'),
-            path.join(os.homedir(), '.0xagent', 'llama', 'fastmtp', 'llama-server.exe'),
-            path.join(os.homedir(), '.0xagent', 'llama', 'llama-server-fastmtp.exe'),
-            path.join(process.cwd(), 'llama', 'llama-server-fastmtp.exe'),
-          ];
-          const fastMtpBinary = fastMtpCandidates.find((b) => fs.existsSync(b));
+          args.push('--spec-draft-model', specDraftTarget);
 
-          if (isFastMtpDraft && !fastMtpBinary) {
-            appendServerLog(`[FASTMTP] Обнаружен сайдкар FastMTP (${path.basename(specDraftTarget)}), требующий C++ патч словаря (HauhauCS patch).`);
-            appendServerLog(`[FASTMTP] Поскольку специализированный бинарник llama-server-fastmtp.exe отсутствует, модель ${path.basename(targetModel)} автоматически запускается в стандартном надежном режиме без сбоев.`);
-          } else {
-            if (fastMtpBinary) {
-              targetExe = fastMtpBinary;
-              appendServerLog(`[FASTMTP] Активирован специализированный пропатченный бинарник: ${path.basename(fastMtpBinary)}`);
-            }
+          const specType = body.specType || ls.spec_type || 'default';
+          args.push('--spec-type', specType);
 
-            args.push('--spec-draft-model', specDraftTarget);
-
-            const specType = body.specType || ls.spec_type || 'draft-mtp';
-            args.push('--spec-type', specType);
-
-            const specDraftNgl = body.specDraftNgl !== undefined && body.specDraftNgl !== null ? body.specDraftNgl : (ls.spec_draft_ngl !== undefined && ls.spec_draft_ngl !== null ? ls.spec_draft_ngl : 'all');
-            if (specDraftNgl !== undefined && specDraftNgl !== null) {
-              args.push('--spec-draft-ngl', String(specDraftNgl));
-            }
-
-            const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : 3);
-            if (specDraftNMax !== undefined && specDraftNMax !== null) {
-              args.push('--spec-draft-n-max', String(specDraftNMax));
-            }
-
-            const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : 0);
-            if (specDraftPMin !== undefined && specDraftPMin !== null) {
-              args.push('--spec-draft-p-min', String(specDraftPMin));
-            }
-
-            appendServerLog(`[FASTMTP] Автоматически подключен Speculative MTP сайдкар: ${path.basename(specDraftTarget)} (тип: ${specType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
+          const specDraftNgl = body.specDraftNgl !== undefined && body.specDraftNgl !== null ? body.specDraftNgl : (ls.spec_draft_ngl !== undefined && ls.spec_draft_ngl !== null ? ls.spec_draft_ngl : 'all');
+          if (specDraftNgl !== undefined && specDraftNgl !== null) {
+            args.push('--spec-draft-ngl', String(specDraftNgl));
           }
+
+          const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : 3);
+          if (specDraftNMax !== undefined && specDraftNMax !== null) {
+            args.push('--spec-draft-n-max', String(specDraftNMax));
+          }
+
+          const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : 0);
+          if (specDraftPMin !== undefined && specDraftPMin !== null) {
+            args.push('--spec-draft-p-min', String(specDraftPMin));
+          }
+
+          appendServerLog(`[SPECULATIVE] Подключена драфт-модель: ${path.basename(specDraftTarget)} (тип: ${specType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
         }
       }
 
@@ -548,9 +527,6 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         const cleanStr = stripAnsiCodes(data.toString()).trim();
         if (cleanStr) {
           appendServerLog(cleanStr);
-          if (cleanStr.includes('expected   5120, 248320, got   5120,  32768') || cleanStr.includes('expected 5120, 248320, got 5120, 32768')) {
-            appendServerLog('[FASTMTP DIAGNOSTIC] Сайдкар FastMTP требует пропатченный бинарник llama.cpp (HauhauCS-FastMTP-llama.cpp.patch). Исполняемый файл ожидает полный словарь Qwen 3.8.');
-          }
         }
       };
 

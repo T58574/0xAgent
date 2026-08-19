@@ -297,8 +297,8 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   // Log Inspection Crash Adviser
   useEffect(() => {
     const logsStr = serverLogs.join('\n');
-    if (logsStr.includes('expected   5120, 248320') || logsStr.includes('expected 5120, 248320') || logsStr.includes('check_tensor_dims: tensor \'output.weight\'')) {
-      setCrashAdvice('Советчик FastMTP: Сайдкар FastMTP для Qwen 3.8 требует пропатченный бинарник llama-server (HauhauCS-FastMTP-llama.cpp.patch для d2t trim). Для запуска без драфта выберите "[x] Отключить" в выпадающем списке Draft/FastMTP модели.');
+    if (logsStr.includes('check_tensor_dims: tensor \'output.weight\'')) {
+      setCrashAdvice('Советчик: Драфт-модель имеет несовпадающий размер словаря. Для официального llama.cpp используйте совместимые драфт-модели с полным словарем (например, Qwen3.8-0.5B/1.5B) либо отключите спекулятивное декодирование.');
     } else if (logsStr.includes('pinned memory') || logsStr.includes('CUDA error') || logsStr.includes('out of memory')) {
       if (!mmap) {
         setCrashAdvice('Советчик: Падение вызвано опцией --no-mmap. Включите Mmap обратно или уменьшите число GPU слоев.');
@@ -493,7 +493,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   };
 
   const handleApplyFastMtpPreset = () => {
-    setSpecType('draft-mtp');
+    setSpecType('default');
     setSpecDraftNMax(3);
     setSpecDraftNgl(99);
     setSpecDraftPMin(0);
@@ -505,21 +505,20 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     setBatchSize(2048);
     setUbatchSize(512);
     setFlashAttn(true);
-    setMmap(false);
     setTopK(20);
     setTopP(0.95);
     setTemp(1.0);
-    setMinP(0);
+    setMinP(0.05);
     setRepeatPenalty(1.0);
     setParallelSlots(1);
     setCtxSize(32768);
 
-    // Auto-locate FastMTP draft model if present in scanned models
-    const draftModel = scannedLocalModels.find((m) => /fastmtp|qwen3.*mtp/i.test(m.fileName));
+    // Auto-locate draft model if present in scanned models
+    const draftModel = scannedLocalModels.find((m) => m.isDraft || /qwen3.*draft|draft.*qwen3/i.test(m.fileName));
     if (draftModel) {
       setSpecDraftModel(draftModel.filePath);
     }
-    showToast('Применен пресет FastMTP для Qwen 3.8 (до 3x ускорения текста и 1.9x рассуждений)!', 'success');
+    showToast('Применен пресет спекулятивного декодирования (Speculative Draft / MTP)!', 'success');
   };
 
   const isSelectedVersionInstalled = installedVersions.some(

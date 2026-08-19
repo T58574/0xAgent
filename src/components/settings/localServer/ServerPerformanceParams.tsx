@@ -165,11 +165,11 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             <button
               type="button"
               onClick={onApplyFastMtpPreset}
-              className="px-3 py-1.5 rounded-xl border border-sky-500/40 bg-sky-500/15 hover:bg-sky-500/25 text-xs font-semibold text-sky-600 dark:text-sky-300 flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
-              title="Применить оптимизированный пресет для Qwen 3.8 + HauhauCS FastMTP (до 3x ускорения)"
+              className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+              title="Применить пресет для спекулятивного декодирования (Speculative Draft / MTP)"
             >
-              <Sparkles size={13} className="text-sky-500 dark:text-sky-300" />
-              <span>FastMTP Qwen3.8 (3x)</span>
+              <Sparkles size={13} className="text-[var(--theme-text-muted)]" />
+              <span>Speculative Draft (2x)</span>
             </button>
           )}
           <button
@@ -398,17 +398,17 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         />
       </div>
 
-      {/* Speculative Decoding & Custom FastMTP Section */}
-      <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-sky-500/30 bg-sky-500/5">
+      {/* Speculative Decoding & Standard MTP Section */}
+      <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)] bg-[var(--theme-card-bg)]">
         <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
           <div className="flex items-center gap-2">
-            <Sparkles size={15} className="text-sky-500 dark:text-sky-400" />
-            <span className="text-xs font-bold text-sky-600 dark:text-sky-300">
-              Спекулятивное декодирование / FastMTP (Custom MTP)
+            <Sparkles size={15} className="text-[var(--theme-accent)]" />
+            <span className="text-xs font-bold text-[var(--theme-text)]">
+              Спекулятивное декодирование / Standard MTP
             </span>
           </div>
-          <span className="text-[10px] font-mono text-sky-600 dark:text-sky-300 bg-sky-500/10 px-2.5 py-0.5 rounded-full border border-sky-500/30 font-medium">
-            Qwen 3.8 MTP / Draft Support
+          <span className="text-[10px] font-mono text-[var(--theme-text-muted)] bg-[var(--theme-border-subtle)] px-2.5 py-0.5 rounded-full border border-[var(--theme-border)] font-medium">
+            Speculative Decoding
           </span>
         </div>
 
@@ -416,15 +416,15 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] flex items-center gap-1.5">
-              <Cpu size={13} className="text-sky-500 dark:text-sky-400" />
-              <span>Draft / FastMTP Модель (--spec-draft-model)</span>
+              <Cpu size={13} className="text-[var(--theme-accent)]" />
+              <span>Драфт-модель (--spec-draft-model)</span>
             </label>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setSpecDraftModel('')}
-                className="text-[11px] text-[var(--theme-text-muted)] hover:text-sky-600 dark:hover:text-sky-300 transition-colors cursor-pointer font-medium"
-                title="Автоматический поиск MTP сайдкара в папке models/"
+                className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer font-medium"
+                title="Автоматический поиск драфт-модели в папке models/"
               >
                 [Авто-поиск]
               </button>
@@ -457,7 +457,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             }}
             className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none cursor-pointer transition-colors"
           >
-            <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">-- Авто-детект FastMTP сайдкара (по умолчанию) --</option>
+            <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">-- Авто-детект драфт-модели (по умолчанию) --</option>
             <option value="none" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">[x] Отключить спекулятивное декодирование (--spec-type none)</option>
             {scannedDraftModels.map((m) => (
               <option key={m.id || m.filePath} value={m.filePath} className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
@@ -474,7 +474,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               type="text"
               value={specDraftModel}
               onChange={(e) => setSpecDraftModel(e.target.value)}
-              placeholder="~/.0xagent/models/Qwen3.8-27B-FastMTP-32K.gguf"
+              placeholder="C:\models\Qwen3.8-1.5B.gguf"
               className="w-full px-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-text-muted)] focus:text-[var(--theme-text)] focus:outline-none transition-colors"
             />
           )}
@@ -489,9 +489,9 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               onChange={(e) => setSpecType(e.target.value)}
               className="w-full px-2.5 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:outline-none cursor-pointer"
             >
-              <option value="draft-mtp" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">draft-mtp (FastMTP)</option>
-              <option value="draft-simple" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">draft-simple</option>
-              <option value="draft-eagle3" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">draft-eagle3</option>
+              <option value="default" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">default (стандартный)</option>
+              <option value="draft-mtp" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">draft-mtp (MTP)</option>
+              <option value="draft-eagle" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">draft-eagle</option>
               <option value="none" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">none (выкл)</option>
             </select>
           </div>
