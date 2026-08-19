@@ -47,8 +47,8 @@ export const EmptyChatHero: React.FC<EmptyChatHeroProps> = ({
   currentSession,
 }) => {
   return (
-    <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto scrollbar-none">
-      <div className="w-full max-w-2xl space-y-6 text-center">
+    <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-3 sm:p-6 overflow-y-auto scrollbar-none">
+      <div className="w-full max-w-2xl space-y-4 sm:space-y-6 text-center">
         {/* Transparent Floating ASCII Animation */}
         <div className="flex flex-col items-center justify-center select-none pointer-events-auto">
           <AsciiCanvasEngine

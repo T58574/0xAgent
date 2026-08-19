@@ -16,6 +16,9 @@ import {
   executeSearchKnowledge,
   executeListKnowledge,
 } from '../tools';
+import { addOrUpdateMemory, queryMemories } from '../memory';
+import { listSkills, readSkill } from '../skills';
+import { listSessions, loadSession } from '../session';
 
 export interface CodeRuntimeOptions {
   timeoutMs?: number;
@@ -106,6 +109,40 @@ export async function executeCodeProgram(
     },
     list_knowledge: async (args: any) => {
       return await executeListKnowledge(args?.category);
+    },
+    recall_memories: async (args: any) => {
+      const q = typeof args === 'string' ? args : args?.query || '';
+      return queryMemories(q);
+    },
+    remember_fact: async (args: any) => {
+      return addOrUpdateMemory(args?.key, args?.value, args?.category);
+    },
+    search_sessions: async (args: any) => {
+      const query = (typeof args === 'string' ? args : args?.query || '').toLowerCase();
+      const sessionSummaries = await listSessions();
+      const results: any[] = [];
+      for (const s of sessionSummaries) {
+        const full = await loadSession(s.id);
+        if (full) {
+          const matches = full.messages.filter((m) => m.content.toLowerCase().includes(query));
+          if (matches.length > 0) {
+            results.push({
+              session_id: s.id,
+              session_title: s.title,
+              matches_count: matches.length,
+              snippets: matches.slice(0, 3).map((m) => m.content.substring(0, 150)),
+            });
+          }
+        }
+      }
+      return results;
+    },
+    list_skills: async () => {
+      return listSkills();
+    },
+    read_skill: async (args: any) => {
+      const name = typeof args === 'string' ? args : args?.name || '';
+      return readSkill(name);
     },
   };
 

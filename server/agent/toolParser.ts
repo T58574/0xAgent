@@ -165,15 +165,24 @@ const DECLARATIVE_RULES: ToolRule[] = [
     },
   },
   {
-    regex: /<(?:code_run|coderun)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:code_run|coderun)>|>)/gi,
+    regex: /<(?:code_run|coderun)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:code_run|coderun)>)/gi,
     handler: (m) => {
       const script = (m[2] || '').trim() || (/script=(?:'([^']*)'|"([^"]*)")/i.exec(m[1] || '')?.[1] || /script=(?:'([^']*)'|"([^"]*)")/i.exec(m[1] || '')?.[2] || '').trim();
-      return script ? { idPrefix: 'code', name: 'code_run', args: { script } } : null;
+      return script ? { idPrefix: 'code', name: 'code_run', args: { script, code: script, program: script } } : null;
     },
   },
   { regex: /<run_scratch_script\s+language=["']([^"']+)["']\s*>([\s\S]*?)<\/run_scratch_script>/gi, handler: (m) => ({ idPrefix: 'scratch', name: 'run_scratch_script', args: { language: m[1], code: m[2] } }) },
   { regex: /<spawn_subagent\s+task=["']([^"']+)["'](?:\s+role=["']([^"']+)["'])?\s*\/?>/gi, handler: (m) => ({ idPrefix: 'subagent', name: 'spawn_subagent', args: { task: m[1], role: m[2] || 'helper' } }) },
 ];
+
+function stripThinkingForToolParsing(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/<(?:think|thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?<\/(?:think|thought|thinking|\|thought\||\|end_thought\|)>/gi, '')
+    .replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>)/gi, '')
+    .replace(/\[(?:think|thinking|thought)\][\s\S]*?\[\/(?:think|thinking|thought)\]/gi, '')
+    .trim();
+}
 
 function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
   const reToolCall = /<tool_?call>([\s\S]*?)<\/tool_?call>/gi;
@@ -214,7 +223,8 @@ function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
 
 export function parseToolCalls(text: string): ParsedToolCall[] {
   const toolCalls: ParsedToolCall[] = [];
-  const sanitizedText = (text || '').replace(/```(?:xml|html|json|tsx|ts)?/gi, '').replace(/```$/gm, '');
+  const textWithoutThinking = stripThinkingForToolParsing(text);
+  const sanitizedText = textWithoutThinking.replace(/```(?:xml|html|json|tsx|ts)?/gi, '').replace(/```$/gm, '');
 
   for (const rule of DECLARATIVE_RULES) {
     const re = new RegExp(rule.regex.source, rule.regex.flags);

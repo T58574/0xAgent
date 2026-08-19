@@ -18,6 +18,8 @@ import {
   Unlink,
   ChevronDown,
   Sparkles,
+  Menu,
+  Plus,
 } from 'lucide-react';
 import { AppConfig, ChatSession, PersonaMetadata } from '../types';
 import * as api from '../services/api';
@@ -33,8 +35,8 @@ import {
 interface NavbarProps {
   sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
-  activeView: 'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge';
-  onChangeView: (view: 'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge') => void;
+  activeView: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge';
+  onChangeView: (view: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge') => void;
   config: AppConfig | null;
   currentSession?: ChatSession | null;
   workspaceDir?: string | null;
@@ -53,7 +55,7 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   sidebarOpen: _sidebarOpen,
-  onToggleSidebar: _onToggleSidebar,
+  onToggleSidebar,
   activeView,
   onChangeView,
   config,
@@ -65,8 +67,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   has0xAgentMd: _has0xAgentMd = false,
   onToggleLogs,
   onModelChanged: _onModelChanged,
-  onOpenJarvis,
-  onNewChat: _onNewChat,
+  onOpenJarvis: _onOpenJarvis,
+  onNewChat,
   onOpenMemorySkills,
 }) => {
   const { showToast } = useToast();
@@ -153,22 +155,35 @@ export const Navbar: React.FC<NavbarProps> = ({
   const wsName = getWorkspaceBaseName(currentSessionWorkspace);
 
   return (
-    <header className="h-14 border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl px-4 rounded-[22px] flex items-center justify-between select-none z-30 shrink-0 font-sans shadow-sm gap-3">
+    <header className="h-13 sm:h-14 border-b sm:border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 sm:bg-[var(--theme-panel)]/90 backdrop-blur-2xl px-2.5 sm:px-4 rounded-none sm:rounded-[22px] flex items-center justify-between select-none z-30 shrink-0 font-sans shadow-sm gap-2 sm:gap-3">
       
-      {/* Left Section: 0xAGENT Brand Logo + Current Chat Title & Workspace Pill */}
-      <div className="flex items-center gap-3 min-w-0 flex-1">
+      {/* Left Section: Mobile Burger Menu + 0xAGENT Brand + Chat Title */}
+      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+        
+        {/* Mobile Burger Menu Button */}
+        {onToggleSidebar && (
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="p-2 -ml-1 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0"
+            title="Открыть список диалогов"
+          >
+            <Menu size={19} className="text-[var(--theme-text)]" />
+          </button>
+        )}
+
         {/* Brand */}
-        <div className="flex items-center gap-2 font-bold text-sm tracking-wider text-[var(--theme-text)] shrink-0">
-          <Terminal size={16} className="text-[var(--theme-text-muted)] shrink-0" />
-          <span>0xAGENT</span>
+        <div className="flex items-center gap-1.5 font-bold text-sm tracking-wider text-[var(--theme-text)] shrink-0">
+          <Terminal size={15} className="text-[var(--theme-text-muted)] shrink-0 hidden xs:inline" />
+          <span className="hidden sm:inline">0xAGENT</span>
         </div>
 
-        <span className="w-px h-5 bg-[var(--theme-border)] shrink-0 hidden sm:inline-block" />
+        <span className="w-px h-4 bg-[var(--theme-border)] shrink-0 hidden sm:inline-block" />
 
-        {/* Current Chat Title & Workspace Pill in Header */}
-        <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
-          <div className="flex items-center gap-1.5 text-[var(--theme-text)] font-semibold text-sm truncate max-w-[150px] sm:max-w-[240px] md:max-w-[320px]">
-            <MessageSquare size={14} className="text-[var(--theme-text-muted)] shrink-0" />
+        {/* Current Chat Title & Workspace Pill */}
+        <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1.5 text-[var(--theme-text)] font-semibold text-xs sm:text-sm truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[240px] md:max-w-[320px]">
+            <MessageSquare size={13} className="text-[var(--theme-text-muted)] shrink-0 hidden sm:inline" />
             <span className="truncate">{currentSession?.title || 'Новый диалог'}</span>
           </div>
 
@@ -177,18 +192,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={() => setWsMenuOpen(!wsMenuOpen)}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer shadow-sm font-semibold"
+              className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[11px] sm:text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer shadow-sm font-semibold"
               title="Рабочая папка текущего диалога"
             >
               {isAutoWs ? (
                 <>
                   <Sparkles size={11} className="text-[var(--theme-accent)]" />
-                  <span className="truncate max-w-[110px]">{wsName}</span>
+                  <span className="truncate max-w-[100px]">{wsName}</span>
                 </>
               ) : hasWs ? (
                 <>
                   <Folder size={11} className="text-[var(--theme-text)]" />
-                  <span className="truncate max-w-[110px]">{wsName}</span>
+                  <span className="truncate max-w-[100px]">{wsName}</span>
                 </>
               ) : (
                 <>
@@ -283,13 +298,28 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Right Section: View Switcher Bento Tabs + Utilities */}
-      <div className="flex items-center gap-2 shrink-0">
-        {/* View Switcher Bento Tabs */}
-        <div className="flex items-center bg-[var(--theme-card-bg)] p-1 rounded-full border border-[var(--theme-border)] shadow-sm">
+      {/* Right Section: Mobile Quick Actions & Desktop View Switcher */}
+      <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        
+        {/* Mobile New Chat Button */}
+        {onNewChat && (
+          <button
+            type="button"
+            onClick={onNewChat}
+            className="md:hidden p-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold text-xs flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+            title="Новый диалог"
+          >
+            <Plus size={16} />
+            <span className="hidden xs:inline text-[11px]">Новый</span>
+          </button>
+        )}
+
+        {/* Desktop View Switcher Bento Tabs */}
+        <div className="hidden md:flex items-center bg-[var(--theme-card-bg)] p-1 rounded-full border border-[var(--theme-border)] shadow-sm">
           {[
             { id: 'chat', label: 'Чат', icon: MessageSquare },
             { id: 'workspace', label: 'Редактор', icon: Code },
+            { id: 'jarvis', label: 'Jarvis', icon: Bot },
             { id: 'knowledge', label: 'Знания', icon: BookOpen },
             { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
             { id: 'settings', label: 'Настройки', icon: SettingsIcon },
@@ -323,18 +353,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Brain size={14} />
               <span className="hidden lg:inline">Память</span>
-            </button>
-          )}
-
-          {onOpenJarvis && (
-            <button
-              type="button"
-              onClick={onOpenJarvis}
-              className="px-3.5 py-1.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
-              title="Jarvis Telemetry & Workspace"
-            >
-              <Bot size={14} />
-              <span className="hidden lg:inline">Jarvis</span>
             </button>
           )}
         </div>
@@ -375,7 +393,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {lanOpen && (
-            <div className="absolute right-0 top-full mt-2 w-76 rounded-2xl bento-card p-2 shadow-2xl z-50 border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl animate-fadeIn space-y-1">
+            <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-76 max-w-[calc(100vw-24px)] rounded-2xl bento-card p-2 shadow-2xl z-50 border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl animate-fadeIn space-y-1">
               <div className="px-3 py-1.5 text-xs font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between font-bold">
                 <div className="flex items-center gap-1.5">
                   <Wifi size={13} />

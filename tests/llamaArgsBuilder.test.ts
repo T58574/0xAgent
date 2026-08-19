@@ -100,4 +100,21 @@ describe('Llama Args Builder Test Suite', () => {
     assert.ok(topKIdx !== -1);
     assert.equal(res.args[topKIdx + 1], '41');
   });
+
+  it('should not inject draft speculative flags when no draft model is present on disk', () => {
+    const res = buildLlamaServerArgs({
+      targetModel: 'C:/models/Qwen3.8-27B-IQ3_M.gguf',
+      host: '127.0.0.1',
+      port: 11434,
+      body: {},
+      localServerConfig: {
+        spec_type: 'default',
+        spec_draft_model: null,
+      },
+    });
+
+    assert.equal(res.args.includes('--spec-draft-model'), false);
+    assert.equal(res.args.includes('--spec-type'), false);
+    assert.equal(res.args.includes('--spec-draft-n-max'), false);
+  });
 });

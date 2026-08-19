@@ -141,10 +141,10 @@ export function buildLlamaServerArgs(params: BuildLlamaArgsParams): { args: stri
       if (specDraftNMax !== undefined && specDraftNMax !== null) args.push('--spec-draft-n-max', String(specDraftNMax));
       if (specDraftPMin !== undefined && specDraftPMin !== null) args.push('--spec-draft-p-min', String(specDraftPMin));
       onLog?.(`[SPECULATIVE] Подключена отдельная драфт-модель: ${path.basename(specDraftTarget)} (тип: ${rawSpecType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
-    } else if (isQwenModel || rawSpecType === 'draft-mtp' || rawSpecType === 'default') {
-      const resolvedMtpType = rawSpecType === 'default' ? 'draft-mtp' : rawSpecType;
-      args.push('--spec-type', resolvedMtpType, '--spec-draft-n-max', String(specDraftNMax), '--spec-draft-ngl', String(specDraftNgl), '--spec-draft-p-min', String(specDraftPMin));
-      onLog?.(`[MTP] Активирован встроенный Multi-Token Prediction (тип: ${resolvedMtpType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
+    } else if (rawSpecType && rawSpecType.startsWith('ngram-')) {
+      args.push('--spec-type', rawSpecType);
+      if (specDraftNMax !== undefined && specDraftNMax !== null) args.push('--spec-draft-n-max', String(specDraftNMax));
+      onLog?.(`[SPECULATIVE] Активирован ngram lookup (${rawSpecType}, n-max: ${specDraftNMax})`);
     }
   }
 

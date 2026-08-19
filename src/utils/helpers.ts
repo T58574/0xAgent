@@ -100,7 +100,8 @@ export function getWorkspaceBaseName(dirPath?: string | null): string {
 export function isAutoWorkspace(dirPath?: string | null): boolean {
   if (!dirPath) return false;
   const normalized = dirPath.replace(/\\/g, '/').toLowerCase();
-  return (normalized.includes('.0xagent') || normalized.includes('0xagent')) && normalized.includes('/workspaces');
+  // Auto-workspaces follow the generated pattern adjective-noun-hash, e.g. /workspaces/nexus-haven-b71i
+  return /\/workspaces\/[a-z]+-[a-z]+-[a-z0-9]{3,8}$/i.test(normalized);
 }
 
 /**

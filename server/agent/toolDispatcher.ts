@@ -210,7 +210,7 @@ export async function dispatchToolExecution(
     }
 
     case 'code_run': {
-      const program = tc.arguments.program || tc.arguments.code || '';
+      const program = tc.arguments.program || tc.arguments.code || tc.arguments.script || '';
       if (!program.trim()) {
         return 'Error: No code provided to execute in code_run.';
       }

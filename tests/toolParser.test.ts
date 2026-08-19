@@ -151,12 +151,43 @@ describe('Tool Parser Subsystem Test Suite', () => {
     assert.equal(gemmaCalls2[0].arguments.path, 'server');
   });
 
-  it('should detect and strip hallucinated tool outputs', () => {
-    const textWithHallucination = 'Here is the result:\n<tool_response name="list_dir">file1.txt\nfile2.txt</tool_response>\nAll done!';
-    assert.equal(detectToolOutputHallucination(textWithHallucination), true);
-    const cleaned = stripHallucinatedToolOutput(textWithHallucination);
-    assert.equal(detectToolOutputHallucination(cleaned), false);
-    assert.match(cleaned, /Here is the result:/);
-    assert.match(cleaned, /All done!/);
+  it('should ignore tool calls inside thinking and thought blocks', () => {
+    const textWithThinking = `
+<THINKING>
+Let me first consider using:
+<code_run>
+const [dir, mem] = await Promise.all([tools.list_dir({path: '.'})]);
+return {dir, mem};
+</code_run>
+or maybe:
+<read_file path="dummy.txt" />
+</THINKING>
+
+Now here is my actual response:
+<list_dir path="src" />
+`;
+    const calls = parseToolCalls(textWithThinking);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, 'list_dir');
+    assert.equal(calls[0].arguments.path, 'src');
+  });
+
+  it('should parse code_run body correctly', () => {
+    const text = `
+I will now inspect the project.
+<code_run>
+const [dir, mem] = await Promise.all([
+  tools.list_dir({path: '.'}),
+  tools.recall_memories({query: 'user goals'})
+]);
+return {dir, mem};
+</code_run>
+`;
+    const calls = parseToolCalls(text);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].name, 'code_run');
+    assert.ok(calls[0].arguments.script.includes('tools.list_dir'));
+    assert.ok(calls[0].arguments.code.includes('tools.recall_memories'));
+    assert.ok(calls[0].arguments.program.includes('return {dir, mem};'));
   });
 });

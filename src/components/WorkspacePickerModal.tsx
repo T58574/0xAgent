@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, FolderPlus, X, AlertCircle } from 'lucide-react';
+import { Folder, FolderPlus, X, AlertCircle, ArrowRight, Sparkles, Link as LinkIcon } from 'lucide-react';
 import * as api from '../services/api';
+import { getWorkspaceBaseName } from '../utils/helpers';
 
 interface WorkspacePickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelectWorkspaceDir: (dirPath: string) => Promise<void>;
+  onSelectWorkspaceDir: (dirPath: string, openInNewChat?: boolean) => Promise<void>;
   currentWorkspaceDir?: string | null;
   recentWorkspaces?: string[];
 }
@@ -37,7 +38,8 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
       const folder = await api.select_workspace();
       if (folder) {
         setInputPath(folder);
-        await onSelectWorkspaceDir(folder);
+        // Automatically open project in a clean dedicated session
+        await onSelectWorkspaceDir(folder, true);
         onClose();
       }
     } catch (err: any) {
@@ -48,43 +50,58 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!inputPath.trim()) return;
+  const handleOpenProjectInNewChat = async (targetPath: string) => {
+    if (!targetPath.trim()) return;
     setErrorMsg(null);
     try {
-      await onSelectWorkspaceDir(inputPath.trim());
+      await onSelectWorkspaceDir(targetPath.trim(), true);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Ошибка выбора директории');
+      setErrorMsg(err.message || 'Ошибка открытия проекта');
+    }
+  };
+
+  const handleBindToCurrentChat = async (targetPath: string) => {
+    if (!targetPath.trim()) return;
+    setErrorMsg(null);
+    try {
+      await onSelectWorkspaceDir(targetPath.trim(), false);
+      onClose();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Ошибка привязки воркспейса');
     }
   };
 
   // Combine default & recent workspaces
   const defaultRecent = [
-    'c:\\Users\\user\\Documents\\projects\\0xAgent',
     ...(currentWorkspaceDir ? [currentWorkspaceDir] : []),
+    'c:\\Users\\user\\.0xagent\\workspaces\\Jarvis',
     ...recentWorkspaces,
   ];
 
   const uniqueRecent = Array.from(new Set(defaultRecent.filter(Boolean)));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 font-sans select-none animate-fadeIn">
-      <div className="w-full max-w-xl bento-card rounded-xl border border-[var(--theme-border)] shadow-2xl overflow-hidden text-[var(--theme-text)] bg-[var(--theme-panel)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xl p-4 font-sans select-none animate-fadeIn">
+      <div className="w-full max-w-xl rounded-2xl border border-[var(--theme-border)] shadow-2xl overflow-hidden text-[var(--theme-text)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl">
         
         {/* Header */}
-        <div className="px-5 py-3.5 border-b border-[var(--theme-border)] flex items-center justify-between bg-black/40">
-          <div className="flex items-center gap-2">
-            <FolderPlus size={16} className="text-[var(--theme-text-muted)]" />
-            <h3 className="text-xs font-semibold text-[var(--theme-text)]">Выбор папки Workspace (Проекта)</h3>
+        <div className="px-5 py-4 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-card-bg)]">
+          <div className="flex items-center gap-2.5">
+            <div className="p-1.5 rounded-xl bg-[var(--theme-accent)]/15 border border-[var(--theme-accent)]/30 text-[var(--theme-accent)]">
+              <FolderPlus size={16} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-[var(--theme-text)]">Выбор Рабочего Проекта (Workspace)</h3>
+              <p className="text-[11px] text-[var(--theme-text-muted)] font-medium">Открытие папки проекта на диске в чистом контексте</p>
+            </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
+            className="p-1.5 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
           >
-            <X size={15} />
+            <X size={16} />
           </button>
         </div>
 
@@ -92,94 +109,147 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
         <div className="p-5 space-y-4">
           
           {errorMsg && (
-            <div className="p-3 rounded-lg bg-white/5 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 font-sans">
-              <AlertCircle size={15} className="shrink-0" />
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2 font-sans animate-fadeIn">
+              <AlertCircle size={15} className="shrink-0 text-rose-400" />
               <span>{errorMsg}</span>
             </div>
           )}
 
-          {/* Form with Path Input */}
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <label className="block text-xs font-medium text-[var(--theme-text-muted)]">
-              Укажите абсолютный путь к папке проекта на диске:
+          {/* Path Input Form */}
+          <div className="space-y-3">
+            <label className="block text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">
+              Путь к папке проекта на диске
             </label>
 
             <div className="flex gap-2">
-              <input
-                type="text"
-                value={inputPath}
-                onChange={(e) => setInputPath(e.target.value)}
-                placeholder="C:\Projects\my-app or ~/projects/my-app"
-                className="flex-1 px-3.5 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
-                autoFocus
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={inputPath}
+                  onChange={(e) => setInputPath(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleOpenProjectInNewChat(inputPath);
+                    }
+                  }}
+                  placeholder="C:\Projects\my-app or ~/projects/my-app"
+                  className="w-full pl-3.5 pr-4 py-2.5 rounded-xl border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] bg-[var(--theme-input-bg)] shadow-inner transition-colors"
+                  autoFocus
+                />
+              </div>
 
               <button
                 type="button"
                 onClick={handleNativeBrowse}
                 disabled={isLoadingNative}
-                className="px-3.5 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 shrink-0 cursor-pointer disabled:opacity-50 transition-colors"
-                title="Обзор через проводник Windows"
+                className="px-4 py-2.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50 transition-all shadow-sm"
+                title="Открыть стандартный Проводник Windows"
               >
-                <Folder size={14} className="text-[var(--theme-text-muted)]" />
+                <Folder size={14} className="text-[var(--theme-accent)]" />
                 <span>{isLoadingNative ? 'Открытие...' : 'Проводник'}</span>
               </button>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            {/* Action Buttons */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
               <button
                 type="button"
-                onClick={onClose}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 cursor-pointer transition-colors"
-              >
-                Отмена
-              </button>
-              <button
-                type="submit"
+                onClick={() => handleBindToCurrentChat(inputPath)}
                 disabled={!inputPath.trim()}
-                className="px-4 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-[var(--theme-border)] text-[var(--theme-text)] text-xs font-medium transition-colors shadow-sm cursor-pointer disabled:opacity-40"
+                className="px-3.5 py-2 rounded-xl border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-all cursor-pointer disabled:opacity-30 flex items-center gap-1.5"
+                title="Привязать выбранную папку к текущему открытому диалогу"
               >
-                Открыть проект
+                <LinkIcon size={13} />
+                <span>Привязать к текущему чату</span>
               </button>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] cursor-pointer transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenProjectInNewChat(inputPath)}
+                  disabled={!inputPath.trim()}
+                  className="px-4.5 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-40 flex items-center gap-1.5 hover:opacity-90 active:scale-95"
+                >
+                  <Sparkles size={13} />
+                  <span>Открыть проект (Чистый чат)</span>
+                </button>
+              </div>
             </div>
-          </form>
+          </div>
 
           {/* Recent Workspaces List */}
           {uniqueRecent.length > 0 && (
             <div className="pt-3 border-t border-[var(--theme-border)] space-y-2">
-              <span className="text-[11px] font-medium text-[var(--theme-text-muted)] uppercase tracking-wider block">
-                Недавние воркспейсы
+              <span className="text-[11px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider block">
+                Недавние проекты и рабочие пространства
               </span>
 
-              <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
                 {uniqueRecent.map((dir) => {
                   const isActive = currentWorkspaceDir && dir.toLowerCase() === currentWorkspaceDir.toLowerCase();
+                  const baseName = getWorkspaceBaseName(dir);
+                  const isJarvisSanctuary = dir.toLowerCase().includes('jarvis');
+
                   return (
-                    <button
+                    <div
                       key={dir}
-                      type="button"
-                      onClick={async () => {
-                        setInputPath(dir);
-                        await onSelectWorkspaceDir(dir);
-                        onClose();
-                      }}
-                      className={`w-full p-2.5 rounded-lg bento-card text-left text-xs font-mono transition-all flex items-center justify-between gap-2 border cursor-pointer ${
+                      className={`group w-full p-2.5 rounded-xl border transition-all flex items-center justify-between gap-3 text-left ${
                         isActive
-                          ? 'bg-white/10 border-[var(--theme-border)] text-[var(--theme-text)]'
-                          : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                          ? 'bg-[var(--theme-accent)]/10 border-[var(--theme-accent)]/30 text-[var(--theme-text)]'
+                          : 'bg-[var(--theme-card-bg)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:border-[var(--theme-text-muted)]/40'
                       }`}
                     >
-                      <div className="flex items-center gap-2 truncate">
-                        <Folder size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                        <span className="truncate">{dir}</span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInputPath(dir);
+                          handleOpenProjectInNewChat(dir);
+                        }}
+                        className="flex-1 flex items-center gap-2.5 truncate cursor-pointer text-left"
+                      >
+                        <div className={`p-1.5 rounded-lg shrink-0 ${isJarvisSanctuary ? 'bg-[var(--theme-accent)]/20 text-[var(--theme-accent)]' : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)]'}`}>
+                          {isJarvisSanctuary ? <Sparkles size={13} /> : <Folder size={13} />}
+                        </div>
+                        <div className="truncate min-w-0">
+                          <div className="text-xs font-bold text-[var(--theme-text)] truncate flex items-center gap-1.5">
+                            <span>{baseName}</span>
+                            {isJarvisSanctuary && (
+                              <span className="text-[9.5px] px-1.5 py-0.2 rounded-md font-mono bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30">
+                                Уголок Jarvis
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] font-mono text-[var(--theme-text-muted)] truncate opacity-80">{dir}</div>
+                        </div>
+                      </button>
 
-                      {isActive && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-md font-mono bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] shrink-0">
-                          Активный
-                        </span>
-                      )}
-                    </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {isActive && (
+                          <span className="text-[10px] px-2 py-0.5 rounded-md font-mono bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30">
+                            Текущий
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInputPath(dir);
+                            handleOpenProjectInNewChat(dir);
+                          }}
+                          className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-all cursor-pointer"
+                          title="Открыть проект в чистом диалоге"
+                        >
+                          <ArrowRight size={14} />
+                        </button>
+                      </div>
+                    </div>
                   );
                 })}
               </div>

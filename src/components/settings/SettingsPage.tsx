@@ -75,7 +75,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => s.setActiveSubtab(tab.id as any)}
-                className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer text-left border ${
+                className={`w-auto md:w-full shrink-0 whitespace-nowrap px-3.5 py-2 md:py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer text-left border ${
                   isActive
                     ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
                     : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'

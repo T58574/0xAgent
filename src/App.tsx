@@ -1,43 +1,123 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
-import { AppConfig, ChatSession, ChatMessage, FileNode, LiveTelemetry, JarvisState, JarvisSparkProposal, PersonaMetadata } from './types';
-import { generateShortId } from './utils/helpers';
+import { AppConfig, LiveTelemetry, JarvisState, PersonaMetadata } from './types';
+import { getWorkspaceBaseName } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { ChatArea } from './components/ChatArea';
 import { SettingsPage } from './components/settings/SettingsPage';
-import { CodeEditor, EditorTabItem } from './components/CodeEditor';
+import { CodeEditor } from './components/CodeEditor';
 import { MemorySkillsModal } from './components/MemorySkillsModal';
 import { WorkspacePickerModal } from './components/WorkspacePickerModal';
 import { AnalyticsPage } from './components/analytics/AnalyticsPage';
 import { KnowledgeVault } from './components/KnowledgeVault';
 import { LockScreen } from './components/LockScreen';
 import { JarvisWidget } from './components/JarvisWidget';
+import { JarvisSanctuary } from './components/JarvisSanctuary';
 import { JarvisIntercomHud } from './components/chat/JarvisIntercomHud';
 import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { useAppWebSocket } from './hooks/useAppWebSocket';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
+import { useSessionManager } from './hooks/useSessionManager';
+import { useWorkspaceManager } from './hooks/useWorkspaceManager';
+import { useServerController } from './hooks/useServerController';
+import { useResponsive } from './hooks/useResponsive';
 
 export default function App() {
   const { showToast } = useToast();
+  const { isMobile } = useResponsive();
+
   // Authentication & Security state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
   const [isPasswordSet, setIsPasswordSet] = useState<boolean>(false);
 
-  // App Config and Sessions state
+  // App Config & Persona state
   const [config, setConfig] = useState<AppConfig | null>(null);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersonaId, setActivePersonaId] = useState<string>('default');
+
+  // Modal Dialogs & Sub-views
   const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
   const [isWorkspacePickerOpen, setIsWorkspacePickerOpen] = useState<boolean>(false);
   const [isJarvisOpen, setIsJarvisOpen] = useState<boolean>(false);
   const [jarvisState, setJarvisState] = useState<JarvisState | null>(null);
   const [settingsSubtab, setSettingsSubtab] = useState<'general' | 'personas' | 'customizations' | 'themes' | 'local_server' | undefined>(undefined);
+
+  // Agent loop & telemetry state
+  const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'waiting_approval' | 'executing_tool'>('idle');
+  const [liveTelemetry, setLiveTelemetry] = useState<LiveTelemetry | null>(null);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [showLogsDrawer, setShowLogsDrawer] = useState<boolean>(false);
+
+  // Navigation view & Sidebar state
+  const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge'>('chat');
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') return window.innerWidth >= 768;
+    return true;
+  });
+  const drawerLogsRef = useRef<HTMLDivElement>(null);
+
+  const addLog = (msg: string) => {
+    setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 99)]);
+  };
+
+  // Workspace Manager Hook
+  const {
+    workspaceTree,
+    setWorkspaceTree,
+    selectedFile,
+    has0xAgentMd,
+    setHas0xAgentMd,
+    splitLeftWidthPercent,
+    setSplitLeftWidthPercent,
+    openTabs,
+    mobileWorkspaceTab,
+    setMobileWorkspaceTab,
+    loadWorkspaceTree,
+    handleSelectTab,
+    handleCloseTab,
+    handleFileSaved,
+    handleFileClick,
+  } = useWorkspaceManager({ addLog });
+
+  // Session Manager Hook
+  const {
+    sessions,
+    setSessions,
+    currentSessionId,
+    setCurrentSessionId,
+    currentSession,
+    setCurrentSession,
+    activeSessionsMapRef,
+    currentSessionIdRef,
+    currentSessionRef,
+    updateSessionState,
+    handleSelectSession,
+    handleCreateSession,
+    handleUpdateCurrentSessionWorkspace,
+    handleDeleteSession,
+    handleSendMessage,
+    handleAcceptSpark,
+    handleRollbackSession,
+  } = useSessionManager({
+    config,
+    loadWorkspaceTree,
+    setWorkspaceTree,
+    setHas0xAgentMd,
+    addLog,
+    showToast,
+    setActiveView,
+    setIsJarvisOpen,
+  });
+
+  // Local Server Controller Hook
+  const { isServerOffline, handleStartServer } = useServerController({
+    config,
+    addLog,
+    setActiveView,
+  });
 
   const fetchJarvisData = async () => {
     try {
@@ -54,111 +134,6 @@ export default function App() {
     return () => { un1(); };
   }, []);
 
-
-  
-  // Agent loop & telemetry state
-  const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'waiting_approval' | 'executing_tool'>('idle');
-  const [liveTelemetry, setLiveTelemetry] = useState<LiveTelemetry | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [showLogsDrawer, setShowLogsDrawer] = useState<boolean>(false);
-  
-  // Workspace File tree & Split View state
-  const [workspaceTree, setWorkspaceTree] = useState<FileNode[]>([]);
-  const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; content: string } | null>(null);
-  const [has0xAgentMd, setHas0xAgentMd] = useState<boolean>(false);
-  const [splitLeftWidthPercent, setSplitLeftWidthPercent] = useState<number>(45);
-  
-  // Navigation view, Mode & Sidebar state
-  const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge'>('chat');
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(true);
-  const [openTabs, setOpenTabs] = useState<EditorTabItem[]>([]);
-  const [isServerOffline, setIsServerOffline] = useState<boolean>(true);
-
-  // Monitor llama server health
-  useEffect(() => {
-    const checkServer = async () => {
-      try {
-        const host = config?.local_server?.host || '127.0.0.1';
-        const port = config?.local_server?.port || 11434;
-        const h = await api.get_server_health(host, port);
-        setIsServerOffline(!h.ok);
-      } catch {
-        setIsServerOffline(true);
-      }
-    };
-
-    checkServer();
-    const timer = setInterval(checkServer, 3000);
-
-    const un = api.listen<{ status: string }>('llama-server-status', (event) => {
-      if (event.payload.status === 'running') {
-        setIsServerOffline(false);
-      } else if (event.payload.status === 'stopped') {
-        setIsServerOffline(true);
-      }
-    });
-
-    return () => {
-      clearInterval(timer);
-      un();
-    };
-  }, [config]);
-
-  const handleStartServer = async () => {
-    try {
-      let currentCfg = config;
-      if (!currentCfg) {
-        try { currentCfg = await api.get_config(); } catch {}
-      }
-      const ls = currentCfg?.local_server;
-      const serverConfig = ls ? {
-        exePath: ls.exe_path || undefined,
-        modelPath: ls.model_path || undefined,
-        host: ls.host || '127.0.0.1',
-        port: ls.port || 11434,
-        ctxSize: ls.ctx_size,
-        gpuLayers: ls.gpu_layers,
-        threads: ls.threads,
-        batchSize: ls.batch_size,
-        ubatchSize: ls.ubatch_size,
-        temp: ls.temp,
-        repeatPenalty: ls.repeat_penalty,
-        minP: ls.min_p,
-        topK: ls.top_k,
-        topP: ls.top_p,
-        predict: ls.predict,
-        flashAttn: ls.flash_attn,
-        mmap: ls.mmap,
-        mlock: ls.mlock,
-        embedding: ls.embedding,
-        contBatching: ls.cont_batching,
-        parallelSlots: ls.parallel_slots,
-        cacheReuse: ls.cache_reuse,
-        slotSavePath: ls.slot_save_path,
-        customArgs: ls.custom_args,
-      } : {};
-
-      addLog('Sending launch request to local llama-server process...');
-      const res = await api.start_local_server(serverConfig);
-      if (res && res.success) {
-        setIsServerOffline(false);
-        addLog('Local llama.cpp server spawned successfully.');
-      }
-    } catch (err: any) {
-      console.error('Failed to start server:', err);
-      const errMsg = err.message || String(err);
-      addLog(`[SERVER START ERROR] ${errMsg}`);
-      if (errMsg.includes('не найден') || errMsg.includes('не задан') || errMsg.includes('GGUF')) {
-        setActiveView('settings');
-      }
-      throw err;
-    }
-  };
-
-  // Mobile Workspace view mode: 'files' tree or 'editor' code tab
-  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'files' | 'editor'>('editor');
-  const drawerLogsRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (showLogsDrawer && drawerLogsRef.current) {
       drawerLogsRef.current.scrollTop = drawerLogsRef.current.scrollHeight;
@@ -173,48 +148,6 @@ export default function App() {
       document.documentElement.setAttribute('data-theme', 'obsidian');
     }
   }, [config]);
-
-  const handleSelectTab = (path: string) => {
-    const tab = openTabs.find((t) => t.path === path);
-    if (tab) {
-      setSelectedFile(tab);
-      setMobileWorkspaceTab('editor');
-    }
-  };
-
-  const handleCloseTab = (path: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updated = openTabs.filter((t) => t.path !== path);
-    setOpenTabs(updated);
-    if (selectedFile && selectedFile.path === path) {
-      if (updated.length > 0) {
-        setSelectedFile(updated[updated.length - 1]);
-      } else {
-        setSelectedFile(null);
-      }
-    }
-  };
-
-  const handleFileSaved = (filePath: string, newContent: string) => {
-    setOpenTabs((prev) =>
-      prev.map((t) => (t.path === filePath ? { ...t, content: newContent, isDirty: false } : t))
-    );
-    if (selectedFile && selectedFile.path === filePath) {
-      setSelectedFile({ ...selectedFile, content: newContent });
-    }
-    addLog(`File saved: ${filePath}`);
-  };
-
-  const activeSessionsMapRef = useRef<Map<string, ChatSession>>(new Map());
-  const currentSessionIdRef = useRef<string | null>(null);
-
-  const currentSessionRef = useRef<ChatSession | null>(null);
-  useEffect(() => {
-    currentSessionRef.current = currentSession;
-    if (currentSession) {
-      activeSessionsMapRef.current.set(currentSession.id, currentSession);
-    }
-  }, [currentSession]);
 
   const checkAuth = async (): Promise<boolean> => {
     try {
@@ -269,7 +202,7 @@ export default function App() {
     }
   };
 
-  // 1. Initial Load Config and Sessions
+  // Initial Load Config and Sessions
   useEffect(() => {
     async function init() {
       const isAuth = await checkAuth();
@@ -279,106 +212,6 @@ export default function App() {
     }
     init();
   }, []);
-
-  // 2. Fetch workspace file tree recursive
-  const loadWorkspaceTree = async (dirPath: string) => {
-    try {
-      const tree = await api.get_workspace_tree(dirPath);
-      setWorkspaceTree(tree);
-      const ctx = await api.get_workspace_context(dirPath);
-      setHas0xAgentMd(ctx.loaded);
-      if (ctx.loaded) {
-        addLog(`Auto-loaded workspace context from ${ctx.filename}`);
-      }
-    } catch (err: any) {
-      addLog(`Failed to load file tree: ${err.message || err}`);
-    }
-  };
-
-  const addLog = (msg: string) => {
-    setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 99)]);
-  };
-
-  // 3. Session management commands
-  const handleSelectSession = async (id: string) => {
-    try {
-      setCurrentSessionId(id);
-      currentSessionIdRef.current = id;
-      const cached = activeSessionsMapRef.current.get(id);
-      if (cached) {
-        currentSessionRef.current = cached;
-        setCurrentSession(cached);
-      }
-      const full = await api.load_session(id);
-      const activeCached = activeSessionsMapRef.current.get(id);
-      if (activeCached && activeCached.messages.length >= full.messages.length) {
-        updateSessionState(activeCached);
-      } else {
-        updateSessionState(full);
-      }
-      if (full.workspace_dir) {
-        loadWorkspaceTree(full.workspace_dir);
-      } else {
-        setWorkspaceTree([]);
-        setHas0xAgentMd(false);
-      }
-      addLog(`Switched session to "${full.title}"`);
-    } catch (err: any) {
-      addLog(`Failed to load session ${id}: ${err.message || err}`);
-    }
-  };
-
-  const handleCreateSession = async (title?: string, workspace_dir?: string | null) => {
-    try {
-      let targetWs = workspace_dir;
-      let name = title;
-
-      if (targetWs === 'auto') {
-        const autoWs = await api.create_auto_workspace();
-        targetWs = autoWs.path;
-        name = title && title !== 'Новый диалог' && title !== 'Быстрый чат' && title !== 'Новый чат' ? title : `Чат (${autoWs.slug})`;
-      } else if (targetWs === undefined) {
-        targetWs = config?.workspace_dir || null;
-      }
-
-      const newSess = await api.create_session(name || `Session ${sessions.length + 1}`, targetWs);
-      activeSessionsMapRef.current.set(newSess.id, newSess);
-      currentSessionIdRef.current = newSess.id;
-      currentSessionRef.current = newSess;
-      setCurrentSessionId(newSess.id);
-      setCurrentSession(newSess);
-      setSessions((prev) => [newSess, ...prev.filter((s) => s.id !== newSess.id)]);
-
-      if (newSess.workspace_dir) {
-        loadWorkspaceTree(newSess.workspace_dir);
-      } else {
-        setWorkspaceTree([]);
-        setHas0xAgentMd(false);
-      }
-      addLog(`Created new session: "${newSess.title}"`);
-    } catch (err: any) {
-      addLog(`Failed to create session: ${err.message || err}`);
-    }
-  };
-
-  const handleUpdateCurrentSessionWorkspace = async (workspace_dir: string | null) => {
-    if (!currentSessionId) return;
-    try {
-      const updated = await api.update_session_workspace(currentSessionId, workspace_dir);
-      updateSessionState(updated);
-      setSessions((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
-      if (workspace_dir) {
-        loadWorkspaceTree(workspace_dir);
-        addLog(`Привязана папка: "${workspace_dir}"`);
-      } else {
-        setWorkspaceTree([]);
-        setHas0xAgentMd(false);
-        addLog(`Сессия переведена в общий режим (без файлов)`);
-      }
-    } catch (err: any) {
-      addLog(`Ошибка обновления воркспейса: ${err.message || err}`);
-    }
-  };
 
   const handleSelectPersona = async (id: string) => {
     try {
@@ -397,32 +230,11 @@ export default function App() {
     }
   };
 
-  const handleDeleteSession = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await api.delete_session(id);
-      const updatedList = sessions.filter((s) => s.id !== id);
-      setSessions(updatedList);
-      addLog(`Deleted session: ${id}`);
-
-      if (currentSessionId === id) {
-        if (updatedList.length > 0) {
-          handleSelectSession(updatedList[0].id);
-        } else {
-          handleCreateSession('Default Session', 'auto');
-        }
-      }
-    } catch (err: any) {
-      addLog(`Failed to delete session: ${err.message || err}`);
-    }
-  };
-
-  // 4. Select workspace directory modal handler
   const handleSelectWorkspace = () => {
     setIsWorkspacePickerOpen(true);
   };
 
-  const handleSelectWorkspaceDir = async (dirPath: string) => {
+  const handleSelectWorkspaceDir = async (dirPath: string, openInNewChat = true) => {
     try {
       let currentCfg = config;
       if (!currentCfg) {
@@ -431,18 +243,26 @@ export default function App() {
       const updated = { ...currentCfg, workspace_dir: dirPath };
       await api.save_config(updated);
       setConfig(updated);
-      if (currentSessionId) {
+
+      // 1. Immediately load workspace tree
+      await loadWorkspaceTree(dirPath);
+
+      if (openInNewChat) {
+        // Create clean dedicated session with project title
+        const baseName = getWorkspaceBaseName(dirPath);
+        await handleCreateSession(baseName, dirPath);
+        showToast(`Проект "${baseName}" открыт в новом чате`, 'success');
+      } else if (currentSessionId) {
         await handleUpdateCurrentSessionWorkspace(dirPath);
-      } else {
-        loadWorkspaceTree(dirPath);
+        showToast(`Папка привязана к текущему чату`, 'info');
       }
-      addLog(`Selected workspace: ${dirPath}`);
+      addLog(`Workspace opened: ${dirPath}`);
     } catch (err: any) {
-      addLog(`Failed to select workspace directory: ${err.message || err}`);
+      addLog(`Failed to open workspace directory: ${err.message || err}`);
+      showToast(`Ошибка открытия проекта: ${err.message || err}`, 'error');
     }
   };
 
-  // 5. Save settings config updates
   const handleSaveConfig = async (updated: AppConfig) => {
     try {
       await api.save_config(updated);
@@ -459,142 +279,6 @@ export default function App() {
     }
   };
 
-  // 6. View raw text file onClick
-  const handleFileClick = async (filePath: string, fileName: string) => {
-    try {
-      const content = await api.read_file_raw(filePath);
-      const newFile = {
-        path: filePath,
-        name: fileName,
-        content,
-      };
-      
-      setOpenTabs((prev) => {
-        const exists = prev.some((t) => t.path === filePath);
-        if (!exists) {
-          return [...prev, newFile];
-        }
-        return prev;
-      });
-
-      setSelectedFile(newFile);
-      setMobileWorkspaceTab('editor');
-      addLog(`Opened file: ${fileName}`);
-    } catch (err: any) {
-      addLog(`Failed to read file contents: ${err.message || err}`);
-    }
-  };
-
-  // 7. Chat Send message logic
-  const handleSendMessage = async (text: string, images?: string[]) => {
-    const activeSessionId = currentSessionIdRef.current || currentSession?.id;
-    const activeSess = (activeSessionId ? activeSessionsMapRef.current.get(activeSessionId) : null) || currentSessionRef.current || currentSession;
-    if (!activeSess) return;
-
-    const userMsg: ChatMessage = {
-      id: generateShortId(),
-      role: 'user',
-      content: text,
-      images: images || null,
-      timestamp: Date.now(),
-    };
-
-    let title = activeSess.title;
-    if (
-      activeSess.messages.length === 0 ||
-      title.startsWith('Чат (') ||
-      title === 'Новый чат' ||
-      title === 'Default Session'
-    ) {
-      const cleanPrompt = text.replace(/\n+/g, ' ').trim();
-      if (cleanPrompt) {
-        title = cleanPrompt.length > 32 ? cleanPrompt.substring(0, 30) + '...' : cleanPrompt;
-      }
-    }
-
-    const updatedSession = {
-      ...activeSess,
-      title,
-      messages: [...activeSess.messages, userMsg],
-      updated_at: Date.now(),
-    };
-
-    updateSessionState(updatedSession);
-    setSessions((prev) =>
-      prev.map((s) => (s.id === activeSess.id ? { ...s, title, updated_at: updatedSession.updated_at } : s))
-    );
-
-    try {
-      await api.save_session(updatedSession);
-      addLog(`Prompt submitted: "${text.substring(0, 30)}..."`);
-      
-      await api.send_message(activeSess.id);
-    } catch (err: any) {
-      addLog(`Failed to execute completions: ${err.message || err}`);
-      const errText = `**Системная ошибка подключения:** ${err.message || err}`;
-      const sessWithErr: ChatSession = {
-        ...updatedSession,
-        messages: [
-          ...updatedSession.messages,
-          {
-            id: generateShortId(),
-            role: 'assistant',
-            content: errText,
-            timestamp: Date.now(),
-          },
-        ],
-        updated_at: Date.now(),
-      };
-      updateSessionState(sessWithErr);
-      api.save_session(sessWithErr).catch(() => {});
-    }
-  };
-
-  // Launch proactive initiative in dedicated session with rich context
-  const handleAcceptSpark = async (spark: JarvisSparkProposal) => {
-    try {
-      await api.accept_spark(spark.id);
-
-      const sparkTitle = `[Джарвис] ${spark.title}`;
-      const newSession = await api.create_session(sparkTitle, config?.workspace_dir);
-
-      setSessions((prev) => [newSession, ...prev]);
-      setCurrentSessionId(newSession.id);
-      currentSessionRef.current = newSession;
-      setCurrentSession(newSession);
-      activeSessionsMapRef.current.set(newSession.id, newSession);
-
-      setActiveView('chat');
-      setIsJarvisOpen(false);
-
-      const directive = spark.directivePrompt || spark.suggestedAction || spark.description;
-
-      const userMsg: ChatMessage = {
-        id: generateShortId(),
-        role: 'user',
-        content: directive,
-        timestamp: Date.now(),
-      };
-
-      const updatedSession: ChatSession = {
-        ...newSession,
-        messages: [userMsg],
-        updated_at: Date.now(),
-      };
-
-      updateSessionState(updatedSession);
-      await api.save_session(updatedSession);
-      await api.send_message(newSession.id);
-
-      showToast(`Инициатива запущена: ${spark.title}`, 'success');
-      addLog(`Initiative dispatched in dedicated session ${newSession.id}`);
-    } catch (err: any) {
-      console.error('Failed to accept spark:', err);
-      showToast(`Ошибка запуска: ${err.message || err}`, 'error');
-    }
-  };
-
-  // Approve or Reject write-based tool actions
   const handleRespondToTool = async (toolId: string, approve: boolean | string) => {
     const targetSessionId = currentSessionId || currentSessionRef.current?.id || '';
     try {
@@ -605,7 +289,6 @@ export default function App() {
     }
   };
 
-  // Cancel running agent completions
   const handleCancelAgent = async () => {
     if (!currentSessionId) return;
     try {
@@ -616,15 +299,20 @@ export default function App() {
     }
   };
 
-  const updateSessionState = (newSession: ChatSession) => {
-    activeSessionsMapRef.current.set(newSession.id, newSession);
-    if (currentSessionIdRef.current === newSession.id || !currentSessionRef.current) {
-      currentSessionRef.current = newSession;
-      setCurrentSession(newSession);
+  const handleTogglePlanningMode = async () => {
+    if (!config) return;
+    const newPlanning = config.planning_mode === false ? true : false;
+    const updated = { ...config, planning_mode: newPlanning };
+    setConfig(updated);
+    try {
+      await api.save_config(updated);
+      addLog(`Planning mode switched to: ${newPlanning ? 'ENABLED' : 'DISABLED'}`);
+    } catch (err: any) {
+      console.error('Failed to save planning mode:', err);
     }
   };
 
-  // 8. WebSocket Event Subscriptions
+  // WebSocket Event Subscriptions
   useAppWebSocket({
     currentSessionIdRef,
     currentSessionRef,
@@ -642,45 +330,13 @@ export default function App() {
     workspaceDir: config?.workspace_dir || undefined,
   });
 
-  // 9. Global Keyboard Shortcuts (Ctrl+N, Ctrl+B, Ctrl+,, Escape)
+  // Global Keyboard Shortcuts (Ctrl+N, Ctrl+B, Ctrl+,, Escape)
   useAppShortcuts({
     onCreateSession: () => handleCreateSession('Новый диалог', 'auto'),
     onToggleSidebar: () => setSidebarOpen((prev) => !prev),
     onOpenSettings: () => setActiveView('settings'),
     onCancelAgent: handleCancelAgent,
   });
-
-  const handleTogglePlanningMode = async () => {
-    if (!config) return;
-    const newPlanning = config.planning_mode === false ? true : false;
-    const updated = { ...config, planning_mode: newPlanning };
-    setConfig(updated);
-    try {
-      await api.save_config(updated);
-      addLog(`Planning mode switched to: ${newPlanning ? 'ENABLED' : 'DISABLED'}`);
-    } catch (err: any) {
-      console.error('Failed to save planning mode:', err);
-    }
-  };
-
-  const handleRollbackSession = async (
-    targetMessageId: string,
-    mode: 'to_user_edit' | 'to_assistant' = 'to_user_edit'
-  ): Promise<string> => {
-    if (!currentSession) return '';
-    try {
-      const res = await api.rollback_session(currentSession.id, targetMessageId, mode);
-      updateSessionState(res.session);
-      setSessions((prev) =>
-        prev.map((s) => (s.id === currentSession.id ? { ...s, messages: res.session.messages, updated_at: res.session.updated_at } : s))
-      );
-      addLog(`Session rolled back to message: ${targetMessageId}`);
-      return res.restoredContent || '';
-    } catch (err: any) {
-      addLog(`Failed to rollback session: ${err.message || err}`);
-      throw err;
-    }
-  };
 
   const isSplitMode = activeView === 'workspace' || (activeView === 'chat' && selectedFile !== null);
   const activeSessionWorkspace = currentSession?.workspace_dir !== undefined ? currentSession.workspace_dir : config?.workspace_dir;
@@ -719,7 +375,7 @@ export default function App() {
   );
 
   return (
-    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-hidden font-sans p-2 sm:p-2.5 gap-2 sm:gap-2.5">
+    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-hidden font-sans p-0 sm:p-2.5 gap-0 sm:gap-2.5">
       
       {/* 1. TOP FLOATING SCI-FI CAPSULE NAVBAR */}
       <Navbar
@@ -737,15 +393,15 @@ export default function App() {
         isServerOffline={isServerOffline}
         onStartServer={handleStartServer}
         onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
-        onOpenJarvis={() => setIsJarvisOpen(true)}
+        onOpenJarvis={() => setActiveView('jarvis')}
         onNewChat={() => handleCreateSession('Новый диалог', 'auto')}
         onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
       />
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}
-      <div className="flex-1 w-full min-h-0 relative flex flex-row overflow-hidden gap-2.5">
+      <div className="flex-1 w-full min-h-0 relative flex flex-row overflow-hidden gap-0 sm:gap-2.5">
         
-        {/* LEFT COLLAPSIBLE SIDEBAR */}
+        {/* LEFT COLLAPSIBLE / MOBILE DRAWER SIDEBAR */}
         <Sidebar
           isOpen={sidebarOpen}
           onToggleOpen={() => setSidebarOpen(!sidebarOpen)}
@@ -758,10 +414,12 @@ export default function App() {
           onSelectWorkspace={handleSelectWorkspace}
           workspaceTreeNodes={workspaceTree}
           onFileClick={handleFileClick}
+          activeView={activeView}
+          onChangeView={setActiveView}
         />
 
-        {/* Collapsed Sidebar Outer Edge Expand Button */}
-        {!sidebarOpen && (
+        {/* Collapsed Sidebar Outer Edge Expand Button (Desktop Only) */}
+        {!sidebarOpen && !isMobile && (
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
@@ -773,14 +431,12 @@ export default function App() {
           </button>
         )}
 
-
-
-        {/* CONTENT VIEWPORT (Sci-Fi Island with rounded-[26px]) */}
-        <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col rounded-[26px] border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl shadow-sm">
+        {/* CONTENT VIEWPORT */}
+        <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col rounded-none sm:rounded-[26px] border-0 sm:border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl shadow-sm">
           
           {/* SETTINGS VIEW */}
           {activeView === 'settings' && (
-            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-[26px]">
+            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
               <SettingsPage
                 config={config}
                 onSaveConfig={handleSaveConfig}
@@ -793,7 +449,7 @@ export default function App() {
 
           {/* ANALYTICS VIEW */}
           {activeView === 'analytics' && (
-            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-[26px]">
+            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
               <AnalyticsPage
                 sessions={sessions}
                 serverLogs={logs}
@@ -809,9 +465,33 @@ export default function App() {
             </div>
           )}
 
-          {/* MAIN CHAT & SPLIT VIEW (Preserved in DOM to maintain stream state & scroll position) */}
+          {/* JARVIS SANCTUARY VIEW */}
+          {activeView === 'jarvis' && (
+            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
+              <JarvisSanctuary
+                config={config}
+                currentSession={currentSession}
+                sessions={sessions}
+                onSelectSession={handleSelectSession}
+                onCreateSession={handleCreateSession}
+                agentStatus={agentStatus}
+                onSendMessage={handleSendMessage}
+                onRespondToTool={handleRespondToTool}
+                onCancelAgent={handleCancelAgent}
+                onRollbackSession={handleRollbackSession}
+                liveTelemetry={liveTelemetry}
+                personas={personas}
+                activePersonaId={activePersonaId}
+                onSelectPersona={handleSelectPersona}
+                isServerOffline={isServerOffline}
+                onStartServer={handleStartServer}
+              />
+            </div>
+          )}
+
+          {/* MAIN CHAT & SPLIT VIEW */}
           <div className={`w-full h-full ${activeView === 'chat' || activeView === 'workspace' ? 'flex flex-col overflow-hidden' : 'hidden'}`}>
-            {isSplitMode ? (
+            {isSplitMode && !isMobile ? (
               <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
                 {/* Left Pane: Code Editor / Workspace Tree */}
                 <div
@@ -870,7 +550,19 @@ export default function App() {
               </div>
             ) : (
               <div className="w-full h-full flex flex-col overflow-hidden">
-                {renderChatComponent()}
+                {activeView === 'workspace' ? (
+                  <div className="w-full h-full flex flex-col overflow-hidden">
+                    <CodeEditor
+                      selectedFile={selectedFile}
+                      openTabs={openTabs}
+                      onSelectTab={handleSelectTab}
+                      onCloseTab={handleCloseTab}
+                      onFileSaved={handleFileSaved}
+                    />
+                  </div>
+                ) : (
+                  renderChatComponent()
+                )}
               </div>
             )}
           </div>
