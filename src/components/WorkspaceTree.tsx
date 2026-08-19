@@ -21,6 +21,94 @@ interface WorkspaceTreeProps {
   onFileClick: (path: string, name: string) => void;
 }
 
+
+
+// Get colored icon for specific file extension
+const getFileIcon = (fileName: string) => {
+  const lower = fileName.toLowerCase();
+  const ext = lower.split('.').pop() || '';
+
+  if (lower === 'dockerfile' || lower.startsWith('.docker')) {
+    return <FileCode size={13} className="text-sky-400" />;
+  }
+  if (lower === 'makefile' || lower === 'cmakelists.txt') {
+    return <FileCode size={13} className="text-amber-500" />;
+  }
+  if (lower.startsWith('.env')) {
+    return <FileText size={13} className="text-emerald-400" />;
+  }
+
+  switch (ext) {
+    case 'ts':
+    case 'tsx':
+      return <Code2 size={13} className="text-sky-400" />;
+    case 'js':
+    case 'jsx':
+    case 'mjs':
+    case 'cjs':
+      return <FileCode size={13} className="text-amber-400" />;
+    case 'json':
+    case 'jsonc':
+      return <FileJson size={13} className="text-yellow-300" />;
+    case 'md':
+    case 'markdown':
+    case 'mdx':
+      return <FileText size={13} className="text-purple-400" />;
+    case 'txt':
+    case 'log':
+    case 'cfg':
+    case 'conf':
+    case 'ini':
+      return <FileText size={13} className="text-zinc-400" />;
+    case 'py':
+    case 'ipynb':
+      return <FileCode size={13} className="text-emerald-400" />;
+    case 'rs':
+      return <FileCode size={13} className="text-orange-400" />;
+    case 'go':
+      return <FileCode size={13} className="text-cyan-400" />;
+    case 'c':
+    case 'cpp':
+    case 'cc':
+    case 'h':
+    case 'hpp':
+    case 'cs':
+    case 'java':
+    case 'kt':
+      return <FileCode size={13} className="text-blue-400" />;
+    case 'html':
+    case 'htm':
+    case 'svg':
+    case 'xml':
+      return <FileCode size={13} className="text-orange-500" />;
+    case 'css':
+    case 'scss':
+    case 'sass':
+    case 'less':
+      return <FileCode size={13} className="text-pink-400" />;
+    case 'yaml':
+    case 'yml':
+    case 'toml':
+      return <FileJson size={13} className="text-teal-400" />;
+    case 'sql':
+    case 'db':
+    case 'sqlite':
+      return <FileText size={13} className="text-indigo-400" />;
+    case 'sh':
+    case 'bash':
+    case 'zsh':
+    case 'ps1':
+    case 'bat':
+    case 'cmd':
+      return <FileCode size={13} className="text-lime-400" />;
+    case 'gguf':
+    case 'bin':
+      return <FileCode size={13} className="text-rose-400" />;
+    default:
+      return <FileText size={13} className="text-[var(--theme-text-muted)]" />;
+  }
+};
+
 export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
   workspaceDir,
   treeNodes,
@@ -55,22 +143,22 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
   }, [treeNodes, filterText]);
 
   return (
-    <div className="h-full flex flex-col select-none text-slate-100 font-sans glass-panel border-r border-white/10 rounded-none">
+    <div className="h-full flex flex-col select-none text-[var(--theme-text)] font-sans bg-[var(--theme-panel)] border-r border-[var(--theme-border)] rounded-none">
       
       {/* Directory Path Selector Header */}
-      <div className="p-2 bg-slate-900/60 border-b border-white/10 text-xs space-y-1.5">
-        <div className="text-slate-400 text-[10px] font-medium uppercase tracking-wider flex items-center justify-between">
+      <div className="p-2.5 bg-[var(--theme-panel)] border-b border-[var(--theme-border)] text-xs space-y-2">
+        <div className="text-[var(--theme-text-muted)] text-[10px] font-bold uppercase tracking-wider flex items-center justify-between">
           <span>Воркспейс</span>
-          <FolderSearch size={12} className="text-emerald-400" />
+          <FolderSearch size={12} className="text-[var(--theme-accent)]" />
         </div>
 
         <button 
           onClick={onSelectWorkspace}
-          className="w-full flat-btn px-2 py-1 rounded text-slate-200 hover:text-white cursor-pointer transition-all text-left flex items-center gap-2 group"
+          className="w-full px-2.5 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] cursor-pointer transition-all text-left flex items-center gap-2 group shadow-sm"
           title={workspaceDir || "Выбрать рабочую папку"}
         >
-          <Folder size={13} className="text-emerald-400 shrink-0 group-hover:scale-105 transition-transform" />
-          <span className="truncate text-xs font-mono flex-1">
+          <Folder size={14} className="text-amber-400 shrink-0 group-hover:scale-105 transition-transform" />
+          <span className="truncate text-xs font-mono font-medium flex-1">
             {workspaceDir ? workspaceDir.split('\\').pop() || workspaceDir.split('/').pop() : "Выбрать папку..."}
           </span>
         </button>
@@ -82,14 +170,14 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
             placeholder="Фильтр файлов..."
-            className="w-full pl-6 pr-5 py-1 rounded bg-black/40 border border-white/10 text-[11px] text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 font-mono"
+            className="w-full pl-6 pr-5 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-accent)] font-mono transition-colors"
           />
-          <Search size={11} className="absolute left-2 top-2.5 text-slate-500" />
+          <Search size={11} className="absolute left-2 top-3 text-[var(--theme-text-muted)]" />
           {filterText && (
             <button
               type="button"
               onClick={() => setFilterText('')}
-              className="absolute right-1.5 top-2 text-slate-400 hover:text-white p-0.5"
+              className="absolute right-1.5 top-2.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] p-0.5 cursor-pointer"
             >
               <X size={11} />
             </button>
@@ -98,7 +186,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
       </div>
 
       {/* File Tree List */}
-      <div className="flex-1 overflow-y-auto px-1 py-1.5 font-mono text-xs scrollbar-none">
+      <div className="flex-1 overflow-y-auto px-1.5 py-2 font-mono text-xs scrollbar-thin">
         {filteredNodes.length > 0 ? (
           <TreeNodeList 
             nodes={filteredNodes} 
@@ -107,7 +195,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
             isFiltering={Boolean(filterText.trim())}
           />
         ) : (
-          <div className="text-center py-8 px-3 text-xs text-slate-500 font-sans leading-relaxed">
+          <div className="text-center py-8 px-3 text-xs text-[var(--theme-text-muted)] font-sans leading-relaxed">
             {workspaceDir
               ? filterText
                 ? 'Файлы не найдены'
@@ -136,7 +224,7 @@ const TreeNodeList: React.FC<TreeNodeListProps> = ({ nodes, depth, onFileClick, 
           key={node.path} 
           node={node} 
           depth={depth} 
-          onFileClick={onFileClick}
+          onFileClick={onFileClick} 
           isFiltering={isFiltering}
         />
       ))}
@@ -150,35 +238,6 @@ interface TreeNodeItemProps {
   onFileClick: (path: string, name: string) => void;
   isFiltering?: boolean;
 }
-
-// Get colored icon for specific file extension
-const getFileIcon = (fileName: string) => {
-  const ext = fileName.split('.').pop()?.toLowerCase();
-  switch (ext) {
-    case 'ts':
-    case 'tsx':
-      return <Code2 size={13} className="text-sky-400" />;
-    case 'js':
-    case 'jsx':
-      return <FileCode size={13} className="text-amber-400" />;
-    case 'json':
-      return <FileJson size={13} className="text-yellow-300" />;
-    case 'md':
-    case 'txt':
-      return <FileText size={13} className="text-purple-400" />;
-    case 'py':
-      return <FileCode size={13} className="text-emerald-400" />;
-    case 'rs':
-      return <FileCode size={13} className="text-orange-400" />;
-    case 'css':
-    case 'html':
-      return <FileCode size={13} className="text-cyan-400" />;
-    case 'gguf':
-      return <FileCode size={13} className="text-rose-400" />;
-    default:
-      return <FileCode size={13} className="text-slate-400" />;
-  }
-};
 
 const TreeNodeItem: React.FC<TreeNodeItemProps> = ({ node, depth, onFileClick, isFiltering }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -196,10 +255,10 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({ node, depth, onFileClick, i
     <div>
       <div
         onClick={handleToggle}
-        className="flex items-center py-1 px-1.5 rounded hover:bg-white/10 cursor-pointer text-slate-300 hover:text-white transition-colors text-xs select-none group"
+        className="flex items-center py-1 px-1.5 rounded-lg hover:bg-[var(--theme-border-subtle)] cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors text-xs select-none group"
         style={{ paddingLeft: `${depth * 10 + 4}px` }}
       >
-        <span className="mr-1 text-slate-500 group-hover:text-slate-300 transition-colors">
+        <span className="mr-1 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors">
           {node.is_dir ? (
             effectivelyOpen ? <ChevronDown size={12} /> : <ChevronRight size={12} />
           ) : (
@@ -226,7 +285,7 @@ const TreeNodeItem: React.FC<TreeNodeItemProps> = ({ node, depth, onFileClick, i
         <TreeNodeList 
           nodes={node.children} 
           depth={depth + 1} 
-          onFileClick={onFileClick}
+          onFileClick={onFileClick} 
           isFiltering={isFiltering}
         />
       )}

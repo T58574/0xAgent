@@ -118,38 +118,82 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
   // Detect file language
   const detectLanguage = (fileName: string): string => {
-    const ext = fileName.split('.').pop()?.toLowerCase();
+    const lower = fileName.toLowerCase();
+    const ext = lower.split('.').pop() || '';
+
+    if (lower === 'dockerfile' || lower.startsWith('.docker')) return 'Dockerfile';
+    if (lower === 'makefile') return 'Makefile';
+    if (lower.startsWith('.env')) return 'Environment Config';
+
     switch (ext) {
       case 'ts':
       case 'tsx':
         return 'TypeScript';
       case 'js':
       case 'jsx':
+      case 'mjs':
+      case 'cjs':
         return 'JavaScript';
       case 'py':
+      case 'ipynb':
         return 'Python';
       case 'rs':
         return 'Rust';
+      case 'go':
+        return 'Go';
+      case 'java':
+      case 'kt':
+        return 'Java/Kotlin';
+      case 'cs':
+        return 'C#';
       case 'json':
+      case 'jsonc':
         return 'JSON';
+      case 'yaml':
+      case 'yml':
+        return 'YAML';
+      case 'toml':
+        return 'TOML';
+      case 'xml':
+      case 'svg':
+        return 'XML/SVG';
+      case 'sql':
+        return 'SQL';
       case 'css':
-        return 'CSS';
+      case 'scss':
+      case 'sass':
+      case 'less':
+        return 'CSS/SCSS';
       case 'html':
+      case 'htm':
         return 'HTML';
       case 'md':
+      case 'markdown':
+      case 'mdx':
         return 'Markdown';
       case 'sh':
+      case 'bash':
+      case 'zsh':
       case 'ps1':
       case 'bat':
-        return 'Shell';
+      case 'cmd':
+        return 'Shell Script';
       case 'cpp':
       case 'c':
       case 'h':
+      case 'hpp':
+      case 'cc':
         return 'C/C++';
+      case 'txt':
+      case 'log':
+      case 'ini':
+      case 'cfg':
+      case 'conf':
+        return 'Plain Text';
       case 'gguf':
-        return 'GGUF Binary';
+        return 'GGUF Binary Model';
       default:
-        return 'Text';
+        return ext ? `${ext.toUpperCase()} File` : 'Plain Text';
     }
   };
 

@@ -18,6 +18,7 @@ import { TelemetryHUD } from './chat/TelemetryHUD';
 import { ChatMessageItem } from './chat/ChatMessageItem';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { sounds } from '../services/soundEffects';
 
 interface ChatAreaProps {
   messages: ChatMessage[];
@@ -258,6 +259,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputText.trim() && attachedImages.length === 0) return;
+    sounds.playSend();
     onSendMessage(inputText, attachedImages.length > 0 ? attachedImages : undefined);
     setInputText('');
     setAttachedImages([]);

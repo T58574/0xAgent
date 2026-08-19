@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import * as api from './services/api';
+import { sounds } from './services/soundEffects';
 import { AppConfig, LiveTelemetry, JarvisState, PersonaMetadata } from './types';
 import { getWorkspaceBaseName } from './utils/helpers';
 import { Navbar } from './components/Navbar';
@@ -142,12 +143,15 @@ export default function App() {
     }
   }, [logs, showLogsDrawer]);
 
-  // Apply glassmorphism preset theme to document element
+  // Apply glassmorphism preset theme to document element & sync audio
   useEffect(() => {
     if (config && config.active_theme) {
       document.documentElement.setAttribute('data-theme', config.active_theme);
     } else {
       document.documentElement.setAttribute('data-theme', 'obsidian');
+    }
+    if (config) {
+      sounds.setEnabled(config.sound_notifications !== false);
     }
   }, [config]);
 

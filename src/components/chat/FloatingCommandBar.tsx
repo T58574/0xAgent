@@ -163,7 +163,17 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = isExpanded ? '280px' : `${Math.min(220, Math.max(34, textareaRef.current.scrollHeight))}px`;
+      if (isExpanded) {
+        textareaRef.current.style.height = '280px';
+      } else {
+        // Reset height first so scrollHeight accurately measures real content
+        textareaRef.current.style.height = '34px';
+        if (inputText && inputText.trim().length > 0) {
+          const scrollH = textareaRef.current.scrollHeight;
+          const newHeight = Math.min(220, Math.max(34, scrollH));
+          textareaRef.current.style.height = `${newHeight}px`;
+        }
+      }
     }
   }, [inputText, isExpanded]);
 
@@ -196,6 +206,16 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     textareaRef.current?.focus();
   };
 
+  const handleFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setIsExpanded(false);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '34px';
+    }
+    onSubmit(e);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (openMenu === 'slash' && filteredSlashCommands.length > 0) {
       if (e.key === 'ArrowDown') {
@@ -221,7 +241,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSubmit(e);
+      handleFormSubmit(e);
     }
   };
 
@@ -293,8 +313,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
-      <form onSubmit={onSubmit}>
-        <div className={`bento-card rounded-3xl p-1.5 sm:p-2 px-3 sm:px-4 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-[var(--theme-accent)] transition-all flex items-end gap-2 sm:gap-3 shadow-xl ${isExpanded ? 'ring-1 ring-[var(--theme-accent)]/30' : ''}`}>
+      <form onSubmit={handleFormSubmit}>
+        <div className={`bento-card rounded-3xl p-1.5 sm:p-2 px-3 sm:px-4 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-[var(--theme-accent)] transition-all duration-200 ease-out flex items-end gap-2 sm:gap-3 shadow-xl ${isExpanded ? 'ring-1 ring-[var(--theme-accent)]/30' : ''}`}>
           <button type="button" onClick={() => fileInputRef.current?.click()} className="p-1.5 sm:p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title="Прикрепить изображение">
             <Plus size={18} className="sm:w-[19px] sm:h-[19px]" />
           </button>
@@ -306,7 +326,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Спросите что угодно или введите / для команд..."
-            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[16px] sm:text-[15px] focus:outline-none resize-none min-h-[34px] max-h-[300px] py-1.5 px-1 leading-normal font-sans font-medium scrollbar-thin"
+            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[16px] sm:text-[15px] focus:outline-none resize-none min-h-[34px] max-h-[300px] py-1.5 px-1 leading-normal font-sans font-medium scrollbar-thin transition-[height] duration-200 ease-out"
           />
 
           {inputText.length > 30 && (

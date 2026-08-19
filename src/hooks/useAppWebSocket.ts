@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import * as api from '../services/api';
+import { sounds } from '../services/soundEffects';
 import { ChatSession, ChatMessage, LiveTelemetry, ToolCallInfo, PersonaMetadata, TodoItem } from '../types';
 
 interface UseAppWebSocketParams {
@@ -163,7 +164,12 @@ export function useAppWebSocket({
       }
       addLog(`Agent status changed [${sid || 'system'}]: ${statusStr}`);
 
+      if (statusStr === 'executing_tool') {
+        sounds.playToolExecute();
+      }
+
       if (statusStr === 'idle') {
+        sounds.playReceive();
         flushPendingTokens();
         if (sid === currentSessionIdRef.current) {
           setLiveTelemetry(null);
@@ -182,6 +188,7 @@ export function useAppWebSocket({
     });
 
     const unErr = api.listen<any>('agent-error', async (event) => {
+      sounds.playError();
       const payload = event.payload;
       const msgText =
         typeof payload === 'string' ? payload : payload?.message || JSON.stringify(payload);
