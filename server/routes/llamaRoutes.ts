@@ -514,6 +514,7 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         args.push(...extra);
       }
 
+      const launchTimestamp = Date.now();
       isIntentionalStop = false;
       lastLaunchParams = { targetExe, args, host, port };
 
@@ -539,13 +540,18 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         const exitMsg = `[llama.cpp] Процесс завершён (код: ${code}, сигнал: ${signal})`;
         appendServerLog(exitMsg);
 
-        if (!isIntentionalStop && lastLaunchParams) {
-          appendServerLog(`[WATCHDOG] WARNING: Process crashed (code ${code}). Auto-recovering...`);
+        const runtimeMs = Date.now() - launchTimestamp;
+        if (!isIntentionalStop && lastLaunchParams && runtimeMs > 6000) {
+          appendServerLog(`[WATCHDOG] WARNING: Process crashed after ${Math.round(runtimeMs / 1000)}s. Auto-recovering...`);
           broadcast('llama-server-status', { status: 'recovering' });
           activeLlamaProcess = null;
         } else {
+          if (!isIntentionalStop && runtimeMs <= 6000) {
+            appendServerLog(`[WATCHDOG] Сервер упал при инициализации модели (${(runtimeMs / 1000).toFixed(1)} с). Авто-перезапуск остановлен.`);
+          }
           broadcast('llama-server-status', { status: 'stopped', code, signal });
           activeLlamaProcess = null;
+          lastLaunchParams = null;
         }
       });
 
