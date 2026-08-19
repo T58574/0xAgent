@@ -1,9 +1,18 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { FileNode } from '../../src/types';
+import { getAppDir, loadConfig } from '../config';
 
 export function resolvePath(workspaceDir: string | null | undefined, pathStr: string): string {
-  const root = workspaceDir && workspaceDir.trim().length > 0 ? workspaceDir : process.cwd();
+  let cfgWorkspace: string | null = null;
+  try {
+    const cfg = loadConfig();
+    if (cfg?.workspace_dir) cfgWorkspace = cfg.workspace_dir;
+  } catch {}
+
+  const root = (workspaceDir && workspaceDir.trim().length > 0)
+    ? workspaceDir
+    : (cfgWorkspace && cfgWorkspace.trim().length > 0 ? cfgWorkspace : process.cwd());
   const normalizedRoot = path.normalize(path.resolve(root));
 
   let targetPath: string;
@@ -15,12 +24,19 @@ export function resolvePath(workspaceDir: string | null | undefined, pathStr: st
     targetPath = path.normalize(path.resolve(normalizedRoot, pathStr));
   }
 
-  // Security Sandboxing: Enforce workspace boundary
+  // Security Sandboxing: Enforce workspace & app directory boundary
   const isWindows = process.platform === 'win32';
   const rootCheck = isWindows ? normalizedRoot.toLowerCase() : normalizedRoot;
   const targetCheck = isWindows ? targetPath.toLowerCase() : targetPath;
+  const appDir = path.normalize(path.resolve(getAppDir()));
+  const appDirCheck = isWindows ? appDir.toLowerCase() : appDir;
+  const globalWsCheck = cfgWorkspace ? (isWindows ? path.normalize(path.resolve(cfgWorkspace)).toLowerCase() : path.normalize(path.resolve(cfgWorkspace))) : null;
 
-  if (!targetCheck.startsWith(rootCheck)) {
+  const isWithinRoot = targetCheck.startsWith(rootCheck);
+  const isWithinAppDir = targetCheck.startsWith(appDirCheck);
+  const isWithinGlobalWs = globalWsCheck ? targetCheck.startsWith(globalWsCheck) : false;
+
+  if (!isWithinRoot && !isWithinAppDir && !isWithinGlobalWs) {
     throw new Error(`Access Denied: Path "${targetPath}" is outside the active workspace directory "${normalizedRoot}"`);
   }
 

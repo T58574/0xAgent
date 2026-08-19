@@ -63,25 +63,6 @@ export default function App() {
     setLogs((prev) => [`[${new Date().toLocaleTimeString()}] ${msg}`, ...prev.slice(0, 99)]);
   };
 
-  // Workspace Manager Hook
-  const {
-    workspaceTree,
-    setWorkspaceTree,
-    selectedFile,
-    has0xAgentMd,
-    setHas0xAgentMd,
-    splitLeftWidthPercent,
-    setSplitLeftWidthPercent,
-    openTabs,
-    mobileWorkspaceTab,
-    setMobileWorkspaceTab,
-    loadWorkspaceTree,
-    handleSelectTab,
-    handleCloseTab,
-    handleFileSaved,
-    handleFileClick,
-  } = useWorkspaceManager({ addLog });
-
   // Session Manager Hook
   const {
     sessions,
@@ -103,14 +84,35 @@ export default function App() {
     handleRollbackSession,
   } = useSessionManager({
     config,
-    loadWorkspaceTree,
-    setWorkspaceTree,
-    setHas0xAgentMd,
+    loadWorkspaceTree: (dir) => loadWorkspaceTree(dir),
+    setWorkspaceTree: (tree) => setWorkspaceTree(tree),
+    setHas0xAgentMd: (has) => setHas0xAgentMd(has),
     addLog,
     showToast,
     setActiveView,
     setIsJarvisOpen,
   });
+
+  const activeSessionWorkspace = currentSession?.workspace_dir !== undefined ? currentSession.workspace_dir : config?.workspace_dir;
+
+  // Workspace Manager Hook
+  const {
+    workspaceTree,
+    setWorkspaceTree,
+    selectedFile,
+    has0xAgentMd,
+    setHas0xAgentMd,
+    splitLeftWidthPercent,
+    setSplitLeftWidthPercent,
+    openTabs,
+    mobileWorkspaceTab,
+    setMobileWorkspaceTab,
+    loadWorkspaceTree,
+    handleSelectTab,
+    handleCloseTab,
+    handleFileSaved,
+    handleFileClick,
+  } = useWorkspaceManager({ addLog, activeWorkspaceDir: activeSessionWorkspace });
 
   // Local Server Controller Hook
   const { isServerOffline, handleStartServer } = useServerController({
@@ -339,7 +341,6 @@ export default function App() {
   });
 
   const isSplitMode = activeView === 'workspace' || (activeView === 'chat' && selectedFile !== null);
-  const activeSessionWorkspace = currentSession?.workspace_dir !== undefined ? currentSession.workspace_dir : config?.workspace_dir;
 
   const renderChatComponent = () => (
     <ChatArea
@@ -529,6 +530,7 @@ export default function App() {
                       onSelectTab={handleSelectTab}
                       onCloseTab={handleCloseTab}
                       onFileSaved={handleFileSaved}
+                      workspaceDir={activeSessionWorkspace}
                     />
                   </div>
                 </div>
@@ -558,6 +560,7 @@ export default function App() {
                       onSelectTab={handleSelectTab}
                       onCloseTab={handleCloseTab}
                       onFileSaved={handleFileSaved}
+                      workspaceDir={activeSessionWorkspace}
                     />
                   </div>
                 ) : (

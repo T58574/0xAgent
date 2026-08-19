@@ -140,13 +140,16 @@ export const get_workspace_context = (workspaceDir?: string | null) =>
     workspaceDir ? `/workspace-context?workspaceDir=${encodeURIComponent(workspaceDir)}` : '/workspace-context'
   );
 
-export async function read_file_raw(path: string): Promise<string> {
-  const data = await get<{ content: string }>(`/read-file-raw?path=${encodeURIComponent(path)}`);
+export async function read_file_raw(path: string, workspaceDir?: string | null): Promise<string> {
+  const url = workspaceDir
+    ? `/read-file-raw?path=${encodeURIComponent(path)}&workspaceDir=${encodeURIComponent(workspaceDir)}`
+    : `/read-file-raw?path=${encodeURIComponent(path)}`;
+  const data = await get<{ content: string }>(url);
   return data.content;
 }
 
-export const write_file_raw = (path: string, content: string) =>
-  post<void>('/write-file-raw', { path, content });
+export const write_file_raw = (path: string, content: string, workspaceDir?: string | null) =>
+  post<void>('/write-file-raw', { path, content, workspaceDir });
 
 // Agent Messaging & Tool Interaction
 export const send_message = (sessionId: string) => post<void>('/send-message', { sessionId });

@@ -5,9 +5,10 @@ import { EditorTabItem } from '../components/CodeEditor';
 
 interface UseWorkspaceManagerOptions {
   addLog: (msg: string) => void;
+  activeWorkspaceDir?: string | null;
 }
 
-export function useWorkspaceManager({ addLog }: UseWorkspaceManagerOptions) {
+export function useWorkspaceManager({ addLog, activeWorkspaceDir }: UseWorkspaceManagerOptions) {
   const [workspaceTree, setWorkspaceTree] = useState<FileNode[]>([]);
   const [selectedFile, setSelectedFile] = useState<{ path: string; name: string; content: string } | null>(null);
   const [has0xAgentMd, setHas0xAgentMd] = useState<boolean>(false);
@@ -62,7 +63,7 @@ export function useWorkspaceManager({ addLog }: UseWorkspaceManagerOptions) {
 
   const handleFileClick = async (filePath: string, fileName: string) => {
     try {
-      const content = await api.read_file_raw(filePath);
+      const content = await api.read_file_raw(filePath, activeWorkspaceDir);
       const newFile = {
         path: filePath,
         name: fileName,

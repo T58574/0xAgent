@@ -30,6 +30,7 @@ interface CodeEditorProps {
   onSelectTab: (path: string) => void;
   onCloseTab: (path: string, e: React.MouseEvent) => void;
   onFileSaved?: (path: string, newContent: string) => void;
+  workspaceDir?: string | null;
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
@@ -38,6 +39,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onSelectTab,
   onCloseTab,
   onFileSaved,
+  workspaceDir,
 }) => {
   const { showToast } = useToast();
   const [editorContent, setEditorContent] = useState<string>('');
@@ -69,7 +71,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     if (!selectedFile) return;
     setIsSaving(true);
     try {
-      await api.write_file_raw(selectedFile.path, editorContent);
+      await api.write_file_raw(selectedFile.path, editorContent, workspaceDir);
       showToast(`Файл "${selectedFile.name}" успешно сохранен`, 'success');
       if (onFileSaved) {
         onFileSaved(selectedFile.path, editorContent);

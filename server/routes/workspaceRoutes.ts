@@ -210,7 +210,8 @@ workspaceRouter.get('/workspace-context', (req, res) => {
 workspaceRouter.get('/read-file-raw', (req, res) => {
   try {
     const filePath = req.query.path as string;
-    const content = executeReadFile(null, filePath);
+    const workspaceDir = (req.query.workspaceDir as string) || null;
+    const content = executeReadFile(workspaceDir, filePath);
     res.json({ content });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -219,8 +220,8 @@ workspaceRouter.get('/read-file-raw', (req, res) => {
 
 workspaceRouter.post('/write-file-raw', (req, res) => {
   try {
-    const { path: filePath, content } = req.body;
-    executeWriteFile(null, filePath, content);
+    const { path: filePath, content, workspaceDir } = req.body;
+    executeWriteFile(workspaceDir || null, filePath, content);
     res.json({ success: true });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
