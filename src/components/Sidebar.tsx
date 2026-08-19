@@ -103,23 +103,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </button>
 
       {/* 1. TOP HEADER: PROMINENT NEW CHAT & QUICK SEARCH */}
-      <div className="p-2.5 border-b border-[var(--theme-border)] shrink-0 bg-black/20 space-y-2">
+      <div className="p-3 border-b border-[var(--theme-border)] shrink-0 bg-[var(--theme-panel)] space-y-2.5">
         {/* Primary Action Button: New Chat with Split dropdown */}
-        <div ref={newChatMenuRef} className="relative flex items-center gap-1">
+        <div ref={newChatMenuRef} className="relative flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => onCreateSession('Новый диалог', 'auto')}
-            className="flex-1 py-2 px-3 rounded-xl bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer group"
+            className="flex-1 py-2.5 px-3 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer group"
             title="Создать быстрый диалог с изолированным воркспейсом (Ctrl+N)"
           >
-            <Plus size={14} className="transition-transform group-hover:rotate-90 text-[var(--theme-text)]" />
+            <Plus size={15} className="transition-transform group-hover:rotate-90 text-[var(--theme-accent-text)]" />
             <span>Новый диалог</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowNewChatMenu(!showNewChatMenu)}
-            className="p-2 rounded-xl bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+            className="p-2.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-panel)] transition-colors cursor-pointer shadow-sm"
             title="Параметры создания диалога"
           >
             <ChevronDown size={14} className={`transition-transform duration-200 ${showNewChatMenu ? 'rotate-180' : ''}`} />
@@ -127,18 +127,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* New Chat Dropdown Popover */}
           {showNewChatMenu && (
-            <div className="absolute top-full left-0 right-0 mt-1.5 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 rounded-2xl space-y-1 animate-fadeIn">
+            <div className="absolute top-full left-0 right-0 mt-2 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 rounded-2xl space-y-1 animate-fadeIn">
               <button
                 type="button"
                 onClick={() => {
                   setShowNewChatMenu(false);
                   onCreateSession('Быстрый чат', 'auto');
                 }}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-white/10 text-[var(--theme-text)] transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-colors cursor-pointer"
               >
-                <Sparkles size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                <Sparkles size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-semibold">Авто-воркспейс</span>
+                  <span className="font-bold">Авто-воркспейс</span>
                   <span className="text-[10px] text-[var(--theme-text-muted)]">Изолированная песочница ~/.0xagent</span>
                 </div>
               </button>
@@ -149,11 +149,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   setShowNewChatMenu(false);
                   onCreateSession('Общий диалог', null);
                 }}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-white/10 text-[var(--theme-text)] transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-colors cursor-pointer"
               >
-                <MessageSquare size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                <MessageSquare size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-semibold">Общий диалог</span>
+                  <span className="font-bold">Общий диалог</span>
                   <span className="text-[10px] text-[var(--theme-text-muted)]">Без привязки к папке на диске</span>
                 </div>
               </button>
@@ -164,11 +164,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   setShowNewChatMenu(false);
                   onSelectWorkspace();
                 }}
-                className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-left text-xs hover:bg-white/10 text-[var(--theme-text)] transition-colors cursor-pointer border-t border-[var(--theme-border)]/40 mt-0.5 pt-1.5"
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-colors cursor-pointer border-t border-[var(--theme-border)] mt-0.5 pt-2"
               >
-                <FolderPlus size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                <FolderPlus size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-semibold">Открыть проект с диска...</span>
+                  <span className="font-bold">Открыть проект с диска...</span>
                   <span className="text-[10px] text-[var(--theme-text-muted)]">Выбрать локальную папку</span>
                 </div>
               </button>
@@ -183,9 +183,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             value={searchFilter}
             onChange={(e) => setSearchFilter(e.target.value)}
             placeholder="Поиск по диалогам..."
-            className="w-full pl-7 pr-2 py-1.5 rounded-lg bg-black/30 border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-white/20 transition-all font-sans"
+            className="w-full pl-8 pr-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-accent)] transition-all font-sans"
           />
-          <Search size={12} className="absolute left-2.5 top-2.5 text-[var(--theme-text-muted)]" />
+          <Search size={13} className="absolute left-2.5 top-2.5 text-[var(--theme-text-muted)]" />
         </div>
       </div>
 
@@ -207,9 +207,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Folder Node Header */}
               <div
                 onClick={() => toggleGroup(dir)}
-                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors text-xs font-medium ${
+                className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer transition-colors text-xs font-medium ${
                   isCurrentActiveWs
-                    ? 'bg-white/10 border border-[var(--theme-border)] text-[var(--theme-text)]'
+                    ? 'bg-[var(--theme-accent)]/10 border border-[var(--theme-accent)]/30 text-[var(--theme-text)] font-bold'
                     : 'bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                 }`}
               >
@@ -220,12 +220,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                   )}
                   <Folder size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                  <span className="truncate font-semibold">{folderName}</span>
+                  <span className="truncate font-bold">{folderName}</span>
                 </div>
 
                 <div className="flex items-center gap-1">
                   {isCurrentActiveWs && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono bg-white/10 text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)]">
                       <GitBranch size={9} />
                       <span>main</span>
                     </span>
@@ -236,7 +236,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       e.stopPropagation();
                       onCreateSession(`Чат (${folderName})`, dir);
                     }}
-                    className="p-1 rounded-md hover:text-[var(--theme-text)] hover:bg-white/10 transition-colors cursor-pointer text-[var(--theme-text-muted)]"
+                    className="p-1 rounded-lg hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer text-[var(--theme-text-muted)]"
                     title="Новый диалог в этой папке"
                   >
                     <Plus size={12} />
@@ -255,27 +255,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <div
                           key={session.id}
                           onClick={() => onSelectSession(session.id)}
-                          className={`relative group px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                          className={`relative group px-2.5 py-1.5 rounded-xl text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
                             isActive
-                              ? 'bg-white/15 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
-                              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold border-[var(--theme-accent)] shadow-sm'
+                              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                           }`}
                         >
                           <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <MessageSquare size={12} className="shrink-0 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)]" />
+                            <MessageSquare size={12} className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0'} />
                             <span className="truncate">{session.title}</span>
                           </div>
 
                           <div className="flex items-center gap-1 shrink-0">
                             {relTime && (
-                              <span className="text-[10px] text-[var(--theme-text-muted)] font-mono group-hover:hidden opacity-75">
+                              <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-accent-text)]/80' : 'text-[var(--theme-text-muted)]'}`}>
                                 {relTime}
                               </span>
                             )}
                             <button
                               type="button"
                               onClick={(e) => onDeleteSession(session.id, e)}
-                              className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                              className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
                               title="Удалить"
                             >
                               <Trash2 size={11} />
@@ -300,7 +300,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <div
               onClick={() => toggleGroup('auto_workspaces')}
-              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer font-medium text-xs"
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer font-bold text-xs"
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 {collapsedGroups['auto_workspaces'] ? (
@@ -309,7 +309,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <ChevronDown size={13} className="shrink-0" />
                 )}
                 <Sparkles size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                <span className="font-semibold">Авто-воркспейсы</span>
+                <span>Авто-воркспейсы</span>
               </div>
               <span className="text-[10px] font-mono opacity-60">({autoWorkspaceSessions.length})</span>
             </div>
@@ -323,27 +323,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div
                       key={session.id}
                       onClick={() => onSelectSession(session.id)}
-                      className={`relative group px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                      className={`relative group px-2.5 py-1.5 rounded-xl text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
                         isActive
-                          ? 'bg-white/15 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
-                          : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold border-[var(--theme-accent)] shadow-sm'
+                          : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                       }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <Terminal size={12} className="shrink-0 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)]" />
+                        <Terminal size={12} className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0'} />
                         <span className="truncate">{session.title}</span>
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
                         {relTime && (
-                          <span className="text-[10px] text-[var(--theme-text-muted)] font-mono group-hover:hidden opacity-75">
+                          <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-accent-text)]/80' : 'text-[var(--theme-text-muted)]'}`}>
                             {relTime}
                           </span>
                         )}
                         <button
                           type="button"
                           onClick={(e) => onDeleteSession(session.id, e)}
-                          className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
                           title="Удалить"
                         >
                           <Trash2 size={11} />
@@ -362,7 +362,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-1">
             <div
               onClick={() => toggleGroup('standalone')}
-              className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer font-medium text-xs"
+              className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer font-bold text-xs"
             >
               <div className="flex items-center gap-1.5 min-w-0">
                 {collapsedGroups['standalone'] ? (
@@ -371,7 +371,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <ChevronDown size={13} className="shrink-0" />
                 )}
                 <MessageSquare size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                <span className="font-semibold">Общие диалоги</span>
+                <span>Общие диалоги</span>
               </div>
               <span className="text-[10px] font-mono opacity-60">({standaloneSessions.length})</span>
             </div>
@@ -385,27 +385,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div
                       key={session.id}
                       onClick={() => onSelectSession(session.id)}
-                      className={`relative group px-2 py-1.5 rounded-lg text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                      className={`relative group px-2.5 py-1.5 rounded-xl text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
                         isActive
-                          ? 'bg-white/15 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
-                          : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
+                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold border-[var(--theme-accent)] shadow-sm'
+                          : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                       }`}
                     >
                       <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                        <MessageSquare size={12} className="shrink-0 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)]" />
+                        <MessageSquare size={12} className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0'} />
                         <span className="truncate">{session.title}</span>
                       </div>
 
                       <div className="flex items-center gap-1 shrink-0">
                         {relTime && (
-                          <span className="text-[10px] text-[var(--theme-text-muted)] font-mono group-hover:hidden opacity-75">
+                          <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-accent-text)]/80' : 'text-[var(--theme-text-muted)]'}`}>
                             {relTime}
                           </span>
                         )}
                         <button
                           type="button"
                           onClick={(e) => onDeleteSession(session.id, e)}
-                          className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
                           title="Удалить"
                         >
                           <Trash2 size={11} />
@@ -425,17 +425,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <button
               type="button"
               onClick={() => setShowFileExplorer(!showFileExplorer)}
-              className="w-full py-1.5 px-2 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] font-medium text-[11px] flex items-center justify-between cursor-pointer"
+              className="w-full py-2 px-2.5 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] font-bold text-[11px] flex items-center justify-between cursor-pointer shadow-sm"
             >
               <div className="flex items-center gap-2">
-                <FolderTree size={13} className="text-[var(--theme-text-muted)]" />
+                <FolderTree size={14} className="text-[var(--theme-text-muted)]" />
                 <span>Дерево файлов проекта</span>
               </div>
-              {showFileExplorer ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {showFileExplorer ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
             </button>
 
             {showFileExplorer && (
-              <div className="mt-1.5 max-h-52 overflow-y-auto border border-[var(--theme-border)] rounded-lg p-1.5 bg-black/40">
+              <div className="mt-2 max-h-52 overflow-y-auto border border-[var(--theme-border)] rounded-xl p-2 bg-[var(--theme-card-bg)] shadow-inner">
                 <WorkspaceTree
                   workspaceDir={workspaceDir}
                   treeNodes={workspaceTreeNodes}
@@ -452,17 +452,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div
         onMouseEnter={() => setIsHoveringHistory(true)}
         onMouseLeave={() => setIsHoveringHistory(false)}
-        className="p-2.5 border-t border-[var(--theme-border)] shrink-0 bg-black/30 relative overflow-hidden group transition-all"
+        className="p-3 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-panel)] relative overflow-hidden group transition-all"
       >
         {/* Interactive ASCII Particle Canvas (starts on hover, flows bottom to top) */}
         <AsciiParticleFlow isActive={isHoveringHistory} />
 
         <div className="relative z-10 flex items-center justify-between text-[11px] font-mono text-[var(--theme-text-muted)]">
           <div className="flex items-center gap-2">
-            <History size={13} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors" />
-            <span className="group-hover:text-[var(--theme-text)] transition-colors">История сессий</span>
+            <History size={14} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors" />
+            <span className="group-hover:text-[var(--theme-text)] transition-colors font-medium">История сессий</span>
           </div>
-          <span className="px-1.5 py-0.5 rounded-md bg-white/10 text-[var(--theme-text)] font-semibold text-[10px] border border-[var(--theme-border)]">
+          <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] text-[var(--theme-text)] font-bold text-[10px] border border-[var(--theme-border)]">
             {sessions.length}
           </span>
         </div>

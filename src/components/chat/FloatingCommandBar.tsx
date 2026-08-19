@@ -328,30 +328,30 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       {/* 1. Slash Commands Popover */}
       {openMenu === 'slash' && filteredSlashCommands.length > 0 && (
         <div className="absolute bottom-full mb-3 left-0 w-full bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
-          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider flex items-center justify-between border-b border-[var(--theme-border)]/50 mb-1">
-            <span>Команды</span>
+          <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider flex items-center justify-between border-b border-[var(--theme-border)] mb-1">
+            <span className="font-bold text-[var(--theme-text)]">Команды</span>
             <span>Tab / ↵ для выбора</span>
           </div>
-          <div className="max-h-48 overflow-y-auto space-y-0.5 scrollbar-thin">
+          <div className="max-h-48 overflow-y-auto space-y-1 scrollbar-thin">
             {filteredSlashCommands.map((item, idx) => (
               <button
                 key={item.cmd}
                 type="button"
                 onClick={() => handleSelectSlash(item)}
-                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                   idx === selectedSlashIndex
-                    ? 'bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)]'
-                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold shadow-sm'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <div className="p-1 rounded-md bg-black/40 text-[var(--theme-text-muted)]">{item.icon}</div>
+                  <div className={`p-1.5 rounded-lg ${idx === selectedSlashIndex ? 'bg-white/20 text-[var(--theme-accent-text)]' : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)]'}`}>{item.icon}</div>
                   <div>
-                    <div className="font-medium text-xs text-[var(--theme-text)]">{item.label}</div>
-                    <div className="text-[11px] text-[var(--theme-text-muted)]">{item.description}</div>
+                    <div className="font-bold text-xs">{item.label}</div>
+                    <div className={`text-[11px] ${idx === selectedSlashIndex ? 'opacity-80' : 'text-[var(--theme-text-muted)]'}`}>{item.description}</div>
                   </div>
                 </div>
-                <span className="font-mono text-[10px] text-[var(--theme-text-muted)]">{item.cmd}</span>
+                <span className="font-mono text-[10px] opacity-75">{item.cmd}</span>
               </button>
             ))}
           </div>
@@ -360,11 +360,11 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
       {/* 2. Persona Selector Popover */}
       {openMenu === 'persona' && personas.length > 0 && (
-        <div className="absolute bottom-full mb-3 left-2 w-60 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
-          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1">
+        <div className="absolute bottom-full mb-3 left-2 w-64 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
+          <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 font-bold text-[var(--theme-text)]">
             Персона
           </div>
-          <div className="max-h-48 overflow-y-auto space-y-0.5 scrollbar-thin">
+          <div className="max-h-48 overflow-y-auto space-y-1 scrollbar-thin">
             {personas.map((p) => (
               <button
                 key={p.id}
@@ -373,13 +373,13 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                   if (onSelectPersona) onSelectPersona(p.id);
                   setOpenMenu('none');
                 }}
-                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                   p.id === activePersonaId
-                    ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
-                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                 }`}
               >
-                <User size={13} className="text-[var(--theme-text-muted)]" />
+                <User size={14} className={p.id === activePersonaId ? 'text-[var(--theme-accent-text)]' : 'text-[var(--theme-text-muted)]'} />
                 <span className="truncate">{p.name}</span>
               </button>
             ))}
@@ -389,13 +389,13 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
       {/* 3. Model Selector Popover */}
       {openMenu === 'model' && (
-        <div className="absolute bottom-full mb-3 left-24 sm:left-32 w-68 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
+        <div className="absolute bottom-full mb-3 left-24 sm:left-32 w-72 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
           {/* Cloud API Models */}
-          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
-            <span>Облачные API</span>
+          <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
+            <span className="font-bold text-[var(--theme-text)]">Облачные API</span>
             <span className="opacity-60 text-[9px]">Google AI</span>
           </div>
-          <div className="space-y-0.5 mb-1.5">
+          <div className="space-y-1 mb-2">
             {modelsData.cloud.map((m) => (
               <button
                 key={m.id}
@@ -404,29 +404,29 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                   selectCloudModel(m.id);
                   setOpenMenu('none');
                 }}
-                className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                   activeModelId === m.id
-                    ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
-                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2 min-w-0">
                   {m.isAudio ? (
-                    <Volume2 size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                    <Volume2 size={14} className={activeModelId === m.id ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'} />
                   ) : (
-                    <Cloud size={13} className="text-[var(--theme-text-muted)] shrink-0" />
+                    <Cloud size={14} className={activeModelId === m.id ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'} />
                   )}
                   <span className="truncate">{m.name}</span>
                 </div>
-                {activeModelId === m.id && <Check size={12} className="text-[var(--theme-text)] shrink-0" />}
+                {activeModelId === m.id && <Check size={13} className="text-[var(--theme-accent-text)] shrink-0" />}
               </button>
             ))}
           </div>
 
           {/* Local Models */}
-          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
+          <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span>Локальные GGUF</span>
+              <span className="font-bold text-[var(--theme-text)]">Локальные GGUF</span>
               <span className="text-[9px] font-mono opacity-60">
                 ({serverStatus.running ? 'online' : 'offline'})
               </span>
@@ -435,7 +435,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               type="button"
               onClick={toggleServer}
               disabled={isStartingServer}
-              className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[var(--theme-text)] border border-[var(--theme-border)] text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-colors"
+              className="px-2 py-0.5 rounded-lg bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
             >
               {isStartingServer ? (
                 <RefreshCw size={8} className="animate-spin" />
@@ -448,7 +448,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             </button>
           </div>
 
-          <div className="max-h-40 overflow-y-auto space-y-0.5 scrollbar-thin">
+          <div className="max-h-44 overflow-y-auto space-y-1 scrollbar-thin">
             {modelsData.local.filter((m) => !m.isDraft && !m.isMmproj).length === 0 ? (
               <div className="text-[10px] text-[var(--theme-text-muted)] italic py-1 px-2.5 font-mono">
                 нет файлов в ~/.0xagent/models/
@@ -467,17 +467,17 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                       selectLocalModel(m);
                       setOpenMenu('none');
                     }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left text-xs transition-colors cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                       isActive
-                        ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
-                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                        ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <HardDrive size={13} className="text-[var(--theme-text-muted)] shrink-0" />
-                      <span className="truncate">{m.title || m.fileName}</span>
+                      <HardDrive size={13} className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'} />
+                      <span className="truncate font-medium">{m.title || m.fileName}</span>
                     </div>
-                    <span className="text-[10px] font-mono opacity-60 shrink-0">{m.sizeGB}</span>
+                    <span className="text-[10px] font-mono opacity-60 shrink-0 font-bold">{m.sizeGB}</span>
                   </button>
                 );
               })
@@ -488,9 +488,9 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
       {/* 4. Permission Preset Popover */}
       {openMenu === 'permission' && (
-        <div className="absolute bottom-full mb-3 left-48 sm:left-64 w-72 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
-          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
-            <span>Безопасность (DeepSeek Presets)</span>
+        <div className="absolute bottom-full mb-3 left-48 sm:left-64 w-76 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
+          <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
+            <span className="font-bold text-[var(--theme-text)]">Безопасность (DeepSeek Presets)</span>
             <Shield size={12} className="opacity-60" />
           </div>
           <div className="space-y-1">
@@ -504,17 +504,17 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 key={preset.id}
                 type="button"
                 onClick={() => handleSelectPreset(preset.id as PermissionPreset)}
-                className={`w-full flex items-start justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                className={`w-full flex items-start justify-between p-2.5 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                   permissionPreset === preset.id
-                    ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
-                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                 }`}
               >
                 <div className="min-w-0 pr-2">
-                  <div className="font-medium text-xs text-[var(--theme-text)]">{preset.title}</div>
-                  <div className="text-[10px] text-[var(--theme-text-muted)] leading-tight">{preset.desc}</div>
+                  <div className="font-bold text-xs">{preset.title}</div>
+                  <div className={`text-[10px] leading-tight ${permissionPreset === preset.id ? 'opacity-80' : 'text-[var(--theme-text-muted)]'}`}>{preset.desc}</div>
                 </div>
-                {permissionPreset === preset.id && <Check size={13} className="text-[var(--theme-text)] shrink-0 mt-0.5" />}
+                {permissionPreset === preset.id && <Check size={14} className="text-[var(--theme-accent-text)] shrink-0 mt-0.5" />}
               </button>
             ))}
           </div>
@@ -524,8 +524,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       {/* 5. Reasoning Effort Popover */}
       {openMenu === 'reasoning' && (
         <div className="absolute bottom-full mb-3 left-64 sm:left-80 w-80 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-xl z-50 animate-fadeIn rounded-2xl">
-          <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
-            <span>Степень рассуждений &lt;think&gt;</span>
+          <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
+            <span className="font-bold text-[var(--theme-text)]">Степень рассуждений &lt;think&gt;</span>
             <Sparkles size={12} className="opacity-60 text-sky-400" />
           </div>
           <div className="space-y-1">
@@ -547,17 +547,17 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => handleSelectReasoningEffort(item.id as ReasoningEffortLevel)}
-                className={`w-full flex items-start justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                className={`w-full flex items-start justify-between p-2.5 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                   reasoningEffort === item.id
-                    ? 'bg-white/10 text-[var(--theme-text)] font-semibold border border-[var(--theme-border)]'
-                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                 }`}
               >
                 <div className="min-w-0 pr-2">
-                  <div className="font-medium text-xs text-[var(--theme-text)]">{item.title}</div>
-                  <div className="text-[10px] text-[var(--theme-text-muted)] leading-tight">{item.desc}</div>
+                  <div className="font-bold text-xs">{item.title}</div>
+                  <div className={`text-[10px] leading-tight ${reasoningEffort === item.id ? 'opacity-80' : 'text-[var(--theme-text-muted)]'}`}>{item.desc}</div>
                 </div>
-                {reasoningEffort === item.id && <Check size={13} className="text-[var(--theme-text)] shrink-0 mt-0.5" />}
+                {reasoningEffort === item.id && <Check size={14} className="text-[var(--theme-accent-text)] shrink-0 mt-0.5" />}
               </button>
             ))}
           </div>
@@ -568,12 +568,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       {attachedImages.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-2 px-2">
           {attachedImages.map((img, idx) => (
-            <div key={idx} className="relative group rounded-lg overflow-hidden border border-[var(--theme-border)] shadow-md">
+            <div key={idx} className="relative group rounded-xl overflow-hidden border border-[var(--theme-border)] shadow-md">
               <img src={img} alt="attached preview" className="w-14 h-14 object-cover" />
               <button
                 type="button"
                 onClick={() => onRemoveImage(idx)}
-                className="absolute top-1 right-1 p-0.5 rounded-md bg-black/80 text-white hover:bg-white/20 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                className="absolute top-1 right-1 p-1 rounded-md bg-black/80 text-white hover:bg-rose-500 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
               >
                 <X size={12} />
               </button>
@@ -584,7 +584,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
       {/* Recording / Voice Feedback HUD Banner */}
       {daemonVoiceState === 'recording' && (
-        <div className="flex items-center justify-between px-4 py-2 mb-2 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-rose-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-rose-950/50">
+        <div className="flex items-center justify-between px-4 py-2.5 mb-2 rounded-2xl bg-rose-950/80 border border-rose-500/40 text-rose-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-rose-950/50">
           <div className="flex items-center gap-2.5">
             <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
@@ -606,7 +606,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       )}
 
       {daemonVoiceState === 'processing' && (
-        <div className="flex items-center justify-between px-4 py-2 mb-2 rounded-2xl bg-sky-950/60 border border-sky-500/40 text-sky-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-sky-950/50">
+        <div className="flex items-center justify-between px-4 py-2.5 mb-2 rounded-2xl bg-sky-950/80 border border-sky-500/40 text-sky-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-sky-950/50">
           <div className="flex items-center gap-2">
             <RefreshCw size={13} className="animate-spin text-sky-400" />
             <span className="font-bold tracking-wider text-[11px] text-white">JARVIS :: GROQ WHISPER</span>
@@ -615,15 +615,15 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
         </div>
       )}
 
-      {/* 1. Seamless ChatGPT-Style Capsule Input */}
+      {/* 1. Seamless Capsule Input */}
       <form onSubmit={onSubmit}>
-        <div className="bento-card rounded-3xl p-2 px-3.5 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-white/25 transition-all flex items-center gap-2.5 shadow-2xl">
+        <div className="bento-card rounded-3xl p-2 px-3.5 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-[var(--theme-accent)] transition-all flex items-center gap-2.5 shadow-2xl">
           
           {/* Plus Attach File Button */}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="p-1.5 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 transition-colors cursor-pointer shrink-0 self-center"
+            className="p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center"
             title="Прикрепить изображение"
           >
             <Plus size={18} />
@@ -637,7 +637,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             onKeyDown={handleKeyDown}
             rows={1}
             placeholder="Спросите что угодно или введите / для команд..."
-            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[13.5px] focus:outline-none resize-none min-h-[30px] max-h-[140px] py-1 px-1 leading-normal font-sans self-center"
+            className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[13.5px] focus:outline-none resize-none min-h-[30px] max-h-[140px] py-1 px-1 leading-normal font-sans self-center font-medium"
           />
 
           {/* Microphone Voice Input (Groq Whisper + Native OS Voice Daemon) */}
@@ -645,14 +645,14 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             type="button"
             onClick={handleMicClick}
             disabled={daemonVoiceState === 'processing'}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 self-center relative ${
+            className={`w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 self-center relative ${
               daemonVoiceState === 'recording'
                 ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/50 scale-105 animate-pulse'
                 : daemonVoiceState === 'processing'
-                ? 'bg-white/10 text-sky-400 cursor-wait animate-pulse'
+                ? 'bg-[var(--theme-border-subtle)] text-sky-400 cursor-wait animate-pulse'
                 : isListeningForWake
-                ? 'text-sky-400 hover:bg-white/10'
-                : 'text-[var(--theme-text-muted)] hover:text-sky-400 hover:bg-white/10'
+                ? 'text-sky-500 hover:bg-[var(--theme-border-subtle)]'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
             }`}
             title={
               daemonVoiceState === 'recording'
@@ -690,7 +690,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               <button
                 type="button"
                 onClick={onCancelAgent}
-                className="w-8 h-8 rounded-full bg-white/15 hover:bg-red-500/25 text-white hover:text-red-400 border border-white/10 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+                className="w-9 h-9 rounded-full bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/30 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
                 title="Остановить выполнение"
               >
                 <Square size={12} fill="currentColor" />
@@ -699,10 +699,10 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               <button
                 type="submit"
                 disabled={!canSubmit}
-                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm ${
+                className={`w-9 h-9 rounded-full flex items-center justify-center transition-all shadow-sm ${
                   canSubmit
-                    ? 'bg-white text-black hover:bg-white/90 shadow-md hover:scale-105 active:scale-95 cursor-pointer'
-                    : 'bg-white/5 text-[var(--theme-text-muted)] opacity-35 cursor-not-allowed border border-transparent'
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 shadow-md hover:scale-105 active:scale-95 cursor-pointer font-bold'
+                    : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-40'
                 }`}
                 title="Отправить сообщение (Enter)"
               >
@@ -724,10 +724,10 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             <button
               type="button"
               onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all cursor-pointer border ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border ${
                 openMenu === 'persona'
-                  ? 'text-[var(--theme-text)] bg-white/15 border-[var(--theme-border)] shadow-sm font-semibold'
-                  : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+                  ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold'
+                  : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-medium'
               }`}
               title="Сменить персону"
             >
@@ -743,86 +743,75 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               fetchModelsAndStatus();
               setOpenMenu(openMenu === 'model' ? 'none' : 'model');
             }}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all cursor-pointer border ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all cursor-pointer border ${
               openMenu === 'model'
-                ? 'text-[var(--theme-text)] bg-white/15 border-[var(--theme-border)] shadow-sm font-semibold'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+                ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-medium'
             }`}
-            title={`Текущая модель: ${activeModelId}`}
+            title="Выбрать модель"
           >
-            <div className="relative shrink-0 flex items-center">
-              {isLocalActive ? <Cpu size={13} /> : <Cloud size={13} />}
-              {isLocalActive && serverStatus.running && (
-                <span className="w-1.5 h-1.5 rounded-full bg-white absolute -top-0.5 -right-0.5 animate-pulse" />
-              )}
-            </div>
-            <span className="truncate max-w-[150px]">{getDisplayTitle(activeModelId)}</span>
+            {isLocalActive ? <Cpu size={13} /> : <Cloud size={13} />}
+            <span className="truncate max-w-[130px] font-semibold">{getDisplayTitle(activeModelId)}</span>
+          </button>
+        </div>
+
+        {/* Right: Presets & Slash Commands */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          {/* Reasoning Effort Level Selector */}
+          <button
+            type="button"
+            onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer border ${
+              openMenu === 'reasoning'
+                ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-medium'
+            }`}
+            title={`Глубина рассуждений <think>: ${reasoningEffort.toUpperCase()}`}
+          >
+            <Sparkles size={13} className="text-sky-500" />
+            <span className="text-[10px] uppercase font-bold">{reasoningEffort}</span>
           </button>
 
-          {/* Permission Preset Selector below input */}
+          {/* Permission Preset Selector */}
           <button
             type="button"
             onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all cursor-pointer border ${
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer border ${
               openMenu === 'permission'
-                ? 'text-[var(--theme-text)] bg-white/15 border-[var(--theme-border)] shadow-sm font-semibold'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+                ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-medium'
             }`}
             title={`Режим безопасности: ${permissionPreset}`}
           >
             <Shield size={13} />
-            <span className="truncate max-w-[100px]">
-              {permissionPreset === 'readonly'
-                ? 'Readonly'
-                : permissionPreset === 'workspace-write'
-                ? 'Sandbox'
-                : permissionPreset === 'unrestricted'
-                ? 'Full Auto'
-                : 'Prompt'}
+            <span className="text-[10px] hidden sm:inline font-semibold capitalize">
+              {permissionPreset === 'workspace-write' ? 'project' : permissionPreset}
             </span>
           </button>
 
-          {/* Reasoning Effort Selector below input */}
+          {/* Slash Commands Dropdown Button */}
           <button
             type="button"
-            onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all cursor-pointer border ${
-              openMenu === 'reasoning'
-                ? 'text-[var(--theme-text)] bg-white/15 border-[var(--theme-border)] shadow-sm font-semibold'
-                : reasoningEffort !== 'off'
-                ? 'text-sky-400 hover:text-sky-300 hover:bg-white/5 border-transparent'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border-transparent'
+            onClick={() => {
+              setSlashFilter('');
+              setSelectedSlashIndex(0);
+              setOpenMenu(openMenu === 'slash' ? 'none' : 'slash');
+            }}
+            className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all cursor-pointer border ${
+              openMenu === 'slash'
+                ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold'
+                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-medium'
             }`}
-            title={`Степень рассуждений <think>: ${reasoningEffort.toUpperCase()} (Рекомендовано: ${recommendedEffort.toUpperCase()})`}
+            title="Быстрые команды (/goal, /search, /patch, /clear)"
           >
-            <Sparkles size={13} className={reasoningEffort !== 'off' ? 'text-sky-400' : 'opacity-60'} />
-            <span className="truncate max-w-[110px]">
-              {reasoningEffort === 'auto'
-                ? `Auto (${recommendedEffort.toUpperCase()})`
-                : reasoningEffort === 'off'
-                ? 'Think: Off'
-                : `Think: ${reasoningEffort.toUpperCase()}`}
-            </span>
+            <Terminal size={13} />
+            <span className="text-[10px] font-bold">/</span>
           </button>
         </div>
-
-        {/* Right: / Commands helper */}
-        <button
-          type="button"
-          onClick={() => {
-            setInputText('/');
-            setOpenMenu('slash');
-            textareaRef.current?.focus();
-          }}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer border border-transparent"
-          title="Открыть список команд"
-        >
-          <span>/</span>
-          <span>Команды</span>
-        </button>
 
       </div>
 
     </div>
   );
 };
+

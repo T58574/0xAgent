@@ -3,102 +3,51 @@
 @import "tailwindcss";
 
 /* ==========================================
-   DYNAMIC MONOCHROME & CYBER HUD DESIGN TOKENS
+   BRUTAL MONOCHROME DESIGN TOKENS (2 THEMES)
    ========================================== */
 
-/* 1. Obsidian Glass (OLED Monolith - Default) */
-:root, [data-theme="obsidian"] {
-  --theme-bg: #050507;
-  --theme-text: #f8fafc;
-  --theme-text-muted: #94a3b8;
-  --theme-border: rgba(255, 255, 255, 0.09);
-  --theme-border-subtle: rgba(255, 255, 255, 0.05);
-  --theme-panel: rgba(10, 12, 18, 0.78);
-  --theme-panel-solid: #0a0c12;
-  --theme-card-bg: rgba(18, 22, 32, 0.65);
-  --theme-accent: #10b981;
-  --theme-accent-hover: #059669;
-  --theme-accent-glow: rgba(16, 185, 129, 0.25);
-  --theme-accent-text: #022c22;
-}
-
-/* 2. Monochrome Studio Light */
-[data-theme="light"] {
-  --theme-bg: #fafafa;
-  --theme-text: #0f172a;
-  --theme-text-muted: #64748b;
-  --theme-border: rgba(15, 23, 42, 0.12);
-  --theme-border-subtle: rgba(15, 23, 42, 0.06);
-  --theme-panel: rgba(255, 255, 255, 0.82);
-  --theme-panel-solid: #ffffff;
-  --theme-card-bg: rgba(241, 245, 249, 0.75);
-  --theme-accent: #0f172a;
-  --theme-accent-hover: #334155;
-  --theme-accent-glow: rgba(15, 23, 42, 0.15);
-  --theme-accent-text: #ffffff;
-}
-
-/* 3. Cyber Midnight */
-[data-theme="cyber"] {
-  --theme-bg: #040711;
-  --theme-text: #f1f5f9;
-  --theme-text-muted: #94a3b8;
-  --theme-border: rgba(56, 189, 248, 0.16);
-  --theme-border-subtle: rgba(56, 189, 248, 0.08);
-  --theme-panel: rgba(7, 13, 28, 0.80);
-  --theme-panel-solid: #070d1c;
-  --theme-card-bg: rgba(12, 20, 36, 0.68);
-  --theme-accent: #38bdf8;
-  --theme-accent-hover: #0284c7;
-  --theme-accent-glow: rgba(56, 189, 248, 0.3);
-  --theme-accent-text: #082f49;
-}
-
-/* 4. Graphite Brutal */
-[data-theme="graphite"] {
+/* 1. Graphite Brutal (Dark - Default) */
+:root, [data-theme="graphite"], [data-theme="obsidian"], [data-theme="cyber"], [data-theme="matrix"], [data-theme="saffron_apricot"], [data-theme="butter_cream"], [data-theme="mint_glacier"], [data-theme="sicilian_tomato"], [data-theme="sky_industrial"], [data-theme="terracotta_dust"] {
   --theme-bg: #09090b;
-  --theme-text: #fafafa;
+  --theme-text: #f4f4f5;
   --theme-text-muted: #a1a1aa;
   --theme-border: rgba(255, 255, 255, 0.12);
   --theme-border-subtle: rgba(255, 255, 255, 0.06);
-  --theme-panel: rgba(18, 18, 22, 0.80);
+  --theme-panel: rgba(18, 18, 22, 0.85);
   --theme-panel-solid: #121216;
-  --theme-card-bg: rgba(28, 28, 34, 0.65);
-  --theme-accent: #e4e4e7;
+  --theme-card-bg: rgba(24, 24, 28, 0.75);
+  --theme-card-solid: #18181c;
+  --theme-input-bg: rgba(14, 14, 17, 0.95);
+  --theme-accent: #f4f4f5;
   --theme-accent-hover: #ffffff;
-  --theme-accent-glow: rgba(228, 228, 231, 0.2);
+  --theme-accent-glow: rgba(255, 255, 255, 0.15);
   --theme-accent-text: #09090b;
+  --theme-btn-dark-bg: #18181b;
+  --theme-btn-dark-text: #fafafa;
+  --theme-code-bg: #09090b;
+  --theme-code-text: #f4f4f5;
 }
 
-/* 5. Emerald Matrix */
-[data-theme="matrix"] {
-  --theme-bg: #030e08;
-  --theme-text: #ecfdf5;
-  --theme-text-muted: #6ee7b7;
-  --theme-border: rgba(52, 211, 153, 0.16);
-  --theme-border-subtle: rgba(52, 211, 153, 0.08);
-  --theme-panel: rgba(5, 27, 17, 0.80);
-  --theme-panel-solid: #051b11;
-  --theme-card-bg: rgba(8, 38, 25, 0.68);
-  --theme-accent: #34d399;
-  --theme-accent-hover: #059669;
-  --theme-accent-glow: rgba(52, 211, 153, 0.28);
-  --theme-accent-text: #022c22;
-}
-
-/* 6. Sunlit Saffron & Amber */
-[data-theme="saffron_apricot"] {
-  --theme-bg: #0c0a09;
-  --theme-text: #fffbeb;
-  --theme-text-muted: #d97706;
-  --theme-border: rgba(245, 158, 11, 0.2);
-  --theme-border-subtle: rgba(245, 158, 11, 0.08);
-  --theme-panel: #1c1917;
-  --theme-card-bg: rgba(44, 26, 14, 0.7);
-  --theme-accent: #f59e0b;
-  --theme-accent-hover: #d97706;
-  --theme-accent-glow: rgba(245, 158, 11, 0.3);
-  --theme-accent-text: #451a03;
+/* 2. Monochrome Studio (Light) */
+[data-theme="light"], [data-theme="cloud_dancer"] {
+  --theme-bg: #f8fafc;
+  --theme-text: #09090b;
+  --theme-text-muted: #52525b;
+  --theme-border: rgba(15, 23, 42, 0.12);
+  --theme-border-subtle: rgba(15, 23, 42, 0.06);
+  --theme-panel: rgba(255, 255, 255, 0.92);
+  --theme-panel-solid: #ffffff;
+  --theme-card-bg: rgba(255, 255, 255, 0.96);
+  --theme-card-solid: #ffffff;
+  --theme-input-bg: #f1f5f9;
+  --theme-accent: #09090b;
+  --theme-accent-hover: #18181b;
+  --theme-accent-glow: rgba(9, 9, 11, 0.12);
+  --theme-accent-text: #ffffff;
+  --theme-btn-dark-bg: #09090b;
+  --theme-btn-dark-text: #ffffff;
+  --theme-code-bg: #09090b;
+  --theme-code-text: #f8fafc;
 }
 
 /* ==========================================
@@ -197,7 +146,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 /* ==========================================
-   MODULAR BENTO & CYBER HUD UTILITIES
+   MODULAR BENTO & MONOCHROME UTILITIES
    ========================================== */
 
 .bento-card {
@@ -206,13 +155,18 @@ h1, h2, h3, h4, h5, h6, .font-heading {
   -webkit-backdrop-filter: blur(14px);
   border: 1px solid var(--theme-border);
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
+[data-theme="graphite"] .bento-card,
+:root .bento-card {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
 .bento-card-interactive:hover {
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+  border-color: var(--theme-text-muted);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
 }
 
 .glass-panel {
@@ -232,7 +186,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 .cyber-capsule {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--theme-card-bg);
   border: 1px solid var(--theme-border);
   border-radius: 9999px;
   padding: 4px 10px;
@@ -260,7 +214,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
   font-weight: 600;
   border-radius: 8px;
   border: 1px solid var(--theme-accent);
-  box-shadow: 0 2px 10px var(--theme-accent-glow);
+  box-shadow: 0 2px 8px var(--theme-accent-glow);
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 }
@@ -268,7 +222,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 .btn-primary:hover {
   background: var(--theme-accent-hover);
   border-color: var(--theme-accent-hover);
-  box-shadow: 0 4px 16px var(--theme-accent-glow);
+  box-shadow: 0 4px 14px var(--theme-accent-glow);
   transform: translateY(-1px);
 }
 
@@ -277,7 +231,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--theme-card-bg);
   border: 1px solid var(--theme-border);
   border-radius: 8px;
   color: var(--theme-text);
@@ -286,7 +240,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--theme-panel);
   border-color: var(--theme-text-muted);
 }
 
@@ -300,7 +254,7 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 }
 
 .btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--theme-border-subtle);
   color: var(--theme-text);
 }
 

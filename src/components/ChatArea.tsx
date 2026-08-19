@@ -426,10 +426,10 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
           {/* Background Context Compression Banner */}
           {isSummarizing && (
-            <div className="px-4 py-2.5 bg-black/40 border-b border-[var(--theme-border)] shrink-0 flex items-center justify-between text-xs z-10 backdrop-blur-md animate-fadeIn">
+            <div className="px-4 py-2.5 bg-[var(--theme-panel)] border-b border-[var(--theme-border)] shrink-0 flex items-center justify-between text-xs z-10 backdrop-blur-md animate-fadeIn">
               <div className="flex items-center gap-2 font-mono">
-                <Sparkles size={14} className="animate-spin text-[var(--theme-text-muted)]" />
-                <span className="font-semibold text-[var(--theme-text)]">{summarizePhase}</span>
+                <Sparkles size={14} className="animate-spin text-[var(--theme-accent)]" />
+                <span className="font-bold text-[var(--theme-text)]">{summarizePhase}</span>
                 {summarizeMetrics.oldTokens && (
                   <span className="text-[var(--theme-text-muted)] text-[11px] hidden sm:inline">
                     ({summarizeMetrics.oldTokens.toLocaleString()} токенов)
@@ -437,13 +437,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 )}
               </div>
               <div className="flex items-center gap-2 w-32">
-                <div className="flex-1 bg-white/10 h-1.5 rounded-full overflow-hidden">
+                <div className="flex-1 bg-[var(--theme-border-subtle)] h-1.5 rounded-full overflow-hidden border border-[var(--theme-border)]">
                   <div
-                    className="bg-white h-full transition-all duration-300 rounded-full"
+                    className="bg-[var(--theme-accent)] h-full transition-all duration-300 rounded-full"
                     style={{ width: `${summarizePercent}%` }}
                   />
                 </div>
-                <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">{summarizePercent}%</span>
+                <span className="text-[10px] font-mono text-[var(--theme-text-muted)] font-bold">{summarizePercent}%</span>
               </div>
             </div>
           )}
@@ -484,13 +484,13 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   <React.Fragment key={msg.id || index}>
                     {isFirstOfDay && msg.timestamp && (
                       <div className="flex justify-center my-4">
-                        <span className="px-3 py-0.5 rounded-full bg-black/40 border border-white/5 text-[10px] font-mono text-[var(--theme-text-muted)] select-none">
+                        <span className="px-3 py-1 rounded-full bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[10px] font-mono text-[var(--theme-text-muted)] select-none shadow-sm">
                           {formatDateSeparator(msg.timestamp)}
                         </span>
                       </div>
                     )}
                     <div id={`msg-${msg.id || index}`} className="flex justify-center my-3 transition-all duration-300">
-                      <div className="px-3.5 py-1 rounded-full bento-card text-[11px] text-[var(--theme-text-muted)] font-mono flex items-center gap-1.5 shadow-sm">
+                      <div className="px-3.5 py-1.5 rounded-full bento-card text-[11px] text-[var(--theme-text-muted)] font-mono flex items-center gap-1.5 shadow-sm border border-[var(--theme-border)]">
                         <Terminal size={12} />
                         <span>{msg.content}</span>
                       </div>
@@ -519,7 +519,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   {/* Date section separator */}
                   {isFirstOfDay && msg.timestamp && (
                     <div className="flex justify-center my-4">
-                      <span className="px-3 py-0.5 rounded-full bg-black/40 border border-white/5 text-[10px] font-mono text-[var(--theme-text-muted)] select-none">
+                      <span className="px-3 py-1 rounded-full bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[10px] font-mono text-[var(--theme-text-muted)] select-none shadow-sm">
                         {formatDateSeparator(msg.timestamp)}
                       </span>
                     </div>

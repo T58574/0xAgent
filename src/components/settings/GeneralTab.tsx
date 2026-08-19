@@ -19,44 +19,46 @@ const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
 }) => (
   <div
     onClick={onToggle}
-    className={`p-3.5 rounded-xl bento-card flex items-center justify-between cursor-pointer transition-all border ${
+    className={`p-4 rounded-2xl bento-card flex items-center justify-between cursor-pointer transition-all border ${
       active
-        ? 'bg-white/10 border-white/20 text-[var(--theme-text)]'
-        : 'bg-black/20 border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:border-white/15'
+        ? 'border-[var(--theme-accent)] bg-[var(--theme-card-bg)] shadow-sm'
+        : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:border-[var(--theme-text-muted)]'
     }`}
   >
-    <div className="flex items-center gap-3 min-w-0 pr-2">
+    <div className="flex items-center gap-3.5 min-w-0 pr-2">
       <div
-        className={`p-2 rounded-lg shrink-0 transition-colors ${
-          active ? 'bg-white/15 text-white' : 'bg-white/5 text-[var(--theme-text-muted)]'
+        className={`p-2.5 rounded-xl shrink-0 transition-colors ${
+          active
+            ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
+            : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)]'
         }`}
       >
         {icon}
       </div>
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-[var(--theme-text)] truncate">{title}</span>
+          <span className="text-xs font-bold text-[var(--theme-text)] truncate">{title}</span>
           <span
-            className={`text-[9px] font-mono px-1.5 py-0.5 rounded transition-colors ${
+            className={`text-[9px] font-mono px-2 py-0.5 rounded-full transition-colors ${
               active
-                ? 'bg-white/15 text-white font-bold border border-white/20'
-                : 'bg-white/5 text-zinc-500 border border-white/5'
+                ? 'bg-[var(--theme-accent)]/15 text-[var(--theme-text)] font-bold border border-[var(--theme-accent)]/30'
+                : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]'
             }`}
           >
             {active ? '[ВКЛ]' : '[ВЫКЛ]'}
           </span>
         </div>
-        <div className="text-[11px] text-[var(--theme-text-muted)] leading-tight mt-0.5">{desc}</div>
+        <div className="text-[11px] text-[var(--theme-text-muted)] leading-tight mt-1">{desc}</div>
       </div>
     </div>
     <div
       className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors shrink-0 ${
-        active ? 'bg-white' : 'bg-white/15'
+        active ? 'bg-[var(--theme-accent)]' : 'bg-zinc-300 dark:bg-zinc-700'
       }`}
     >
       <div
         className={`w-4 h-4 rounded-full transition-transform ${
-          active ? 'translate-x-4 bg-black shadow-sm' : 'translate-x-0 bg-white/70'
+          active ? 'translate-x-4 bg-[var(--theme-accent-text)] shadow-sm' : 'translate-x-0 bg-white'
         }`}
       />
     </div>
@@ -174,7 +176,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   return (
     <div className="space-y-4 font-sans text-[var(--theme-text)] max-w-4xl pb-6">
       <div>
-        <h3 className="text-sm font-semibold text-[var(--theme-text)] flex items-center gap-2">
+        <h3 className="text-sm font-bold text-[var(--theme-text)] flex items-center gap-2">
           <Sliders size={15} className="text-[var(--theme-text-muted)]" />
           <span>Основные параметры</span>
         </h3>
@@ -184,16 +186,16 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
       </div>
 
       {/* 1. Connection Card */}
-      <div className="p-4 rounded-xl bento-card space-y-3">
-        <div className="text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 border-b border-[var(--theme-border)] pb-2">
-          <Globe size={13} className="text-[var(--theme-text-muted)]" />
+      <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
+        <div className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5 border-b border-[var(--theme-border)] pb-2.5">
+          <Globe size={14} className="text-[var(--theme-text-muted)]" />
           <span>Параметры API подключения</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* API Endpoint URL */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--theme-text-muted)] flex items-center gap-1">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
               <Globe size={12} />
               <span>Ссылка API</span>
             </label>
@@ -202,13 +204,13 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
               placeholder="http://127.0.0.1:11434/v1"
-              className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
+              className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
             />
           </div>
 
           {/* Google AI Studio (Gemini) API Key */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--theme-text-muted)] flex items-center gap-1">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
               <Key size={12} />
               <span>Google Gemini API Key</span>
             </label>
@@ -217,13 +219,13 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               value={geminiApiKey}
               onChange={(e) => setGeminiApiKey && setGeminiApiKey(e.target.value)}
               placeholder="AIzaSy..."
-              className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
+              className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
             />
           </div>
 
           {/* Groq API Key */}
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--theme-text-muted)] flex items-center gap-1">
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
               <Key size={12} />
               <span>Groq API Key (Whisper)</span>
             </label>
@@ -232,21 +234,20 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               value={groqApiKey}
               onChange={(e) => setGroqApiKey(e.target.value)}
               placeholder="gsk_..."
-              className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
+              className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
             />
           </div>
-
         </div>
       </div>
 
       {/* 2. UI & Behavior Toggles */}
-      <div className="p-4 rounded-xl bento-card space-y-3">
-        <div className="text-xs font-medium text-[var(--theme-text)] flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
+      <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
+        <div className="text-xs font-bold text-[var(--theme-text)] flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
           <div className="flex items-center gap-1.5">
             <Sliders size={14} className="text-[var(--theme-text-muted)]" />
             <span>Поведение и интерфейс</span>
           </div>
-          <span className="text-[10px] font-mono text-[var(--theme-text-muted)] opacity-70">
+          <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
             :: Preferences
           </span>
         </div>
@@ -287,13 +288,13 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
       </div>
 
       {/* 3. Jarvis Voice Intercom & Proactive Companion */}
-      <div className="p-4 rounded-xl bento-card space-y-4">
-        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
-          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-text)]">
+      <div className="p-4 rounded-2xl bento-card space-y-4 border border-[var(--theme-border)]">
+        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
             <Volume2 size={14} className="text-[var(--theme-text-muted)]" />
             <span>Голосовой интерком Jarvis и автономный напарник</span>
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
             :: Push-Driven Engine
           </span>
         </div>
@@ -320,33 +321,33 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         {ttsVoiceEnabled && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--theme-border)]">
-              <div>
-                <label className="text-[11px] font-medium text-[var(--theme-text-muted)] block mb-1.5 font-mono">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] block font-mono">
                   Голос (Edge-TTS)
                 </label>
                 <select
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice && setTtsVoice(e.target.value)}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-white/40"
+                  className="w-full text-xs px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] cursor-pointer transition-colors"
                 >
-                  <option value="ru-RU-SvetlanaNeural" className="bg-black">Светлана (Женский, четкий)</option>
-                  <option value="ru-RU-DmitryNeural" className="bg-black">Дмитрий (Мужской, глубокий)</option>
+                  <option value="ru-RU-SvetlanaNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Светлана (Женский, четкий)</option>
+                  <option value="ru-RU-DmitryNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Дмитрий (Мужской, глубокий)</option>
                 </select>
               </div>
 
-              <div>
-                <label className="text-[11px] font-medium text-[var(--theme-text-muted)] block mb-1.5 font-mono">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] block font-mono">
                   Скорость речи
                 </label>
                 <select
                   value={ttsRate}
                   onChange={(e) => setTtsRate && setTtsRate(e.target.value)}
-                  className="w-full text-xs px-2.5 py-1.5 rounded-lg bg-black/40 border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-white/40"
+                  className="w-full text-xs px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] cursor-pointer transition-colors"
                 >
-                  <option value="+0%" className="bg-black">Стандартная (+0%)</option>
-                  <option value="+15%" className="bg-black">Быстрая (+15%)</option>
-                  <option value="+20%" className="bg-black">Оптимальная (+20%)</option>
-                  <option value="+30%" className="bg-black">Ультра (+30%)</option>
+                  <option value="+0%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Стандартная (+0%)</option>
+                  <option value="+15%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Быстрая (+15%)</option>
+                  <option value="+20%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Оптимальная (+20%)</option>
+                  <option value="+30%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Ультра (+30%)</option>
                 </select>
               </div>
 
@@ -365,41 +366,41 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                       console.error('Voice test failed:', err);
                     }
                   }}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs text-[var(--theme-text)] transition-colors active:scale-95 cursor-pointer font-medium"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-xs transition-all hover:opacity-90 shadow-sm cursor-pointer"
                 >
-                  <Volume2 size={13} className="text-[var(--theme-text)]" />
+                  <Volume2 size={14} />
                   <span>Тест голоса</span>
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--theme-border)]">
-              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none font-medium">
                 <input
                   type="checkbox"
                   checked={ttsPlayOnSpeaker}
                   onChange={(e) => setTtsPlayOnSpeaker && setTtsPlayOnSpeaker(e.target.checked)}
-                  className="rounded border-[var(--theme-border)] bg-black/40 text-white focus:ring-0 cursor-pointer"
+                  className="rounded accent-[var(--theme-accent)] cursor-pointer"
                 />
                 <span>Воспроизводить через системные динамики (MCI)</span>
               </label>
 
-              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none font-medium">
                 <input
                   type="checkbox"
                   checked={ttsPlayInBrowser}
                   onChange={(e) => setTtsPlayInBrowser && setTtsPlayInBrowser(e.target.checked)}
-                  className="rounded border-[var(--theme-border)] bg-black/40 text-white focus:ring-0 cursor-pointer"
+                  className="rounded accent-[var(--theme-accent)] cursor-pointer"
                 />
                 <span>Воспроизводить в активной вкладке браузера</span>
               </label>
 
-              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] sm:col-span-2 select-none">
+              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] sm:col-span-2 select-none font-medium">
                 <input
                   type="checkbox"
                   checked={wakeWordEnabled}
                   onChange={(e) => setWakeWordEnabled && setWakeWordEnabled(e.target.checked)}
-                  className="rounded border-[var(--theme-border)] bg-black/40 text-white focus:ring-0 cursor-pointer"
+                  className="rounded accent-[var(--theme-accent)] cursor-pointer"
                 />
                 <span>Бесконтактная активация голосом (Wake-Word «Джарвис»)</span>
               </label>
@@ -408,10 +409,10 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         )}
       </div>
 
-      {/* 3. Password & Session Security */}
-      <div className="p-4 rounded-xl bento-card space-y-3">
-        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2">
-          <div className="flex items-center gap-2 text-xs font-medium text-[var(--theme-text)]">
+      {/* 4. Password & Session Security */}
+      <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
+        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
             <KeyRound size={14} className="text-[var(--theme-text-muted)]" />
             <span>Мастер-пароль и безопасность</span>
           </div>
@@ -419,26 +420,26 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
           <button
             type="button"
             onClick={handleLogout}
-            className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors"
+            className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-xs text-[var(--theme-text-muted)] flex items-center gap-1.5 cursor-pointer transition-all font-medium"
             title="Сбросить токен авторизации в браузере"
           >
-            <LogOut size={12} />
+            <LogOut size={13} />
             <span>Выйти из сеанса</span>
           </button>
         </div>
 
         {statusMsg && (
           <div
-            className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
+            className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
               statusMsg.type === 'success'
-                ? 'bg-white/10 border-[var(--theme-border)] text-[var(--theme-text)]'
-                : 'bg-white/5 border-rose-500/40 text-rose-300'
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-300'
+                : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-300'
             }`}
           >
             {statusMsg.type === 'success' ? (
-              <CheckCircle2 size={14} className="shrink-0" />
+              <CheckCircle2 size={15} className="shrink-0" />
             ) : (
-              <AlertTriangle size={14} className="shrink-0" />
+              <AlertTriangle size={15} className="shrink-0" />
             )}
             <span>{statusMsg.text}</span>
           </div>
@@ -446,38 +447,38 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
 
         <form onSubmit={handleChangePassword} className="space-y-3 pt-1">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-[var(--theme-text-muted)]">Текущий пароль</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">Текущий пароль</label>
               <input
                 type="password"
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
                 required
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-[var(--theme-text-muted)]">Новый пароль</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">Новый пароль</label>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Мин. 4 символа"
-                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
                 required
               />
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-[var(--theme-text-muted)]">Повторите пароль</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">Повторите пароль</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
                 required
               />
             </div>
@@ -487,7 +488,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             <button
               type="submit"
               disabled={isSubmittingPassword}
-              className="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] transition-colors cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-xs transition-all hover:opacity-90 shadow-sm cursor-pointer disabled:opacity-50"
             >
               {isSubmittingPassword ? 'Сохранение...' : 'Обновить пароль'}
             </button>

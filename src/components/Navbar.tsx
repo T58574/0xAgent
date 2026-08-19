@@ -108,39 +108,39 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Right Section: View Switcher Bento Tabs + Utilities */}
       <div className="flex items-center gap-2">
         {/* View Switcher Bento Tabs */}
-        <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-[var(--theme-border)]">
-          <button
-            type="button"
-            onClick={() => onChangeView('chat')}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeView === 'chat'
-                ? 'bg-white/15 text-[var(--theme-text)] border border-[var(--theme-border)] shadow-sm'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <MessageSquare size={13} />
-            <span className="hidden md:inline">Чат</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onChangeView('workspace')}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeView === 'workspace'
-                ? 'bg-white/15 text-[var(--theme-text)] border border-[var(--theme-border)] shadow-sm'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <Code size={13} />
-            <span className="hidden md:inline">Редактор</span>
-          </button>
+        <div className="flex items-center bg-[var(--theme-card-bg)] p-1 rounded-xl border border-[var(--theme-border)] shadow-sm">
+          {[
+            { id: 'chat', label: 'Чат', icon: MessageSquare },
+            { id: 'workspace', label: 'Редактор', icon: Code },
+            { id: 'knowledge', label: 'Знания', icon: BookOpen },
+            { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
+            { id: 'settings', label: 'Настройки', icon: SettingsIcon },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onChangeView(tab.id as any)}
+                className={`px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+                }`}
+              >
+                <Icon size={13} className={isActive ? 'text-[var(--theme-accent-text)]' : 'text-[var(--theme-text-muted)]'} />
+                <span className="hidden md:inline">{tab.label}</span>
+              </button>
+            );
+          })}
 
           {/* Memory & Skills Tab Trigger in Header */}
           {onOpenMemorySkills && (
             <button
               type="button"
               onClick={onOpenMemorySkills}
-              className="px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent"
+              className="px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
               title="Память & Скиллы ИИ"
             >
               <Brain size={13} />
@@ -148,50 +148,11 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          <button
-            type="button"
-            onClick={() => onChangeView('knowledge')}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeView === 'knowledge'
-                ? 'bg-white/15 text-[var(--theme-text)] border border-[var(--theme-border)] shadow-sm'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <BookOpen size={13} />
-            <span className="hidden md:inline">Знания</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onChangeView('analytics')}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeView === 'analytics'
-                ? 'bg-white/15 text-[var(--theme-text)] border border-[var(--theme-border)] shadow-sm'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <BarChart2 size={13} />
-            <span className="hidden md:inline">Аналитика</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onChangeView('settings')}
-            className={`px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
-              activeView === 'settings'
-                ? 'bg-white/15 text-[var(--theme-text)] border border-[var(--theme-border)] shadow-sm'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent'
-            }`}
-          >
-            <SettingsIcon size={13} />
-            <span className="hidden md:inline">Настройки</span>
-          </button>
-
           {onOpenJarvis && (
             <button
               type="button"
               onClick={onOpenJarvis}
-              className="px-2.5 py-1 rounded-md font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 border border-transparent"
+              className="px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
               title="Jarvis Telemetry & Workspace"
             >
               <Bot size={13} />

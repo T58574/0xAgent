@@ -60,71 +60,32 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
       {/* Main Settings Layout (Sidebar Navigation + Right Content Panel) */}
       <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden">
         {/* Left Vertical Navigation Menu */}
-        <div className="w-full md:w-56 bg-[var(--theme-panel)] border-r border-[var(--theme-border)] p-3 shrink-0 flex flex-row md:flex-col gap-1 select-none overflow-x-auto scrollbar-none">
-          <button
-            type="button"
-            onClick={() => s.setActiveSubtab('general')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
-              s.activeSubtab === 'general'
-                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
-            }`}
-          >
-            <Sliders size={14} className="text-[var(--theme-text-muted)]" />
-            <span>Основные</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => s.setActiveSubtab('customizations')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
-              s.activeSubtab === 'customizations'
-                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
-            }`}
-          >
-            <Sparkles size={14} className="text-cyan-400" />
-            <span>Кастомизации & Токены</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => s.setActiveSubtab('personas')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
-              s.activeSubtab === 'personas'
-                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
-            }`}
-          >
-            <User size={14} className="text-[var(--theme-text-muted)]" />
-            <span>Личности (Personas)</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => s.setActiveSubtab('themes')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
-              s.activeSubtab === 'themes'
-                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
-            }`}
-          >
-            <Palette size={14} className="text-[var(--theme-text-muted)]" />
-            <span>Темы оформления</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => s.setActiveSubtab('local_server')}
-            className={`w-full px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 transition-all cursor-pointer text-left border ${
-              s.activeSubtab === 'local_server'
-                ? 'bg-white/10 text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-sm'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5'
-            }`}
-          >
-            <Cpu size={14} className="text-[var(--theme-text-muted)]" />
-            <span>Сервер LLM</span>
-          </button>
+        <div className="w-full md:w-60 bg-[var(--theme-panel)] border-r border-[var(--theme-border)] p-3 shrink-0 flex flex-row md:flex-col gap-1.5 select-none overflow-x-auto scrollbar-none">
+          {[
+            { id: 'general', label: 'Основные', icon: Sliders },
+            { id: 'customizations', label: 'Кастомизации & Токены', icon: Sparkles },
+            { id: 'personas', label: 'Личности (Personas)', icon: User },
+            { id: 'themes', label: 'Темы оформления', icon: Palette },
+            { id: 'local_server', label: 'Сервер LLM', icon: Cpu },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = s.activeSubtab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => s.setActiveSubtab(tab.id as any)}
+                className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer text-left border ${
+                  isActive
+                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
+                    : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+                }`}
+              >
+                <Icon size={15} className={isActive ? 'text-[var(--theme-accent-text)]' : 'text-[var(--theme-text-muted)]'} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Right Scrollable Content Panel */}

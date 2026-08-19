@@ -560,9 +560,9 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
       {/* Crash Advisory Alert Box */}
       {crashAdvice && (
-        <div className="p-3 rounded-xl bento-card border border-[var(--theme-border)] text-xs flex items-start gap-2 animate-fadeIn bg-white/5">
-          <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-400" />
-          <span>{crashAdvice}</span>
+        <div className="p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-xs flex items-start gap-2.5 animate-fadeIn">
+          <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-500" />
+          <span className="text-[var(--theme-text)] font-medium leading-relaxed">{crashAdvice}</span>
         </div>
       )}
 
@@ -570,20 +570,20 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         
         {/* LEFT COLUMN: Server Settings & Controls */}
-        <div className="lg:col-span-7 space-y-3.5">
+        <div className="lg:col-span-7 space-y-4">
           
           {/* Hardware GPU Status Banner */}
           {hardwareInfo && hardwareInfo.isAutoDetected && (
-            <div className="p-3.5 rounded-xl bento-card flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-white/5 border border-[var(--theme-border)] text-[var(--theme-text-muted)]">
-                  <Zap size={15} />
+            <div className="p-4 rounded-2xl bento-card flex items-center justify-between gap-3 text-xs border border-[var(--theme-border)]">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)]">
+                  <Zap size={16} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 font-medium text-[var(--theme-text)]">
+                  <div className="flex items-center gap-2 font-bold text-[var(--theme-text)]">
                     <span>Видеокарта:</span>
                     <span className="font-mono text-[var(--theme-text)]">{hardwareInfo.gpuName}</span>
-                    <span className="px-2 py-0.5 rounded-md bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono text-[10px]">
+                    <span className="px-2 py-0.5 rounded-md bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono text-[10px] font-semibold">
                       Full GPU Offload (-ngl 999)
                     </span>
                   </div>
@@ -623,14 +623,14 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           </div>
 
           {/* Executable Path & Model Selector Card */}
-          <div className="p-4 rounded-xl bento-card space-y-3">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-[var(--theme-text)] flex items-center justify-between">
+          <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-[var(--theme-text)] flex items-center justify-between">
                 <span>Исполняемый файл (llama-server.exe)</span>
                 <button
                   type="button"
                   onClick={handleSelectExe}
-                  className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-normal"
+                  className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
                 >
                   <Folder size={12} />
                   <span>Обзор...</span>
@@ -641,21 +641,21 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 value={exePath}
                 onChange={(e) => setExePath(e.target.value)}
                 placeholder="~/.0xagent/llama/llama-server.exe"
-                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none"
+                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
               />
             </div>
 
             <div className="space-y-1.5 pt-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5">
-                  <HardDrive size={13} className="text-[var(--theme-text-muted)]" />
+                <label className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5">
+                  <HardDrive size={14} className="text-[var(--theme-text-muted)]" />
                   <span>Файл GGUF Модели (.gguf)</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={refreshScannedModels}
-                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-normal"
+                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
                     title="Пересканировать папку models/"
                   >
                     <RefreshCw size={11} />
@@ -664,7 +664,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                   <button
                     type="button"
                     onClick={handleSelectModel}
-                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-normal"
+                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
                     title="Выбрать файл через проводник"
                   >
                     <Folder size={12} />
@@ -686,16 +686,16 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                     setModelPath(val);
                   }
                 }}
-                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] bg-black/40 focus:outline-none cursor-pointer"
+                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none cursor-pointer transition-colors"
               >
-                <option value="" className="bg-black">-- Выберите локальную GGUF модель из ~/.0xagent/models/ --</option>
+                <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">-- Выберите локальную GGUF модель из ~/.0xagent/models/ --</option>
                 {mainLocalModels.map((m) => (
-                  <option key={m.id || m.filePath} value={m.filePath} className="bg-black">
+                  <option key={m.id || m.filePath} value={m.filePath} className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
                     {m.title || m.fileName} ({m.quantization} • {m.sizeGB})
                   </option>
                 ))}
                 {modelPath && !mainLocalModels.some((m) => m.filePath.toLowerCase() === modelPath.toLowerCase()) && (
-                  <option value="custom" className="bg-black">Пользовательский путь: {modelPath}</option>
+                  <option value="custom" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Пользовательский путь: {modelPath}</option>
                 )}
               </select>
 
@@ -705,21 +705,21 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 value={modelPath}
                 onChange={(e) => setModelPath(e.target.value)}
                 placeholder="~/.0xagent/models/model.gguf"
-                className="w-full px-3 py-1.5 rounded-lg bento-card text-[11px] font-mono text-[var(--theme-text-muted)] bg-black/40 focus:outline-none focus:text-[var(--theme-text)]"
+                className="w-full px-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-text-muted)] focus:text-[var(--theme-text)] focus:outline-none transition-colors"
               />
             </div>
 
             {/* GGUF Model Metadata Card with Reasoning Specs */}
             {modelMeta && (
-              <div className="p-3 rounded-lg bg-black/40 border border-[var(--theme-border)] text-xs space-y-2 font-mono">
-                <div className="flex items-center justify-between text-[var(--theme-text)] font-semibold border-b border-[var(--theme-border)] pb-1.5">
+              <div className="p-4 rounded-2xl bento-card border border-[var(--theme-border)] text-xs space-y-2.5 font-mono shadow-sm">
+                <div className="flex items-center justify-between text-[var(--theme-text)] font-bold border-b border-[var(--theme-border)] pb-2">
                   <div className="flex items-center gap-2 truncate">
                     <span className="truncate">{modelMeta.cleanTitle || modelMeta.modelName || modelMeta.architecture}</span>
-                    <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] text-white/80">
+                    <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-semibold">
                       {modelMeta.quantization}
                     </span>
                   </div>
-                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[var(--theme-text-muted)] text-[10px] shrink-0">
+                  <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] text-[10px] shrink-0 font-medium">
                     {modelMeta.fileSizeFormatted}
                   </span>
                 </div>
@@ -727,30 +727,30 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
                     <span>Семейство:</span>
-                    <span className="text-[var(--theme-text)] font-medium uppercase">{modelMeta.family || 'GGUF'}</span>
+                    <span className="text-[var(--theme-text)] font-bold uppercase">{modelMeta.family || 'GGUF'}</span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
                     <span>Контекст обучения:</span>
-                    <span className="text-[var(--theme-text)] font-medium">{modelMeta.contextLength.toLocaleString()} tok</span>
+                    <span className="text-[var(--theme-text)] font-bold">{modelMeta.contextLength.toLocaleString()} tok</span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
                     <span>Рассуждения &lt;think&gt;:</span>
-                    <span className={modelMeta.supportsReasoning ? 'text-sky-400 font-medium' : 'text-zinc-400'}>
+                    <span className={modelMeta.supportsReasoning ? 'text-sky-600 dark:text-sky-400 font-bold' : 'text-[var(--theme-text-muted)]'}>
                       {modelMeta.supportsReasoning ? 'Поддерживается' : 'Instruct / Direct'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
                     <span>Реком. режим:</span>
-                    <span className="text-white font-medium uppercase">
+                    <span className="text-[var(--theme-text)] font-bold uppercase">
                       {modelMeta.recommendedReasoningEffort || 'AUTO'}
                     </span>
                   </div>
                 </div>
 
                 {modelMeta.supportsFastMtp && (
-                  <div className="flex items-center justify-between text-[11px] border-t border-[var(--theme-border)] pt-1.5 mt-1">
-                    <span className="text-sky-300">FastMTP Ускорение:</span>
-                    <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[10px] font-bold">
+                  <div className="flex items-center justify-between text-[11px] border-t border-[var(--theme-border)] pt-2 mt-1">
+                    <span className="text-sky-600 dark:text-sky-300 font-semibold">FastMTP Ускорение:</span>
+                    <span className="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/30 text-[10px] font-bold">
                       СОВМЕСТИМО (3x Speed)
                     </span>
                   </div>

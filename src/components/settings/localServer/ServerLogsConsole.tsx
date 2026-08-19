@@ -1,5 +1,5 @@
 import React from 'react';
-import { Terminal, Check, Copy, FileText } from 'lucide-react';
+import { Terminal, Check, Copy, FileText, Trash2 } from 'lucide-react';
 
 interface ServerLogsConsoleProps {
   serverLogs: string[];
@@ -27,27 +27,34 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
   logsEndRef,
 }) => {
   return (
-    <div className="bento-card border border-[var(--theme-border)] rounded-xl overflow-hidden flex flex-col h-[650px] max-h-[calc(100vh-140px)] shadow-2xl font-sans bg-[var(--theme-panel)]">
+    <div className="bento-card border border-[var(--theme-border)] rounded-2xl overflow-hidden flex flex-col h-[680px] max-h-[calc(100vh-140px)] shadow-2xl font-sans bg-[var(--theme-panel)]">
       {/* Terminal Header Bar */}
-      <div className="bg-black/40 px-3.5 py-2.5 border-b border-[var(--theme-border)] flex flex-wrap items-center justify-between gap-2 select-none">
-        <div className="flex items-center gap-2">
-          <Terminal size={14} className="text-[var(--theme-text-muted)]" />
-          <span className="text-xs font-semibold text-[var(--theme-text)]">Логи Сервера (llama-server.log)</span>
-          {logFilePath && (
-            <span className="text-[10px] text-[var(--theme-text-muted)] font-mono hidden xl:inline" title={logFilePath}>
-              (~/.0xagent/logs)
-            </span>
-          )}
+      <div className="px-4 py-3 border-b border-[var(--theme-border)] flex flex-wrap items-center justify-between gap-2 select-none bg-[var(--theme-card-bg)]">
+        <div className="flex items-center gap-2.5">
+          <div className="p-1.5 rounded-lg bg-[var(--theme-border-subtle)] border border-[var(--theme-border)]">
+            <Terminal size={14} className="text-[var(--theme-text)]" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-2">
+              <span>Логи Сервера Llama.cpp</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            {logFilePath && (
+              <div className="text-[10px] text-[var(--theme-text-muted)] font-mono truncate max-w-[200px]" title={logFilePath}>
+                ~/.0xagent/logs
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Console Action Buttons */}
-        <div className="flex items-center gap-1.5 text-[11px]">
-          <label className="flex items-center gap-1.5 cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none">
+        {/* Console Action Controls */}
+        <div className="flex items-center gap-1.5 text-xs">
+          <label className="flex items-center gap-1.5 cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none mr-1 font-medium text-[11px]">
             <input
               type="checkbox"
               checked={serverLogsAutoScroll}
               onChange={(e) => setServerLogsAutoScroll(e.target.checked)}
-              className="rounded"
+              className="rounded accent-[var(--theme-accent)]"
             />
             <span>Auto-scroll</span>
           </label>
@@ -55,17 +62,17 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
           <button
             type="button"
             onClick={onCopyLogs}
-            className="px-2 py-1 rounded-md bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition-all cursor-pointer"
+            className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-[var(--theme-text)] flex items-center gap-1.5 transition-all cursor-pointer text-[11px] font-medium shadow-sm"
             title="Копировать все логи"
           >
-            {isCopiedLogs ? <Check size={12} className="text-[var(--theme-text)]" /> : <Copy size={12} />}
-            <span>{isCopiedLogs ? 'Скопировано!' : 'Копия'}</span>
+            {isCopiedLogs ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+            <span>{isCopiedLogs ? 'Скопировано' : 'Копия'}</span>
           </button>
 
           <button
             type="button"
             onClick={onDownloadLogs}
-            className="px-2 py-1 rounded-md bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition-all cursor-pointer"
+            className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-[var(--theme-text)] flex items-center gap-1.5 transition-all cursor-pointer text-[11px] font-medium shadow-sm"
             title="Скачать файл логов"
           >
             <FileText size={12} />
@@ -75,29 +82,40 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
           <button
             type="button"
             onClick={onClearLogs}
-            className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/15 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer transition-all border border-[var(--theme-border)]"
+            className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-[var(--theme-text-muted)] cursor-pointer transition-all text-[11px] font-medium flex items-center gap-1"
             title="Очистить экран логов"
           >
-            Clear
+            <Trash2 size={12} />
+            <span>Очистить</span>
           </button>
         </div>
       </div>
 
-      {/* Terminal Body */}
-      <div ref={logsContainerRef} className="flex-1 p-3.5 font-mono text-[11px] bg-black/50 text-[var(--theme-text)] overflow-y-auto space-y-1 select-text scrollbar-thin rounded-b-xl leading-relaxed">
+      {/* Terminal Body with Pure Dark Contrast CLI Surface */}
+      <div
+        ref={logsContainerRef}
+        className="flex-1 p-4 font-mono text-[11.5px] bg-[#09090b] text-[#f4f4f5] overflow-y-auto space-y-1 select-text scrollbar-thin rounded-b-2xl leading-relaxed border-t border-[var(--theme-border)]"
+      >
         {serverLogs.length > 0 ? (
           serverLogs.map((log, index) => {
-            const isError = log.includes('[ERROR]') || log.includes('error') || log.includes('FAILED');
-            const isCmd = log.includes('[CMD]');
+            const isError = log.includes('[ERROR]') || log.includes('error') || log.includes('FAILED') || log.includes('exiting due to');
+            const isWarning = log.includes('[WARNING]') || log.includes('[WATCHDOG]');
+            const isDiagnostic = log.includes('[FASTMTP') || log.includes('[CMD]');
+            const isSuccess = log.includes('HTTP server listening') || log.includes('model loaded') || log.includes('all slots are idle');
+            
             return (
               <div
                 key={index}
-                className={`break-all ${
+                className={`break-all py-0.5 px-1.5 rounded ${
                   isError
-                    ? 'text-rose-300 font-semibold bg-rose-950/20 p-1 rounded border border-rose-500/20'
-                    : isCmd
-                    ? 'text-white font-semibold'
-                    : 'text-[var(--theme-text)]/90'
+                    ? 'text-rose-300 font-medium bg-rose-950/40 border-l-2 border-rose-500'
+                    : isWarning
+                    ? 'text-amber-300 bg-amber-950/30 border-l-2 border-amber-500'
+                    : isDiagnostic
+                    ? 'text-sky-300 font-semibold bg-sky-950/30 border-l-2 border-sky-400'
+                    : isSuccess
+                    ? 'text-emerald-300 bg-emerald-950/30'
+                    : 'text-[#e4e4e7]'
                 }`}
               >
                 {log}
@@ -105,8 +123,9 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
             );
           })
         ) : (
-          <div className="text-[var(--theme-text-muted)] italic p-4 text-center text-xs">
-            Логи сервера будут автоматически сохранены и отображены в этом окне при запуске llama-server.exe.
+          <div className="text-zinc-400 italic p-6 text-center text-xs flex flex-col items-center justify-center h-full gap-2 select-none">
+            <Terminal size={24} className="opacity-30 mb-1" />
+            <span>Логи сервера будут автоматически сохранены и отображены в этом окне при запуске llama-server.exe.</span>
           </div>
         )}
         <div ref={logsEndRef} />
