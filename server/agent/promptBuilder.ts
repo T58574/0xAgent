@@ -14,21 +14,21 @@ export function buildFullSystemPrompt(config: AppConfig): string {
   const thinkTrigger = isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
 
   const memoryContext = getSystemPromptMemoryContext();
-  const envContext = `\n\n# ENVIRONMENT
-- OS: Windows (${process.platform})
-- Shell: PowerShell
-- Workspace: ${config.workspace_dir || process.cwd()}
-- Direct PowerShell commands only. Do not wrap in 'powershell -Command' or 'cd'. Do not run blocking background dev-servers.
-- ALWAYS use compact relative paths (e.g. 'src/App.tsx', 'server/agent.ts', '.') in tool calls and commands. Avoid redundant absolute drive paths ('C:\\Users\\...').`;
+  const envContext = `\n\n# ОКРУЖЕНИЕ СИСТЕМЫ
+- ОС: Windows (${process.platform})
+- Оболочка: PowerShell
+- Рабочая директория: ${config.workspace_dir || process.cwd()}
+- Команды исполняются напрямую в PowerShell. Не оборачивай в 'powershell -Command' или 'cd'. Не запускай блокирующие фоновые серверы разработки.
+- ВСЕГДА используй компактные относительные пути (напр. 'src/App.tsx', 'server/agent.ts', '.') в вызовах инструментов и командах.`;
 
   const isPlanningMode = config.planning_mode !== false;
   const planningContext = isPlanningMode
-    ? `\n\n# PLANNING MODE
-Before modifying files, inspect codebase first (<read_file>, <list_dir>, <grep_search>), state brief plan, and verify changes.`
+    ? `\n\n# РЕЖИМ ПЛАНИРОВАНИЯ
+Перед изменением файлов сначала изучи кодовую базу (<read_file>, <list_dir>, <grep_search>), сформулируй краткий план и проверь изменения.`
     : '';
 
   const activePersona = getActivePersona();
-  const personaContext = `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
+  const personaContext = `\n\n# ПЕРСОНА АГЕНТА: ${activePersona.metadata.name} (${activePersona.metadata.id})
 
 ## SOUL.md
 ${activePersona.soul}
@@ -36,31 +36,34 @@ ${activePersona.soul}
 ## USER.md (${activePersona.metadata.user_id})
 ${activePersona.user}
 
-## ISOLATION & MEMORY RULES:
-- Each conversation is strictly isolated. Do not bleed context from past dialogues.
-- Only call <update_user_profile> when the user explicitly requests to remember personal preferences.
-- Never write USER.md or SOUL.md to workspace directory.`;
+## ПРАВИЛА ИЗОЛЯЦИИ И ПАМЯТИ:
+- Каждый диалог строго изолирован. Не переноси контекст из прошлых несвязанных сессий.
+- Вызывай <update_user_profile> только когда пользователь явно просит запомнить личные предпочтения.
+- Никогда не создавай файлы USER.md или SOUL.md в корне рабочего пространства.`;
 
-  const toolExecutionDirective = `\n\n# TOOL EXECUTION & ENVIRONMENT INTERACTION PROTOCOL
-1. Provide a brief explanation before emitting XML tool calls.
-2. ALWAYS use <patch_file> with concise SEARCH/REPLACE blocks (3-8 lines) for existing files. Reserve <write_file> strictly for new files.
-3. Use compact relative paths for path attributes (e.g. path="src/index.ts" or path=".").
-4. Close all XML tool tags properly.
-5. STOP GENERATING immediately after emitting tool tags. The execution engine runs the tool in the real OS environment and returns the real result in a <tool_response name="...">...</tool_response> message.
-6. NEVER fabricate, simulate, or hallucinate tool outputs yourself (such as writing "[Tool ... output:]" or "<tool_response>" in your response). You only output the tool CALL tag and wait for the real environment response.`;
+  const toolExecutionDirective = `\n\n# ПРОТОКОЛ ВЫЗОВА ИНСТРУМЕНТОВ
+1. Давай краткое пояснение перед вызовом XML-тегов инструментов.
+2. ВСЕГДА используй <patch_file> с компактными SEARCH/REPLACE блоками (3-8 строк) для существующих файлов. Инструмент <write_file> используй только для новых файлов.
+3. Используй относительные пути (напр. path="src/index.ts" или path=".").
+4. Закрывай все XML-теги инструментов корректно.
+5. ОСТАНАВЛИВАЙ ГЕНЕРАЦИЮ сразу после закрывающего тега инструмента. Среда исполнит команду в реальной ОС и вернет ответ в <tool_response name="...">...</tool_response>.
+6. НИКОГДА не выдумывай и не симулируй результаты инструментов самостоятельно.`;
 
   const gemmaToolDirective = isGemmaModel
-    ? `\n\n# JSON TOOL FORMAT (Gemma 4)\nYou may also call tools in JSON format wrapped in <tool_call> tags.`
+    ? `\n\n# JSON ФОРМАТ ИНСТРУМЕНТОВ (Gemma 4)\nТы также можешь вызывать инструменты в формате JSON внутри тегов <tool_call>.`
     : '';
 
   const reasoningDirective = !isReasoningExplicitlyOff && !isGemmaModel
-    ? `\n\n# REASONING INSTRUCTIONS\nWhen analyzing tasks or forming code changes, think step-by-step inside <think>...</think> tags in RUSSIAN before providing the final answer or tool calls.`
+    ? `\n\n# ИНСТРУКЦИИ ДЛЯ БЛОКА РАССУЖДЕНИЙ <THINK>
+- Веди весь процесс размышления, анализа задачи и формулирования плана ИСКЛЮЧИТЕЛЬНО НА РУССКОМ ЯЗЫКЕ.
+- Запрещено вести рассуждения на английском языке, чтобы исключить смешивание языков в итоговом ответе.`
     : '';
 
-  const languageProtocolDirective = `\n\n# LANGUAGE & COMMUNICATION PROTOCOL
-- You MUST ALWAYS communicate, converse, explain, think, and answer the user STRICTLY IN RUSSIAN (Русский язык).
-- Code, code blocks, variables, function names, types, terminal commands, and technical identifiers MUST remain in ENGLISH.
-- Never output mixed English conversational sentences or switch to English when explaining code. All explanations must be fluent, natural Russian.`;
+  const languageProtocolDirective = `\n\n# ГЛАВНЫЙ ЯЗЫКОВОЙ СТАНДАРТ (СТРОЖАЙШИЙ ЗАПРЕТ СМЕШИВАНИЯ ЯЗЫКОВ):
+1. ВСЕ рассуждения (<think>), весь диалог, все объяснения и заголовки формулируй ИСКЛЮЧИТЕЛЬНО НА ЧИСТОМ И ГРАМОТНОМ РУССКОМ ЯЗЫКЕ.
+2. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать английские слова, фразы, заголовки или предложения внутри русского текста (полный запрет на рунглиш/Chinglish).
+3. Все термины формулируй по-русски или сопровождай понятным русским пояснением.
+4. Английский язык разрешен СТРОГО И ТОЛЬКО для: программного кода, имен переменных/функций/типов, команд терминала и официальных названий компаний/моделей (OpenAI, Anthropic, Gemma, Qwen, DeepSeek).`;
 
   const unifiedToolsContext = getUnifiedToolsContext();
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);

@@ -363,7 +363,11 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
 
       // Auto-detect / configure FastMTP and Speculative Decoding draft models
       let specDraftTarget = body.specDraftModel !== undefined ? body.specDraftModel : ls.spec_draft_model;
-      const isDraftDisabled = specDraftTarget === 'none' || specDraftTarget === 'disabled' || specDraftTarget === false;
+      const isDraftDisabled = specDraftTarget === 'none' || specDraftTarget === 'disabled' || specDraftTarget === false || ls.spec_type === 'none' || body.specType === 'none';
+
+      const modelNameLower = path.basename(targetModel).toLowerCase();
+      const isQwen3 = /qwen3|qwen-3|qwen_3|qwen 3|qwen3.8/i.test(modelNameLower);
+      const isQwenModel = isQwen3 || /qwen/i.test(modelNameLower);
 
       if (!isDraftDisabled) {
         if (!specDraftTarget || !fs.existsSync(specDraftTarget)) {
@@ -374,8 +378,6 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
             ...(cfg.workspace_dir ? [path.join(cfg.workspace_dir, 'models')] : []),
           ];
 
-          const modelBaseLower = path.basename(targetModel).toLowerCase();
-          const isQwenModel = /qwen3|qwen-3|qwen_3|qwen 3|qwen3.8/i.test(modelBaseLower);
           let bestDraft: string | null = null;
 
           for (const cDir of candidateDirs) {
@@ -402,33 +404,36 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
           }
         }
 
+        const rawSpecType = body.specType || ls.spec_type || 'default';
+        const specDraftNgl = body.specDraftNgl !== undefined && body.specDraftNgl !== null ? body.specDraftNgl : (ls.spec_draft_ngl !== undefined && ls.spec_draft_ngl !== null ? ls.spec_draft_ngl : 'all');
+        const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : 1);
+        const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : 0);
+
         if (specDraftTarget && fs.existsSync(specDraftTarget)) {
           args.push('--spec-draft-model', specDraftTarget);
+          args.push('--spec-type', rawSpecType);
 
-          const specType = body.specType || ls.spec_type || 'default';
-          args.push('--spec-type', specType);
-
-          const specDraftNgl = body.specDraftNgl !== undefined && body.specDraftNgl !== null ? body.specDraftNgl : (ls.spec_draft_ngl !== undefined && ls.spec_draft_ngl !== null ? ls.spec_draft_ngl : 'all');
           if (specDraftNgl !== undefined && specDraftNgl !== null) {
             args.push('--spec-draft-ngl', String(specDraftNgl));
           }
-
-          const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : 3);
           if (specDraftNMax !== undefined && specDraftNMax !== null) {
             args.push('--spec-draft-n-max', String(specDraftNMax));
           }
-
-          const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : 0);
           if (specDraftPMin !== undefined && specDraftPMin !== null) {
             args.push('--spec-draft-p-min', String(specDraftPMin));
           }
 
-          appendServerLog(`[SPECULATIVE] Подключена драфт-модель: ${path.basename(specDraftTarget)} (тип: ${specType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
+          appendServerLog(`[SPECULATIVE] Подключена отдельная драфт-модель: ${path.basename(specDraftTarget)} (тип: ${rawSpecType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
+        } else if (isQwenModel || rawSpecType === 'draft-mtp' || rawSpecType === 'default') {
+          // Native Multi-Token Prediction (MTP / NextN heads built into target model tensors like blk.64.nextn.*)
+          const resolvedMtpType = rawSpecType === 'default' ? 'draft-mtp' : rawSpecType;
+          args.push('--spec-type', resolvedMtpType);
+          args.push('--spec-draft-n-max', String(specDraftNMax));
+          args.push('--spec-draft-ngl', String(specDraftNgl));
+          args.push('--spec-draft-p-min', String(specDraftPMin));
+          appendServerLog(`[MTP] Активирован встроенный Multi-Token Prediction (тип: ${resolvedMtpType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
         }
       }
-
-      const modelNameLower = path.basename(targetModel).toLowerCase();
-      const isQwen3 = /qwen3|qwen-3|qwen_3|qwen 3|qwen3.8/i.test(modelNameLower);
 
       // Jinja and Reasoning template flags for Qwen 3.8 / local reasoning models
       const jinja = body.jinja !== undefined ? body.jinja : ls.jinja;
@@ -446,9 +451,14 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
         args.push('--reasoning-format', reasoningFormat);
       }
 
-      const reasoningEffort = body.reasoningEffort || ls.reasoning_effort || (isQwen3 ? 'xhigh' : null);
+      const reasoningEffort = body.reasoningEffort || ls.reasoning_effort || (isQwen3 ? 'medium' : null);
       if (reasoningEffort && reasoningEffort !== 'off' && reasoningEffort !== 'auto') {
         args.push('--reasoning', 'on', '--reasoning-effort', reasoningEffort);
+      }
+
+      const reasoningBudget = body.reasoningBudget !== undefined ? body.reasoningBudget : ls.reasoning_budget;
+      if (reasoningBudget !== undefined && reasoningBudget !== null && Number(reasoningBudget) > 0) {
+        args.push('--reasoning-budget', String(reasoningBudget));
       }
 
       const ctxSize = body.ctxSize !== undefined ? body.ctxSize : ls.ctx_size;
@@ -469,10 +479,18 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       if (ubatchSize) args.push('-ub', String(ubatchSize));
 
       const temp = body.temp !== undefined ? body.temp : ls.temp;
-      if (temp !== undefined && temp !== null) args.push('--temp', String(temp));
+      if (temp !== undefined && temp !== null) {
+        args.push('--temp', String(temp));
+      } else if (isQwen3) {
+        args.push('--temp', '0.6');
+      }
 
       const repeatPenalty = body.repeatPenalty !== undefined ? body.repeatPenalty : ls.repeat_penalty;
-      if (repeatPenalty !== undefined && repeatPenalty !== null) args.push('--repeat-penalty', String(repeatPenalty));
+      if (repeatPenalty !== undefined && repeatPenalty !== null) {
+        args.push('--repeat-penalty', String(repeatPenalty));
+      } else if (isQwen3) {
+        args.push('--repeat-penalty', '1.05');
+      }
 
       const minP = body.minP !== undefined ? body.minP : ls.min_p;
       if (minP !== undefined && minP !== null && Number(minP) > 0) args.push('--min-p', String(minP));
@@ -493,7 +511,7 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       if (mmap === false) args.push('--no-mmap');
 
       const mlock = body.mlock !== undefined ? body.mlock : ls.mlock;
-      if (mlock === true) args.push('--mlock');
+      if (mlock === true) args.push('--load-mode', 'mlock');
 
       const cacheReuse = body.cacheReuse !== undefined ? body.cacheReuse : ls.cache_reuse;
       if (cacheReuse !== undefined && cacheReuse !== null && Number(cacheReuse) > 0) args.push('--cache-reuse', String(cacheReuse));

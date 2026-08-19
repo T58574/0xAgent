@@ -53,6 +53,7 @@ export interface LocalServerConfig {
   spec_draft_ngl?: number | string | null;
   spec_draft_n_max?: number | null;
   spec_draft_p_min?: number | null;
+  reasoning_budget?: number | null;
   jinja?: boolean | null;
   reasoning_preserve?: boolean | null;
   reasoning_format?: string | null;
