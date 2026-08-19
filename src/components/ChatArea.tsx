@@ -23,7 +23,6 @@ import { ChatTimelineScrubber } from './chat/ChatTimelineScrubber';
 import { JarvisSparkCard } from './chat/JarvisSparkCard';
 import { PlanProgressStrip } from './chat/PlanProgressStrip';
 import { InteractiveQuestionCard } from './chat/InteractiveQuestionCard';
-import { ChatHeaderBar } from './chat/ChatHeaderBar';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -72,8 +71,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   isServerOffline: _isServerOffline = false,
   onStartServer: _onStartServer,
   workspaceDir: _workspaceDir,
-  onSelectWorkspace,
-  onUpdateSessionWorkspace,
+  onSelectWorkspace: _onSelectWorkspace,
+  onUpdateSessionWorkspace: _onUpdateSessionWorkspace,
   modelName: _modelName,
   config,
   onModelChanged,
@@ -144,11 +143,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   const personas = personasProp.length > 0 ? personasProp : localPersonas;
   const activePersonaId = activePersonaIdProp || config?.active_persona_id || 'default';
-  const currentPersona = personas.find((p) => p.id === activePersonaId) || personas[0] || {
-    id: 'default',
-    name: '0xAgent Core',
-    icon: 'Zap',
-  };
 
 
 
@@ -353,15 +347,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         isDraggingOver ? 'ring-1 ring-[var(--theme-border)] ring-inset' : ''
       }`}
     >
-      {/* 0. TOP WORKSPACE & CONTEXT BAR */}
-      <ChatHeaderBar
-        currentSession={currentSession}
-        config={config}
-        currentPersona={currentPersona}
-        onSelectWorkspace={onSelectWorkspace}
-        onUpdateSessionWorkspace={onUpdateSessionWorkspace}
-      />
-
       {/* 1. EMPTY CHAT STATE: CLEAN FLOATING ASCII HERO */}
       {!hasMessages && (
         <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto scrollbar-none">

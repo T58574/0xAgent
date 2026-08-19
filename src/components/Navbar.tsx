@@ -13,11 +13,22 @@ import {
   X,
   Bot,
   RefreshCw,
+  Folder,
+  FolderPlus,
+  Unlink,
+  ChevronDown,
+  Sparkles,
 } from 'lucide-react';
-import { AppConfig } from '../types';
+import { AppConfig, ChatSession, PersonaMetadata } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { MaterialIcon } from './common/MaterialIcon';
+import {
+  getWorkspaceBaseName,
+  isAutoWorkspace,
+  exportSessionLogAsText,
+  exportSessionJson,
+} from '../utils/helpers';
 
 interface NavbarProps {
   sidebarOpen?: boolean;
@@ -25,7 +36,11 @@ interface NavbarProps {
   activeView: 'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge';
   onChangeView: (view: 'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge') => void;
   config: AppConfig | null;
-  onSelectWorkspace: () => void;
+  currentSession?: ChatSession | null;
+  workspaceDir?: string | null;
+  onSelectWorkspace?: () => void;
+  onUpdateSessionWorkspace?: (dir: string | null) => void;
+  currentPersona?: PersonaMetadata;
   has0xAgentMd?: boolean;
   onToggleLogs?: () => void;
   isServerOffline?: boolean;
@@ -42,7 +57,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   activeView,
   onChangeView,
   config,
-  onSelectWorkspace: _onSelectWorkspace,
+  currentSession,
+  workspaceDir,
+  onSelectWorkspace,
+  onUpdateSessionWorkspace,
+  currentPersona: _currentPersona,
   has0xAgentMd: _has0xAgentMd = false,
   onToggleLogs,
   onModelChanged: _onModelChanged,
@@ -58,6 +77,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [lanLoading, setLanLoading] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const lanRef = useRef<HTMLDivElement>(null);
+
+  // Workspace Popover state
+  const [wsMenuOpen, setWsMenuOpen] = useState(false);
+  const [copiedLog, setCopiedLog] = useState(false);
+  const wsMenuRef = useRef<HTMLDivElement>(null);
 
   // Handle LAN menu
   const handleToggleLan = async () => {
@@ -84,29 +108,183 @@ export const Navbar: React.FC<NavbarProps> = ({
     setTimeout(() => setCopiedUrl(null), 2000);
   };
 
+  const handleCopySessionLog = (e: React.MouseEvent) => {
+    if (!currentSession) {
+      showToast('Нет активной сессии для копирования', 'info');
+      return;
+    }
+    try {
+      const isAltOrShift = e.altKey || e.shiftKey;
+      const textToCopy = isAltOrShift
+        ? exportSessionJson(currentSession)
+        : exportSessionLogAsText(currentSession, config?.model_name);
+
+      navigator.clipboard.writeText(textToCopy);
+      setCopiedLog(true);
+      showToast(
+        isAltOrShift ? 'Сырой JSON сессии скопирован в буфер' : 'Лог сессии скопирован в буфер обмена',
+        'success'
+      );
+      setTimeout(() => setCopiedLog(false), 2000);
+    } catch (err: any) {
+      showToast(`Ошибка копирования: ${err.message || err}`, 'error');
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (lanRef.current && !lanRef.current.contains(event.target as Node)) {
         setLanOpen(false);
       }
+      if (wsMenuRef.current && !wsMenuRef.current.contains(event.target as Node)) {
+        setWsMenuOpen(false);
+      }
     };
-    if (lanOpen) document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [lanOpen]);
+  }, []);
+
+  const currentSessionWorkspace =
+    currentSession?.workspace_dir !== undefined
+      ? currentSession.workspace_dir
+      : workspaceDir || config?.workspace_dir;
+  const hasWs = !!currentSessionWorkspace;
+  const isAutoWs = isAutoWorkspace(currentSessionWorkspace);
+  const wsName = getWorkspaceBaseName(currentSessionWorkspace);
 
   return (
-    <header className="h-14 border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl px-4 rounded-[22px] flex items-center justify-between select-none z-30 shrink-0 font-sans shadow-sm">
+    <header className="h-14 border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl px-4 rounded-[22px] flex items-center justify-between select-none z-30 shrink-0 font-sans shadow-sm gap-3">
       
-      {/* Left Section: 0xAGENT Brand Logo */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="flex items-center gap-2 font-bold text-sm tracking-wider text-[var(--theme-text)]">
+      {/* Left Section: 0xAGENT Brand Logo + Current Chat Title & Workspace Pill */}
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        {/* Brand */}
+        <div className="flex items-center gap-2 font-bold text-sm tracking-wider text-[var(--theme-text)] shrink-0">
           <Terminal size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <span>0xAGENT</span>
+        </div>
+
+        <span className="w-px h-5 bg-[var(--theme-border)] shrink-0 hidden sm:inline-block" />
+
+        {/* Current Chat Title & Workspace Pill in Header */}
+        <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-1.5 text-[var(--theme-text)] font-semibold text-sm truncate max-w-[150px] sm:max-w-[240px] md:max-w-[320px]">
+            <MessageSquare size={14} className="text-[var(--theme-text-muted)] shrink-0" />
+            <span className="truncate">{currentSession?.title || 'Новый диалог'}</span>
+          </div>
+
+          {/* Workspace Pill Dropdown */}
+          <div ref={wsMenuRef} className="relative shrink-0 hidden sm:block">
+            <button
+              type="button"
+              onClick={() => setWsMenuOpen(!wsMenuOpen)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer shadow-sm font-semibold"
+              title="Рабочая папка текущего диалога"
+            >
+              {isAutoWs ? (
+                <>
+                  <Sparkles size={11} className="text-[var(--theme-accent)]" />
+                  <span className="truncate max-w-[110px]">{wsName}</span>
+                </>
+              ) : hasWs ? (
+                <>
+                  <Folder size={11} className="text-[var(--theme-text)]" />
+                  <span className="truncate max-w-[110px]">{wsName}</span>
+                </>
+              ) : (
+                <>
+                  <Folder size={11} />
+                  <span>Без воркспейса</span>
+                </>
+              )}
+              <ChevronDown size={11} className={`transition-transform duration-200 ${wsMenuOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {/* Workspace Switcher Popover */}
+            {wsMenuOpen && (
+              <div className="absolute left-0 top-full mt-2 w-72 rounded-2xl bento-card p-2 shadow-2xl z-50 border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl animate-fadeIn space-y-1">
+                <div className="px-2.5 py-1 text-[11px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
+                  <span>Воркспейс Диалога</span>
+                  <button
+                    type="button"
+                    onClick={() => setWsMenuOpen(false)}
+                    className="p-0.5 rounded-md hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+
+                <div className="px-2.5 py-1.5 text-xs text-[var(--theme-text)] bg-[var(--theme-input-bg)] rounded-xl border border-[var(--theme-border)] truncate font-mono">
+                  {currentSessionWorkspace || 'Изолированная авто-песочница'}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWsMenuOpen(false);
+                    onSelectWorkspace?.();
+                  }}
+                  className="w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-2 transition-colors cursor-pointer text-left"
+                >
+                  <FolderPlus size={14} className="text-[var(--theme-text)]" />
+                  <span>Выбрать локальную папку проекта</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setWsMenuOpen(false);
+                    if (currentSession?.id) {
+                      try {
+                        const res = await api.create_auto_workspace();
+                        if (res.path && onUpdateSessionWorkspace) {
+                          onUpdateSessionWorkspace(res.path);
+                          showToast(`Создана изолированная песочница ${res.slug}`, 'success');
+                        }
+                      } catch (err: any) {
+                        showToast(`Ошибка создания песочницы: ${err.message || err}`, 'error');
+                      }
+                    }
+                  }}
+                  className="w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-2 transition-colors cursor-pointer text-left"
+                >
+                  <Sparkles size={14} className="text-[var(--theme-accent)]" />
+                  <span>Создать новую авто-песочницу</span>
+                </button>
+
+                {hasWs && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setWsMenuOpen(false);
+                      onUpdateSessionWorkspace?.(null);
+                      showToast('Диалог отвязан от воркспейса', 'info');
+                    }}
+                    className="w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <Unlink size={14} />
+                    <span>Отвязать от папки (Авто-режим)</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Copy Session Log Button */}
+          {currentSession && (
+            <button
+              type="button"
+              onClick={handleCopySessionLog}
+              className="p-1.5 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer hidden md:flex items-center"
+              title="Скопировать лог диалога (Shift+Клик для полного JSON)"
+            >
+              {copiedLog ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Right Section: View Switcher Bento Tabs + Utilities */}
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2 shrink-0">
         {/* View Switcher Bento Tabs */}
         <div className="flex items-center bg-[var(--theme-card-bg)] p-1 rounded-full border border-[var(--theme-border)] shadow-sm">
           {[
@@ -172,7 +350,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 console.error(err);
               }
             }}
-            className="p-2 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono border border-[var(--theme-border)] shadow-sm"
+            className="p-2 rounded-full bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono border border-[var(--theme-border)] shadow-sm"
             title="Голосовой интерком Jarvis. Клик — проверить связь."
           >
             <MaterialIcon name="volume_up" size={15} />
@@ -185,7 +363,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={handleToggleLan}
-            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-sm ${
+            className={`p-2 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-sm ${
               lanOpen
                 ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-[var(--theme-accent-text)]'
                 : 'bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
@@ -258,7 +436,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={onToggleLogs}
-            className="p-2 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-[var(--theme-border)] shadow-sm"
+            className="p-2 rounded-full bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-[var(--theme-border)] shadow-sm"
             title="Открыть / закрыть логи LLM сервера"
           >
             <Terminal size={14} />

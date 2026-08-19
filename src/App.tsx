@@ -728,7 +728,10 @@ export default function App() {
         activeView={activeView}
         onChangeView={setActiveView}
         config={config}
+        currentSession={currentSession}
+        workspaceDir={activeSessionWorkspace}
         onSelectWorkspace={handleSelectWorkspace}
+        onUpdateSessionWorkspace={handleUpdateCurrentSessionWorkspace}
         has0xAgentMd={has0xAgentMd}
         onToggleLogs={() => setShowLogsDrawer(!showLogsDrawer)}
         isServerOffline={isServerOffline}
