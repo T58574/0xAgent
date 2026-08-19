@@ -92,7 +92,7 @@ export function getWorkspaceBaseName(dirPath?: string | null): string {
 export function isAutoWorkspace(dirPath?: string | null): boolean {
   if (!dirPath) return false;
   const normalized = dirPath.replace(/\\/g, '/').toLowerCase();
-  return normalized.includes('/.0xagent/workspaces/') || normalized.includes('/.0xagent/workspaces');
+  return (normalized.includes('.0xagent') || normalized.includes('0xagent')) && normalized.includes('/workspaces');
 }
 
 /**

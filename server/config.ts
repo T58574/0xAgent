@@ -3,10 +3,59 @@ import path from 'node:path';
 import os from 'node:os';
 import { AppConfig } from '../src/types';
 
-const APP_DIR = path.join(os.homedir(), '.0xagent');
-const PROMPTS_DIR = path.join(APP_DIR, 'prompts');
-const DATA_DIR = path.join(APP_DIR, 'data');
-const CONFIG_FILE = path.join(APP_DIR, 'config.json');
+export function getAppDir(): string {
+  const isTest = process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR;
+  const baseDir = isTest
+    ? path.join(os.tmpdir(), '.0xagent_test_env')
+    : path.join(os.homedir(), '.0xagent');
+
+  const promptsDir = path.join(baseDir, 'prompts');
+  const dataDir = path.join(baseDir, 'data');
+  const sessionsDir = path.join(baseDir, 'sessions');
+
+  if (!fs.existsSync(baseDir)) {
+    fs.mkdirSync(baseDir, { recursive: true });
+  }
+  if (!fs.existsSync(promptsDir)) {
+    fs.mkdirSync(promptsDir, { recursive: true });
+  }
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+  if (!fs.existsSync(sessionsDir)) {
+    fs.mkdirSync(sessionsDir, { recursive: true });
+  }
+
+  // Populate default prompts if directory is empty or default file missing
+  const defaultFile = path.join(promptsDir, 'default.md');
+  if (!fs.existsSync(defaultFile)) {
+    fs.writeFileSync(defaultFile, DEFAULT_PROMPT_CONTENT, 'utf-8');
+  }
+
+  const codingFile = path.join(promptsDir, 'coding_agent.md');
+  if (!fs.existsSync(codingFile)) {
+    fs.writeFileSync(codingFile, CODING_AGENT_PROMPT, 'utf-8');
+  }
+
+  const reviewerFile = path.join(promptsDir, 'code_reviewer.md');
+  if (!fs.existsSync(reviewerFile)) {
+    fs.writeFileSync(reviewerFile, CODE_REVIEWER_PROMPT, 'utf-8');
+  }
+
+  return baseDir;
+}
+
+export function getConfigFile(): string {
+  return path.join(getAppDir(), 'config.json');
+}
+
+export function getPromptsDir(): string {
+  return path.join(getAppDir(), 'prompts');
+}
+
+export function getDataDir(): string {
+  return path.join(getAppDir(), 'data');
+}
 
 const DEFAULT_PROMPT_CONTENT = `You are 0xAgent, an expert AI software developer assistant running on Windows with PowerShell.
 You can read files, write files, patch files, list directories, grep search, and execute PowerShell commands directly in the active workspace.
@@ -40,36 +89,6 @@ const CODE_REVIEWER_PROMPT = `# Code Reviewer & Security Auditor Prompt
 You are 0xAgent Auditor.
 Your primary role is to inspect code for security vulnerabilities, type mismatches, and edge-case bugs before execution.
 Provide constructive feedback and precise patches.`;
-
-export function getAppDir(): string {
-  if (!fs.existsSync(APP_DIR)) {
-    fs.mkdirSync(APP_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(PROMPTS_DIR)) {
-    fs.mkdirSync(PROMPTS_DIR, { recursive: true });
-  }
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  // Populate default prompts if directory is empty or default file missing
-  const defaultFile = path.join(PROMPTS_DIR, 'default.md');
-  if (!fs.existsSync(defaultFile)) {
-    fs.writeFileSync(defaultFile, DEFAULT_PROMPT_CONTENT, 'utf-8');
-  }
-
-  const codingFile = path.join(PROMPTS_DIR, 'coding_agent.md');
-  if (!fs.existsSync(codingFile)) {
-    fs.writeFileSync(codingFile, CODING_AGENT_PROMPT, 'utf-8');
-  }
-
-  const reviewerFile = path.join(PROMPTS_DIR, 'code_reviewer.md');
-  if (!fs.existsSync(reviewerFile)) {
-    fs.writeFileSync(reviewerFile, CODE_REVIEWER_PROMPT, 'utf-8');
-  }
-
-  return APP_DIR;
-}
 
 export function getDefaultConfig(): AppConfig {
   return {
@@ -120,20 +139,22 @@ export function getDefaultConfig(): AppConfig {
 }
 
 export function loadConfig(): AppConfig {
-  getAppDir();
-  if (!fs.existsSync(CONFIG_FILE)) {
+  const configFile = getConfigFile();
+  const promptsDir = getPromptsDir();
+
+  if (!fs.existsSync(configFile)) {
     const defaultConfig = getDefaultConfig();
     saveConfig(defaultConfig);
     return defaultConfig;
   }
   try {
-    const data = fs.readFileSync(CONFIG_FILE, 'utf-8');
+    const data = fs.readFileSync(configFile, 'utf-8');
     const parsed = JSON.parse(data);
     const config: AppConfig = { ...getDefaultConfig(), ...parsed };
 
     // Read active prompt file content if present
     const activeFile = config.active_prompt_file || 'default.md';
-    const activeFilePath = path.join(PROMPTS_DIR, activeFile);
+    const activeFilePath = path.join(promptsDir, activeFile);
     if (fs.existsSync(activeFilePath)) {
       config.system_prompt = fs.readFileSync(activeFilePath, 'utf-8');
     }
@@ -146,15 +167,15 @@ export function loadConfig(): AppConfig {
 }
 
 export function saveConfig(config: AppConfig): void {
-  getAppDir();
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf-8');
+  const configFile = getConfigFile();
+  const promptsDir = getPromptsDir();
+
+  fs.writeFileSync(configFile, JSON.stringify(config, null, 2), 'utf-8');
 
   // Also sync current system_prompt to active file
   const activeFile = config.active_prompt_file || 'default.md';
-  const activeFilePath = path.join(PROMPTS_DIR, activeFile);
+  const activeFilePath = path.join(promptsDir, activeFile);
   if (config.system_prompt) {
     fs.writeFileSync(activeFilePath, config.system_prompt, 'utf-8');
   }
 }
-
-

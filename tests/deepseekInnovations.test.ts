@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -10,9 +10,12 @@ import { forkSession, deriveMessagesFromEvents } from '../server/agent/sessionEv
 import { subagentOrchestrator } from '../server/agent/subagentOrchestrator';
 import { runCompactionPipeline } from '../server/agent/compactionPipeline';
 import { AppConfig, ChatSession, SessionEvent } from '../src/types';
-import { saveSession } from '../server/session';
+import { saveSession, deleteSession } from '../server/session';
 
 describe('DeepSeek Harness Innovations Subsystem Test Suite', () => {
+  before(() => {
+    process.env.NODE_ENV = 'test';
+  });
   const dummyConfig: AppConfig = {
     api_url: 'http://127.0.0.1:8080/v1',
     model_name: 'test-model',
@@ -139,16 +142,22 @@ describe('DeepSeek Harness Innovations Subsystem Test Suite', () => {
         updated_at: 4000,
       };
 
-      await saveSession(initialSession);
+      try {
+        await saveSession(initialSession);
 
-      const forked = await forkSession(sourceId, 'm2', 'Branched Architecture');
-      assert.notEqual(forked.id, sourceId);
-      assert.equal(forked.title, 'Branched Architecture');
-      assert.equal(forked.messages.length, 2);
-      assert.deepEqual(
-        forked.messages.map((m) => m.id),
-        ['m1', 'm2']
-      );
+        const forked = await forkSession(sourceId, 'm2', 'Branched Architecture');
+        assert.notEqual(forked.id, sourceId);
+        assert.equal(forked.title, 'Branched Architecture');
+        assert.equal(forked.messages.length, 2);
+        assert.deepEqual(
+          forked.messages.map((m) => m.id),
+          ['m1', 'm2']
+        );
+
+        await deleteSession(forked.id);
+      } finally {
+        await deleteSession(sourceId);
+      }
     });
 
     it('should derive deterministic ChatMessages from raw SessionEvents stream', () => {
