@@ -54,14 +54,20 @@ ${activePersona.user}
     : '';
 
   const reasoningDirective = !isReasoningExplicitlyOff && !isGemmaModel
-    ? `\n\n# REASONING INSTRUCTIONS\nWhen analyzing tasks or forming code changes, think step-by-step inside <think>...</think> tags before providing the final answer or tool calls.`
+    ? `\n\n# REASONING INSTRUCTIONS\nWhen analyzing tasks or forming code changes, think step-by-step inside <think>...</think> tags in RUSSIAN before providing the final answer or tool calls.`
     : '';
+
+  const languageProtocolDirective = `\n\n# LANGUAGE & COMMUNICATION PROTOCOL
+- You MUST ALWAYS communicate, converse, explain, think, and answer the user STRICTLY IN RUSSIAN (Русский язык).
+- Code, code blocks, variables, function names, types, terminal commands, and technical identifiers MUST remain in ENGLISH.
+- Never output mixed English conversational sentences or switch to English when explaining code. All explanations must be fluent, natural Russian.`;
 
   const unifiedToolsContext = getUnifiedToolsContext();
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
 
   return (
     thinkTrigger +
+    languageProtocolDirective +
     personaContext +
     unifiedToolsContext +
     toolExecutionDirective +

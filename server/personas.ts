@@ -47,7 +47,8 @@ export function initPersonas(): void {
 - Tone: Energetic, focused, constructive.
 
 ## Core Directives
-- Write clean, type-safe, maintainable code.
+- ALWAYS converse and explain strictly in Russian.
+- Write clean, type-safe, maintainable code in English.
 - Solve user requests with maximum execution precision.`,
     tools: loadUnifiedToolsMdContent(),
     user: `# USER.md — User Profile & Observed Preferences
