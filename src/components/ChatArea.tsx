@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Terminal, Sparkles, CheckCheck, RotateCcw } from 'lucide-react';
 import {
-  Terminal,
-  Sparkles,
-  CheckCheck,
-  RotateCcw,
-} from 'lucide-react';
-import { AppConfig, ChatMessage, LiveTelemetry, PersonaMetadata, JarvisSparkProposal, ChatSession, AskUserQuestionItem } from '../types';
+  AppConfig,
+  ChatMessage,
+  LiveTelemetry,
+  PersonaMetadata,
+  JarvisSparkProposal,
+  ChatSession,
+  AskUserQuestionItem,
+} from '../types';
 import {
   cleanContent,
   extractThinkingFromContent,
@@ -15,14 +18,14 @@ import {
 } from '../utils/helpers';
 import { ToolCard } from './ToolCard';
 import { NotionMarkdown } from './NotionMarkdown';
-import { AsciiCanvasEngine } from './common/AsciiCanvasEngine';
-import { MaterialIcon } from './common/MaterialIcon';
 import { FloatingCommandBar } from './chat/FloatingCommandBar';
 import { ReasoningViewer } from './chat/ReasoningViewer';
 import { ChatTimelineScrubber } from './chat/ChatTimelineScrubber';
 import { JarvisSparkCard } from './chat/JarvisSparkCard';
 import { PlanProgressStrip } from './chat/PlanProgressStrip';
 import { InteractiveQuestionCard } from './chat/InteractiveQuestionCard';
+import { EmptyChatHero } from './chat/EmptyChatHero';
+import { TelemetryHUD } from './chat/TelemetryHUD';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 
@@ -54,6 +57,8 @@ interface ChatAreaProps {
   onOpenCustomizations?: () => void;
 }
 
+const ASCII_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
 export const ChatArea: React.FC<ChatAreaProps> = ({
   messages,
   currentSession,
@@ -64,16 +69,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onRollbackSession,
   onAcceptSpark,
   reasoningEnabled = true,
-  groqApiKey: _groqApiKey,
   liveTelemetry,
-  planningMode: _planningMode = true,
-  onTogglePlanningMode: _onTogglePlanningMode,
-  isServerOffline: _isServerOffline = false,
-  onStartServer: _onStartServer,
-  workspaceDir: _workspaceDir,
-  onSelectWorkspace: _onSelectWorkspace,
-  onUpdateSessionWorkspace: _onUpdateSessionWorkspace,
-  modelName: _modelName,
   config,
   onModelChanged,
   personas: personasProp = [],
@@ -102,11 +98,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   // Jarvis Proactive Sparks
   const [activeSparks, setActiveSparks] = useState<JarvisSparkProposal[]>([]);
 
-  // ASCII thinking animation frames
-  const ASCII_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  // ASCII thinking animation & Live thinking timer
   const [asciiFrameIndex, setAsciiFrameIndex] = useState(0);
-
-  // Live thinking timer state
   const [thinkingSeconds, setThinkingSeconds] = useState(0);
 
   useEffect(() => {
@@ -144,8 +137,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const personas = personasProp.length > 0 ? personasProp : localPersonas;
   const activePersonaId = activePersonaIdProp || config?.active_persona_id || 'default';
 
-
-
+  // Listeners for summarization, proactive sparks and audio
   useEffect(() => {
     const u1 = api.listen<{ promptTokens: number; estimatedNewTokens: number }>('agent-summarizing-start', (e) => {
       setIsSummarizing(true);
@@ -169,7 +161,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       }, 3500);
     });
 
-    // Jarvis Proactive Sparks & Voice Intercom listeners
     const u4 = api.listen<JarvisSparkProposal>('jarvis_spark_proposal', (e) => {
       setActiveSparks((prev) => [e.payload, ...prev.filter((s) => s.id !== e.payload.id)]);
     });
@@ -183,17 +174,15 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     });
 
     const u6 = api.listen<{ text: string; audioBase64?: string }>('jarvis_speak', (e) => {
-      // Only play in browser if play_in_browser is enabled and not playing directly on system speakers
       if (config?.tts_config?.play_in_browser && !config?.tts_config?.play_on_speaker && e.payload.audioBase64) {
         try {
           const audio = new Audio(e.payload.audioBase64);
-          audio.volume = 0.6; // 60% master volume
+          audio.volume = 0.6;
           audio.play().catch(() => {});
         } catch {}
       }
     });
 
-    // Load existing pending sparks
     api.get_jarvis_state().then((st) => {
       if (st?.activeSparks) {
         setActiveSparks(st.activeSparks.filter((s) => s.status === 'pending'));
@@ -245,7 +234,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
-    if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+    if (e.clipboardData?.files && e.clipboardData.files.length > 0) {
       const imageFiles = Array.from(e.clipboardData.files).filter((f) => f.type.startsWith('image/'));
       if (imageFiles.length > 0) {
         e.preventDefault();
@@ -267,7 +256,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDraggingOver(false);
-    if (e.dataTransfer && e.dataTransfer.files) {
+    if (e.dataTransfer?.files) {
       processImageFiles(e.dataTransfer.files);
     }
   };
@@ -347,63 +336,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
         isDraggingOver ? 'ring-1 ring-[var(--theme-border)] ring-inset' : ''
       }`}
     >
-      {/* 1. EMPTY CHAT STATE: CLEAN FLOATING ASCII HERO */}
+      {/* 1. EMPTY CHAT STATE */}
       {!hasMessages && (
-        <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto scrollbar-none">
-          <div className="w-full max-w-2xl space-y-6 text-center">
-            {/* Transparent Floating ASCII Animation */}
-            <div className="flex flex-col items-center justify-center select-none pointer-events-auto">
-              <AsciiCanvasEngine
-                effect="hero_wave"
-                fps={60}
-                color="platinum"
-                fontSize={11}
-                interactive
-              />
-            </div>
-
-            {/* Proactive Sparks in Empty State */}
-            {config?.proactive_companion_enabled !== false && activeSparks.length > 0 && (
-              <div className="w-full max-w-xl mx-auto space-y-2 text-left">
-                {activeSparks.map((spark) => (
-                  <JarvisSparkCard
-                    key={spark.id}
-                    spark={spark}
-                    onAccept={handleAcceptSpark}
-                    onDismiss={handleDismissSpark}
-                    onSpeak={handleSpeakPhrase}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Dynamic Plan & Todos HUD in Empty State */}
-            {currentSession?.active_todos && currentSession.active_todos.length > 0 && (
-              <div className="w-full max-w-xl mx-auto text-left">
-                <PlanProgressStrip todos={currentSession.active_todos} />
-              </div>
-            )}
-
-            {/* Bottom Floating Command Bar for Empty State */}
-            <div className="pt-2 w-full max-w-xl mx-auto">
-              <FloatingCommandBar
-                inputText={inputText}
-                setInputText={setInputText}
-                onSubmit={handleSubmit}
-                agentStatus={agentStatus}
-                onCancelAgent={onCancelAgent}
-                personas={personas}
-                activePersonaId={activePersonaId}
-                onSelectPersona={handleSelectPersona}
-                attachedImages={attachedImages}
-                onAttachImages={(imgs) => setAttachedImages(imgs)}
-                onRemoveImage={handleRemoveImage}
-                config={config}
-                onModelChanged={onModelChanged}
-              />
-            </div>
-          </div>
-        </div>
+        <EmptyChatHero
+          inputText={inputText}
+          setInputText={setInputText}
+          onSubmit={handleSubmit}
+          agentStatus={agentStatus}
+          onCancelAgent={onCancelAgent}
+          personas={personas}
+          activePersonaId={activePersonaId}
+          onSelectPersona={handleSelectPersona}
+          attachedImages={attachedImages}
+          onAttachImages={(imgs) => setAttachedImages(imgs)}
+          onRemoveImage={handleRemoveImage}
+          config={config}
+          onModelChanged={onModelChanged}
+          activeSparks={activeSparks}
+          onAcceptSpark={handleAcceptSpark}
+          onDismissSpark={handleDismissSpark}
+          onSpeakPhrase={handleSpeakPhrase}
+          currentSession={currentSession}
+        />
       )}
 
       {/* 2. ACTIVE CHAT MESSAGES STREAM */}
@@ -433,7 +387,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             </div>
           )}
 
-          {/* Interactive Timeline Navigation Scrubber (Pinned to viewport center-right) */}
+          {/* Interactive Timeline Navigation Scrubber */}
           <ChatTimelineScrubber
             messages={messages}
             containerRef={chatContainerRef}
@@ -494,14 +448,12 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               const hasText = Boolean(text && text.trim().length > 0);
               const hasTools = Boolean(msg.tool_calls && msg.tool_calls.length > 0);
 
-              // Do not render empty bubble if there is no content and message is not actively generating
               if (!isUser && !hasThinking && !hasText && !hasTools && !isActivelyGenerating) {
                 return null;
               }
 
               return (
                 <React.Fragment key={msg.id || index}>
-                  {/* Date section separator */}
                   {isFirstOfDay && msg.timestamp && (
                     <div className="flex justify-center my-4">
                       <span className="px-3 py-1 rounded-full bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[10px] font-mono text-[var(--theme-text-muted)] select-none shadow-sm">
@@ -517,7 +469,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     {isUser ? (
                       /* User Bubble */
                       <div className="relative w-fit max-w-[78%] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-accent)]/20 rounded-2xl rounded-tr-[4px] px-4 py-2.5 shadow-sm text-sm leading-relaxed select-text space-y-1.5 transition-all">
-                        {/* Attached Images */}
                         {msg.images && msg.images.length > 0 && (
                           <div className="flex flex-wrap gap-2 justify-end mb-2">
                             {msg.images.map((imgSrc, imgIdx) => (
@@ -531,7 +482,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </div>
                         )}
 
-                        {/* Text & Inline Timestamp with Double Checkmarks and Rollback Action */}
                         <div className="flex flex-wrap items-end justify-end gap-x-3 gap-y-1">
                           <span className="whitespace-pre-wrap flex-1 text-left">{text}</span>
                           <span className="text-xs text-[var(--theme-text-muted)] font-sans select-none shrink-0 inline-flex items-center gap-1.5 opacity-80">
@@ -566,9 +516,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         </div>
                       </div>
                     ) : (
-                      /* Assistant Bubble (Telegram Incoming Style with Bento Glass Theme) */
+                      /* Assistant Bubble */
                       <div className="relative w-fit max-w-[85%] bento-card text-[var(--theme-text)] border border-[var(--theme-border)] rounded-2xl rounded-tl-[4px] px-4.5 py-3 shadow-md text-[13.5px] leading-relaxed select-text space-y-2.5 transition-all">
-                        {/* Thinking / Reasoning Block (Active while generating OR when thinking content exists) */}
                         {reasoningEnabled && (hasThinking || isActivelyGenerating) && (
                           <div className="mb-2 w-full">
                             <ReasoningViewer
@@ -581,7 +530,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </div>
                         )}
 
-                        {/* Assistant Text & Bottom Right Timestamp with Rollback */}
                         {text && (
                           <div className="space-y-1">
                             <NotionMarkdown content={cleanContent(text)} />
@@ -616,7 +564,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                           </div>
                         )}
 
-                        {/* Tool Calls Rendering */}
                         {msg.tool_calls && msg.tool_calls.length > 0 && (
                           <div className="space-y-2 pt-1 w-full">
                             {msg.tool_calls.map((tool) => {
@@ -671,73 +618,28 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               );
             })}
 
-            {/* Live Thinking ASCII HUD (displayed while agent is thinking before assistant message tokens arrive) */}
-            {agentStatus === 'thinking' && (!messages.some((m) => m.role === 'assistant' && (m.content.trim().length > 0 || (m.tool_calls && m.tool_calls.length > 0)))) && (
-              <div className="flex justify-start max-w-3xl mx-auto w-full my-3">
-                <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bento-card border border-[var(--theme-border)] text-xs text-[var(--theme-text)] animate-fadeIn shadow-sm font-mono">
-                  <span className="text-[var(--theme-accent)] font-bold text-sm tracking-wider select-none">
-                    {ASCII_FRAMES[asciiFrameIndex]}
-                  </span>
-                  <span className="font-medium text-xs text-[var(--theme-text)]">
-                    ИИ-Агент рассуждает...
-                  </span>
-                  <span className="inline-flex items-center gap-1 text-[10px] text-[var(--theme-text-muted)] opacity-80">
-                    <MaterialIcon name="schedule" size={11} />
-                    <span>{thinkingSeconds.toFixed(1)}s</span>
-                  </span>
-                  {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-[var(--theme-accent)] font-semibold pl-1 border-l border-[var(--theme-border)]">
-                      <MaterialIcon name="bolt" size={11} />
-                      <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
-                    </span>
-                  )}
-                  {liveTelemetry?.tokenCount !== undefined && liveTelemetry.tokenCount > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-[var(--theme-text-muted)]">
-                      <MaterialIcon name="memory" size={11} />
-                      <span>{liveTelemetry.tokenCount} tok</span>
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Live Telemetry Card during Generation */}
-            {liveTelemetry && agentStatus !== 'idle' && (
-              <div className="flex justify-start max-w-3xl mx-auto w-full my-2">
-                <div className="inline-flex items-center gap-3 px-3 py-1 rounded-full bento-card border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-text-muted)] shadow-sm">
-                  {liveTelemetry.tokensPerSec !== undefined && (
-                    <span className="flex items-center gap-1 text-[var(--theme-accent)] font-semibold">
-                      <MaterialIcon name="bolt" size={12} />
-                      <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
-                    </span>
-                  )}
-                  {liveTelemetry.tokenCount !== undefined && (
-                    <span className="flex items-center gap-1 text-[var(--theme-text)]">
-                      <MaterialIcon name="memory" size={12} className="text-[var(--theme-text-muted)]" />
-                      <span>{liveTelemetry.tokenCount} токенов</span>
-                    </span>
-                  )}
-                  {liveTelemetry.contextUsed !== undefined && (
-                    <button
-                      type="button"
-                      onClick={onOpenCustomizations}
-                      className="flex items-center gap-1 hidden sm:flex text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
-                      title="Нажмите, чтобы открыть детальный анализ токенов и кастомизаций"
-                    >
-                      <MaterialIcon name="storage" size={12} />
-                      <span>{liveTelemetry.contextUsed.toLocaleString()}{liveTelemetry.contextMax ? ` / ${liveTelemetry.contextMax.toLocaleString()}` : ''}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+            {/* Live Telemetry & Thinking Indicator via TelemetryHUD */}
+            <TelemetryHUD
+              liveTelemetry={liveTelemetry}
+              agentStatus={agentStatus}
+              thinkingSeconds={thinkingSeconds}
+              asciiFrame={ASCII_FRAMES[asciiFrameIndex]}
+              showThinkingBanner={
+                agentStatus === 'thinking' &&
+                !messages.some(
+                  (m) =>
+                    m.role === 'assistant' &&
+                    (m.content.trim().length > 0 || (m.tool_calls && m.tool_calls.length > 0))
+                )
+              }
+              onOpenCustomizations={onOpenCustomizations}
+            />
 
             <div ref={historyEndRef} />
           </div>
 
           {/* Bottom Floating Command Bar for Active Chat */}
           <div className="p-3 sm:p-4 shrink-0 max-w-3xl mx-auto w-full">
-            {/* Proactive Sparks Stream */}
             {config?.proactive_companion_enabled !== false && activeSparks.length > 0 && (
               <div className="space-y-2 mb-3">
                 {activeSparks.map((spark) => (
@@ -752,7 +654,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               </div>
             )}
 
-            {/* Dynamic Plan & Todos HUD in Active Chat */}
             {currentSession?.active_todos && currentSession.active_todos.length > 0 && (
               <PlanProgressStrip todos={currentSession.active_todos} />
             )}
@@ -778,4 +679,3 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     </div>
   );
 };
-

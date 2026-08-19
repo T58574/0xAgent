@@ -1,51 +1,37 @@
-import { Router } from 'express';
-
 let cachedLlamaReleases: any[] | null = null;
 let lastLlamaFetchTime: number = 0;
 const LLAMA_RELEASES_TTL_MS = 15 * 60 * 1000;
 
-export function createLlamaReleasesRouter(): Router {
-  const router = Router();
+export async function fetchLlamaReleases(forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedLlamaReleases && now - lastLlamaFetchTime < LLAMA_RELEASES_TTL_MS) {
+    return cachedLlamaReleases;
+  }
 
-  router.get('/llama-releases', async (_req, res) => {
-    try {
-      const now = Date.now();
-      if (cachedLlamaReleases && now - lastLlamaFetchTime < LLAMA_RELEASES_TTL_MS) {
-        return res.json({ releases: cachedLlamaReleases, cached: true });
-      }
-
-      const response = await fetch('https://api.github.com/repos/ggerganov/llama.cpp/releases?per_page=10', {
-        headers: { 'User-Agent': '0xAgent-Local-IDE/1.0' },
-      });
-
-      if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
-      }
-
-      const releasesData: any[] = await response.json();
-      const parsedReleases = releasesData.map((r) => ({
-        tag_name: r.tag_name,
-        name: r.name,
-        published_at: r.published_at,
-        assets: (r.assets || []).map((a: any) => ({
-          id: a.id,
-          name: a.name,
-          size: a.size,
-          browser_download_url: a.browser_download_url,
-        })),
-      }));
-
-      cachedLlamaReleases = parsedReleases;
-      lastLlamaFetchTime = now;
-
-      res.json({ releases: parsedReleases, cached: false });
-    } catch (err: any) {
-      if (cachedLlamaReleases) {
-        return res.json({ releases: cachedLlamaReleases, cached: true, error: err.message });
-      }
-      res.status(500).json({ error: err.message });
-    }
+  const response = await fetch('https://api.github.com/repos/ggerganov/llama.cpp/releases?per_page=15', {
+    headers: { 'User-Agent': '0xAgent-LocalApp' },
   });
 
-  return router;
+  if (!response.ok) {
+    if (cachedLlamaReleases) return cachedLlamaReleases;
+    throw new Error(`GitHub API error (${response.status}): ${response.statusText}`);
+  }
+
+  const releases: any[] = await response.json();
+  const formatted = releases.map((rel) => ({
+    tag: rel.tag_name,
+    name: rel.name || rel.tag_name,
+    published_at: rel.published_at,
+    assets: (rel.assets || [])
+      .filter((a: any) => a.name.endsWith('.zip') || a.name.endsWith('.tar.gz') || a.name.endsWith('.exe'))
+      .map((a: any) => ({
+        name: a.name,
+        download_url: a.browser_download_url,
+        size: `${(a.size / (1024 * 1024)).toFixed(1)} MB`,
+      })),
+  }));
+
+  cachedLlamaReleases = formatted;
+  lastLlamaFetchTime = now;
+  return formatted;
 }

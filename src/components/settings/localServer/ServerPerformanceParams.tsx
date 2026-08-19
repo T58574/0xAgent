@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
-import { Zap, Folder, Sparkles, Cpu, HelpCircle, ChevronDown, ChevronUp, Gauge, Check } from 'lucide-react';
+import { Zap, Folder, Sparkles, Cpu, ChevronDown, ChevronUp, Gauge } from 'lucide-react';
 import { LocalModelItem } from '../../../types';
+import {
+  InfoTooltip,
+  ParamNumberInput,
+  ParamTextInput,
+  ParamSlider,
+  ParamSelect,
+  SpeedPresetButton,
+  ParamToggleCard,
+} from './atoms';
 
-interface ServerPerformanceParamsProps {
+export interface ServerPerformanceParamsProps {
   host: string;
   setHost: (val: string) => void;
   port: number;
@@ -72,41 +81,13 @@ interface ServerPerformanceParamsProps {
   onApplyFastMtpPreset?: () => void;
 }
 
-// Apple-Style Help Tooltip Popover
-const InfoTooltip: React.FC<{ title: string; text: string; benefit?: string }> = ({ title, text, benefit }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className="relative inline-block ml-1 align-middle" onMouseEnter={() => setIsOpen(true)} onMouseLeave={() => setIsOpen(false)}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsOpen(!isOpen);
-        }}
-        className="p-0.5 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
-        title="Справка"
-      >
-        <HelpCircle size={13} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 z-50 w-64 p-3 rounded-2xl bento-card bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] shadow-2xl backdrop-blur-2xl text-left animate-fadeIn pointer-events-none">
-          <div className="text-xs font-bold text-[var(--theme-text)] mb-1 flex items-center gap-1.5">
-            <span>{title}</span>
-          </div>
-          <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed mb-1.5">{text}</p>
-          {benefit && (
-            <div className="pt-1.5 border-t border-[var(--theme-border)] text-[10px] font-semibold text-[var(--theme-accent)] flex items-center gap-1">
-              <span>✦ Эффект:</span>
-              <span>{benefit}</span>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+const CTX_PRESETS = [
+  { label: '4k', value: 4096 },
+  { label: '8k', value: 8192 },
+  { label: '16k', value: 16384 },
+  { label: '32k', value: 32768 },
+  { label: '65k', value: 65536 },
+];
 
 export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = ({
   host,
@@ -179,10 +160,8 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
 }) => {
   const [showAdvancedMtp, setShowAdvancedMtp] = useState(false);
 
-  // Is Speculative Decoding Enabled?
   const isMtpEnabled = specType !== 'none' && specDraftModel !== 'none';
 
-  // Toggle MTP on / off
   const handleToggleMtp = () => {
     if (isMtpEnabled) {
       setSpecType('none');
@@ -196,11 +175,9 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
     }
   };
 
-  // Speed Presets (Apple-Style)
   const applySpeedProfile = (profile: 'balanced' | 'turbo' | 'accurate') => {
     setSpecType('default');
     if (specDraftModel === 'none') setSpecDraftModel('');
-    
     if (profile === 'balanced') {
       setSpecDraftNMax(3);
       setSpecDraftPMin(0);
@@ -217,72 +194,88 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
     {
       label: 'Flash Attention (-fa)',
       sub: 'Ускорение внимания на GPU',
-      helpTitle: 'Flash Attention (-fa)',
-      helpText: 'Оптимизирует вычисление слоя внимания в VRAM. Ускоряет генерацию в 1.5–2 раза и снижает нагрев видеокарты.',
-      benefit: '+50-100% к скорости генерации',
+      tooltip: {
+        title: 'Flash Attention (-fa)',
+        text: 'Оптимизирует вычисление слоя внимания в VRAM. Ускоряет генерацию в 1.5–2 раза и снижает нагрев видеокарты.',
+        benefit: '+50-100% к скорости генерации',
+      },
       value: flashAttn,
       toggle: () => setFlashAttn(!flashAttn),
     },
     {
       label: 'Jinja Template (--jinja)',
       sub: 'Шаблоны промптов и мыслей',
-      helpTitle: 'Jinja Template (--jinja)',
-      helpText: 'Включает нативный рендеринг системных шаблонов чата и формата рассуждений для современных моделей (Qwen, DeepSeek).',
-      benefit: 'Идеальное форматирование мыслей',
+      tooltip: {
+        title: 'Jinja Template (--jinja)',
+        text: 'Включает нативный рендеринг системных шаблонов чата и формата рассуждений для современных моделей (Qwen, DeepSeek).',
+        benefit: 'Идеальное форматирование мыслей',
+      },
       value: jinja,
       toggle: () => setJinja(!jinja),
     },
     {
       label: 'Preserve Reasoning',
       sub: 'Отображение хода мыслей',
-      helpTitle: 'Preserve Reasoning',
-      helpText: 'Сохраняет и выводит цепочку мыслей <think>...</think> в интерфейсе чата, позволяя видеть логику агента перед кодом.',
-      benefit: 'Прозрачность решений ассистента',
+      tooltip: {
+        title: 'Preserve Reasoning',
+        text: 'Сохраняет и выводит цепочку мыслей <think>...</think> в интерфейсе чата, позволяя видеть логику агента перед кодом.',
+        benefit: 'Прозрачность решений ассистента',
+      },
       value: reasoningPreserve,
       toggle: () => setReasoningPreserve(!reasoningPreserve),
     },
     {
       label: 'Prompt Cache',
       sub: 'Кэширование истории в ОЗУ',
-      helpTitle: 'Prompt Cache',
-      helpText: 'Сохраняет неизменную часть системного промпта и контекста в оперативной памяти, избавляя от повторного чтения при каждом вопросе.',
-      benefit: 'Мгновенный старт генерации',
+      tooltip: {
+        title: 'Prompt Cache',
+        text: 'Сохраняет неизменную часть системного промпта и контекста в оперативной памяти, избавляя от повторного чтения при каждом вопросе.',
+        benefit: 'Мгновенный старт генерации',
+      },
       value: promptCache,
       toggle: () => setPromptCache(!promptCache),
     },
     {
       label: 'Use Memory Map (--mmap)',
       sub: 'Быстрая загрузка файла модели',
-      helpTitle: 'Memory Map (--mmap)',
-      helpText: 'Загружает модель напрямую через виртуальную память Windows без полного дублирования файла в оперативную память.',
-      benefit: 'Запуск сервера за 1–2 секунды',
+      tooltip: {
+        title: 'Memory Map (--mmap)',
+        text: 'Загружает модель напрямую через виртуальную память Windows без полного дублирования файла в оперативную память.',
+        benefit: 'Запуск сервера за 1–2 секунды',
+      },
       value: mmap,
       toggle: () => setMmap(!mmap),
     },
     {
       label: 'Lock Memory (--mlock)',
       sub: 'Запрет сброса в файл подкачки',
-      helpTitle: 'Lock Memory (--mlock)',
-      helpText: 'Блокирует память модели в физической RAM, запрещая Windows сбрасывать её на жесткий диск/SSD при нехватке памяти.',
-      benefit: 'Защита от фризов при нагрузке',
+      tooltip: {
+        title: 'Lock Memory (--mlock)',
+        text: 'Блокирует память модели в физической RAM, запрещая Windows сбрасывать её на жесткий диск/SSD при нехватке памяти.',
+        benefit: 'Защита от фризов при нагрузке',
+      },
       value: mlock,
       toggle: () => setMlock(!mlock),
     },
     {
       label: 'Continuous Batching',
       sub: 'Параллельная обработка запросов',
-      helpTitle: 'Continuous Batching',
-      helpText: 'Позволяет серверу обрабатывать новые входящие запросы в фоне без блокировки главного потока.',
-      benefit: 'Многозадачность без ожидания',
+      tooltip: {
+        title: 'Continuous Batching',
+        text: 'Позволяет серверу обрабатывать новые входящие запросы в фоне без блокировки главного потока.',
+        benefit: 'Многозадачность без ожидания',
+      },
       value: contBatching,
       toggle: () => setContBatching(!contBatching),
     },
     {
       label: 'Embeddings Output',
       sub: 'Векторные эмбеддинги',
-      helpTitle: 'Embeddings Output',
-      helpText: 'Включает генерацию числовых векторных представлений текста для семантического поиска по коду и памяти.',
-      benefit: 'Векторный поиск по проекту',
+      tooltip: {
+        title: 'Embeddings Output',
+        text: 'Включает генерацию числовых векторных представлений текста для семантического поиска по коду и памяти.',
+        benefit: 'Векторный поиск по проекту',
+      },
       value: embedding,
       toggle: () => setEmbedding(!embedding),
     },
@@ -321,310 +314,199 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
 
       {/* Host & Port */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Host (IP-адрес)</label>
-            <InfoTooltip
-              title="Host (Сетевой адрес)"
-              text="IP-адрес, на котором локальный сервер слушает входящие запросы. 127.0.0.1 доступен только с вашего ПК, 0.0.0.0 открывает доступ в локальной сети."
-              benefit="Локальная изоляция или раздача по LAN"
-            />
-          </div>
-          <input
-            type="text"
-            value={host}
-            onChange={(e) => setHost(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Port (Порт)</label>
-            <InfoTooltip
-              title="Port (Сетевой порт)"
-              text="Сетевой порт API сервера. По умолчанию 11434 (стандарт OpenAI/Ollama) или 8080."
-            />
-          </div>
-          <input
-            type="number"
-            value={port}
-            onChange={(e) => setPort(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-      </div>
-
-      {/* Context Size -c with quick presets */}
-      <div className="space-y-1.5 pt-1">
-        <div className="flex justify-between items-center text-xs">
-          <div className="flex items-center">
-            <label className="font-bold text-xs text-[var(--theme-text)]">Размер контекста (-c)</label>
-            <InfoTooltip
-              title="Размер контекста (-c)"
-              text="Максимальное количество токенов истории диалога и кода, которые модель может удерживать в памяти одновременно."
-              benefit="16k–32k достаточно для 95% проектов"
-            />
-          </div>
-          <div className="flex gap-1.5">
-            {[4096, 8192, 16384, 32768, 65536].map((sz) => (
-              <button
-                key={sz}
-                type="button"
-                onClick={() => setCtxSize(sz)}
-                className={`px-2 py-0.5 rounded-lg text-[10px] font-mono cursor-pointer transition-all border ${
-                  ctxSize === sz
-                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] font-bold shadow-sm'
-                    : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border-[var(--theme-border)] hover:text-[var(--theme-text)]'
-                }`}
-              >
-                {sz / 1024}k
-              </button>
-            ))}
-          </div>
-        </div>
-        <input
-          type="number"
-          value={ctxSize}
-          onChange={(e) => setCtxSize(Number(e.target.value))}
-          className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
+        <ParamTextInput
+          label="Host (IP-адрес)"
+          value={host}
+          onChange={setHost}
+          tooltip={{
+            title: 'Host (Сетевой адрес)',
+            text: 'IP-адрес, на котором локальный сервер слушает входящие запросы. 127.0.0.1 доступен только с вашего ПК, 0.0.0.0 открывает доступ в локальной сети.',
+            benefit: 'Локальная изоляция или раздача по LAN',
+          }}
+        />
+        <ParamNumberInput
+          label="Port (Порт)"
+          value={port}
+          onChange={setPort}
+          tooltip={{
+            title: 'Port (Сетевой порт)',
+            text: 'Сетевой порт API сервера. По умолчанию 11434 (стандарт OpenAI/Ollama) или 8080.',
+          }}
         />
       </div>
 
+      {/* Context Size -c with quick presets */}
+      <ParamSlider
+        label="Размер контекста (-c)"
+        value={ctxSize}
+        onChange={setCtxSize}
+        min={512}
+        max={131072}
+        step={512}
+        presets={CTX_PRESETS}
+        tooltip={{
+          title: 'Размер контекста (-c)',
+          text: 'Максимальное количество токенов истории диалога и кода, которые модель может удерживать в памяти одновременно.',
+          benefit: '16k–32k достаточно для 95% проектов',
+        }}
+      />
+
       {/* GPU Layers & CPU Threads */}
       <div className="grid grid-cols-2 gap-3 pt-1">
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">GPU Layers (-ngl)</label>
-            <InfoTooltip
-              title="Слои GPU (-ngl)"
-              text="Сколько слоев нейросети выгрузить в видеопамять (VRAM). Значение 99 выгружает всю модель на видеокарту для максимальной скорости."
-              benefit="Максимальная скорость на GPU"
-            />
-          </div>
-          <input
-            type="number"
-            value={gpuLayers}
-            onChange={(e) => setGpuLayers(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center text-xs">
-            <div className="flex items-center">
-              <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">CPU Threads (-t)</label>
-              <InfoTooltip
-                title="Потоки процессора (-t)"
-                text="Количество потоков CPU для вычислений. 0 — автоматический подбор под физические ядра вашего процессора."
-              />
-            </div>
-            <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">{threads === 0 ? 'Авто' : `${threads} потоков`}</span>
-          </div>
-          <input
-            type="number"
-            min="0"
-            value={threads}
-            onChange={(e) => setThreads(Number(e.target.value))}
-            placeholder="0 = Авто"
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
+        <ParamNumberInput
+          label="GPU Layers (-ngl)"
+          value={gpuLayers}
+          onChange={setGpuLayers}
+          tooltip={{
+            title: 'Слои GPU (-ngl)',
+            text: 'Сколько слоев нейросети выгрузить в видеопамять (VRAM). Значение 99 выгружает всю модель на видеокарту для максимальной скорости.',
+            benefit: 'Максимальная скорость на GPU',
+          }}
+        />
+        <ParamNumberInput
+          label="CPU Threads (-t)"
+          value={threads}
+          min={0}
+          placeholder="0 = Авто"
+          badge={threads === 0 ? 'Авто' : `${threads} потоков`}
+          onChange={setThreads}
+          tooltip={{
+            title: 'Потоки процессора (-t)',
+            text: 'Количество потоков CPU для вычислений. 0 — автоматический подбор под физические ядра вашего процессора.',
+          }}
+        />
       </div>
 
       {/* Batch & Micro-Batch */}
       <div className="grid grid-cols-2 gap-3 pt-1">
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Batch Size (-b)</label>
-            <InfoTooltip
-              title="Размер батча (-b)"
-              text="Размер пакета токенов для одновременной обработки промпта. Значение 2048 оптимально для быстрого чтения длинного кода."
-            />
-          </div>
-          <input
-            type="number"
-            value={batchSize}
-            onChange={(e) => setBatchSize(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Micro-Batch (-ub)</label>
-            <InfoTooltip
-              title="Микро-батч (-ub)"
-              text="Размер подпакета вычислений внутри VRAM. 512 обеспечивает идеальный баланс между скоростью и экономией видеопамяти."
-            />
-          </div>
-          <input
-            type="number"
-            value={ubatchSize}
-            onChange={(e) => setUbatchSize(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
+        <ParamNumberInput
+          label="Batch Size (-b)"
+          value={batchSize}
+          onChange={setBatchSize}
+          tooltip={{
+            title: 'Размер батча (-b)',
+            text: 'Размер пакета токенов для одновременной обработки промпта. Значение 2048 оптимально для быстрого чтения длинного кода.',
+          }}
+        />
+        <ParamNumberInput
+          label="Micro-Batch (-ub)"
+          value={ubatchSize}
+          onChange={setUbatchSize}
+          tooltip={{
+            title: 'Микро-батч (-ub)',
+            text: 'Размер подпакета вычислений внутри VRAM. 512 обеспечивает идеальный баланс между скоростью и экономией видеопамяти.',
+          }}
+        />
       </div>
 
       {/* Temperature & Predict */}
       <div className="grid grid-cols-2 gap-3 pt-1">
-        <div className="space-y-1.5">
-          <div className="flex justify-between items-center text-xs">
-            <div className="flex items-center">
-              <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Температура (Креативность)</label>
-              <InfoTooltip
-                title="Температура"
-                text="Степень случайности и креативности модели. Для программирования рекомендуется 0.2–0.7 (строгая логика), для идей — 0.8–1.0."
-              />
-            </div>
-            <span className="text-[10px] font-mono text-[var(--theme-text-muted)] font-bold">{temp.toFixed(2)}</span>
-          </div>
-          <input
-            type="number"
-            step="0.05"
-            min="0"
-            max="2"
-            value={temp}
-            onChange={(e) => setTemp(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Макс. токенов ответа (-n)</label>
-            <InfoTooltip
-              title="Лимит токенов ответа (-n)"
-              text="Максимальная длина одного ответа модели. -1 или большие значения позволяют писать длинные файлы без обрезки."
-            />
-          </div>
-          <input
-            type="number"
-            value={predict}
-            onChange={(e) => setPredict(Number(e.target.value))}
-            placeholder="-1 = Без лимита"
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
+        <ParamNumberInput
+          label="Температура (Креативность)"
+          value={temp}
+          min={0}
+          max={2}
+          step={0.05}
+          badge={temp.toFixed(2)}
+          onChange={setTemp}
+          tooltip={{
+            title: 'Температура',
+            text: 'Степень случайности и креативности модели. Для программирования рекомендуется 0.2–0.7 (строгая логика), для идей — 0.8–1.0.',
+          }}
+        />
+        <ParamNumberInput
+          label="Макс. токенов ответа (-n)"
+          value={predict}
+          placeholder="-1 = Без лимита"
+          onChange={setPredict}
+          tooltip={{
+            title: 'Лимит токенов ответа (-n)',
+            text: 'Максимальная длина одного ответа модели. -1 или большие значения позволяют писать длинные файлы без обрезки.',
+          }}
+        />
       </div>
 
       {/* Sampling Parameters: Min-P, Top-K, Top-P, Repeat Penalty */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Min-P</label>
-            <InfoTooltip
-              title="Min-P сэмплинг"
-              text="Отсекает маловероятные токены относительно самого вероятного. Значение 0.05 отсекает мусорные варианты и защищает от галлюцинаций."
-            />
-          </div>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="1"
-            value={minP}
-            onChange={(e) => setMinP(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Top-K</label>
-            <InfoTooltip
-              title="Top-K сэмплинг"
-              text="Ограничивает выборку K наиболее вероятными токенами на каждом шаге генерации. 20–40 идеально для точного кода."
-            />
-          </div>
-          <input
-            type="number"
-            value={topK}
-            onChange={(e) => setTopK(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Top-P</label>
-            <InfoTooltip
-              title="Top-P (Nucleus Sampling)"
-              text="Суммарная вероятность пула токенов для выбора. 0.95 сохраняет вариативность языка без потери строгости."
-            />
-          </div>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="1"
-            value={topP}
-            onChange={(e) => setTopP(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Штраф повторов</label>
-            <InfoTooltip
-              title="Штраф за повторы (Repeat Penalty)"
-              text="Предотвращает зацикливание модели на одних и тех же словах. Для кода рекомендуется 1.0 (без штрафа, чтобы не ломать синтаксис)."
-            />
-          </div>
-          <input
-            type="number"
-            step="0.05"
-            min="1"
-            max="2"
-            value={repeatPenalty}
-            onChange={(e) => setRepeatPenalty(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
+        <ParamNumberInput
+          label="Min-P"
+          value={minP}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={setMinP}
+          tooltip={{
+            title: 'Min-P сэмплинг',
+            text: 'Отсекает маловероятные токены относительно самого вероятного. Значение 0.05 отсекает мусорные варианты и защищает от галлюцинаций.',
+          }}
+        />
+        <ParamNumberInput
+          label="Top-K"
+          value={topK}
+          onChange={setTopK}
+          tooltip={{
+            title: 'Top-K сэмплинг',
+            text: 'Ограничивает выборку K наиболее вероятными токенами на каждом шаге генерации. 20–40 идеально для точного кода.',
+          }}
+        />
+        <ParamNumberInput
+          label="Top-P"
+          value={topP}
+          min={0}
+          max={1}
+          step={0.01}
+          onChange={setTopP}
+          tooltip={{
+            title: 'Top-P (Nucleus Sampling)',
+            text: 'Суммарная вероятность пула токенов для выбора. 0.95 сохраняет вариативность языка без потери строгости.',
+          }}
+        />
+        <ParamNumberInput
+          label="Штраф повторов"
+          value={repeatPenalty}
+          min={1}
+          max={2}
+          step={0.05}
+          onChange={setRepeatPenalty}
+          tooltip={{
+            title: 'Штраф за повторы (Repeat Penalty)',
+            text: 'Предотвращает зацикливание модели на одних и тех же словах. Для кода рекомендуется 1.0 (без штрафа, чтобы не ломать синтаксис).',
+          }}
+        />
       </div>
 
       {/* Parallel Slots & Cache Reuse */}
       <div className="grid grid-cols-2 gap-3 pt-1">
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Параллельные слоты (-np)</label>
-            <InfoTooltip
-              title="Параллельные слоты (-np)"
-              text="Количество одновременно обрабатываемых диалогов. Для персонального локального использования рекомендуется строго 1 слот для экономии VRAM."
-              benefit="1 слот экономит до 70% видеопамяти"
-            />
-          </div>
-          <input
-            type="number"
-            min="1"
-            max="8"
-            value={parallelSlots}
-            onChange={(e) => setParallelSlots(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Cache Reuse (KV Chunk)</label>
-            <InfoTooltip
-              title="Повторное использование кэша"
-              text="Минимальный размер блока кэша для переиспользования между запросами. 256 ускоряет повторные запросы."
-            />
-          </div>
-          <input
-            type="number"
-            value={cacheReuse}
-            onChange={(e) => setCacheReuse(Number(e.target.value))}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-          />
-        </div>
+        <ParamNumberInput
+          label="Параллельные слоты (-np)"
+          value={parallelSlots}
+          min={1}
+          max={8}
+          onChange={setParallelSlots}
+          tooltip={{
+            title: 'Параллельные слоты (-np)',
+            text: 'Количество одновременно обрабатываемых диалогов. Для персонального локального использования рекомендуется строго 1 слот для экономии VRAM.',
+            benefit: '1 слот экономит до 70% видеопамяти',
+          }}
+        />
+        <ParamNumberInput
+          label="Cache Reuse (KV Chunk)"
+          value={cacheReuse}
+          onChange={setCacheReuse}
+          tooltip={{
+            title: 'Повторное использование кэша',
+            text: 'Минимальный размер блока кэша для переиспользования между запросами. 256 ускоряет повторные запросы.',
+          }}
+        />
       </div>
 
       {/* Slot Save Path */}
-      <div className="space-y-1.5 pt-1">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Папка сохранения слотов (--slot-save-path)</label>
-            <InfoTooltip
-              title="Сохранение состояния слотов"
-              text="Путь к директории, в которую сервер сохраняет состояние KV-кэша для мгновенного восстановления контекста после перезагрузки."
-            />
-          </div>
+      <ParamTextInput
+        label="Папка сохранения слотов (--slot-save-path)"
+        value={slotSavePath}
+        onChange={setSlotSavePath}
+        placeholder="~/.0xagent/slots or C:\path\to\slots"
+        actionButton={
           <button
             type="button"
             onClick={onSelectSlotSavePath}
@@ -633,22 +515,15 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             <Folder size={12} />
             <span>Обзор...</span>
           </button>
-        </div>
-        <input
-          type="text"
-          value={slotSavePath}
-          onChange={(e) => setSlotSavePath(e.target.value)}
-          placeholder="~/.0xagent/slots or C:\path\to\slots"
-          className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-        />
-      </div>
+        }
+        tooltip={{
+          title: 'Сохранение состояния слотов',
+          text: 'Путь к директории, в которую сервер сохраняет состояние KV-кэша для мгновенного восстановления контекста после перезагрузки.',
+        }}
+      />
 
-      {/* ========================================================================= */}
       {/* 🚀 APPLE-STYLE SPECULATIVE ACCELERATION (MTP & DRAFT) SECTION */}
-      {/* ========================================================================= */}
       <div className="p-4.5 rounded-3xl bento-card space-y-4 border border-[var(--theme-border)] bg-[var(--theme-panel)]/80 shadow-md">
-        
-        {/* Main Apple-Style Master Switch Header */}
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
@@ -667,7 +542,6 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             </p>
           </div>
 
-          {/* Master Toggle Pill */}
           <button
             type="button"
             onClick={handleToggleMtp}
@@ -684,10 +558,8 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           </button>
         </div>
 
-        {/* When Enabled: Apple Segmented Speed Controls & Model Selector */}
         {isMtpEnabled && (
           <div className="space-y-3.5 pt-2 border-t border-[var(--theme-border)] animate-fadeIn">
-            
             {/* Speed Profile Segmented Control */}
             <div className="space-y-1.5">
               <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] flex items-center gap-1.5">
@@ -695,53 +567,24 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
                 <span>Профиль скорости (Агрессивность драфта)</span>
               </label>
               <div className="grid grid-cols-3 gap-2 p-1 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)]">
-                <button
-                  type="button"
+                <SpeedPresetButton
+                  title="⚡ Баланс (2.0x)"
+                  subtitle="3 токена • Рекомендуется"
+                  active={specDraftNMax === 3}
                   onClick={() => applySpeedProfile('balanced')}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                    specDraftNMax === 3
-                      ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-sm border border-[var(--theme-border)] font-bold'
-                      : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
-                  }`}
-                >
-                  <div className="flex items-center gap-1">
-                    <span>⚡ Баланс (2.0x)</span>
-                    {specDraftNMax === 3 && <Check size={12} className="text-[var(--theme-accent)]" />}
-                  </div>
-                  <span className="text-[9px] opacity-70 font-normal">3 токена • Рекомендуется</span>
-                </button>
-
-                <button
-                  type="button"
+                />
+                <SpeedPresetButton
+                  title="🔥 Турбо (2.5x+)"
+                  subtitle="5 токенов • Макс. скорость"
+                  active={specDraftNMax === 5}
                   onClick={() => applySpeedProfile('turbo')}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                    specDraftNMax === 5
-                      ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-sm border border-[var(--theme-border)] font-bold'
-                      : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
-                  }`}
-                >
-                  <div className="flex items-center gap-1">
-                    <span>🔥 Турбо (2.5x+)</span>
-                    {specDraftNMax === 5 && <Check size={12} className="text-[var(--theme-accent)]" />}
-                  </div>
-                  <span className="text-[9px] opacity-70 font-normal">5 токенов • Макс. скорость</span>
-                </button>
-
-                <button
-                  type="button"
+                />
+                <SpeedPresetButton
+                  title="🎯 Точный (1.5x)"
+                  subtitle="2 токена • Для сложных задач"
+                  active={specDraftNMax === 2}
                   onClick={() => applySpeedProfile('accurate')}
-                  className={`py-2 px-3 rounded-xl text-xs font-semibold flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer ${
-                    specDraftNMax === 2
-                      ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-sm border border-[var(--theme-border)] font-bold'
-                      : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
-                  }`}
-                >
-                  <div className="flex items-center gap-1">
-                    <span>🎯 Точный (1.5x)</span>
-                    {specDraftNMax === 2 && <Check size={12} className="text-[var(--theme-accent)]" />}
-                  </div>
-                  <span className="text-[9px] opacity-70 font-normal">2 токена • Для сложных задач</span>
-                </button>
+                />
               </div>
             </div>
 
@@ -777,7 +620,9 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               <select
                 value={
                   scannedDraftModels.find(
-                    (m) => m.filePath.toLowerCase() === specDraftModel.toLowerCase() || m.fileName.toLowerCase() === specDraftModel.toLowerCase()
+                    (m) =>
+                      m.filePath.toLowerCase() === specDraftModel.toLowerCase() ||
+                      m.fileName.toLowerCase() === specDraftModel.toLowerCase()
                   )?.filePath || (specDraftModel ? 'custom' : '')
                 }
                 onChange={(e) => {
@@ -790,15 +635,25 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
                 }}
                 className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none cursor-pointer transition-colors"
               >
-                <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">-- Авто-детект драфт-модели (по умолчанию) --</option>
+                <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
+                  -- Авто-детект драфт-модели (по умолчанию) --
+                </option>
                 {scannedDraftModels.map((m) => (
-                  <option key={m.id || m.filePath} value={m.filePath} className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
+                  <option
+                    key={m.id || m.filePath}
+                    value={m.filePath}
+                    className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]"
+                  >
                     {m.fileName} ({m.quantization || 'GGUF'} • {m.sizeGB})
                   </option>
                 ))}
-                {specDraftModel && specDraftModel !== 'none' && !scannedDraftModels.some((m) => m.filePath.toLowerCase() === specDraftModel.toLowerCase()) && (
-                  <option value="custom" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Пользовательский путь: {specDraftModel}</option>
-                )}
+                {specDraftModel &&
+                  specDraftModel !== 'none' &&
+                  !scannedDraftModels.some((m) => m.filePath.toLowerCase() === specDraftModel.toLowerCase()) && (
+                    <option value="custom" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
+                      Пользовательский путь: {specDraftModel}
+                    </option>
+                  )}
               </select>
 
               {specDraftModel && specDraftModel !== 'none' && (
@@ -825,57 +680,47 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
 
               {showAdvancedMtp && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2.5 animate-fadeIn">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-[var(--theme-text-muted)]">Режим (--spec-type)</label>
-                    <select
-                      value={specType}
-                      onChange={(e) => setSpecType(e.target.value)}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:outline-none cursor-pointer"
-                    >
-                      <option value="default" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">default (стандартный)</option>
-                      <option value="draft-mtp" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">draft-mtp (MTP)</option>
-                      <option value="draft-eagle" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">draft-eagle</option>
-                    </select>
-                  </div>
+                  <ParamSelect
+                    label="Режим (--spec-type)"
+                    value={specType}
+                    compact
+                    onChange={setSpecType}
+                    options={[
+                      { value: 'default', label: 'default (стандартный)' },
+                      { value: 'draft-mtp', label: 'draft-mtp (MTP)' },
+                      { value: 'draft-eagle', label: 'draft-eagle' },
+                    ]}
+                  />
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-[var(--theme-text-muted)]">Draft GPU (-ngld)</label>
-                    <input
-                      type="number"
-                      value={specDraftNgl}
-                      onChange={(e) => setSpecDraftNgl(Number(e.target.value))}
-                      placeholder="99"
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:outline-none"
-                    />
-                  </div>
+                  <ParamNumberInput
+                    label="Draft GPU (-ngld)"
+                    value={specDraftNgl}
+                    placeholder="99"
+                    className="space-y-1.5"
+                    onChange={setSpecDraftNgl}
+                  />
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-[var(--theme-text-muted)]">Min Prob (-p-min)</label>
-                    <input
-                      type="number"
-                      step="0.05"
-                      value={specDraftPMin}
-                      onChange={(e) => setSpecDraftPMin(Number(e.target.value))}
-                      className="w-full px-2.5 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:outline-none"
-                    />
-                  </div>
+                  <ParamNumberInput
+                    label="Min Prob (-p-min)"
+                    value={specDraftPMin}
+                    step={0.05}
+                    onChange={setSpecDraftPMin}
+                  />
 
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-semibold text-[var(--theme-text-muted)]">Формат мыслей</label>
-                    <select
-                      value={reasoningFormat}
-                      onChange={(e) => setReasoningFormat(e.target.value)}
-                      className="w-full px-2 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:outline-none cursor-pointer"
-                    >
-                      <option value="deepseek" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">deepseek (Qwen 3.8)</option>
-                      <option value="chatml" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">chatml</option>
-                      <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">auto / default</option>
-                    </select>
-                  </div>
+                  <ParamSelect
+                    label="Формат мыслей"
+                    value={reasoningFormat}
+                    compact
+                    onChange={setReasoningFormat}
+                    options={[
+                      { value: 'deepseek', label: 'deepseek (Qwen 3.8)' },
+                      { value: 'chatml', label: 'chatml' },
+                      { value: '', label: 'auto / default' },
+                    ]}
+                  />
                 </div>
               )}
             </div>
-
           </div>
         )}
       </div>
@@ -884,7 +729,9 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
       <div className="space-y-1.5 pt-1">
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">Дополнительные CLI флаги (Custom Args)</label>
+            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+              Дополнительные CLI флаги (Custom Args)
+            </label>
             <InfoTooltip
               title="Дополнительные CLI флаги"
               text="Прямые параметры командной строки llama.cpp. Например, квантование контекста -ctk q8_0 -ctv q8_0 экономит до 50% видеопамяти VRAM."
@@ -937,40 +784,17 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         />
       </div>
 
-      {/* Switches Grid with Apple-Style Subtitles and Info Popovers */}
+      {/* Switches Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-[var(--theme-border)]">
         {toggleItems.map((item, i) => (
-          <div
+          <ParamToggleCard
             key={i}
-            onClick={item.toggle}
-            className={`flex items-center justify-between p-3 rounded-2xl border cursor-pointer transition-all ${
-              item.value
-                ? 'border-[var(--theme-accent)] bg-[var(--theme-card-bg)] shadow-sm'
-                : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:border-[var(--theme-text-muted)]'
-            }`}
-          >
-            <div className="space-y-0.5 pr-2">
-              <div className="flex items-center">
-                <span className="text-[11px] font-bold text-[var(--theme-text)]">{item.label}</span>
-                <InfoTooltip title={item.helpTitle} text={item.helpText} benefit={item.benefit} />
-              </div>
-              <p className="text-[10px] text-[var(--theme-text-muted)] line-clamp-1">{item.sub}</p>
-            </div>
-
-            <div
-              className={`w-8 h-4.5 rounded-full p-0.5 flex items-center transition-colors shrink-0 ${
-                item.value ? 'bg-[var(--theme-accent)]' : 'bg-zinc-300 dark:bg-zinc-700'
-              }`}
-            >
-              <div
-                className={`w-3.5 h-3.5 rounded-full transition-transform ${
-                  item.value
-                    ? 'translate-x-3.5 bg-[var(--theme-accent-text)]'
-                    : 'translate-x-0 bg-white'
-                }`}
-              />
-            </div>
-          </div>
+            label={item.label}
+            sub={item.sub}
+            value={item.value}
+            onToggle={item.toggle}
+            tooltip={item.tooltip}
+          />
         ))}
       </div>
     </div>
