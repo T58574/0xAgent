@@ -530,8 +530,8 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     className={`flex max-w-3xl mx-auto w-full my-3 transition-all duration-300 ${isUser ? 'justify-end' : 'justify-start'}`}
                   >
                     {isUser ? (
-                      /* User Bubble (Telegram Outgoing Style with Theme Styling) */
-                      <div className="relative w-fit max-w-[78%] bg-[var(--theme-accent,#38bdf8)]/15 text-[var(--theme-text)] border border-[var(--theme-accent,#38bdf8)]/30 rounded-2xl rounded-tr-[4px] px-4 py-2.5 shadow-md text-[13.5px] leading-relaxed select-text space-y-1.5 transition-all">
+                      /* User Bubble */
+                      <div className="relative w-fit max-w-[78%] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-accent)]/20 rounded-2xl rounded-tr-[4px] px-4 py-2.5 shadow-sm text-sm leading-relaxed select-text space-y-1.5 transition-all">
                         {/* Attached Images */}
                         {msg.images && msg.images.length > 0 && (
                           <div className="flex flex-wrap gap-2 justify-end mb-2">
@@ -540,7 +540,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                                 key={imgIdx}
                                 src={imgSrc}
                                 alt="Attached"
-                                className="max-h-48 rounded-xl border border-[var(--theme-border)] shadow-md object-contain"
+                                className="max-h-48 rounded-xl border border-[var(--theme-border)] shadow-sm object-contain"
                               />
                             ))}
                           </div>
@@ -549,9 +549,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                         {/* Text & Inline Timestamp with Double Checkmarks and Rollback Action */}
                         <div className="flex flex-wrap items-end justify-end gap-x-3 gap-y-1">
                           <span className="whitespace-pre-wrap flex-1 text-left">{text}</span>
-                          <span className="text-[10px] text-[var(--theme-text-muted)] font-sans select-none shrink-0 inline-flex items-center gap-1.5 opacity-80">
+                          <span className="text-xs text-[var(--theme-text-muted)] font-sans select-none shrink-0 inline-flex items-center gap-1.5 opacity-80">
                             {formatTime(msg.timestamp)}
-                            <CheckCheck size={13} className="text-[var(--theme-accent,#38bdf8)]" />
+                            <CheckCheck size={14} className="text-[var(--theme-accent)]" />
                             {currentSession?.id && (
                               <button
                                 type="button"
@@ -733,7 +733,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                     <button
                       type="button"
                       onClick={onOpenCustomizations}
-                      className="flex items-center gap-1 hidden sm:flex text-[var(--theme-text-muted)] hover:text-sky-400 transition-colors cursor-pointer"
+                      className="flex items-center gap-1 hidden sm:flex text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
                       title="Нажмите, чтобы открыть детальный анализ токенов и кастомизаций"
                     >
                       <MaterialIcon name="storage" size={12} />

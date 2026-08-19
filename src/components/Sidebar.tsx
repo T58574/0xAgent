@@ -458,12 +458,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Interactive ASCII Particle Canvas (starts on hover, flows bottom to top) */}
         <AsciiParticleFlow isActive={isHoveringHistory} />
 
-        <div className="relative z-10 flex items-center justify-between text-[11px] font-mono text-[var(--theme-text-muted)]">
+        <div className="relative z-10 flex items-center justify-between text-xs text-[var(--theme-text-muted)] font-medium">
           <div className="flex items-center gap-2">
-            <History size={14} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors" />
-            <span className="group-hover:text-[var(--theme-text)] transition-colors font-medium">История сессий</span>
+            <History size={15} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors" />
+            <span className="group-hover:text-[var(--theme-text)] transition-colors font-semibold">История сессий</span>
           </div>
-          <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] text-[var(--theme-text)] font-bold text-[10px] border border-[var(--theme-border)]">
+          <span className="px-2.5 py-0.5 rounded-md bg-[var(--theme-border-subtle)] text-[var(--theme-text)] font-bold text-xs border border-[var(--theme-border)]">
             {sessions.length}
           </span>
         </div>

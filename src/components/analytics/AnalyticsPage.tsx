@@ -93,26 +93,27 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
   }, [allAssistantMessages, searchFilter, selectedCategory]);
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-theme-bg overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin font-sans">
+    <div className="flex-1 flex flex-col h-full bg-[var(--theme-bg)] overflow-y-auto p-4 sm:p-6 space-y-6 scrollbar-thin font-sans text-[var(--theme-text)] select-text">
       
       {/* HEADER BAR */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--theme-border)] pb-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-100 flex items-center gap-2.5">
-            <Activity className="text-emerald-400" size={24} />
+          <h1 className="text-lg sm:text-xl font-bold text-[var(--theme-text)] flex items-center gap-2.5">
+            <Activity size={22} className="text-[var(--theme-accent)]" />
             <span>Аналитика & Телеметрия Производительности</span>
           </h1>
-          <p className="text-xs text-slate-400 mt-1 font-mono">
-            Мониторинг скорости токенов (t/s), заполнении контекста, объема диалогов и ошибок в реальном времени.
+          <p className="text-xs text-[var(--theme-text-muted)] mt-1 font-mono">
+            Мониторинг скорости токенов (t/s), заполнения контекста, объема диалогов и надежности в реальном времени.
           </p>
         </div>
 
         {onRefresh && (
           <button
+            type="button"
             onClick={onRefresh}
-            className="flat-btn px-3.5 py-1.5 rounded-md text-xs font-medium text-slate-300 hover:text-white flex items-center gap-1.5 cursor-pointer self-start sm:self-auto border-[var(--theme-border)]"
+            className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text)] flex items-center gap-2 cursor-pointer shadow-sm transition-colors"
           >
-            <RefreshCw size={14} />
+            <RefreshCw size={13} />
             <span>Обновить данные</span>
           </button>
         )}
@@ -122,81 +123,77 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* KPI 1: Speed */}
-        <div className="glass-panel p-4 rounded-xl border border-emerald-500/30 bg-slate-900/60 shadow-lg relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-400 mb-2 text-xs font-medium">
+        <div className="p-4.5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm relative overflow-hidden group">
+          <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-2 text-xs font-bold uppercase tracking-wider">
             <span>Средняя Скорость (t/s)</span>
-            <Zap size={16} className="text-emerald-400" />
+            <Zap size={16} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-accent)] transition-colors" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-emerald-400 tracking-tight">
-            {stats.avgSpeed} <span className="text-xs font-sans text-slate-400">т/сек</span>
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-[var(--theme-text)] tracking-tight">
+            {stats.avgSpeed} <span className="text-xs font-sans text-[var(--theme-text-muted)] font-normal">т/сек</span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-2 flex items-center gap-1 font-mono">
-            <span className="text-emerald-400 font-semibold">Живой расчет</span> генерации токенов
+          <div className="text-xs text-[var(--theme-text-muted)] mt-2 flex items-center gap-1 font-mono">
+            <span className="font-bold text-[var(--theme-text)]">Живой расчет</span> генерации токенов
           </div>
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-xl pointer-events-none" />
         </div>
 
         {/* KPI 2: Tokens */}
-        <div className="glass-panel p-4 rounded-xl border border-purple-500/30 bg-slate-900/60 shadow-lg relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-400 mb-2 text-xs font-medium">
+        <div className="p-4.5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm relative overflow-hidden group">
+          <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-2 text-xs font-bold uppercase tracking-wider">
             <span>Обработано Токенов</span>
-            <Database size={16} className="text-purple-400" />
+            <Database size={16} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-accent)] transition-colors" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-purple-300 tracking-tight">
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-[var(--theme-text)] tracking-tight">
             {stats.totalTokens.toLocaleString()}
           </div>
-          <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between font-mono">
+          <div className="text-xs text-[var(--theme-text-muted)] mt-2 flex items-center justify-between font-mono">
             <span>Промпт: {stats.totalPromptTokens.toLocaleString()}</span>
             <span>Вывод: {stats.totalEvalTokens.toLocaleString()}</span>
           </div>
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-purple-500/5 rounded-full blur-xl pointer-events-none" />
         </div>
 
         {/* KPI 3: Context Peak */}
-        <div className="glass-panel p-4 rounded-xl border border-[var(--theme-accent)]/30 bg-theme-panel/60 shadow-lg relative overflow-hidden group">
-          <div className="flex items-center justify-between text-theme-muted mb-2 text-xs font-medium">
+        <div className="p-4.5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm relative overflow-hidden group">
+          <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-2 text-xs font-bold uppercase tracking-wider">
             <span>Пик Контекстного Окна</span>
-            <MaterialIcon name="psychology" size={18} className="text-theme-accent" />
+            <MaterialIcon name="psychology" size={18} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-accent)] transition-colors" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-theme-accent tracking-tight">
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-[var(--theme-text)] tracking-tight">
             {stats.maxContextPercent}%
           </div>
-          <div className="w-full bg-slate-950 h-1.5 rounded-full overflow-hidden mt-3.5 border border-white/5">
+          <div className="w-full bg-[var(--theme-input-bg)] h-2 rounded-full overflow-hidden mt-3.5 border border-[var(--theme-border)]">
             <div
-              className="bg-theme-accent h-full transition-all duration-500"
+              className="bg-[var(--theme-accent)] h-full transition-all duration-500 rounded-full"
               style={{ width: `${Math.min(100, Number(stats.maxContextPercent))}%` }}
             />
           </div>
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-theme-accent/5 rounded-full blur-xl pointer-events-none" />
         </div>
 
         {/* KPI 4: Reliability */}
-        <div className="glass-panel p-4 rounded-xl border border-amber-500/30 bg-slate-900/60 shadow-lg relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-400 mb-2 text-xs font-medium">
+        <div className="p-4.5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm relative overflow-hidden group">
+          <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-2 text-xs font-bold uppercase tracking-wider">
             <span>Надежность Исполнения</span>
-            <CheckCircle2 size={16} className="text-amber-400" />
+            <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-accent)] transition-colors" />
           </div>
-          <div className="text-2xl sm:text-3xl font-bold font-mono text-amber-300 tracking-tight">
+          <div className="text-2xl sm:text-3xl font-bold font-mono text-[var(--theme-text)] tracking-tight">
             {stats.successRate}%
           </div>
-          <div className="text-[11px] text-slate-400 mt-2 flex items-center justify-between font-mono">
+          <div className="text-xs text-[var(--theme-text-muted)] mt-2 flex items-center justify-between font-mono">
             <span>Всего ответов: {stats.totalCount}</span>
-            <span className="text-rose-400">Ошибок: {stats.errorCount}</span>
+            <span className={stats.errorCount > 0 ? 'text-rose-500 font-bold' : ''}>Ошибок: {stats.errorCount}</span>
           </div>
-          <div className="absolute right-0 bottom-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none" />
         </div>
 
       </div>
 
       {/* TELEMETRY TABLE & FILTERS */}
-      <div className="glass-panel rounded-xl border border-[var(--theme-border)] bg-slate-900/40 p-4 space-y-4 shadow-xl">
+      <div className="p-5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] space-y-4 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <Layers className="text-emerald-400" size={18} />
-            <h2 className="text-sm font-semibold text-slate-100 uppercase tracking-wider">
+            <Layers className="text-[var(--theme-accent)]" size={18} />
+            <h2 className="text-xs font-bold text-[var(--theme-text)] uppercase tracking-wider">
               Логи Телеметрии Сообщений
             </h2>
-            <span className="px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+            <span className="px-2 py-0.5 rounded-md text-[11px] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] font-mono border border-[var(--theme-border)] font-bold">
               {filteredMessages.length} записей
             </span>
           </div>
@@ -204,42 +201,45 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
           {/* Filter Pills */}
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-2 text-slate-400" />
+              <Search size={14} className="absolute left-3 top-2.5 text-[var(--theme-text-muted)]" />
               <input
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 placeholder="Поиск по тексту или модели..."
-                className="pl-8 pr-3 py-1 rounded flat-input text-xs text-slate-200 focus:outline-none w-48 sm:w-56"
+                className="pl-8.5 pr-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] focus:outline-none w-48 sm:w-56 font-medium"
               />
             </div>
             
             <button
+              type="button"
               onClick={() => setSelectedCategory('all')}
-              className={`px-2.5 py-1 rounded text-xs font-medium cursor-pointer transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors border ${
                 selectedCategory === 'all'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
+                  : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
               }`}
             >
               Все
             </button>
             <button
+              type="button"
               onClick={() => setSelectedCategory('high_speed')}
-              className={`px-2.5 py-1 rounded text-xs font-medium cursor-pointer transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors border ${
                 selectedCategory === 'high_speed'
-                  ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
+                  : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
               }`}
             >
               Высокая скорость (≥30 t/s)
             </button>
             <button
+              type="button"
               onClick={() => setSelectedCategory('errors')}
-              className={`px-2.5 py-1 rounded text-xs font-medium cursor-pointer transition-colors ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-colors border ${
                 selectedCategory === 'errors'
-                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                  ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
+                  : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
               }`}
             >
               Ошибки ({stats.errorCount})
@@ -248,22 +248,22 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         </div>
 
         {/* TABLE */}
-        <div className="overflow-x-auto rounded-lg border border-white/5">
-          <table className="w-full text-xs text-left border-collapse">
-            <thead className="bg-slate-950 text-slate-300 font-semibold border-b border-[var(--theme-border)] uppercase tracking-wider text-[10px]">
+        <div className="overflow-x-auto rounded-xl border border-[var(--theme-border)]">
+          <table className="w-full text-xs text-left border-collapse font-sans">
+            <thead className="bg-[var(--theme-border-subtle)] text-[var(--theme-text)] font-bold border-b border-[var(--theme-border)] uppercase tracking-wider text-[10.5px]">
               <tr>
-                <th className="p-3">Время / Сессия</th>
-                <th className="p-3">Модель</th>
-                <th className="p-3">Скорость (t/s)</th>
-                <th className="p-3">Токены (Промпт / Вывод)</th>
-                <th className="p-3">Заполнение Контекста</th>
-                <th className="p-3">Время (мс)</th>
+                <th className="p-3.5">Время / Сессия</th>
+                <th className="p-3.5">Модель</th>
+                <th className="p-3.5">Скорость (t/s)</th>
+                <th className="p-3.5">Токены (Промпт / Вывод)</th>
+                <th className="p-3.5">Заполнение Контекста</th>
+                <th className="p-3.5">Время (мс)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/5 bg-slate-900/60 font-mono text-slate-300">
+            <tbody className="divide-y divide-[var(--theme-border)] bg-[var(--theme-card-bg)] font-mono text-[var(--theme-text)]">
               {filteredMessages.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-slate-500 font-sans">
+                  <td colSpan={6} className="p-8 text-center text-[var(--theme-text-muted)] font-sans">
                     Записи телеметрии не найдены.
                   </td>
                 </tr>
@@ -273,50 +273,50 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
                   const ctxPercent = m?.contextUsed && m?.contextMax ? ((m.contextUsed / m.contextMax) * 100).toFixed(1) : '0.0';
 
                   return (
-                    <tr key={item.msg.id} className="hover:bg-white/5 transition-colors">
-                      <td className="p-3 font-sans">
-                        <div className="font-semibold text-slate-200 truncate max-w-xs">{item.sessionTitle}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">
+                    <tr key={item.msg.id} className="hover:bg-[var(--theme-border-subtle)] transition-colors">
+                      <td className="p-3.5 font-sans">
+                        <div className="font-bold text-[var(--theme-text)] truncate max-w-xs">{item.sessionTitle}</div>
+                        <div className="text-[11px] text-[var(--theme-text-muted)] font-mono mt-0.5">
                           {new Date(item.msg.timestamp).toLocaleTimeString()}
                         </div>
                       </td>
-                      <td className="p-3">
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-purple-300 border border-purple-500/20 text-[11px]">
+                      <td className="p-3.5">
+                        <span className="px-2.5 py-1 rounded-lg bg-[var(--theme-input-bg)] text-[var(--theme-text)] border border-[var(--theme-border)] text-xs font-semibold">
                           {m?.modelName || 'qwen2.5-coder:7b'}
                         </span>
                       </td>
-                      <td className="p-3">
+                      <td className="p-3.5">
                         {m?.tokensPerSec ? (
-                          <span className="font-bold text-emerald-400 text-xs">
+                          <span className="font-bold text-[var(--theme-text)] text-xs">
                             {m.tokensPerSec} t/s
                           </span>
                         ) : (
-                          <span className="text-slate-500">—</span>
+                          <span className="text-[var(--theme-text-muted)]">—</span>
                         )}
                       </td>
-                      <td className="p-3 text-slate-300">
+                      <td className="p-3.5 text-[var(--theme-text)]">
                         {m?.promptTokens !== undefined ? (
                           <span>
-                            <span className="text-slate-400">{m.promptTokens}</span> +{' '}
-                            <span className="text-emerald-400">{m.completionTokens}</span> ={' '}
-                            <span className="font-semibold">{m.totalTokens}</span>
+                            <span className="text-[var(--theme-text-muted)]">{m.promptTokens}</span> +{' '}
+                            <span className="font-semibold">{m.completionTokens}</span> ={' '}
+                            <span className="font-bold">{m.totalTokens}</span>
                           </span>
                         ) : (
-                          <span className="text-slate-500">—</span>
+                          <span className="text-[var(--theme-text-muted)]">—</span>
                         )}
                       </td>
-                      <td className="p-3">
+                      <td className="p-3.5">
                         <div className="flex items-center gap-2">
-                          <div className="w-16 bg-slate-950 h-1.5 rounded-full overflow-hidden border border-white/5">
+                          <div className="w-18 bg-[var(--theme-input-bg)] h-2 rounded-full overflow-hidden border border-[var(--theme-border)]">
                             <div
-                              className="bg-theme-accent h-full"
+                              className="bg-[var(--theme-accent)] h-full rounded-full"
                               style={{ width: `${Math.min(100, Number(ctxPercent))}%` }}
                             />
                           </div>
-                          <span className="text-[11px] text-slate-400">{ctxPercent}%</span>
+                          <span className="text-xs text-[var(--theme-text-muted)] font-semibold">{ctxPercent}%</span>
                         </div>
                       </td>
-                      <td className="p-3 text-slate-400">
+                      <td className="p-3.5 text-[var(--theme-text-muted)]">
                         {m?.evalDurationMs ? `${m.evalDurationMs} ms` : '—'}
                       </td>
                     </tr>
@@ -329,19 +329,19 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
       </div>
 
       {/* DIAGNOSTIC SERVER LOGS */}
-      <div className="glass-panel rounded-xl border border-[var(--theme-border)] bg-slate-900/40 p-4 space-y-3 shadow-xl">
+      <div className="p-5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] space-y-3 shadow-sm">
         <div className="flex items-center gap-2">
-          <Terminal className="text-purple-400" size={18} />
-          <h2 className="text-sm font-semibold text-slate-100 uppercase tracking-wider">
+          <Terminal className="text-[var(--theme-text-muted)]" size={18} />
+          <h2 className="text-xs font-bold text-[var(--theme-text)] uppercase tracking-wider">
             Живой Терминал и Системный Лог Сервера
           </h2>
         </div>
-        <div className="bg-slate-950 p-3 rounded-lg border border-white/5 font-mono text-[11px] text-slate-300 max-h-48 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+        <div className="bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] p-3.5 rounded-xl border border-[var(--theme-border)] font-mono text-xs max-h-52 overflow-y-auto whitespace-pre-wrap leading-relaxed">
           {serverLogs.length === 0 ? (
-            <span className="text-slate-500">Логи сервера пока отсутствуют.</span>
+            <span className="text-[var(--theme-text-muted)]">Логи сервера пока отсутствуют.</span>
           ) : (
             serverLogs.slice(-50).map((log, idx) => (
-              <div key={idx} className={log.includes('[ERROR]') || log.includes('Ошибка') ? 'text-rose-400 font-semibold' : ''}>
+              <div key={idx} className={log.includes('[ERROR]') || log.includes('Ошибка') ? 'text-rose-500 font-bold' : ''}>
                 {log}
               </div>
             ))

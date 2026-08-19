@@ -45,7 +45,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
   const [wordWrap, setWordWrap] = useState<boolean>(false);
-  const [fontSize, setFontSize] = useState<number>(12); // px
+  const [fontSize, setFontSize] = useState<number>(14); // px
   
   // Search in file state
   const [showSearch, setShowSearch] = useState<boolean>(false);
@@ -188,15 +188,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       const key = `${match.index}-${fullMatch}`;
 
       if (comment) {
-        parts.push(<span key={key} className="opacity-40 text-theme-muted italic">{comment}</span>);
+        parts.push(<span key={key} className="opacity-40 text-[var(--theme-text-muted)] italic">{comment}</span>);
       } else if (stringLit) {
-        parts.push(<span key={key} className="text-emerald-400 font-medium">{stringLit}</span>);
+        parts.push(<span key={key} className="text-[var(--theme-text)] font-semibold">{stringLit}</span>);
       } else if (keyword) {
-        parts.push(<span key={key} className="text-amber-400 font-medium">{keyword}</span>);
+        parts.push(<span key={key} className="text-[var(--theme-text)] font-bold">{keyword}</span>);
       } else if (fnCall) {
-        parts.push(<span key={key} className="text-sky-400 font-medium">{fnCall}</span>);
+        parts.push(<span key={key} className="text-[var(--theme-text)] font-bold">{fnCall}</span>);
       } else if (numberLit) {
-        parts.push(<span key={key} className="text-emerald-300 font-medium">{numberLit}</span>);
+        parts.push(<span key={key} className="text-[var(--theme-text-muted)] font-semibold">{numberLit}</span>);
       } else {
         parts.push(fullMatch);
       }
@@ -218,10 +218,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     : 0;
 
   return (
-    <div className="h-full w-full bg-theme-bg text-theme-text flex flex-col font-mono text-xs overflow-hidden select-text">
+    <div className="h-full w-full bg-[var(--theme-bg)] text-[var(--theme-text)] flex flex-col text-xs overflow-hidden select-text font-sans">
       
       {/* 1. IDE EDITOR TABS BAR */}
-      <div className="flex items-center justify-between bg-theme-panel border-b border-theme-border select-none shrink-0 font-sans">
+      <div className="flex items-center justify-between bg-[var(--theme-panel)] border-b border-[var(--theme-border)] select-none shrink-0">
         
         {/* Open File Tabs */}
         <div className="flex items-center overflow-x-auto scrollbar-none flex-1 min-w-0">
@@ -233,15 +233,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               <div
                 key={tab.path}
                 onClick={() => onSelectTab(tab.path)}
-                className={`group flex items-center gap-2 px-3 py-2 border-r border-theme-border cursor-pointer transition-all shrink-0 ${
+                className={`group flex items-center gap-2 px-3.5 py-2.5 border-r border-[var(--theme-border)] cursor-pointer transition-all shrink-0 ${
                   isActive
-                    ? 'bg-theme-bg text-theme-text border-t-2 border-[var(--theme-accent)] font-medium shadow-inner'
-                    : 'bg-black/20 text-theme-muted hover:bg-black/40 hover:text-theme-text'
+                    ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-t-2 border-[var(--theme-accent)] font-bold shadow-sm'
+                    : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                 }`}
               >
-                <FileCode size={13} className={isActive ? 'text-emerald-400' : 'text-slate-400'} />
+                <FileCode size={14} className={isActive ? 'text-[var(--theme-text)]' : 'text-[var(--theme-text-muted)]'} />
                 
-                <span className="truncate max-w-[130px] font-mono text-xs">
+                <span className="truncate max-w-[140px] text-xs font-semibold">
                   {tab.name}
                 </span>
 
@@ -254,10 +254,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 <button
                   type="button"
                   onClick={(e) => onCloseTab(tab.path, e)}
-                  className="p-0.5 rounded hover:bg-rose-500/20 text-theme-muted hover:text-rose-400 transition-colors cursor-pointer"
+                  className="p-0.5 rounded hover:bg-rose-500/20 text-[var(--theme-text-muted)] hover:text-rose-500 transition-colors cursor-pointer"
                   title="Закрыть вкладку"
                 >
-                  <X size={12} />
+                  <X size={13} />
                 </button>
               </div>
             );
@@ -266,21 +266,21 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
         {/* Editor Quick Actions Toolbar */}
         {selectedFile && (
-          <div className="flex items-center gap-1 px-2 shrink-0 border-l border-theme-border bg-black/30 py-1">
+          <div className="flex items-center gap-1.5 px-3 shrink-0 border-l border-[var(--theme-border)] bg-[var(--theme-card-bg)] py-1.5">
             
             {/* Save Button */}
             <button
               type="button"
               onClick={handleSave}
               disabled={isSaving || !isDirty}
-              className={`px-2 py-1 rounded text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              className={`px-3 py-1 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm ${
                 isDirty
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30'
-                  : 'text-slate-500 opacity-50 cursor-not-allowed'
+                  ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)]'
+                  : 'text-[var(--theme-text-muted)] opacity-50 cursor-not-allowed border border-[var(--theme-border)]'
               }`}
               title="Сохранить файл (Ctrl+S)"
             >
-              <Save size={12} className={isSaving ? 'animate-spin' : ''} />
+              <Save size={13} className={isSaving ? 'animate-spin' : ''} />
               <span className="hidden lg:inline">{isSaving ? 'Сохранение...' : 'Сохранить'}</span>
             </button>
 
@@ -288,64 +288,70 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             <button
               type="button"
               onClick={() => setIsEditing(!isEditing)}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                isEditing ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                isEditing
+                  ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border-[var(--theme-border)]'
+                  : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent'
               }`}
-              title={isEditing ? 'Переключить в режим подсветки' : 'Переключить в интерактивный редактор'}
+              title={isEditing ? 'Режим: Редактирование' : 'Режим: Просмотр (Read-Only)'}
             >
-              {isEditing ? <Edit3 size={13} className="text-cyan-400" /> : <Eye size={13} />}
+              {isEditing ? <Eye size={14} /> : <Edit3 size={14} />}
             </button>
 
             {/* Search Trigger */}
             <button
               type="button"
               onClick={() => setShowSearch(!showSearch)}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                showSearch ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                showSearch
+                  ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border-[var(--theme-border)]'
+                  : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent'
               }`}
               title="Поиск в файле (Ctrl+F)"
             >
-              <Search size={13} />
+              <Search size={14} />
             </button>
 
             {/* Word Wrap Toggle */}
             <button
               type="button"
               onClick={() => setWordWrap(!wordWrap)}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                wordWrap ? 'bg-white/15 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                wordWrap
+                  ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border-[var(--theme-border)]'
+                  : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent'
               }`}
-              title="Перенос строк"
+              title={wordWrap ? 'Перенос строк: Вкл' : 'Перенос строк: Выкл'}
             >
-              <WrapText size={13} />
+              <WrapText size={14} />
             </button>
 
             {/* Font Zoom Controls */}
             <button
               type="button"
               onClick={() => setFontSize((prev) => Math.max(10, prev - 1))}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/5 cursor-pointer"
+              className="p-1.5 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
               title="Уменьшить шрифт"
             >
-              <ZoomOut size={13} />
+              <ZoomOut size={14} />
             </button>
             <button
               type="button"
-              onClick={() => setFontSize((prev) => Math.min(20, prev + 1))}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/5 cursor-pointer"
+              onClick={() => setFontSize((prev) => Math.min(22, prev + 1))}
+              className="p-1.5 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
               title="Увеличить шрифт"
             >
-              <ZoomIn size={13} />
+              <ZoomIn size={14} />
             </button>
 
             {/* Copy Code */}
             <button
               type="button"
               onClick={handleCopyCode}
-              className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-white/5 cursor-pointer"
+              className="p-1.5 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
               title="Скопировать весь код"
             >
-              {copied ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
+              {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
             </button>
           </div>
         )}
@@ -353,15 +359,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
       {/* 2. IDE BREADCRUMBS BAR */}
       {selectedFile && (
-        <div className="flex items-center justify-between px-3 py-1 bg-black/40 border-b border-theme-border text-[11px] font-sans text-slate-400 select-none shrink-0">
+        <div className="flex items-center justify-between px-4 py-1.5 bg-[var(--theme-panel)]/80 border-b border-[var(--theme-border)] text-xs text-[var(--theme-text-muted)] select-none shrink-0 font-medium">
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none min-w-0">
-            <Folder size={12} className="text-emerald-400 shrink-0" />
+            <Folder size={13} className="text-[var(--theme-text-muted)] shrink-0" />
             {pathSegments.map((seg, idx) => {
               const isLast = idx === pathSegments.length - 1;
               return (
                 <React.Fragment key={idx}>
-                  {idx > 0 && <ChevronRight size={10} className="text-slate-600 shrink-0" />}
-                  <span className={`truncate ${isLast ? 'text-slate-200 font-semibold font-mono' : 'text-slate-400'}`}>
+                  {idx > 0 && <ChevronRight size={11} className="text-[var(--theme-text-muted)] opacity-60 shrink-0" />}
+                  <span className={`truncate ${isLast ? 'text-[var(--theme-text)] font-bold' : 'text-[var(--theme-text-muted)]'}`}>
                     {seg}
                   </span>
                 </React.Fragment>
@@ -369,31 +375,31 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             })}
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0 text-[10px] font-mono text-slate-500">
-            <span className="px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-slate-300">
+          <div className="flex items-center gap-2.5 shrink-0 text-xs text-[var(--theme-text-muted)] font-semibold">
+            <span className="px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text)]">
               {detectLanguage(selectedFile.name)}
             </span>
             <span>{lines.length} строк</span>
-            <span>{editorContent.length} симв.</span>
+            <span>{editorContent.length.toLocaleString()} симв.</span>
           </div>
         </div>
       )}
 
       {/* 3. IN-FILE SEARCH POPUP BAR */}
       {showSearch && selectedFile && (
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 border-b border-white/10 text-xs font-sans animate-fadeIn">
-          <Search size={13} className="text-slate-400 shrink-0" />
+        <div className="flex items-center gap-2 px-4 py-2 bg-[var(--theme-card-bg)] border-b border-[var(--theme-border)] text-xs shadow-md animate-fadeIn">
+          <Search size={14} className="text-[var(--theme-text-muted)] shrink-0" />
           <input
             ref={searchInputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Найти в файле..."
-            className="flex-1 bg-transparent text-white text-xs placeholder-slate-500 focus:outline-none font-mono"
+            className="flex-1 bg-transparent text-[var(--theme-text)] text-xs placeholder-[var(--theme-text-muted)] focus:outline-none"
             autoFocus
           />
           {searchQuery && (
-            <span className="text-[11px] font-mono text-slate-400">
+            <span className="text-xs font-semibold text-[var(--theme-text-muted)]">
               {searchMatchesCount} совпадений
             </span>
           )}
@@ -403,22 +409,22 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               setShowSearch(false);
               setSearchQuery('');
             }}
-            className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white"
+            className="p-1 rounded hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
           >
-            <X size={12} />
+            <X size={13} />
           </button>
         </div>
       )}
 
       {/* 4. CODE EDITOR / VIEWER WORKSPACE */}
-      <div className="flex-1 overflow-auto flex relative select-text">
+      <div className="flex-1 overflow-auto flex relative select-text scrollbar-thin">
         {selectedFile ? (
           isEditing ? (
             /* Interactive Code Textarea with Line Numbers */
             <div className="flex-1 w-full h-full flex overflow-hidden">
               {/* Line Numbers Gutter */}
               <div
-                className="text-right text-theme-muted/50 font-mono select-none px-3 py-2 border-r border-theme-border bg-theme-panel/50 shrink-0 h-full overflow-hidden"
+                className="text-right text-[var(--theme-text-muted)] font-mono select-none px-3 py-2.5 border-r border-[var(--theme-border)] bg-[var(--theme-panel)]/50 shrink-0 h-full overflow-hidden opacity-60 font-semibold"
                 style={{ fontSize: `${fontSize}px`, lineHeight: `${fontSize * 1.5}px` }}
               >
                 {lines.map((_, i) => (
@@ -434,7 +440,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                 onChange={(e) => setEditorContent(e.target.value)}
                 spellCheck={false}
                 wrap={wordWrap ? 'on' : 'off'}
-                className="flex-1 w-full h-full p-2 bg-transparent text-slate-100 font-mono resize-none focus:outline-none leading-normal border-none"
+                className="flex-1 w-full h-full p-2.5 bg-transparent text-[var(--theme-text)] font-mono resize-none focus:outline-none leading-normal border-none"
                 style={{
                   fontSize: `${fontSize}px`,
                   lineHeight: `${fontSize * 1.5}px`,
@@ -444,10 +450,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             </div>
           ) : (
             /* Syntax Highlighted View Mode */
-            <div className="flex-1 flex overflow-auto p-2" style={{ fontSize: `${fontSize}px` }}>
+            <div className="flex-1 flex overflow-auto p-2.5" style={{ fontSize: `${fontSize}px` }}>
               {/* Line Numbers */}
               <div
-                className="text-right text-theme-muted/50 font-mono select-none pr-3 border-r border-theme-border sticky left-0 bg-theme-bg h-fit"
+                className="text-right text-[var(--theme-text-muted)] font-mono select-none pr-3 border-r border-[var(--theme-border)] sticky left-0 bg-[var(--theme-bg)] h-fit opacity-60 font-semibold"
                 style={{ lineHeight: `${fontSize * 1.5}px` }}
               >
                 {lines.map((_, i) => (
@@ -459,7 +465,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
               {/* Highlighted Code Lines */}
               <pre
-                className="flex-1 pl-3 select-text overflow-visible m-0"
+                className="flex-1 pl-3 select-text overflow-visible m-0 text-[var(--theme-text)]"
                 style={{
                   lineHeight: `${fontSize * 1.5}px`,
                   whiteSpace: wordWrap ? 'pre-wrap' : 'pre',
@@ -477,13 +483,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           )
         ) : (
           /* Empty Editor State */
-          <div className="flex-1 flex flex-col items-center justify-center text-center select-none text-theme-muted space-y-3 font-sans p-6">
-            <div className="w-12 h-12 rounded-xl border border-theme-border bg-theme-panel flex items-center justify-center text-emerald-400 shadow-xl">
-              <FileCode size={24} />
+          <div className="flex-1 flex flex-col items-center justify-center text-center select-none text-[var(--theme-text-muted)] space-y-3 font-sans p-6 h-full">
+            <div className="w-14 h-14 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] flex items-center justify-center text-[var(--theme-text)] shadow-sm">
+              <FileCode size={26} />
             </div>
             <div className="space-y-1">
-              <div className="text-sm font-semibold text-theme-text">Редактор файлов пуст</div>
-              <div className="text-xs text-theme-muted max-w-xs leading-relaxed">
+              <div className="text-base font-bold text-[var(--theme-text)]">Редактор файлов пуст</div>
+              <div className="text-xs text-[var(--theme-text-muted)] max-w-xs leading-relaxed font-medium">
                 Выберите файл в дереве файлов слева или откройте воркспейс для работы с проектом.
               </div>
             </div>

@@ -95,18 +95,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   }, [lanOpen]);
 
   return (
-    <header className="h-12 border-b border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-xl px-3 flex items-center justify-between select-none z-30 shrink-0 font-sans">
+    <header className="h-13 border-b border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-xl px-4 flex items-center justify-between select-none z-30 shrink-0 font-sans shadow-sm">
       
       {/* Left Section: 0xAGENT Brand Logo */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className="flex items-center gap-1.5 font-mono font-bold text-xs tracking-wider text-[var(--theme-text)]">
-          <Terminal size={14} className="text-[var(--theme-text-muted)] shrink-0" />
+        <div className="flex items-center gap-2 font-mono font-bold text-sm tracking-wider text-[var(--theme-text)]">
+          <Terminal size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <span>0xAGENT</span>
         </div>
       </div>
 
       {/* Right Section: View Switcher Bento Tabs + Utilities */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2.5">
         {/* View Switcher Bento Tabs */}
         <div className="flex items-center bg-[var(--theme-card-bg)] p-1 rounded-xl border border-[var(--theme-border)] shadow-sm">
           {[
@@ -123,13 +123,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => onChangeView(tab.id as any)}
-                className={`px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-3.5 py-1.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all cursor-pointer ${
                   isActive
                     ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
                     : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                 }`}
               >
-                <Icon size={13} className={isActive ? 'text-[var(--theme-accent-text)]' : 'text-[var(--theme-text-muted)]'} />
+                <Icon size={14} className={isActive ? 'text-[var(--theme-accent-text)]' : 'text-[var(--theme-text-muted)]'} />
                 <span className="hidden md:inline">{tab.label}</span>
               </button>
             );
@@ -140,10 +140,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenMemorySkills}
-              className="px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
+              className="px-3.5 py-1.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
               title="Память & Скиллы ИИ"
             >
-              <Brain size={13} />
+              <Brain size={14} />
               <span className="hidden lg:inline">Память</span>
             </button>
           )}
@@ -152,10 +152,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenJarvis}
-              className="px-3 py-1 rounded-lg font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
+              className="px-3.5 py-1.5 rounded-lg font-bold text-sm flex items-center gap-2 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
               title="Jarvis Telemetry & Workspace"
             >
-              <Bot size={13} />
+              <Bot size={14} />
               <span className="hidden lg:inline">Jarvis</span>
             </button>
           )}
@@ -172,11 +172,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 console.error(err);
               }
             }}
-            className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-sky-400 hover:border-sky-500/30 transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono"
-            title="Голосовой интерком Jarvis (Дмитрий, Edge-TTS). Клик — проверить связь."
+            className="p-2 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono border border-[var(--theme-border)] shadow-sm"
+            title="Голосовой интерком Jarvis. Клик — проверить связь."
           >
-            <MaterialIcon name="volume_up" size={14} className="text-sky-400" />
-            <span className="hidden xl:inline text-[10px]">:: [VOICE]</span>
+            <MaterialIcon name="volume_up" size={15} />
+            <span className="hidden xl:inline text-xs font-bold">:: [VOICE]</span>
           </button>
         )}
 
@@ -185,10 +185,10 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={handleToggleLan}
-            className={`p-1.5 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-medium ${
+            className={`p-2 rounded-xl border transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold shadow-sm ${
               lanOpen
-                ? 'bg-white/15 border-[var(--theme-border)] text-[var(--theme-text)]'
-                : 'bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-[var(--theme-accent-text)]'
+                : 'bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
             }`}
             title="Раздача в локальную сеть Wi-Fi"
           >
@@ -197,18 +197,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
 
           {lanOpen && (
-            <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl bento-card p-2 shadow-2xl z-50 border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl animate-fadeIn space-y-1">
-              <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)]/50 mb-1 flex items-center justify-between">
+            <div className="absolute right-0 top-full mt-2 w-76 rounded-2xl bento-card p-2 shadow-2xl z-50 border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl animate-fadeIn space-y-1">
+              <div className="px-3 py-1.5 text-xs font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between font-bold">
                 <div className="flex items-center gap-1.5">
-                  <Wifi size={12} />
+                  <Wifi size={13} />
                   <span>Раздача в LAN</span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setLanOpen(false)}
-                  className="p-0.5 rounded-md hover:bg-white/10 text-[var(--theme-text-muted)] hover:text-white transition-colors cursor-pointer"
+                  className="p-1 rounded-md hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
                 >
-                  <X size={12} />
+                  <X size={13} />
                 </button>
               </div>
 
@@ -219,25 +219,30 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <span className="text-xs text-[var(--theme-text-muted)]">Определение IP...</span>
                   </div>
                 ) : lanUrls.length === 0 ? (
-                  <div className="text-center py-3">
-                    <span className="text-xs text-[var(--theme-text-muted)]">Нет доступных адресов</span>
+                  <div className="py-2 px-1 text-xs text-[var(--theme-text-muted)] text-center">
+                    Нет доступных сетевых интерфейсов
                   </div>
                 ) : (
-                  <div className="space-y-1">
-                    <p className="text-[10px] text-[var(--theme-text-muted)] font-mono mb-1">Адреса для подключения:</p>
-                    {lanUrls.map((url) => (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {lanUrls.map((url, idx) => (
                       <div
-                        key={url}
-                        className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-white/5 border border-[var(--theme-border)] transition-colors"
+                        key={idx}
+                        className="flex items-center justify-between p-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] gap-2 hover:border-[var(--theme-accent)] transition-colors"
                       >
-                        <span className="text-xs font-mono text-[var(--theme-text)] truncate">{url}</span>
+                        <span className="font-mono text-xs text-[var(--theme-text)] truncate select-all font-semibold">
+                          {url}
+                        </span>
                         <button
                           type="button"
                           onClick={() => handleCopyUrl(url)}
-                          className="shrink-0 p-1 rounded-md bg-white/10 hover:bg-white/20 text-[var(--theme-text)] transition-all cursor-pointer"
-                          title="Скопировать"
+                          className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
+                          title="Скопировать ссылку"
                         >
-                          {copiedUrl === url ? <Check size={12} className="text-[var(--theme-text)]" /> : <Copy size={12} />}
+                          {copiedUrl === url ? (
+                            <Check size={13} className="text-emerald-500" />
+                          ) : (
+                            <Copy size={13} />
+                          )}
                         </button>
                       </div>
                     ))}
@@ -248,18 +253,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
-        {/* Console Logs Button */}
+        {/* Server Logs Toggle Button */}
         {onToggleLogs && (
           <button
             type="button"
             onClick={onToggleLogs}
-            className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer hidden md:flex"
-            title="Логи терминала"
+            className="p-2 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-[var(--theme-border)] shadow-sm"
+            title="Открыть / закрыть логи LLM сервера"
           >
             <Terminal size={14} />
+            <span className="hidden sm:inline">Логи</span>
           </button>
         )}
       </div>
+
     </header>
   );
 };
