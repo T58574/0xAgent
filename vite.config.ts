@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import basicSsl from "@vitejs/plugin-basic-ssl";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
@@ -24,20 +25,23 @@ function getCerts() {
 
 // https://vite.dev/config/
 export default defineConfig(() => {
-  const certs = getCerts();
-  const hasSsl = Boolean(certs && process.env.DISABLE_HTTPS !== 'true');
+  const useHttps = process.env.DISABLE_HTTPS !== 'true';
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      ...(useHttps ? [basicSsl()] : []),
+    ],
     clearScreen: false,
     server: {
       port: 5173,
       strictPort: false,
       host: "0.0.0.0", // Bind to all interfaces for local Wi-Fi network sharing
-      https: hasSsl && certs ? { cert: certs.cert, key: certs.key } : undefined,
+      https: useHttps,
       proxy: {
         "/api": {
-          target: hasSsl ? "https://127.0.0.1:3001" : "http://127.0.0.1:3001",
+          target: useHttps ? "https://127.0.0.1:3001" : "http://127.0.0.1:3001",
           changeOrigin: true,
           secure: false,
           configure: (proxy) => {
@@ -53,7 +57,7 @@ export default defineConfig(() => {
           },
         },
         "/ws": {
-          target: hasSsl ? "wss://127.0.0.1:3001" : "ws://127.0.0.1:3001",
+          target: useHttps ? "wss://127.0.0.1:3001" : "ws://127.0.0.1:3001",
           ws: true,
           changeOrigin: true,
           secure: false,
