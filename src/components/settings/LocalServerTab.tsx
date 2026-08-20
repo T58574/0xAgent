@@ -613,8 +613,8 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
   return (
     <div className="space-y-4 font-sans text-[var(--theme-text)] max-w-full">
-      {/* Top Header & Server Control Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--theme-border)] pb-3">
+      {/* Top Header & Live Health Metric */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[var(--theme-border)] pb-3">
         <div>
           <h3 className="text-sm font-semibold text-[var(--theme-text)] flex items-center gap-2">
             <Cpu size={16} className="text-[var(--theme-accent)]" />
@@ -625,59 +625,19 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           </p>
         </div>
 
-        {/* Server Control Actions Bar */}
-        <div className="flex items-center gap-2 shrink-0">
-          {serverStatus === 'running' ? (
-            <>
-              <button
-                type="button"
-                disabled={isActionLoading}
-                onClick={handleRestartLocalServer}
-                className="px-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                title="Перезапустить сервер с текущими параметрами"
-              >
-                <RefreshCw size={13} className={isActionLoading ? 'animate-spin' : ''} />
-                <span>Перезапуск</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={isActionLoading}
-                onClick={handleStopLocalServer}
-                className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                title="Остановить сервер"
-              >
-                <Square size={13} className="fill-current" />
-                <span>Остановить</span>
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              disabled={isActionLoading || !modelPath}
-              onClick={handleStartLocalServer}
-              className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              title={modelPath ? "Запустить сервер llama.cpp" : "Выберите модель GGUF для запуска"}
-            >
-              <Play size={13} className={isActionLoading ? 'animate-spin fill-current' : 'fill-current'} />
-              <span>{isActionLoading ? 'Запуск...' : 'Запустить сервер'}</span>
-            </button>
-          )}
-
-          {/* Live Slot & Health Metrics Badge */}
-          {serverStatus === 'running' && (
-            <div className="flex items-center gap-2 text-xs font-mono bento-card px-3 py-1.5 rounded-lg select-none">
-              <Activity size={13} className="text-emerald-500 animate-pulse" />
-              <span className="text-[var(--theme-text)] font-medium">
-                {healthStatus === 'loading'
-                  ? 'Загрузка в GPU...'
-                  : healthStatus === 'ok'
-                  ? `Готов | Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 1}`
-                  : 'Инициализация...'}
-              </span>
-            </div>
-          )}
-        </div>
+        {/* Live Health Metrics Badge */}
+        {serverStatus === 'running' && (
+          <div className="flex items-center gap-2 text-xs font-mono bento-card px-3 py-1.5 rounded-lg select-none">
+            <Activity size={13} className="text-emerald-500 animate-pulse" />
+            <span className="text-[var(--theme-text)] font-medium">
+              {healthStatus === 'loading'
+                ? 'Загрузка в GPU...'
+                : healthStatus === 'ok'
+                ? `Готов | Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 1}`
+                : 'Инициализация...'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Crash Advisory Alert Box */}
@@ -694,25 +654,77 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
         {/* LEFT COLUMN: Server Settings & Controls */}
         <div className="lg:col-span-7 space-y-4">
           
-          {/* Hardware GPU Status Banner */}
-          {hardwareInfo && hardwareInfo.isAutoDetected && (
-            <div className="p-4 rounded-2xl bento-card flex items-center justify-between gap-3 text-xs border border-[var(--theme-border)]">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)]">
-                  <Zap size={16} />
+          {/* Hardware GPU & Server Control Hero Banner */}
+          <div className="p-4.5 rounded-3xl bento-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[var(--theme-border)] bg-[var(--theme-panel)]/80 shadow-md">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 rounded-2xl bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-accent)]">
+                <Zap size={20} />
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 font-bold text-xs text-[var(--theme-text)]">
+                  <span>Видеокарта:</span>
+                  <span className="font-mono text-[var(--theme-text)]">
+                    {hardwareInfo?.gpuName || 'Автоопределение GPU'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono text-[10px] font-semibold">
+                    Full GPU Offload (-ngl 999)
+                  </span>
                 </div>
-                <div>
-                  <div className="flex items-center gap-2 font-bold text-[var(--theme-text)]">
-                    <span>Видеокарта:</span>
-                    <span className="font-mono text-[var(--theme-text)]">{hardwareInfo.gpuName}</span>
-                    <span className="px-2 py-0.5 rounded-md bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono text-[10px] font-semibold">
-                      Full GPU Offload (-ngl 999)
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2 text-[11px] font-mono text-[var(--theme-text-muted)]">
+                  <span className="flex items-center gap-1.5">
+                    <span className={`w-2 h-2 rounded-full ${serverStatus === 'running' ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
+                    {serverStatus === 'running'
+                      ? healthStatus === 'loading'
+                        ? 'Загрузка модели в GPU...'
+                        : healthStatus === 'ok'
+                        ? `Онлайн • Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 1}`
+                        : 'Инициализация...'
+                      : 'Сервер остановлен'}
+                  </span>
                 </div>
               </div>
             </div>
-          )}
+
+            {/* Prominent Large Server Control Button */}
+            <div className="flex items-center gap-2.5 shrink-0">
+              {serverStatus === 'running' ? (
+                <>
+                  <button
+                    type="button"
+                    disabled={isActionLoading}
+                    onClick={handleRestartLocalServer}
+                    className="px-4 py-2.5 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                    title="Перезапустить сервер с текущими параметрами"
+                  >
+                    <RefreshCw size={15} className={isActionLoading ? 'animate-spin' : ''} />
+                    <span>Перезапуск</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={isActionLoading}
+                    onClick={handleStopLocalServer}
+                    className="px-4.5 py-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                    title="Остановить сервер"
+                  >
+                    <Square size={15} className="fill-current" />
+                    <span>Остановить</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  disabled={isActionLoading || !modelPath}
+                  onClick={handleStartLocalServer}
+                  className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center gap-2.5 transition-all cursor-pointer shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  title={modelPath ? "Запустить сервер llama.cpp" : "Выберите модель GGUF для запуска"}
+                >
+                  <Play size={16} className={isActionLoading ? 'animate-spin fill-current' : 'fill-current'} />
+                  <span>{isActionLoading ? 'Запуск...' : 'Запустить сервер'}</span>
+                </button>
+              )}
+            </div>
+          </div>
 
           {/* GitHub Releases Llama.cpp Installer Section */}
           <div className="space-y-3">
