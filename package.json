@@ -35,6 +35,7 @@
     "preview": "vite preview",
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1",
     "audit:security": "node ./scripts/security_audit.cjs",
+    "bridge": "tsx scripts/agent-bridge.ts",
     "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {

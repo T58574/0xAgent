@@ -79,16 +79,19 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
     const cfg = loadConfig();
     const host = (req.query.host as string) || cfg.local_server?.host || '127.0.0.1';
     const port = (req.query.port as string) || cfg.local_server?.port || 11434;
-    if (!activeLlamaProcess || activeLlamaProcess.killed) {
-      return res.json({ ok: false, status: 'stopped', processRunning: false });
-    }
+    const processRunning = activeLlamaProcess !== null && !activeLlamaProcess.killed;
+
     try {
-      const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(5000) });
+      const response = await fetch(`http://${host}:${port}/health`, { signal: AbortSignal.timeout(4000) });
       const data: any = await response.json().catch(() => ({}));
       const isHealthy = response.ok || data.status === 'ok' || data.status === 'loading model' || data.status === 'no slot available';
       res.json({ ok: isHealthy, status: data.status || 'ok', processRunning: true });
     } catch {
-      res.json({ ok: true, status: 'busy', processRunning: true });
+      if (!processRunning) {
+        res.json({ ok: false, status: 'stopped', processRunning: false });
+      } else {
+        res.json({ ok: true, status: 'loading model', processRunning: true });
+      }
     }
   });
 
@@ -163,30 +166,34 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       lastLaunchParams = { targetExe, args, host, port };
 
       appendServerLog(`[CMD] ${path.basename(targetExe)} ${args.join(' ')}`);
-      activeLlamaProcess = spawn(targetExe, args, { cwd: path.dirname(targetExe) });
-      broadcast('llama-server-status', { status: 'running', pid: activeLlamaProcess.pid, host, port });
+      const spawnedProc = spawn(targetExe, args, { cwd: path.dirname(targetExe) });
+      activeLlamaProcess = spawnedProc;
+      broadcast('llama-server-status', { status: 'running', pid: spawnedProc.pid, host, port });
 
       const handleLogData = (data: Buffer) => {
         const cleanStr = stripAnsiCodes(data.toString()).trim();
         if (cleanStr) appendServerLog(cleanStr);
       };
 
-      activeLlamaProcess.stdout?.on('data', handleLogData);
-      activeLlamaProcess.stderr?.on('data', handleLogData);
+      spawnedProc.stdout?.on('data', handleLogData);
+      spawnedProc.stderr?.on('data', handleLogData);
 
-      activeLlamaProcess.on('exit', (code, signal) => {
+      spawnedProc.on('exit', (code, signal) => {
         appendServerLog(`[llama.cpp] Процесс завершён (код: ${code}, сигнал: ${signal})`);
         const runtimeMs = Date.now() - launchTimestamp;
+
+        if (activeLlamaProcess === spawnedProc) {
+          activeLlamaProcess = null;
+        }
+
         if (!isIntentionalStop && lastLaunchParams && runtimeMs > 6000) {
           appendServerLog(`[WATCHDOG] WARNING: Process crashed after ${Math.round(runtimeMs / 1000)}s. Auto-recovering...`);
           broadcast('llama-server-status', { status: 'recovering' });
-          activeLlamaProcess = null;
         } else {
           if (!isIntentionalStop && runtimeMs <= 6000) {
             appendServerLog(`[WATCHDOG] Сервер упал при инициализации модели (${(runtimeMs / 1000).toFixed(1)} с). Авто-перезапуск остановлен.`);
           }
           broadcast('llama-server-status', { status: 'stopped', code, signal });
-          activeLlamaProcess = null;
           lastLaunchParams = null;
         }
       });
