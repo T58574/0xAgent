@@ -283,7 +283,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               title="Применить пресет для спекулятивного декодирования (Speculative Draft / MTP)"
             >
               <Sparkles size={13} className="text-[var(--theme-text-muted)]" />
-              <span>Speculative Draft (2x)</span>
+              <span>Пресет MTP / Draft</span>
             </button>
           )}
           <button
@@ -292,7 +292,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
           >
             <Zap size={13} className="text-[var(--theme-text-muted)]" />
-            <span>Быстрый пресет (50+ t/s)</span>
+            <span>Быстрый пресет (Flash Attention)</span>
           </button>
         </div>
       </div>
@@ -519,7 +519,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               <InfoTooltip
                 title="Аппаратное MTP ускорение"
                 text="Спекулятивное декодирование токенов за 1 шаг GPU. Для моделей со встроенными MTP-слоями ускорение работает нативно на весах основной модели без дополнительных файлов."
-                benefit="Ускорение генерации до 25–27 tok/s"
+                benefit="Спекулятивное предсказание токенов за шаг"
               />
             </div>
             <p className="text-[11px] text-[var(--theme-text-muted)]">
@@ -549,7 +549,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
                   <Zap size={14} className="animate-pulse text-emerald-500" />
-                  <span>Встроенный MTP-слой активен (23–27 t/s)</span>
+                  <span>Встроенный MTP-слой активен (Native draft-mtp)</span>
                 </div>
                 <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
                   Определены аппаратные MTP-головы (<code className="font-mono text-emerald-600 dark:text-emerald-300 font-semibold">nextn_predict_layers = 1</code>). Ускорение работает нативно на весах модели.
