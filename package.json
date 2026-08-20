@@ -45,6 +45,7 @@
     "marked": "^18.0.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "selfsigned": "^5.5.0",
     "tailwindcss": "^4.3.3",
     "uuid": "^11.0.5",
     "ws": "^8.18.0"
@@ -55,6 +56,7 @@
     "@types/node": "^22.10.7",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/selfsigned": "^2.0.4",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.14",
     "@vitejs/plugin-basic-ssl": "^2.3.0",

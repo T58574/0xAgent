@@ -1,9 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import http from 'node:http';
+import https from 'node:https';
 import { WebSocketServer, WebSocket } from 'ws';
 
 import { isPasswordSet, verifySessionToken } from './auth';
+import { getOrCreateSslCertificates, SslCertificates } from './sslHelper';
 
 import { authRouter } from './routes/authRoutes';
 import { configRouter } from './routes/configRoutes';
@@ -66,7 +68,20 @@ app.use((req, res, next) => {
   next();
 });
 
-const server = http.createServer(app);
+const useHttps = process.env.DISABLE_HTTPS !== 'true';
+let sslCerts: SslCertificates | null = null;
+try {
+  if (useHttps) {
+    sslCerts = getOrCreateSslCertificates();
+  }
+} catch (err) {
+  console.warn('[SSL] Failed to generate local SSL certificates, falling back to plain HTTP:', err);
+}
+
+const server = (useHttps && sslCerts)
+  ? https.createServer({ key: sslCerts.key, cert: sslCerts.cert }, app)
+  : http.createServer(app);
+
 const wss = new WebSocketServer({ server, path: '/ws' });
 const clients = new Set<WebSocket>();
 
@@ -185,9 +200,18 @@ process.on('uncaughtException', (err: any) => {
 });
 
 server.listen(Number(PORT), HOST, () => {
-  process.stdout.write(`[0xAgent] Local Server running at http://${HOST}:${PORT}\n`);
-  process.stdout.write(`[WS] WebSocket server listening on ws://${HOST}:${PORT}/ws\n`);
-  
+  const isHttps = Boolean(useHttps && sslCerts);
+  const proto = isHttps ? 'https' : 'http';
+  const wsProto = isHttps ? 'wss' : 'ws';
+
+  process.stdout.write(`[0xAgent] Local Server running at ${proto}://${HOST}:${PORT}\n`);
+  process.stdout.write(`[WS] WebSocket server listening on ${wsProto}://${HOST}:${PORT}/ws\n`);
+  if (isHttps && sslCerts?.lanIps) {
+    sslCerts.lanIps.forEach((ip) => {
+      process.stdout.write(`[LAN] Mobile HTTPS Access: https://${ip}:${PORT}\n`);
+    });
+  }
+
   // Clean up any stale ephemeral sandbox workspaces left behind from previous sessions
   cleanupOrphanWorkspaces().catch(() => {});
 
