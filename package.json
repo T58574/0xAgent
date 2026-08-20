@@ -25,9 +25,11 @@
     "privacy-first"
   ],
   "scripts": {
+    "predev": "node ./scripts/ensure-ssl.cjs",
     "dev": "concurrently -k -p \"[{name}]\" -c \"blue,green\" -n \"SERVER,CLIENT\" \"tsx watch server/index.ts\" \"vite --host 0.0.0.0\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite --host 0.0.0.0",
+    "prebuild": "node ./scripts/ensure-ssl.cjs",
     "build": "tsc && vite build",
     "build:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-launcher.ps1",
     "preview": "vite preview",
