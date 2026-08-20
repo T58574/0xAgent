@@ -1,13 +1,11 @@
-import React, { useState } from 'react';
-import { Zap, Folder, Sparkles, Cpu, ChevronDown, ChevronUp, Gauge, Activity } from 'lucide-react';
+import React from 'react';
+import { Zap, Folder, Sparkles } from 'lucide-react';
 import { LocalModelItem, GgufMetadata } from '../../../types';
 import {
   InfoTooltip,
   ParamNumberInput,
   ParamTextInput,
   ParamSlider,
-  ParamSelect,
-  SpeedPresetButton,
   ParamToggleCard,
 } from './atoms';
 
@@ -142,91 +140,26 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
   setSpecDraftModel,
   specType,
   setSpecType,
-  specDraftNgl,
+  specDraftNgl: _specDraftNgl,
   setSpecDraftNgl,
-  specDraftNMax,
+  specDraftNMax: _specDraftNMax,
   setSpecDraftNMax,
-  specDraftPMin,
+  specDraftPMin: _specDraftPMin,
   setSpecDraftPMin,
   jinja,
   setJinja,
   reasoningPreserve,
   setReasoningPreserve,
-  reasoningFormat,
-  setReasoningFormat,
-  scannedDraftModels = [],
-  onSelectDraftModelFile,
+  reasoningFormat: _reasoningFormat,
+  setReasoningFormat: _setReasoningFormat,
+  scannedDraftModels: _scannedDraftModels = [],
+  onSelectDraftModelFile: _onSelectDraftModelFile,
   onSelectSlotSavePath,
   onApplyFastPreset,
   onApplyFastMtpPreset,
   modelMeta,
-  serverStatus,
+  serverStatus: _serverStatus,
 }) => {
-  const [showAdvancedMtp, setShowAdvancedMtp] = useState(false);
-  const [isTestingMtp, setIsTestingMtp] = useState(false);
-  const [mtpTestResult, setMtpTestResult] = useState<{
-    generationTps: number;
-    promptTps: number;
-    draftAcceptedRatio: number;
-    draftAccepted: number;
-    draftTotal: number;
-    error?: string;
-  } | null>(null);
-
-  const handleRunMtpSpeedTest = async () => {
-    setIsTestingMtp(true);
-    setMtpTestResult(null);
-    try {
-      const t0 = Date.now();
-      const targetHost = !host || host === '0.0.0.0' ? (typeof window !== 'undefined' ? window.location.hostname || '127.0.0.1' : '127.0.0.1') : host;
-      const res = await fetch(`http://${targetHost}:${port}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: [{ role: 'user', content: 'Напиши 3 коротких предложения о квантовых вычислениях.' }],
-          max_tokens: 120,
-          temperature: 0.7,
-          stream: false,
-        }),
-      });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-      const data = await res.json();
-      const timings = data.timings;
-      if (timings) {
-        setMtpTestResult({
-          generationTps: timings.predicted_per_second || 0,
-          promptTps: timings.prompt_per_second || 0,
-          draftAcceptedRatio: timings.draft_n > 0 ? (timings.draft_n_accepted / timings.draft_n) * 100 : 0,
-          draftAccepted: timings.draft_n_accepted || 0,
-          draftTotal: timings.draft_n || 0,
-        });
-      } else {
-        const usage = data.usage;
-        const dur = (Date.now() - t0) / 1000;
-        setMtpTestResult({
-          generationTps: usage?.completion_tokens ? Number((usage.completion_tokens / dur).toFixed(1)) : 0,
-          promptTps: 0,
-          draftAcceptedRatio: 0,
-          draftAccepted: 0,
-          draftTotal: 0,
-        });
-      }
-    } catch (err: any) {
-      setMtpTestResult({
-        generationTps: 0,
-        promptTps: 0,
-        draftAcceptedRatio: 0,
-        draftAccepted: 0,
-        draftTotal: 0,
-        error: err.message || 'Ошибка подключения к локальному серверу. Убедитесь, что сервер запущен.',
-      });
-    } finally {
-      setIsTestingMtp(false);
-    }
-  };
-
   const isMtpEnabled = specType !== 'none' && specDraftModel !== 'none';
 
   const handleToggleMtp = () => {
@@ -238,22 +171,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
       setSpecDraftModel('');
       setSpecDraftNMax(3);
       setSpecDraftNgl(99);
-      setSpecDraftPMin(0);
-    }
-  };
-
-  const applySpeedProfile = (profile: 'balanced' | 'turbo' | 'accurate') => {
-    setSpecType('default');
-    if (specDraftModel === 'none') setSpecDraftModel('');
-    if (profile === 'balanced') {
-      setSpecDraftNMax(3);
-      setSpecDraftPMin(0);
-    } else if (profile === 'turbo') {
-      setSpecDraftNMax(5);
       setSpecDraftPMin(0.05);
-    } else if (profile === 'accurate') {
-      setSpecDraftNMax(2);
-      setSpecDraftPMin(0.1);
     }
   };
 
@@ -589,23 +507,23 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         }}
       />
 
-      {/* 🚀 APPLE-STYLE SPECULATIVE ACCELERATION (MTP & DRAFT) SECTION */}
-      <div className="p-4.5 rounded-3xl bento-card space-y-4 border border-[var(--theme-border)] bg-[var(--theme-panel)]/80 shadow-md">
+      {/* 🚀 MINIMALIST SPECULATIVE ACCELERATION (MTP) SECTION */}
+      <div className="p-4 rounded-3xl bento-card space-y-3 border border-[var(--theme-border)] bg-[var(--theme-panel)]/80 shadow-md">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-[var(--theme-accent)]" />
               <span className="text-xs font-bold text-[var(--theme-text)]">
-                Ускорение генерации (Speculative Decoding & MTP)
+                Ускорение генерации (MTP)
               </span>
               <InfoTooltip
-                title="Спекулятивное декодирование (MTP / Draft)"
-                text="Аппаратное предугадывание следующих 2–5 токенов за 1 шаг GPU. Для моделей со встроенными MTP-слоями ускорение работает нативно на весах модели без необходимости внешних файлов драфта."
-                benefit="Удваивает скорость генерации (до 25–30 tok/s)"
+                title="Аппаратное MTP ускорение"
+                text="Спекулятивное декодирование токенов за 1 шаг GPU. Для моделей со встроенными MTP-слоями ускорение работает нативно на весах основной модели без дополнительных файлов."
+                benefit="Ускорение генерации до 25–27 tok/s"
               />
             </div>
             <p className="text-[11px] text-[var(--theme-text-muted)]">
-              Аппаратное предугадывание следующих токенов через встроенный MTP-слой или легкую драфт-модель
+              Аппаратное предугадывание следующих токенов через встроенный MTP-слой модели
             </p>
           </div>
 
@@ -615,7 +533,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             className={`w-12 h-6.5 rounded-full p-1 flex items-center transition-all cursor-pointer shrink-0 shadow-inner ${
               isMtpEnabled ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30' : 'bg-zinc-300 dark:bg-zinc-700'
             }`}
-            title={isMtpEnabled ? 'Отключить спекулятивное ускорение' : 'Включить спекулятивное ускорение'}
+            title={isMtpEnabled ? 'Отключить MTP ускорение' : 'Включить MTP ускорение'}
           >
             <div
               className={`w-4.5 h-4.5 rounded-full bg-white transition-transform shadow-md ${
@@ -626,248 +544,28 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         </div>
 
         {isMtpEnabled && (
-          <div className="space-y-3.5 pt-2 border-t border-[var(--theme-border)] animate-fadeIn">
-            {/* Live Hardware MTP Detection Badge */}
+          <div className="pt-2 border-t border-[var(--theme-border)] animate-fadeIn">
             {modelMeta?.supportsFastMtp ? (
-              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1 animate-fadeIn">
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
-                  <Zap size={14} className="animate-pulse" />
-                  <span>Аппаратный MTP-слой обнаружен в GGUF (Native draft-mtp)</span>
+                  <Zap size={14} className="animate-pulse text-emerald-500" />
+                  <span>Встроенный MTP-слой активен (23–27 t/s)</span>
                 </div>
                 <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                  Модель содержит встроенные MTP-головы (<code className="font-mono text-emerald-600 dark:text-emerald-300 font-semibold">nextn_predict_layers = 1</code>). Внешний файл драфта не требуется — спекулятивное декодирование работает нативно на весах основной модели со скоростью 23–27 t/s.
+                  Определены аппаратные MTP-головы (<code className="font-mono text-emerald-600 dark:text-emerald-300 font-semibold">nextn_predict_layers = 1</code>). Ускорение работает нативно на весах модели.
                 </p>
               </div>
             ) : (
-              <div className="p-3 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs space-y-1 animate-fadeIn">
-                <div className="flex items-center gap-2 text-[var(--theme-text)] font-semibold">
-                  <Cpu size={14} className="text-[var(--theme-accent)]" />
-                  <span>Внешняя драфт-модель (Speculative Sidecar)</span>
+              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
+                  <Zap size={14} className="text-emerald-500" />
+                  <span>Спекулятивное ускорение активно</span>
                 </div>
                 <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                  Для ускорения этой модели выберите легкий драфт-файл (например, Qwen-0.5B или Gemma-2B) из папки models/.
+                  Аппаратное предугадывание следующих токенов включено.
                 </p>
               </div>
             )}
-
-            {/* Speed Profile Segmented Control */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] flex items-center gap-1.5">
-                <Gauge size={13} className="text-[var(--theme-accent)]" />
-                <span>Профиль скорости (Агрессивность драфта)</span>
-              </label>
-              <div className="grid grid-cols-3 gap-2 p-1 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)]">
-                <SpeedPresetButton
-                  title="⚡ Баланс (2.0x)"
-                  subtitle="3 токена • Рекомендуется (25 t/s)"
-                  active={specDraftNMax === 3}
-                  onClick={() => applySpeedProfile('balanced')}
-                />
-                <SpeedPresetButton
-                  title="🔥 Турбо (2.5x+)"
-                  subtitle="5 токенов • Макс. драфт"
-                  active={specDraftNMax === 5}
-                  onClick={() => applySpeedProfile('turbo')}
-                />
-                <SpeedPresetButton
-                  title="🎯 Точный (1.5x)"
-                  subtitle="2 токена • Для сложных задач"
-                  active={specDraftNMax === 2}
-                  onClick={() => applySpeedProfile('accurate')}
-                />
-              </div>
-            </div>
-
-            {/* Draft Model GGUF Selector */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] flex items-center gap-1.5">
-                  <Cpu size={13} className="text-[var(--theme-accent)]" />
-                  <span>Драфт-модель (--spec-draft-model)</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSpecDraftModel('')}
-                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer font-medium"
-                    title="Автоматический поиск совместимой драфт-модели в папке models/"
-                  >
-                    [Авто-поиск]
-                  </button>
-                  {onSelectDraftModelFile && (
-                    <button
-                      type="button"
-                      onClick={onSelectDraftModelFile}
-                      className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
-                    >
-                      <Folder size={12} />
-                      <span>Обзор...</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <select
-                value={
-                  scannedDraftModels.find(
-                    (m) =>
-                      m.filePath.toLowerCase() === specDraftModel.toLowerCase() ||
-                      m.fileName.toLowerCase() === specDraftModel.toLowerCase()
-                  )?.filePath || (specDraftModel ? 'custom' : '')
-                }
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (val && val !== 'custom') {
-                    setSpecDraftModel(val);
-                  } else if (!val) {
-                    setSpecDraftModel('');
-                  }
-                }}
-                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none cursor-pointer transition-colors"
-              >
-                <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
-                  {modelMeta?.supportsFastMtp
-                    ? '-- Нативный MTP режим (встроенный в модель, без файла) --'
-                    : '-- Авто-детект драфт-модели (по умолчанию) --'}
-                </option>
-                {scannedDraftModels.map((m) => (
-                  <option
-                    key={m.id || m.filePath}
-                    value={m.filePath}
-                    className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]"
-                  >
-                    {m.fileName} ({m.quantization || 'GGUF'} • {m.sizeGB})
-                  </option>
-                ))}
-                {specDraftModel &&
-                  specDraftModel !== 'none' &&
-                  !scannedDraftModels.some((m) => m.filePath.toLowerCase() === specDraftModel.toLowerCase()) && (
-                    <option value="custom" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
-                      Пользовательский путь: {specDraftModel}
-                    </option>
-                  )}
-              </select>
-
-              {specDraftModel && specDraftModel !== 'none' && (
-                <input
-                  type="text"
-                  value={specDraftModel}
-                  onChange={(e) => setSpecDraftModel(e.target.value)}
-                  placeholder="C:\models\Qwen3.8-1.5B.gguf"
-                  className="w-full px-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-text-muted)] focus:text-[var(--theme-text)] focus:outline-none transition-colors"
-                />
-              )}
-            </div>
-
-            {/* Live Real-time MTP Speed Tester */}
-            <div className="pt-2 border-t border-[var(--theme-border)] space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  disabled={serverStatus !== 'running' || isTestingMtp}
-                  onClick={handleRunMtpSpeedTest}
-                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-2 disabled:opacity-40 transition-all cursor-pointer shadow-sm"
-                >
-                  <Activity size={14} className={isTestingMtp ? 'animate-spin' : ''} />
-                  <span>{isTestingMtp ? 'Замер скорости...' : 'Тест скорости MTP'}</span>
-                </button>
-                {serverStatus !== 'running' && (
-                  <span className="text-[11px] text-[var(--theme-text-muted)]">
-                    Запустите сервер для проведения замера
-                  </span>
-                )}
-              </div>
-
-              {mtpTestResult && (
-                <div className="p-3 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs space-y-2 animate-fadeIn font-mono">
-                  {mtpTestResult.error ? (
-                    <span className="text-rose-400 font-sans">{mtpTestResult.error}</span>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-1.5 font-sans">
-                        <span className="font-bold text-[var(--theme-text)]">Результаты тестирования:</span>
-                        <span className="text-emerald-500 font-bold text-sm">
-                          {mtpTestResult.generationTps.toFixed(1)} tok/s
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="flex justify-between">
-                          <span className="text-[var(--theme-text-muted)]">Скорость генерации:</span>
-                          <span className="text-[var(--theme-text)] font-bold">{mtpTestResult.generationTps.toFixed(1)} t/s</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-[var(--theme-text-muted)]">Обработка промпта:</span>
-                          <span className="text-[var(--theme-text)] font-bold">{mtpTestResult.promptTps.toFixed(1)} t/s</span>
-                        </div>
-                        {mtpTestResult.draftTotal > 0 && (
-                          <div className="col-span-2 flex justify-between pt-1 border-t border-[var(--theme-border)]/50">
-                            <span className="text-[var(--theme-text-muted)]">Принято MTP драфт-токенов:</span>
-                            <span className="text-emerald-500 font-bold">
-                              {mtpTestResult.draftAccepted} / {mtpTestResult.draftTotal} ({mtpTestResult.draftAcceptedRatio.toFixed(1)}%)
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Collapsible Advanced Fine-Tuning CLI Parameters */}
-            <div className="pt-1">
-              <button
-                type="button"
-                onClick={() => setShowAdvancedMtp(!showAdvancedMtp)}
-                className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer font-medium transition-colors"
-              >
-                <span>{showAdvancedMtp ? 'Скрыть тонкие параметры' : '⚙️ Тонкие параметры CLI (--spec-type, -ngld, -p-min)'}</span>
-                {showAdvancedMtp ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              </button>
-
-              {showAdvancedMtp && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2.5 animate-fadeIn">
-                  <ParamSelect
-                    label="Режим (--spec-type)"
-                    value={specType}
-                    compact
-                    onChange={setSpecType}
-                    options={[
-                      { value: 'default', label: 'default (стандартный)' },
-                      { value: 'draft-mtp', label: 'draft-mtp (MTP)' },
-                      { value: 'draft-eagle', label: 'draft-eagle' },
-                    ]}
-                  />
-
-                  <ParamNumberInput
-                    label="Draft GPU (-ngld)"
-                    value={specDraftNgl}
-                    placeholder="99"
-                    className="space-y-1.5"
-                    onChange={setSpecDraftNgl}
-                  />
-
-                  <ParamNumberInput
-                    label="Min Prob (-p-min)"
-                    value={specDraftPMin}
-                    step={0.05}
-                    onChange={setSpecDraftPMin}
-                  />
-
-                  <ParamSelect
-                    label="Формат мыслей"
-                    value={reasoningFormat}
-                    compact
-                    onChange={setReasoningFormat}
-                    options={[
-                      { value: 'deepseek', label: 'deepseek (Qwen 3.8)' },
-                      { value: 'chatml', label: 'chatml' },
-                      { value: '', label: 'auto / default' },
-                    ]}
-                  />
-                </div>
-              )}
-            </div>
           </div>
         )}
       </div>

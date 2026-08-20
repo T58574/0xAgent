@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Cpu, Folder, AlertTriangle, Zap, Activity, RefreshCw, HardDrive } from 'lucide-react';
+import { Cpu, Folder, AlertTriangle, Zap, Activity, RefreshCw, HardDrive, Play, Square } from 'lucide-react';
 import { GgufMetadata, HardwareInfo, LocalModelItem } from '../../types';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -521,6 +521,89 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     showToast('Применен пресет спекулятивного декодирования (Speculative Draft / MTP)!', 'success');
   };
 
+  const [isActionLoading, setIsActionLoading] = useState(false);
+
+  const handleStartLocalServer = async () => {
+    if (!modelPath) {
+      showToast('Выберите модель GGUF для запуска', 'error');
+      return;
+    }
+    setIsActionLoading(true);
+    try {
+      const res = await api.start_local_server({
+        exePath,
+        modelPath,
+        host,
+        port,
+        ctxSize,
+        threads,
+        gpuLayers,
+        temp,
+        batchSize,
+        ubatchSize,
+        minP,
+        topK,
+        topP,
+        predict,
+        repeatPenalty,
+        flashAttn,
+        mmap,
+        mlock,
+        embedding,
+        contBatching,
+        promptCache,
+        parallelSlots,
+        cacheReuse,
+        slotSavePath,
+        customArgs,
+        specDraftModel,
+        specType,
+        specDraftNgl,
+        specDraftNMax,
+        specDraftPMin,
+        jinja,
+        reasoningPreserve,
+        reasoningFormat,
+      });
+      if (res && res.success) {
+        setServerStatus('running');
+        showToast('Сервер llama.cpp успешно запущен', 'success');
+      } else {
+        showToast((res && res.message) || 'Ошибка запуска сервера', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Не удалось запустить сервер', 'error');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleStopLocalServer = async () => {
+    setIsActionLoading(true);
+    try {
+      await api.stop_local_server();
+      setServerStatus('stopped');
+      showToast('Сервер llama.cpp остановлен', 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Не удалось остановить сервер', 'error');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRestartLocalServer = async () => {
+    setIsActionLoading(true);
+    try {
+      await api.stop_local_server();
+      await new Promise((r) => setTimeout(r, 600));
+      await handleStartLocalServer();
+    } catch (err: any) {
+      showToast(err.message || 'Не удалось перезапустить сервер', 'error');
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const isSelectedVersionInstalled = installedVersions.some(
     (v) => v.tag.toLowerCase() === selectedTag.toLowerCase()
   );
@@ -530,11 +613,11 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
   return (
     <div className="space-y-4 font-sans text-[var(--theme-text)] max-w-full">
-      {/* Top Header & Live Health Metric */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[var(--theme-border)] pb-3">
+      {/* Top Header & Server Control Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-[var(--theme-border)] pb-3">
         <div>
           <h3 className="text-sm font-semibold text-[var(--theme-text)] flex items-center gap-2">
-            <Cpu size={16} className="text-[var(--theme-text-muted)]" />
+            <Cpu size={16} className="text-[var(--theme-accent)]" />
             <span>Параметры и Логи ИИ-Сервера Llama.cpp</span>
           </h3>
           <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
@@ -542,19 +625,59 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           </p>
         </div>
 
-        {/* Live Slot & Health Metrics Badge */}
-        {serverStatus === 'running' && (
-          <div className="flex items-center gap-2 text-xs font-mono bento-card px-3 py-1.5 rounded-lg select-none">
-            <Activity size={13} className="text-[var(--theme-text-muted)] animate-pulse" />
-            <span className="text-[var(--theme-text)] font-medium">
-              {healthStatus === 'loading'
-                ? 'Загрузка модели в GPU...'
-                : healthStatus === 'ok'
-                ? `Готов | Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 1}`
-                : 'Инициализация...'}
-            </span>
-          </div>
-        )}
+        {/* Server Control Actions Bar */}
+        <div className="flex items-center gap-2 shrink-0">
+          {serverStatus === 'running' ? (
+            <>
+              <button
+                type="button"
+                disabled={isActionLoading}
+                onClick={handleRestartLocalServer}
+                className="px-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                title="Перезапустить сервер с текущими параметрами"
+              >
+                <RefreshCw size={13} className={isActionLoading ? 'animate-spin' : ''} />
+                <span>Перезапуск</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isActionLoading}
+                onClick={handleStopLocalServer}
+                className="px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                title="Остановить сервер"
+              >
+                <Square size={13} className="fill-current" />
+                <span>Остановить</span>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              disabled={isActionLoading || !modelPath}
+              onClick={handleStartLocalServer}
+              className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              title={modelPath ? "Запустить сервер llama.cpp" : "Выберите модель GGUF для запуска"}
+            >
+              <Play size={13} className={isActionLoading ? 'animate-spin fill-current' : 'fill-current'} />
+              <span>{isActionLoading ? 'Запуск...' : 'Запустить сервер'}</span>
+            </button>
+          )}
+
+          {/* Live Slot & Health Metrics Badge */}
+          {serverStatus === 'running' && (
+            <div className="flex items-center gap-2 text-xs font-mono bento-card px-3 py-1.5 rounded-lg select-none">
+              <Activity size={13} className="text-emerald-500 animate-pulse" />
+              <span className="text-[var(--theme-text)] font-medium">
+                {healthStatus === 'loading'
+                  ? 'Загрузка в GPU...'
+                  : healthStatus === 'ok'
+                  ? `Готов | Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 1}`
+                  : 'Инициализация...'}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Crash Advisory Alert Box */}
