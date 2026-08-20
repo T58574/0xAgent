@@ -10,8 +10,8 @@ describe('SSL & Local HTTPS Helper Subsystem', () => {
     assert.ok(ips.includes('127.0.0.1'));
   });
 
-  it('should generate or load valid X.509 SSL certificate and RSA key', () => {
-    const ssl = getOrCreateSslCertificates();
+  it('should generate or load valid X.509 SSL certificate and RSA key', async () => {
+    const ssl = await getOrCreateSslCertificates();
     assert.ok(ssl.key);
     assert.ok(ssl.cert);
     assert.ok(ssl.cert.includes('BEGIN CERTIFICATE'));

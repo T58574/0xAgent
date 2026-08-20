@@ -35,13 +35,12 @@ export function getCertsDir(): string {
   return dir;
 }
 
-export function getOrCreateSslCertificates(): SslCertificates {
+export function loadSslCertificatesSync(): SslCertificates | null {
   const certsDir = getCertsDir();
   const certPath = path.join(certsDir, 'cert.pem');
   const keyPath = path.join(certsDir, 'key.pem');
   const lanIps = getLocalLanIps();
 
-  // If certificates already exist and are non-empty, load them
   if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
     try {
       const cert = fs.readFileSync(certPath, 'utf-8');
@@ -51,6 +50,19 @@ export function getOrCreateSslCertificates(): SslCertificates {
       }
     } catch {}
   }
+  return null;
+}
+
+export async function getOrCreateSslCertificates(): Promise<SslCertificates> {
+  const cached = loadSslCertificatesSync();
+  if (cached) {
+    return cached;
+  }
+
+  const certsDir = getCertsDir();
+  const certPath = path.join(certsDir, 'cert.pem');
+  const keyPath = path.join(certsDir, 'key.pem');
+  const lanIps = getLocalLanIps();
 
   // Generate fresh Subject Alternative Names (SAN) for localhost + all local LAN IPs
   const altNames: any[] = [
@@ -61,7 +73,7 @@ export function getOrCreateSslCertificates(): SslCertificates {
   ];
 
   const attrs: Array<{ name: string; value: string }> = [{ name: 'commonName', value: '0xAgent Local Development CA' }];
-  const pems: any = (selfsigned as any).generate(attrs, {
+  const pems: any = await (selfsigned as any).generate(attrs, {
     days: 365,
     keySize: 2048,
     algorithm: 'sha256',

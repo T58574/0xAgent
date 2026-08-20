@@ -72,7 +72,7 @@ const useHttps = process.env.DISABLE_HTTPS !== 'true';
 let sslCerts: SslCertificates | null = null;
 try {
   if (useHttps) {
-    sslCerts = getOrCreateSslCertificates();
+    sslCerts = await getOrCreateSslCertificates();
   }
 } catch (err) {
   console.warn('[SSL] Failed to generate local SSL certificates, falling back to plain HTTP:', err);
