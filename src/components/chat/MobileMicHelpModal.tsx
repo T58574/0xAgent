@@ -56,44 +56,43 @@ export const MobileMicHelpModal: React.FC<MobileMicHelpModalProps> = ({ isOpen, 
           <div className="space-y-3 font-sans">
             <div className="font-bold text-sm text-[var(--theme-text)]">Выберите удобный способ:</div>
 
-            {/* Method 1: HTTPS (iPhone & Android) */}
-            <div className="p-3.5 rounded-2xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] space-y-2">
+            {/* Method 1: Chrome flags (Android / Yandex) - Most reliable for LAN HTTP */}
+            <div className="p-3.5 rounded-2xl bg-[var(--theme-card-bg)] border border-cyan-500/30 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-[13px] text-emerald-400">Способ 1: Открыть через HTTPS (Быстро)</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 font-mono">iOS & Android</span>
+                <span className="font-bold text-[13px] text-cyan-400">Способ 1: Для Android (Chrome / Яндекс / Brave)</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-cyan-950/40 text-cyan-300 border border-cyan-500/30 font-mono">[Рекомендуется]</span>
               </div>
               <p className="text-[11px] text-[var(--theme-text-muted)]">
-                Откройте страницу по защищённому адресу <strong>HTTPS</strong>. Браузер сразу запросит разрешение на микрофон:
+                Активирует микрофон по обычному HTTP без SSL-ошибок за 10 секунд:
               </p>
-              <div className="flex items-center justify-between gap-2 p-2 rounded-xl bg-black/40 border border-[var(--theme-border)] font-mono text-[11px]">
-                <span className="truncate text-emerald-300">{httpsUrl}</span>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(httpsUrl)}
-                  className="px-2.5 py-1 rounded-lg bg-[var(--theme-border-subtle)] hover:bg-[var(--theme-accent)] hover:text-black font-bold transition-colors shrink-0"
-                >
-                  {copied ? 'Скопировано!' : 'Скопировать'}
-                </button>
-              </div>
-              <p className="text-[10px] text-[var(--theme-text-muted)] opacity-80">
-                * При первом входе нажмите «Подробнее» / «Дополнительно» → «Перейти на сайт (небезопасно)».
-              </p>
+              <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-[var(--theme-text)]">
+                <li>Откройте в новой вкладке телефона: <br /><code className="font-mono text-cyan-300 select-all break-all">chrome://flags/#unsafely-treat-insecure-origin-as-secure</code></li>
+                <li>Вставьте в текстовое поле адрес вашего сервера:
+                  <div className="flex items-center justify-between gap-2 mt-1 p-2 rounded-xl bg-black/40 border border-[var(--theme-border)] font-mono text-[11px]">
+                    <span className="truncate text-amber-300 select-all">{insecureFlagOrigin}</span>
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(insecureFlagOrigin)}
+                      className="px-2.5 py-1 rounded-lg bg-[var(--theme-border-subtle)] hover:bg-[var(--theme-accent)] hover:text-black font-bold transition-colors shrink-0 cursor-pointer"
+                    >
+                      {copied ? 'Скопировано!' : 'Скопировать IP'}
+                    </button>
+                  </div>
+                </li>
+                <li>Переключите выпадающий список в <strong>Enabled</strong> и нажмите синюю кнопку <strong>Relaunch</strong> внизу.</li>
+              </ol>
             </div>
 
-            {/* Method 2: Chrome flags (Android) */}
+            {/* Method 2: iPhone / Safari */}
             <div className="p-3.5 rounded-2xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] space-y-2">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-[13px] text-cyan-400">Способ 2: Chrome Flags (Для Android)</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-md bg-cyan-950/40 text-cyan-300 border border-cyan-500/30 font-mono">Chrome / Yandex</span>
+                <span className="font-bold text-[13px] text-emerald-400">Способ 2: Для iPhone / iPad (Safari)</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-md bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 font-mono">iOS</span>
               </div>
               <p className="text-[11px] text-[var(--theme-text-muted)]">
-                Разрешить HTTP для локального IP в браузере телефона навсегда:
+                На iPhone Safari откройте 0xAgent через защищённый туннель или запустите сервер с SSL:
+                <code>npm run dev:ssl</code> и перейдите на <span className="text-emerald-300 font-mono">{httpsUrl}</span> (приняв сертификат).
               </p>
-              <ol className="list-decimal list-inside space-y-1 text-[11px] text-[var(--theme-text)]">
-                <li>Откройте в новой вкладке: <code className="font-mono text-cyan-300">chrome://flags/#unsafely-treat-insecure-origin-as-secure</code></li>
-                <li>Вставьте в поле адрес: <code className="font-mono text-amber-300">{insecureFlagOrigin}</code></li>
-                <li>Выберите <strong>Enabled</strong> и нажмите <strong>Relaunch</strong>.</li>
-              </ol>
             </div>
           </div>
         </div>

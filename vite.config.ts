@@ -3,9 +3,11 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import basicSsl from "@vitejs/plugin-basic-ssl";
 
+const useSsl = process.env.VITE_HTTPS === 'true' || process.env.HTTPS === 'true';
+
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), basicSsl()],
+  plugins: [react(), tailwindcss(), ...(useSsl ? [basicSsl()] : [])],
   clearScreen: false,
   server: {
     port: 5173,
