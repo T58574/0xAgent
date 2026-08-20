@@ -15,6 +15,9 @@ import { hardwareRouter } from './routes/hardwareRoutes';
 import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes';
 import { createAgentRouter } from './routes/agentRoutes';
 import { contextRouter } from './routes/contextRoutes';
+
+import path from 'node:path';
+import fs from 'node:fs';
 import knowledgeRouter from './routes/knowledge';
 import { jarvisRouter } from './routes/jarvisRoutes';
 import { jarvisSupervisor } from './agent/jarvisSupervisor';
@@ -126,6 +129,21 @@ app.use('/api', createAgentRouter(broadcast));
 app.use('/api', contextRouter);
 app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
+
+// Serve static production build (dist/) if present (PWA shell, assets, icons)
+const DIST_DIR = path.resolve(process.cwd(), 'dist');
+if (fs.existsSync(DIST_DIR)) {
+  app.use(express.static(DIST_DIR));
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path === '/ws') return next();
+    const indexPath = path.join(DIST_DIR, 'index.html');
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      next();
+    }
+  });
+}
 
 // Global JSON Error Handler
 app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

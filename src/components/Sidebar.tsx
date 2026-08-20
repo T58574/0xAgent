@@ -143,7 +143,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Mobile Header Title & Close Button */}
             <div className="flex md:hidden items-center justify-between pb-1">
               <div className="flex items-center gap-2 font-bold text-sm tracking-wider text-[var(--theme-text)]">
-                <Terminal size={16} className="text-[var(--theme-text-muted)]" />
+                <img
+                  src="/0xAgent-icon.jpg"
+                  alt="0xAgent Logo"
+                  className="w-5 h-5 rounded-md object-cover border border-[var(--theme-border)] shrink-0"
+                />
                 <span>0xAGENT</span>
               </div>
               <button

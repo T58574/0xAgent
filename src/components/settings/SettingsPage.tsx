@@ -38,6 +38,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           >
             <ChevronLeft size={16} />
           </button>
+          <img
+            src="/0xAgent-icon.jpg"
+            alt="0xAgent Logo"
+            className="w-5 h-5 rounded-md object-cover border border-[var(--theme-border)] shrink-0"
+          />
           <h2 className="text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider">Настройки</h2>
         </div>
 
@@ -86,6 +91,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               </button>
             );
           })}
+
+          {/* 0xAgent System Badge */}
+          <div className="hidden md:flex mt-auto pt-4 border-t border-[var(--theme-border)] items-center gap-2.5 px-2">
+            <img
+              src="/0xAgent-icon.jpg"
+              alt="0xAgent"
+              className="w-7 h-7 rounded-lg object-cover border border-[var(--theme-border)] shadow-xs shrink-0"
+            />
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold text-[var(--theme-text)] tracking-wider">0xAGENT</div>
+              <div className="text-[9px] font-mono text-[var(--theme-text-muted)]">v0.1.0 (local)</div>
+            </div>
+          </div>
         </div>
 
         {/* Right Scrollable Content Panel */}

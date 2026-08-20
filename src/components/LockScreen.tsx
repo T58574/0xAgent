@@ -100,6 +100,15 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black font-mono text-[var(--theme-text)] select-none px-4">
       <div className="w-full max-w-sm flex flex-col items-center space-y-6">
         
+        {/* 0xAgent Cyber Emblem */}
+        <div className="flex flex-col items-center justify-center select-none">
+          <img
+            src="/0xAgent-icon.jpg"
+            alt="0xAgent Emblem"
+            className="w-14 h-14 rounded-2xl object-cover border border-white/20 shadow-2xl hover:scale-105 transition-transform duration-300 pointer-events-auto"
+          />
+        </div>
+
         {/* Interactive 0xAgent ASCII Wave Logo */}
         <div className="flex flex-col items-center justify-center select-none pointer-events-auto">
           <AsciiCanvasEngine

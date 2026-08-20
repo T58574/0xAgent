@@ -82,6 +82,48 @@ namespace OxAgent.Launcher
         {
             try
             {
+                string iconPath = Path.Combine(_projectDir, "0xAgent-icon.jpg");
+                if (!File.Exists(iconPath))
+                {
+                    iconPath = Path.Combine(_projectDir, "public", "0xAgent-icon.jpg");
+                }
+
+                if (File.Exists(iconPath))
+                {
+                    using (Image srcImg = Image.FromFile(iconPath))
+                    using (Bitmap bmp = new Bitmap(32, 32))
+                    using (Graphics g = Graphics.FromImage(bmp))
+                    {
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                        g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                        g.Clear(Color.Transparent);
+
+                        using (GraphicsPath path = new GraphicsPath())
+                        {
+                            int radius = 8;
+                            Rectangle rect = new Rectangle(0, 0, 31, 31);
+                            path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
+                            path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90);
+                            path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90);
+                            path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90);
+                            path.CloseFigure();
+
+                            g.SetClip(path);
+                            g.DrawImage(srcImg, rect);
+                            g.ResetClip();
+
+                            using (Pen borderPen = new Pen(Color.FromArgb(100, 255, 255, 255), 1.5f))
+                            {
+                                g.DrawPath(borderPen, path);
+                            }
+                        }
+
+                        IntPtr hIcon = bmp.GetHicon();
+                        return Icon.FromHandle(hIcon);
+                    }
+                }
+
+                // Fallback procedural icon
                 using (Bitmap bmp = new Bitmap(32, 32))
                 using (Graphics g = Graphics.FromImage(bmp))
                 {

@@ -398,3 +398,27 @@ h1, h2, h3, h4, h5, h6, .font-heading {
 .highlight-pulse {
   animation: messageHighlightPulse 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ==========================================
+   INSTALL-APP BANNER (mobile PWA prompt)
+   ========================================== */
+.install-app-banner {
+  position: fixed;
+  left: max(env(safe-area-inset-left), 10px);
+  right: max(env(safe-area-inset-right), 10px);
+  top: calc(env(safe-area-inset-top, 0px) + 60px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--theme-border);
+  background: color-mix(in srgb, var(--theme-panel-solid) 96%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow:
+    0 16px 48px -8px rgba(0, 0, 0, 0.65),
+    inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  touch-action: manipulation;
+}

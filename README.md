@@ -1,6 +1,8 @@
-# 0xAgent — Autonomous AI Developer & Web-IDE Platform
-
 <div align="center">
+
+<img src="0xAgent-icon.jpg" alt="0xAgent Icon" width="120" style="border-radius: 26px; margin-bottom: 12px;" />
+
+# 0xAgent — Autonomous AI Developer & Web-IDE Platform
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React 19](https://img.shields.io/badge/React-19.1-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)

@@ -173,8 +173,12 @@ export const Navbar: React.FC<NavbarProps> = ({
         )}
 
         {/* Brand */}
-        <div className="flex items-center gap-1.5 font-bold text-sm tracking-wider text-[var(--theme-text)] shrink-0">
-          <Terminal size={15} className="text-[var(--theme-text-muted)] shrink-0 hidden xs:inline" />
+        <div className="flex items-center gap-2 font-bold text-sm tracking-wider text-[var(--theme-text)] shrink-0">
+          <img
+            src="/0xAgent-icon.jpg"
+            alt="0xAgent Logo"
+            className="w-5 h-5 rounded-md object-cover border border-[var(--theme-border)] shadow-xs shrink-0"
+          />
           <span className="hidden sm:inline">0xAGENT</span>
         </div>
 

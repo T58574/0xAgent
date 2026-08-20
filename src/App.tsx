@@ -16,6 +16,7 @@ import { KnowledgeVault } from './components/KnowledgeVault';
 import { LockScreen } from './components/LockScreen';
 import { JarvisWidget } from './components/JarvisWidget';
 import { JarvisSanctuary } from './components/JarvisSanctuary';
+import { InstallAppBanner } from './components/InstallAppBanner';
 import { JarvisIntercomHud } from './components/chat/JarvisIntercomHud';
 import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
 import { useToast } from './context/ToastContext';
@@ -637,6 +638,9 @@ export default function App() {
 
       {/* JARVIS OLED MORPHIZM ASCII INTERCOM HUD */}
       <JarvisIntercomHud />
+
+      {/* Mobile PWA "Add to Home Screen" prompt (after auth, never over lock screen) */}
+      {isAuthenticated && isPasswordSet && <InstallAppBanner />}
 
       {(!isAuthenticated || !isPasswordSet) && (
         <LockScreen
