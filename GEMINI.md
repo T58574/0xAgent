@@ -71,6 +71,7 @@
 9. **Zero-Emoji UI & Design Policy**: No unicode emojis in HUDs, toasts, cards, or telemetry. Use Material Design 3 icons (`MaterialIcon`) or monospaced ASCII indicators (`[OK]`, `[ERR]`, `[>]`, `::`). Popups use persona glassmorphism (`rounded-2xl`, `backdrop-blur-2xl`).
 10. **Workspace Isolation**: Never write persona files (`SOUL.md`, `USER.md`) to the user workspace root. Use `<update_user_profile>` and `<update_persona_file>` which target `~/.0xagent/personas/`.
 11. **Robust Error Handling**: Wrap user/LLM regex in `try/catch`. Never return fake success responses on caught subagent/task errors.
+12. **Model & Agent Testing Protocol (0xAgent Bridge)**: Never test models via ad-hoc standalone CLI commands or isolated configs. Always test through the 0xAgent Bridge (`npm run bridge` or `scripts/agent-bridge.ts`), which authenticates against the live 0xAgent backend API (`POST /api/start-local-server`, `GET /api/server-health`, `/v1/chat/completions`) using the active application configuration, tracking real-time t/s, MTP draft acceptance rates, and memory telemetry.
 
 ---
 
@@ -80,6 +81,7 @@
 npm run dev              # Run backend (:3001) and Vite frontend (:5173) concurrently
 npm run build            # Typecheck (tsc) and build production frontend
 npm test                 # Run subsystem and unit tests
+npm run bridge           # Run 0xAgent Diagnostic Bridge for backend & MTP model benchmarking
 npm run audit:security   # Run OPSEC and security audit script
 npm run build:launcher   # Compile native C# Windows tray launcher (0xAgent.exe)
 npm run stop             # Clean up hanging processes and ports (scripts/cleanup.ps1)

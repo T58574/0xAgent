@@ -827,6 +827,8 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             onSelectSlotSavePath={handleSelectSlotSavePath}
             onApplyFastPreset={handleApplyFastPreset}
             onApplyFastMtpPreset={handleApplyFastMtpPreset}
+            modelMeta={modelMeta}
+            serverStatus={serverStatus}
           />
         </div>
 
