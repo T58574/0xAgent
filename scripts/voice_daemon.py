@@ -421,7 +421,7 @@ class VoiceDaemon:
 
     def run(self):
         if not self.init_vosk():
-            sys.exit(1)
+            print("[VoiceDaemon] [WARN] Running in audio-only mode without Vosk model.", flush=True)
 
         # Start local HTTP server thread
         threading.Thread(target=self.run_http_server, daemon=True).start()
@@ -429,31 +429,65 @@ class VoiceDaemon:
         # Start stdin listener thread
         threading.Thread(target=self.run_stdin_listener, daemon=True).start()
 
+        # --- Retry loop for InputStream (MME device can be busy on Windows) ---
+        MAX_STREAM_RETRIES = 3
+        RETRY_DELAY_SEC = 1.5
+
         print("[VoiceDaemon] Opening SoundDevice microphone stream (16kHz float32)...", flush=True)
-        try:
-            with sd.InputStream(
-                samplerate=SAMPLE_RATE,
-                channels=CHANNELS,
-                dtype="float32",
-                blocksize=BLOCK_SIZE,
-                callback=self.audio_callback
-            ):
-                print("[VoiceDaemon] ===================================================", flush=True)
-                print("[VoiceDaemon] [READY] 0xAgent OS Voice & Wake Daemon is LIVE!", flush=True)
-                print(f"[VoiceDaemon] [INFO] Wake Words: {', '.join(WAKE_WORDS[:5])}", flush=True)
-                print("[VoiceDaemon] ===================================================", flush=True)
 
-                while self.is_running:
-                    time.sleep(0.2)
+        stream_opened = False
+        for attempt in range(1, MAX_STREAM_RETRIES + 1):
+            try:
+                if attempt > 1:
+                    print(f"[VoiceDaemon] [RETRY {attempt}/{MAX_STREAM_RETRIES}] Reopening InputStream after {RETRY_DELAY_SEC}s delay...", flush=True)
 
-        except KeyboardInterrupt:
-            print("\n[VoiceDaemon] Stopping on keyboard interrupt...", flush=True)
-        except Exception as e:
-            print(f"[VoiceDaemon] Fatal audio stream error: {e}", file=sys.stderr, flush=True)
-        finally:
-            self.is_running = False
+                with sd.InputStream(
+                    samplerate=SAMPLE_RATE,
+                    channels=CHANNELS,
+                    dtype="float32",
+                    blocksize=BLOCK_SIZE,
+                    callback=self.audio_callback
+                ):
+                    print("[VoiceDaemon] ===================================================", flush=True)
+                    print("[VoiceDaemon] [READY] 0xAgent OS Voice & Wake Daemon is LIVE!", flush=True)
+                    print(f"[VoiceDaemon] [INFO] Wake Words: {', '.join(WAKE_WORDS[:5])}", flush=True)
+                    print("[VoiceDaemon] ===================================================", flush=True)
+
+                    stream_opened = True
+                    while self.is_running:
+                        time.sleep(0.2)
+                break
+
+            except KeyboardInterrupt:
+                print("\n[VoiceDaemon] Stopping on keyboard interrupt...", flush=True)
+                break
+
+            except Exception as e:
+                err_str = str(e)
+                is_mme_error = ('MME' in err_str or 'PaErrorCode' in err_str or 'InputStream' in err_str)
+                if is_mme_error and attempt < MAX_STREAM_RETRIES:
+                    print(f"[VoiceDaemon] [WARN] Audio stream open failed (attempt {attempt}): {e}", file=sys.stderr, flush=True)
+                    time.sleep(RETRY_DELAY_SEC)
+                else:
+                    print(f"[VoiceDaemon] [WARN] Microphone input stream unavailable: {e}", file=sys.stderr, flush=True)
+                    print("[VoiceDaemon] Daemon remaining active in HTTP/Manual mode.", flush=True)
+                    self.post_backend("/jarvis/voice-state", {"state": "no_mic"})
+                    # Stay alive for HTTP control without crashing
+                    while self.is_running:
+                        time.sleep(1.0)
+                    break
+
+        self.is_running = False
 
 
 if __name__ == "__main__":
     daemon = VoiceDaemon()
-    daemon.run()
+    try:
+        daemon.run()
+    except (KeyboardInterrupt, SystemExit):
+        pass
+    finally:
+        try:
+            sd.terminate()
+        except Exception:
+            pass

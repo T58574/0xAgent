@@ -210,13 +210,22 @@ export function useAppWebSocket({
 
     const onWsReconnected = async () => {
       const sid = currentSessionIdRef.current;
+      setAgentStatus('idle');
+      setLiveTelemetry(null);
+      flushPendingTokens();
       if (sid) {
         try {
           const fresh = await api.load_session(sid);
           if (fresh && fresh.messages) {
-            updateSessionState(fresh);
+            const cleaned = {
+              ...fresh,
+              messages: fresh.messages.map((m) => ({ ...m, isStreaming: false })),
+            };
+            updateSessionState(cleaned);
           }
-        } catch {}
+        } catch (err) {
+          console.warn('[WS] Failed to sync session on reconnect:', err);
+        }
       }
     };
     window.addEventListener('0xagent-ws-reconnected', onWsReconnected);

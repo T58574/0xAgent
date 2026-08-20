@@ -22,6 +22,13 @@ import {
   selectFileNative,
   find0xAgentContext,
 } from '../tools';
+import {
+  listProposals,
+  getProposal,
+  createStagedProposal,
+  verifyStagedProposal,
+  applyStagedProposal,
+} from '../agent/selfPatchEngine';
 
 export const workspaceRouter = Router();
 
@@ -287,5 +294,63 @@ workspaceRouter.post('/transcribe-audio', async (req, res) => {
   } catch (err: any) {
     console.error('Transcription error:', err);
     res.status(500).json({ error: err.message || 'Ошибка транскрибации Groq' });
+  }
+});
+
+// Self-Improvement & Pull Request Staged Proposals Endpoints
+workspaceRouter.get('/staging/proposals', async (req, res) => {
+  try {
+    const sessionId = req.query.sessionId as string | undefined;
+    const proposals = await listProposals(sessionId);
+    res.json({ proposals });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to list proposals' });
+  }
+});
+
+workspaceRouter.get('/staging/proposals/:id', async (req, res) => {
+  try {
+    const proposal = await getProposal(req.params.id);
+    if (!proposal) {
+      res.status(404).json({ error: 'Proposal not found' });
+      return;
+    }
+    res.json({ proposal });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to get proposal' });
+  }
+});
+
+workspaceRouter.post('/staging/proposals', async (req, res) => {
+  try {
+    const { sessionId, title, description, changes, workspaceDir } = req.body;
+    if (!sessionId || !title || !Array.isArray(changes)) {
+      res.status(400).json({ error: 'sessionId, title, and changes array are required' });
+      return;
+    }
+    const proposal = await createStagedProposal(sessionId, title, description || '', changes, workspaceDir);
+    res.json({ success: true, proposal });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create proposal' });
+  }
+});
+
+workspaceRouter.post('/staging/proposals/:id/verify', async (req, res) => {
+  try {
+    const { workspaceDir } = req.body;
+    const proposal = await verifyStagedProposal(req.params.id, workspaceDir);
+    res.json({ success: true, proposal });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to verify proposal' });
+  }
+});
+
+workspaceRouter.post('/staging/proposals/:id/apply', async (req, res) => {
+  try {
+    const { workspaceDir } = req.body;
+    const result = await applyStagedProposal(req.params.id, workspaceDir);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to apply proposal' });
   }
 });

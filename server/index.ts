@@ -23,6 +23,7 @@ import { jarvisRouter } from './routes/jarvisRoutes';
 import { jarvisSupervisor } from './agent/jarvisSupervisor';
 import { voiceDaemonManager } from './agent/voiceDaemonManager';
 import { cleanupOrphanWorkspaces } from './session';
+import { reconcileInterruptedSessions } from './agent/selfPatchEngine';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -189,4 +190,11 @@ server.listen(Number(PORT), HOST, () => {
   
   // Clean up any stale ephemeral sandbox workspaces left behind from previous sessions
   cleanupOrphanWorkspaces().catch(() => {});
+
+  // Reconcile and seal any sessions interrupted by crashes or hot reloads
+  reconcileInterruptedSessions().then((count) => {
+    if (count > 0) {
+      process.stdout.write(`[0xAgent] Reconciled ${count} interrupted sessions on boot.\n`);
+    }
+  }).catch(() => {});
 });

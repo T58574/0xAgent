@@ -15,6 +15,7 @@ import {
   KnowledgeQueryOptions,
   JarvisState,
   ContextBreakdownReport,
+  StagedProposal,
 } from '../types';
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
@@ -290,3 +291,15 @@ export const start_voice_daemon_recording = () => post<{ success: boolean; state
 export const stop_voice_daemon_recording = () => post<{ success: boolean; state: string }>('/jarvis/voice-record/stop');
 export const get_context_breakdown = (sessionId?: string | null) =>
   get<ContextBreakdownReport>(sessionId ? `/context/breakdown?sessionId=${encodeURIComponent(sessionId)}` : '/context/breakdown');
+
+// Self-Improvement & Pull Request Proposals API
+export const list_proposals = (sessionId?: string) =>
+  get<{ proposals: StagedProposal[] }>(sessionId ? `/staging/proposals?sessionId=${encodeURIComponent(sessionId)}` : '/staging/proposals');
+export const get_proposal = (id: string) =>
+  get<{ proposal: StagedProposal }>(`/staging/proposals/${encodeURIComponent(id)}`);
+export const create_proposal = (params: { sessionId: string; title: string; description?: string; changes: any[]; workspaceDir?: string }) =>
+  post<{ success: boolean; proposal: StagedProposal }>('/staging/proposals', params);
+export const verify_proposal = (id: string, workspaceDir?: string) =>
+  post<{ success: boolean; proposal: StagedProposal }>(`/staging/proposals/${encodeURIComponent(id)}/verify`, { workspaceDir });
+export const apply_proposal = (id: string, workspaceDir?: string) =>
+  post<{ success: boolean; appliedFiles: string[]; message: string }>(`/staging/proposals/${encodeURIComponent(id)}/apply`, { workspaceDir });

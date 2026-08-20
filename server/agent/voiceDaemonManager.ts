@@ -57,6 +57,18 @@ export class VoiceDaemonManager {
 
       this.isRunningFlag = true;
 
+      // Guard stdin against EPIPE (daemon dies before we write)
+      const stdin = this.process.stdin;
+      if (stdin) {
+        stdin.on('error', (err: NodeJS.ErrnoException) => {
+          if (err.code === 'EPIPE' || err.code === 'ECONNRESET') {
+            logger.info('VoiceDaemonManager', `stdin pipe closed (${err.code}), daemon likely exited.`);
+          } else {
+            logger.warn('VoiceDaemonManager', `stdin error: ${err.message}`);
+          }
+        });
+      }
+
       this.process.stdout?.on('data', (data: Buffer) => {
         const str = data.toString().trim();
         if (str) {
@@ -123,6 +135,23 @@ export class VoiceDaemonManager {
     this.broadcastState('stopped');
   }
 
+  private safeWriteStdin(cmd: string): boolean {
+    if (this.process && !this.process.killed && this.process.exitCode === null && this.process.stdin?.writable) {
+      try {
+        this.process.stdin.write(cmd, (err) => {
+          if (err) {
+            logger.info('VoiceDaemonManager', `stdin write error (${err.message})`);
+          }
+        });
+        return true;
+      } catch (err: any) {
+        logger.info('VoiceDaemonManager', `stdin write exception: ${err?.message || err}`);
+        return false;
+      }
+    }
+    return false;
+  }
+
   public async startRecording(): Promise<boolean> {
     if (!this.isRunningFlag) {
       this.start();
@@ -137,8 +166,7 @@ export class VoiceDaemonManager {
       }
     } catch {
       // Fallback via stdin
-      if (this.process?.stdin?.writable) {
-        this.process.stdin.write('START\n');
+      if (this.safeWriteStdin('START\n')) {
         this.broadcastState('recording');
         return true;
       }
@@ -155,8 +183,7 @@ export class VoiceDaemonManager {
       }
     } catch {
       // Fallback via stdin
-      if (this.process?.stdin?.writable) {
-        this.process.stdin.write('STOP\n');
+      if (this.safeWriteStdin('STOP\n')) {
         this.broadcastState('processing');
         return true;
       }
@@ -177,8 +204,7 @@ export class VoiceDaemonManager {
         return true;
       }
     } catch {
-      if (this.process?.stdin?.writable) {
-        this.process.stdin.write('TOGGLE\n');
+      if (this.safeWriteStdin('TOGGLE\n')) {
         return true;
       }
     }
@@ -194,9 +220,7 @@ export class VoiceDaemonManager {
         body: JSON.stringify({ is_speaking: speaking }),
         signal: AbortSignal.timeout(800),
       }).catch(() => {
-        if (this.process?.stdin?.writable) {
-          this.process.stdin.write(speaking ? 'TTS_ON\n' : 'TTS_OFF\n');
-        }
+        this.safeWriteStdin(speaking ? 'TTS_ON\n' : 'TTS_OFF\n');
       });
     } catch {}
   }

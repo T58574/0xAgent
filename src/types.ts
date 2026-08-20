@@ -480,3 +480,28 @@ export interface ContextBreakdownReport {
   modelName: string;
   sessionId?: string | null;
 }
+
+export interface StagedFileChange {
+  path: string;
+  originalContent?: string;
+  newContent?: string;
+  patch?: string;
+  changeType: 'created' | 'modified' | 'deleted';
+}
+
+export interface StagedProposal {
+  id: string;
+  sessionId: string;
+  title: string;
+  description: string;
+  status: 'pending' | 'verified' | 'failed' | 'applied' | 'rejected';
+  files: StagedFileChange[];
+  createdAt: number;
+  updatedAt: number;
+  verificationResult?: {
+    passed: boolean;
+    typecheckOutput?: string;
+    testsOutput?: string;
+    durationMs?: number;
+  };
+}

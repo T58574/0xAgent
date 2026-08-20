@@ -69,10 +69,13 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [daemonVoiceState, setDaemonVoiceState] = useState<'idle' | 'recording' | 'processing' | 'stopped'>('idle');
   const [voicePhraseNotification, setVoicePhraseNotification] = useState<string | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const inputTextRef = useRef(inputText);
   inputTextRef.current = inputText;
 
@@ -127,10 +130,124 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   const isListeningForWake = Boolean(config?.tts_config?.wake_word_enabled);
 
   const handleMicClick = async () => {
+    setVoiceError(null);
+
+    // If browser MediaRecorder is currently recording, stop and transcribe
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
+      return;
+    }
+
+    const isMobileOrTouch = /iphone|ipad|ipod|android/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+    // Mobile: Use direct in-browser WebAudio MediaRecorder
+    if (isMobileOrTouch && navigator?.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/mp4')
+          ? 'audio/mp4'
+          : '';
+        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+        mediaRecorderRef.current = recorder;
+        audioChunksRef.current = [];
+
+        recorder.ondataavailable = (e) => {
+          if (e.data && e.data.size > 0) {
+            audioChunksRef.current.push(e.data);
+          }
+        };
+
+        recorder.onstop = async () => {
+          stream.getTracks().forEach((t) => t.stop());
+          const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+          if (blob.size > 200) {
+            setDaemonVoiceState('processing');
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+              const resBase64 = (reader.result as string).split(',')[1];
+              try {
+                const text = await api.transcribe_audio(resBase64, config?.groq_api_key || '');
+                if (text && text.trim()) {
+                  setInputText(inputTextRef.current ? `${inputTextRef.current} ${text.trim()}` : text.trim());
+                  textareaRef.current?.focus();
+                }
+              } catch (err: any) {
+                setVoiceError(err.message || 'Ошибка распознавания речи');
+                setTimeout(() => setVoiceError(null), 6000);
+              } finally {
+                setDaemonVoiceState('idle');
+              }
+            };
+            reader.readAsDataURL(blob);
+          } else {
+            setDaemonVoiceState('idle');
+          }
+        };
+
+        recorder.start();
+        setDaemonVoiceState('recording');
+        return;
+      } catch (err: any) {
+        console.warn('[WebAudio] Mic capture failed:', err);
+        const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+        setVoiceError(isDenied ? 'Доступ к микрофону заблокирован в настройках браузера' : 'Микрофон недоступен на этом устройстве');
+        setTimeout(() => setVoiceError(null), 6000);
+        return;
+      }
+    }
+
+    // Desktop: Trigger local OS voice daemon (with fallback to browser mic)
     try {
-      await api.toggle_voice_daemon_recording();
-    } catch (err) {
-      console.error('Failed to toggle voice recording:', err);
+      const res = await api.toggle_voice_daemon_recording();
+      if (!res.success) {
+        // If desktop daemon has no mic, fallback to browser getUserMedia
+        if (navigator?.mediaDevices?.getUserMedia) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = recorder;
+            audioChunksRef.current = [];
+            recorder.ondataavailable = (e) => { if (e.data?.size) audioChunksRef.current.push(e.data); };
+            recorder.onstop = async () => {
+              stream.getTracks().forEach((t) => t.stop());
+              const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+              if (blob.size > 200) {
+                setDaemonVoiceState('processing');
+                const reader = new FileReader();
+                reader.onloadend = async () => {
+                  const b64 = (reader.result as string).split(',')[1];
+                  try {
+                    const text = await api.transcribe_audio(b64, config?.groq_api_key || '');
+                    if (text?.trim()) {
+                      setInputText(inputTextRef.current ? `${inputTextRef.current} ${text.trim()}` : text.trim());
+                      textareaRef.current?.focus();
+                    }
+                  } catch (e: any) {
+                    setVoiceError(e.message || 'Ошибка распознавания речи');
+                  } finally {
+                    setDaemonVoiceState('idle');
+                  }
+                };
+                reader.readAsDataURL(blob);
+              } else {
+                setDaemonVoiceState('idle');
+              }
+            };
+            recorder.start();
+            setDaemonVoiceState('recording');
+            return;
+          } catch {}
+        }
+        setVoiceError('Устройство ввода звука недоступно. Проверьте системный микрофон.');
+        setTimeout(() => setVoiceError(null), 6000);
+      }
+    } catch (err: any) {
+      setVoiceError(`Ошибка микрофона: ${err?.message || err}`);
+      setTimeout(() => setVoiceError(null), 6000);
     }
   };
 
@@ -143,9 +260,15 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       }
     });
 
-    const un2 = api.listen<{ state: 'idle' | 'recording' | 'processing' | 'stopped'; phrase?: string }>('jarvis_voice_state', (e) => {
+    const un2 = api.listen<{ state: 'idle' | 'recording' | 'processing' | 'stopped' | 'no_mic'; phrase?: string }>('jarvis_voice_state', (e) => {
       if (e.payload?.state) {
-        setDaemonVoiceState(e.payload.state);
+        if (e.payload.state === 'no_mic') {
+          setDaemonVoiceState('idle');
+          setVoiceError('Системный микрофон ПК занят или не подключен');
+          setTimeout(() => setVoiceError(null), 6000);
+        } else {
+          setDaemonVoiceState(e.payload.state as any);
+        }
         if (e.payload.phrase) {
           setVoicePhraseNotification(e.payload.phrase);
           setTimeout(() => setVoicePhraseNotification(null), 3000);
@@ -310,6 +433,22 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             <span className="font-bold tracking-wider text-xs text-[var(--theme-text)]">JARVIS :: GROQ WHISPER</span>
             <span className="text-xs text-[var(--theme-text-muted)]">Расшифровка голосовой команды...</span>
           </div>
+        </div>
+      )}
+
+      {voiceError && (
+        <div className="flex items-center justify-between px-4 py-2 mb-2 rounded-2xl bg-rose-950/80 border border-rose-500/40 text-rose-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in duration-200 shadow-lg">
+          <div className="flex items-center gap-2 truncate">
+            <span className="text-rose-400 font-bold">[ERR]:</span>
+            <span className="truncate">{voiceError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVoiceError(null)}
+            className="p-1 text-rose-400 hover:text-white rounded-md hover:bg-rose-900/50 cursor-pointer transition-colors shrink-0 ml-2"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
