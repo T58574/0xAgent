@@ -40,6 +40,35 @@ export const MODIFYING_TOOLS: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * Detects whether a path targets the 0xAgent engine's own core codebase (server, src, scripts, configs).
+ */
+export function isCoreSystemPath(filePath: string, workspaceDir?: string | null): boolean {
+  if (!filePath) return false;
+
+  const appRoot = process.cwd();
+  const baseDir = workspaceDir ? path.resolve(workspaceDir) : appRoot;
+  const targetAbs = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : path.resolve(baseDir, filePath);
+
+  const relFromAppRoot = path.relative(appRoot, targetAbs).replace(/\\/g, '/');
+  if (relFromAppRoot.startsWith('..') || path.isAbsolute(relFromAppRoot)) {
+    return false;
+  }
+
+  const corePrefixes = [
+    'server/',
+    'src/',
+    'scripts/',
+    'package.json',
+    'vite.config.ts',
+    'tsconfig.json',
+  ];
+
+  return corePrefixes.some((pat) => relFromAppRoot === pat || relFromAppRoot.startsWith(pat));
+}
+
+/**
  * Validates whether a file path is safely contained within the designated workspace directory.
  */
 export function isPathInsideWorkspace(filePath: string, workspaceDir?: string | null): boolean {

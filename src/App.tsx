@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import * as api from './services/api';
 import { sounds } from './services/soundEffects';
 import { AppConfig, LiveTelemetry, JarvisState, PersonaMetadata } from './types';
@@ -7,17 +7,18 @@ import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { ResizableSplitter } from './components/ResizableSplitter';
 import { ChatArea } from './components/ChatArea';
-import { SettingsPage } from './components/settings/SettingsPage';
-import { CodeEditor } from './components/CodeEditor';
-import { MemorySkillsModal } from './components/MemorySkillsModal';
-import { WorkspacePickerModal } from './components/WorkspacePickerModal';
-import { AnalyticsPage } from './components/analytics/AnalyticsPage';
-import { KnowledgeVault } from './components/KnowledgeVault';
 import { LockScreen } from './components/LockScreen';
-import { JarvisWidget } from './components/JarvisWidget';
-import { JarvisSanctuary } from './components/JarvisSanctuary';
 import { InstallAppBanner } from './components/InstallAppBanner';
 import { JarvisIntercomHud } from './components/chat/JarvisIntercomHud';
+
+const SettingsPage = lazy(() => import('./components/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
+const CodeEditor = lazy(() => import('./components/CodeEditor').then((m) => ({ default: m.CodeEditor })));
+const MemorySkillsModal = lazy(() => import('./components/MemorySkillsModal').then((m) => ({ default: m.MemorySkillsModal })));
+const WorkspacePickerModal = lazy(() => import('./components/WorkspacePickerModal').then((m) => ({ default: m.WorkspacePickerModal })));
+const AnalyticsPage = lazy(() => import('./components/analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
+const KnowledgeVault = lazy(() => import('./components/KnowledgeVault').then((m) => ({ default: m.KnowledgeVault })));
+const JarvisSanctuary = lazy(() => import('./components/JarvisSanctuary').then((m) => ({ default: m.JarvisSanctuary })));
+const JarvisWidget = lazy(() => import('./components/JarvisWidget').then((m) => ({ default: m.JarvisWidget })));
 import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { useAppWebSocket } from './hooks/useAppWebSocket';
@@ -439,142 +440,142 @@ export default function App() {
 
         {/* CONTENT VIEWPORT */}
         <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col rounded-none sm:rounded-[26px] border-0 sm:border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl shadow-sm">
-          
-          {/* SETTINGS VIEW */}
-          {activeView === 'settings' && (
-            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
-              <SettingsPage
-                config={config}
-                onSaveConfig={handleSaveConfig}
-                onCancel={() => setActiveView('chat')}
-                initialSubtab={settingsSubtab}
-                currentSessionId={currentSessionId}
-              />
-            </div>
-          )}
-
-          {/* ANALYTICS VIEW */}
-          {activeView === 'analytics' && (
-            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
-              <AnalyticsPage
-                sessions={sessions}
-                serverLogs={logs}
-                onRefresh={() => window.location.reload()}
-              />
-            </div>
-          )}
-
-          {/* KNOWLEDGE VAULT VIEW */}
-          {activeView === 'knowledge' && (
-            <div className="w-full h-full overflow-hidden bg-theme-bg">
-              <KnowledgeVault />
-            </div>
-          )}
-
-          {/* JARVIS SANCTUARY VIEW */}
-          {activeView === 'jarvis' && (
-            <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
-              <JarvisSanctuary
-                config={config}
-                currentSession={currentSession}
-                sessions={sessions}
-                onSelectSession={handleSelectSession}
-                onCreateSession={handleCreateSession}
-                agentStatus={agentStatus}
-                onSendMessage={handleSendMessage}
-                onRespondToTool={handleRespondToTool}
-                onCancelAgent={handleCancelAgent}
-                onRollbackSession={handleRollbackSession}
-                liveTelemetry={liveTelemetry}
-                personas={personas}
-                activePersonaId={activePersonaId}
-                onSelectPersona={handleSelectPersona}
-                isServerOffline={isServerOffline}
-                onStartServer={handleStartServer}
-              />
-            </div>
-          )}
-
-          {/* MAIN CHAT & SPLIT VIEW */}
-          <div className={`w-full h-full ${activeView === 'chat' || activeView === 'workspace' ? 'flex flex-col overflow-hidden' : 'hidden'}`}>
-            {isSplitMode && !isMobile ? (
-              <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
-                {/* Left Pane: Code Editor / Workspace Tree */}
-                <div
-                  className="h-full overflow-hidden flex flex-col border-r border-white/10"
-                  style={{ width: `${splitLeftWidthPercent}%` }}
-                >
-                  {/* Mobile Tab Switcher */}
-                  <div className="flex md:hidden glass-panel p-1 border-b border-white/10 shrink-0 select-none">
-                    <button
-                      type="button"
-                      onClick={() => setMobileWorkspaceTab('files')}
-                      className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
-                        mobileWorkspaceTab === 'files' ? 'bg-slate-800 text-white' : 'text-slate-400'
-                      }`}
-                    >
-                      <FolderTree size={13} />
-                      <span>Файлы</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMobileWorkspaceTab('editor')}
-                      className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
-                        mobileWorkspaceTab === 'editor' ? 'bg-slate-800 text-white' : 'text-slate-400'
-                      }`}
-                    >
-                      <Code size={13} />
-                      <span>Редактор ({openTabs.length})</span>
-                    </button>
-                  </div>
-
-                  <div className="flex-1 w-full h-full overflow-hidden">
-                    <CodeEditor
-                      selectedFile={selectedFile}
-                      openTabs={openTabs}
-                      onSelectTab={handleSelectTab}
-                      onCloseTab={handleCloseTab}
-                      onFileSaved={handleFileSaved}
-                      workspaceDir={activeSessionWorkspace}
-                    />
-                  </div>
-                </div>
-
-                {/* Draggable Divider Handle */}
-                <ResizableSplitter
-                  onResize={(pct) => setSplitLeftWidthPercent(pct)}
-                  minPercent={20}
-                  maxPercent={80}
+          <Suspense fallback={<div className="w-full h-full flex items-center justify-center text-xs font-mono text-[var(--theme-text-muted)] animate-pulse">LOADING...</div>}>
+            {/* SETTINGS VIEW */}
+            {activeView === 'settings' && (
+              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
+                <SettingsPage
+                  config={config}
+                  onSaveConfig={handleSaveConfig}
+                  onCancel={() => setActiveView('chat')}
+                  initialSubtab={settingsSubtab}
+                  currentSessionId={currentSessionId}
                 />
-
-                {/* Right Pane: Chat Window */}
-                <div
-                  className="h-full overflow-hidden flex flex-col flex-1"
-                  style={{ width: `${100 - splitLeftWidthPercent}%` }}
-                >
-                  {renderChatComponent()}
-                </div>
-              </div>
-            ) : (
-              <div className="w-full h-full flex flex-col overflow-hidden">
-                {activeView === 'workspace' ? (
-                  <div className="w-full h-full flex flex-col overflow-hidden">
-                    <CodeEditor
-                      selectedFile={selectedFile}
-                      openTabs={openTabs}
-                      onSelectTab={handleSelectTab}
-                      onCloseTab={handleCloseTab}
-                      onFileSaved={handleFileSaved}
-                      workspaceDir={activeSessionWorkspace}
-                    />
-                  </div>
-                ) : (
-                  renderChatComponent()
-                )}
               </div>
             )}
-          </div>
 
+            {/* ANALYTICS VIEW */}
+            {activeView === 'analytics' && (
+              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
+                <AnalyticsPage
+                  sessions={sessions}
+                  serverLogs={logs}
+                  onRefresh={() => window.location.reload()}
+                />
+              </div>
+            )}
+
+            {/* KNOWLEDGE VAULT VIEW */}
+            {activeView === 'knowledge' && (
+              <div className="w-full h-full overflow-hidden bg-theme-bg">
+                <KnowledgeVault />
+              </div>
+            )}
+
+            {/* JARVIS SANCTUARY VIEW */}
+            {activeView === 'jarvis' && (
+              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
+                <JarvisSanctuary
+                  config={config}
+                  currentSession={currentSession}
+                  sessions={sessions}
+                  onSelectSession={handleSelectSession}
+                  onCreateSession={handleCreateSession}
+                  agentStatus={agentStatus}
+                  onSendMessage={handleSendMessage}
+                  onRespondToTool={handleRespondToTool}
+                  onCancelAgent={handleCancelAgent}
+                  onRollbackSession={handleRollbackSession}
+                  liveTelemetry={liveTelemetry}
+                  personas={personas}
+                  activePersonaId={activePersonaId}
+                  onSelectPersona={handleSelectPersona}
+                  isServerOffline={isServerOffline}
+                  onStartServer={handleStartServer}
+                />
+              </div>
+            )}
+
+            {/* MAIN CHAT & SPLIT VIEW */}
+            <div className={`w-full h-full ${activeView === 'chat' || activeView === 'workspace' ? 'flex flex-col overflow-hidden' : 'hidden'}`}>
+              {isSplitMode && !isMobile ? (
+                <div className="w-full h-full flex flex-col md:flex-row overflow-hidden">
+                  {/* Left Pane: Code Editor / Workspace Tree */}
+                  <div
+                    className="h-full overflow-hidden flex flex-col border-r border-white/10"
+                    style={{ width: `${splitLeftWidthPercent}%` }}
+                  >
+                    {/* Mobile Tab Switcher */}
+                    <div className="flex md:hidden glass-panel p-1 border-b border-white/10 shrink-0 select-none">
+                      <button
+                        type="button"
+                        onClick={() => setMobileWorkspaceTab('files')}
+                        className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
+                          mobileWorkspaceTab === 'files' ? 'bg-slate-800 text-white' : 'text-slate-400'
+                        }`}
+                      >
+                        <FolderTree size={13} />
+                        <span>Файлы</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMobileWorkspaceTab('editor')}
+                        className={`flex-1 py-1 text-xs font-bold flex items-center justify-center gap-1 rounded ${
+                          mobileWorkspaceTab === 'editor' ? 'bg-slate-800 text-white' : 'text-slate-400'
+                        }`}
+                      >
+                        <Code size={13} />
+                        <span>Редактор ({openTabs.length})</span>
+                      </button>
+                    </div>
+
+                    <div className="flex-1 w-full h-full overflow-hidden">
+                      <CodeEditor
+                        selectedFile={selectedFile}
+                        openTabs={openTabs}
+                        onSelectTab={handleSelectTab}
+                        onCloseTab={handleCloseTab}
+                        onFileSaved={handleFileSaved}
+                        workspaceDir={activeSessionWorkspace}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Draggable Divider Handle */}
+                  <ResizableSplitter
+                    onResize={(pct) => setSplitLeftWidthPercent(pct)}
+                    minPercent={20}
+                    maxPercent={80}
+                  />
+
+                  {/* Right Pane: Chat Window */}
+                  <div
+                    className="h-full overflow-hidden flex flex-col flex-1"
+                    style={{ width: `${100 - splitLeftWidthPercent}%` }}
+                  >
+                    {renderChatComponent()}
+                  </div>
+                </div>
+              ) : (
+                <div className="w-full h-full flex flex-col overflow-hidden">
+                  {activeView === 'workspace' ? (
+                    <div className="w-full h-full flex flex-col overflow-hidden">
+                      <CodeEditor
+                        selectedFile={selectedFile}
+                        openTabs={openTabs}
+                        onSelectTab={handleSelectTab}
+                        onCloseTab={handleCloseTab}
+                        onFileSaved={handleFileSaved}
+                        workspaceDir={activeSessionWorkspace}
+                      />
+                    </div>
+                  ) : (
+                    renderChatComponent()
+                  )}
+                </div>
+              )}
+            </div>
+          </Suspense>
         </div>
       </div>
 
@@ -604,37 +605,45 @@ export default function App() {
         </div>
       )}
 
-      {/* MEMORY & SKILLS MODAL */}
-      <MemorySkillsModal
-        isOpen={isMemorySkillsOpen}
-        onClose={() => setIsMemorySkillsOpen(false)}
-      />
+      <Suspense fallback={null}>
+        {/* MEMORY & SKILLS MODAL */}
+        {isMemorySkillsOpen && (
+          <MemorySkillsModal
+            isOpen={isMemorySkillsOpen}
+            onClose={() => setIsMemorySkillsOpen(false)}
+          />
+        )}
 
-      {/* WORKSPACE DIRECTORY PICKER MODAL */}
-      <WorkspacePickerModal
-        isOpen={isWorkspacePickerOpen}
-        onClose={() => setIsWorkspacePickerOpen(false)}
-        onSelectWorkspaceDir={handleSelectWorkspaceDir}
-        currentWorkspaceDir={config?.workspace_dir}
-        recentWorkspaces={sessions.map((s) => s.workspace_dir).filter((d): d is string => Boolean(d))}
-      />
+        {/* WORKSPACE DIRECTORY PICKER MODAL */}
+        {isWorkspacePickerOpen && (
+          <WorkspacePickerModal
+            isOpen={isWorkspacePickerOpen}
+            onClose={() => setIsWorkspacePickerOpen(false)}
+            onSelectWorkspaceDir={handleSelectWorkspaceDir}
+            currentWorkspaceDir={config?.workspace_dir}
+            recentWorkspaces={sessions.map((s) => s.workspace_dir).filter((d): d is string => Boolean(d))}
+          />
+        )}
 
-      {/* JARVIS MULTI-AGENT ORCHESTRATOR WIDGET */}
-      <JarvisWidget
-        isOpen={isJarvisOpen}
-        onClose={() => setIsJarvisOpen(false)}
-        jarvisState={jarvisState}
-        onRefresh={fetchJarvisData}
-        onAcceptSpark={handleAcceptSpark}
-        onDismissSpark={async (sparkId: string) => {
-          try {
-            await api.dismiss_spark(sparkId);
-            fetchJarvisData();
-          } catch (err: any) {
-            console.error('Failed to dismiss spark:', err);
-          }
-        }}
-      />
+        {/* JARVIS MULTI-AGENT ORCHESTRATOR WIDGET */}
+        {isJarvisOpen && (
+          <JarvisWidget
+            isOpen={isJarvisOpen}
+            onClose={() => setIsJarvisOpen(false)}
+            jarvisState={jarvisState}
+            onRefresh={fetchJarvisData}
+            onAcceptSpark={handleAcceptSpark}
+            onDismissSpark={async (sparkId: string) => {
+              try {
+                await api.dismiss_spark(sparkId);
+                fetchJarvisData();
+              } catch (err: any) {
+                console.error('Failed to dismiss spark:', err);
+              }
+            }}
+          />
+        )}
+      </Suspense>
 
       {/* JARVIS OLED MORPHIZM ASCII INTERCOM HUD */}
       <JarvisIntercomHud />

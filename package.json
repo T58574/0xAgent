@@ -26,7 +26,7 @@
   ],
   "scripts": {
     "predev": "node ./scripts/ensure-ssl.cjs",
-    "dev": "concurrently -k -p \"[{name}]\" -c \"blue,green\" -n \"SERVER,CLIENT\" \"tsx watch server/index.ts\" \"vite --host 0.0.0.0\"",
+    "dev": "concurrently -k -p \"[{name}]\" -c \"blue,green\" -n \"SERVER,CLIENT\" \"tsx watch server/index.ts\" \"node ./scripts/dev-client.cjs\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite --host 0.0.0.0",
     "prebuild": "node ./scripts/ensure-ssl.cjs",

@@ -268,7 +268,19 @@ new replacement lines
     requiresApproval: false,
     enabled: true,
     xmlSpec: `25. <list_knowledge />
-   - List Knowledge Vault.`,
+   - List Knowledge Vault items.`,
+  },
+  {
+    id: 'propose_pull_request',
+    name: 'propose_pull_request',
+    description: 'Propose a staged pull request for modifying engine core or complex multi-file features without direct overwriting.',
+    category: 'interactive',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `26. <propose_pull_request title="..." description="...">
+[{"path":"server/routes/api.ts","newContent":"..."}]
+</propose_pull_request>
+   - Create a Staged Pull Request for review with background TypeScript verification.`,
   },
   {
     id: 'search_sessions',

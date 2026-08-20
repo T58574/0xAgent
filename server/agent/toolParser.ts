@@ -28,6 +28,7 @@ const TOOL_NAME_MAP: Record<string, string> = {
   list_knowledge: 'list_knowledge', listknowledge: 'list_knowledge',
   update_user_profile: 'update_user_profile', updateuserprofile: 'update_user_profile', user_profile: 'update_user_profile', update_profile: 'update_user_profile',
   update_persona_file: 'update_persona_file', updatepersonafile: 'update_persona_file', persona_file: 'update_persona_file',
+  propose_pull_request: 'propose_pull_request', pull_request: 'propose_pull_request', propose_staged_changes: 'propose_pull_request',
 };
 
 function tryParseJson(text: string): any {
@@ -178,6 +179,21 @@ const DECLARATIVE_RULES: ToolRule[] = [
   },
   { regex: /<run_scratch_script\s+language=["']([^"']+)["']\s*>([\s\S]*?)<\/run_scratch_script>/gi, handler: (m) => ({ idPrefix: 'scratch', name: 'run_scratch_script', args: { language: m[1], code: m[2] } }) },
   { regex: /<spawn_subagent\s+task=["']([^"']+)["'](?:\s+role=["']([^"']+)["'])?\s*\/?>/gi, handler: (m) => ({ idPrefix: 'subagent', name: 'spawn_subagent', args: { task: m[1], role: m[2] || 'helper' } }) },
+  {
+    regex: /<(?:propose_pull_request|propose_staged_changes|pull_request)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:propose_pull_request|propose_staged_changes|pull_request)>|>([\s\S]*?)$)/gi,
+    handler: (m) => {
+      const title = parseAttrOrBody(m[1] || '', 'title') || 'Proposed Changes';
+      const description = parseAttrOrBody(m[1] || '', 'description') || '';
+      const bodyStr = (m[2] || m[3] || '').trim();
+      const parsedChanges = tryParseJson(bodyStr);
+      const changes = Array.isArray(parsedChanges) ? parsedChanges : (parsedChanges?.changes || []);
+      return {
+        idPrefix: 'pr',
+        name: 'propose_pull_request',
+        args: { title, description, changes, rawBody: bodyStr },
+      };
+    },
+  },
 ];
 
 function stripThinkingForToolParsing(text: string): string {

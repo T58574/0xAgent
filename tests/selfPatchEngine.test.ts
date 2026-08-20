@@ -90,4 +90,33 @@ describe('Self-Improvement & Pull Request Staged Proposal Subsystem', () => {
     const count = await reconcileInterruptedSessions();
     assert.ok(typeof count === 'number');
   });
+
+  it('should correctly identify core engine files with isCoreSystemPath', async () => {
+    const { isCoreSystemPath } = await import('../server/agent/permissionGuard');
+    assert.strictEqual(isCoreSystemPath('server/index.ts'), true);
+    assert.strictEqual(isCoreSystemPath('src/App.tsx'), true);
+    assert.strictEqual(isCoreSystemPath('scripts/cleanup.ps1'), true);
+    assert.strictEqual(isCoreSystemPath('package.json'), true);
+    assert.strictEqual(isCoreSystemPath('my-project/src/index.js'), false);
+    assert.strictEqual(isCoreSystemPath('server/index.ts', 'C:/Users/test/.0xagent/workspaces/cool-task-123'), false);
+  });
+
+  it('should intercept core file writes in dispatchToolExecution and create a Staged Proposal', async () => {
+    const { dispatchToolExecution } = await import('../server/agent/toolDispatcher');
+    const resStr = await dispatchToolExecution(
+      {
+        name: 'write_file',
+        arguments: { path: 'server/agent/testCoreGuard.ts', content: '// Core test' },
+      },
+      { workspace_dir: process.cwd() } as any,
+      true,
+      'test-session-guard'
+    );
+
+    const res = JSON.parse(resStr);
+    assert.strictEqual(res.success, true);
+    assert.strictEqual(res.type, 'staged_proposal');
+    assert.ok(res.proposal.id.startsWith('pr-'));
+    assert.ok(res.message.includes('[CORE SYSTEM PROTECTION]'));
+  });
 });

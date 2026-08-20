@@ -62,7 +62,8 @@ ${activePersona.user}
 1. Веди весь процесс размышления, анализа задачи и формулирования плана ИСКЛЮЧИТЕЛЬНО НА РУССКОМ ЯЗЫКЕ.
 2. АРХИТЕКТУРНЫЙ ФОКУС: В блоке рассуждений формулируй стратегию, логику и выбор инструментов.
 3. ЗАПРЕТ ЧЕРНОВИКОВ ФАЙЛОВ В МЫСЛЯХ: Категорически запрещено прописывать полный текст файлов, шаблоны или длинные патчи внутри блока рассуждений. Текст файлов сразу пишется в тело целевого инструмента (<write_file>, <patch_file>, <save_knowledge>).
-4. ЭФФЕКТИВНОСТЬ: Избегай зацикливания и многократного повторения одних и тех же мыслей.`
+4. ЭФФЕКТИВНОСТЬ: Избегай зацикливания и многократного повторения одних и тех же мыслей.
+5. ТЕГИ ИНСТРУМЕНТОВ ВНЕ МЫСЛЕЙ: Всегда закрывай блок размышлений тегом </think> ПЕРЕД вызовом XML-тегов инструментов! Вызовы инструментов ВСЕГДА должны быть снаружи блока <think>.`
     : '';
 
   const languageProtocolDirective = `\n\n# ГЛАВНЫЙ ЯЗЫКОВОЙ СТАНДАРТ (СТРОЖАЙШИЙ ЗАПРЕТ СМЕШИВАНИЯ ЯЗЫКОВ):
@@ -92,52 +93,6 @@ ${activePersona.user}
 export function formatMessageContent(m: ChatMessage, isHistoryAssistant: boolean = false): string | any[] {
   let content = m.content || '';
 
-  // If this assistant message executed tools but its content lost raw tags (e.g. legacy session),
-  // reconstruct the XML tags so the LLM context clearly sees what the assistant requested.
-  if (isHistoryAssistant && m.tool_calls && m.tool_calls.length > 0) {
-    const hasExistingTags = /<(?:read_file|readfile|write_file|writefile|patch_file|patchfile|list_dir|listdir|grep_search|grepsearch|fff_search|fffsearch|web_search|websearch|read_web_page|readwebpage|execute_command|executecommand|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|spawn_subagent|tool_?call|code_run|todo_write|update_?user_?profile|update_?persona_?file)\b/i.test(content);
-    if (!hasExistingTags) {
-      const reconstructedTags = m.tool_calls.map((tc) => {
-        let argsObj: any = {};
-        try {
-          argsObj = typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments || {};
-        } catch {
-          argsObj = {};
-        }
-        if (tc.name === 'list_dir' || tc.name === 'listdir') {
-          return `<list_dir path="${argsObj.path || '.'}" />`;
-        }
-        if (tc.name === 'read_file' || tc.name === 'readfile') {
-          return `<read_file path="${argsObj.path || ''}" />`;
-        }
-        if (tc.name === 'grep_search' || tc.name === 'grepsearch') {
-          return `<grep_search pattern="${argsObj.pattern || ''}" path="${argsObj.path || '.'}" />`;
-        }
-        if (tc.name === 'fff_search' || tc.name === 'fffsearch') {
-          return `<fff_search query="${argsObj.query || ''}" />`;
-        }
-        if (tc.name === 'web_search' || tc.name === 'websearch') {
-          return `<web_search query="${argsObj.query || ''}" />`;
-        }
-        if (tc.name === 'read_web_page' || tc.name === 'readwebpage') {
-          return `<read_web_page url="${argsObj.url || ''}" />`;
-        }
-        if (tc.name === 'execute_command' || tc.name === 'executecommand') {
-          return `<execute_command command="${argsObj.command || ''}" />`;
-        }
-        if (tc.name === 'write_file' || tc.name === 'writefile') {
-          return `<write_file path="${argsObj.path || ''}">\n${argsObj.content || ''}\n</write_file>`;
-        }
-        if (tc.name === 'patch_file' || tc.name === 'patchfile') {
-          return `<patch_file path="${argsObj.path || ''}">\n${argsObj.content || ''}\n</patch_file>`;
-        }
-        return `<${tc.name}>\n${JSON.stringify(argsObj)}\n</${tc.name}>`;
-      }).join('\n');
-
-      content = content ? `${content}\n\n${reconstructedTags}` : reconstructedTags;
-    }
-  }
-
   // Tier-2 CoT Compaction:
   // In multi-turn conversations, historical assistant outputs must NOT retain large thinking blocks.
   // Stripping past reasoning prevents context bloat, reduces KV cache memory consumption,
@@ -148,6 +103,52 @@ export function formatMessageContent(m: ChatMessage, isHistoryAssistant: boolean
       .replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?(?:\/channel|channel\|?)>|$)/gi, '')
       .replace(/\[(?:think|thinking|thought)\][\s\S]*?(?:\[\/(?:think|thinking|thought)\]|$)/gi, '')
       .trim();
+
+    // If this assistant message executed tools, ensure XML tool tags remain in content
+    // Check and reconstruct each tool call individually so no tool call is lost if partially inside/outside <think>
+    if (m.tool_calls && m.tool_calls.length > 0) {
+      const missingTags: string[] = [];
+
+      for (const tc of m.tool_calls) {
+        let argsObj: any = {};
+        try {
+          argsObj = typeof tc.arguments === 'string' ? JSON.parse(tc.arguments) : tc.arguments || {};
+        } catch {
+          argsObj = {};
+        }
+
+        const tagPattern = new RegExp(`<(?:${tc.name}|${tc.name.replace(/_/g, '')})\\b`, 'i');
+        const alreadyPresent = tagPattern.test(content) && (!argsObj.path || content.includes(argsObj.path));
+
+        if (!alreadyPresent) {
+          if (tc.name === 'list_dir' || tc.name === 'listdir') {
+            missingTags.push(`<list_dir path="${argsObj.path || '.'}" />`);
+          } else if (tc.name === 'read_file' || tc.name === 'readfile') {
+            missingTags.push(`<read_file path="${argsObj.path || ''}" />`);
+          } else if (tc.name === 'grep_search' || tc.name === 'grepsearch') {
+            missingTags.push(`<grep_search pattern="${argsObj.pattern || ''}" path="${argsObj.path || '.'}" />`);
+          } else if (tc.name === 'fff_search' || tc.name === 'fffsearch') {
+            missingTags.push(`<fff_search query="${argsObj.query || ''}" />`);
+          } else if (tc.name === 'web_search' || tc.name === 'websearch') {
+            missingTags.push(`<web_search query="${argsObj.query || ''}" />`);
+          } else if (tc.name === 'read_web_page' || tc.name === 'readwebpage') {
+            missingTags.push(`<read_web_page url="${argsObj.url || ''}" />`);
+          } else if (tc.name === 'execute_command' || tc.name === 'executecommand') {
+            missingTags.push(`<execute_command command="${argsObj.command || ''}" />`);
+          } else if (tc.name === 'write_file' || tc.name === 'writefile') {
+            missingTags.push(`<write_file path="${argsObj.path || ''}">\n${argsObj.content || ''}\n</write_file>`);
+          } else if (tc.name === 'patch_file' || tc.name === 'patchfile') {
+            missingTags.push(`<patch_file path="${argsObj.path || ''}">\n${argsObj.content || ''}\n</patch_file>`);
+          } else {
+            missingTags.push(`<${tc.name}>\n${JSON.stringify(argsObj)}\n</${tc.name}>`);
+          }
+        }
+      }
+
+      if (missingTags.length > 0) {
+        content = content ? `${content}\n\n${missingTags.join('\n')}` : missingTags.join('\n');
+      }
+    }
   }
 
   if (Array.isArray(m.images) && m.images.length > 0) {

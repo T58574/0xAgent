@@ -22,7 +22,7 @@ enum GgufValueType {
 
 function readGgufKvPairs(buffer: Buffer, bytesRead: number, kvCount: number): Record<string, any> {
   const rawKv: Record<string, any> = {};
-  let offset = 20;
+  let offset = 24; // GGUF Header: 4 (magic) + 4 (version) + 8 (tensor_count) + 8 (kv_count) = 24
 
   for (let i = 0; i < kvCount && offset < bytesRead - 8; i++) {
     try {
@@ -37,7 +37,7 @@ function readGgufKvPairs(buffer: Buffer, bytesRead: number, kvCount: number): Re
       const valType = buffer.readUInt32LE(offset) as GgufValueType;
       offset += 4;
 
-      const { value, newOffset } = parseGgufValue(buffer, offset, valType);
+      const { value, newOffset } = parseGgufValue(buffer, offset, valType, bytesRead);
       offset = newOffset;
 
       rawKv[key] = value;
@@ -48,13 +48,25 @@ function readGgufKvPairs(buffer: Buffer, bytesRead: number, kvCount: number): Re
   return rawKv;
 }
 
-function formatModelTitle(modelName: string, fileName: string): string {
-  let cleanTitle = modelName || fileName.replace(/\.gguf$/i, '');
-  cleanTitle = cleanTitle
+function formatModelTitle(modelName: string, fileName: string, rawKv: Record<string, any> = {}): string {
+  let baseName = rawKv['general.name'] || modelName || fileName.replace(/\.gguf$/i, '');
+  const sizeLabel = rawKv['general.size_label'] || '';
+
+  // Clean technical quant/hash suffixes
+  let cleanTitle = String(baseName)
     .replace(/[-_.]?(Q\d_[A-Z0-9_]+|Q\d_K_[SML]|IQ\d_[A-Z0-9_]+|F16|F32|BF16)$/i, '')
     .replace(/[-_.]?(Q\d_[A-Z0-9_]+|Q\d_K_[SML]|IQ\d_[A-Z0-9_]+|F16|F32|BF16)[-_.]/i, ' ')
     .replace(/[-_]/g, ' ')
     .trim();
+
+  if (/^rvn\b/i.test(cleanTitle) && !/qwen/i.test(cleanTitle)) {
+    cleanTitle = cleanTitle.replace(/^rvn\b/i, 'Raven (Qwen 3.8)').trim();
+  }
+
+  if (sizeLabel && !cleanTitle.toLowerCase().includes(sizeLabel.toLowerCase())) {
+    cleanTitle = `${cleanTitle} ${sizeLabel}`.trim();
+  }
+
   if (!cleanTitle) cleanTitle = fileName.replace(/\.gguf$/i, '');
   return cleanTitle;
 }
@@ -63,17 +75,32 @@ export function detectModelReasoningCapabilities(
   modelName: string,
   fileName: string,
   architecture: string = '',
-  _rawKv: Record<string, any> = {}
+  rawKv: Record<string, any> = {}
 ): {
   family: 'qwen' | 'gemma' | 'deepseek' | 'phi' | 'llama' | 'mistral' | 'unknown';
   supportsReasoning: boolean;
   recommendedReasoningEffort: ReasoningEffortLevel;
   supportedReasoningLevels: ReasoningEffortLevel[];
 } {
-  const combined = `${modelName} ${fileName} ${architecture}`.toLowerCase();
+  const metaName = String(rawKv['general.name'] || '');
+  const metaBasename = String(rawKv['general.basename'] || '');
+  const metaArch = String(rawKv['general.architecture'] || architecture || '');
+  const combined = `${modelName} ${fileName} ${architecture} ${metaName} ${metaBasename} ${metaArch}`.toLowerCase();
 
-  // 1. Qwen 3 / Qwen 3.8 / Qwen 3.5 Series
-  if (combined.includes('qwen3') || combined.includes('qwen-3') || combined.includes('qwen_3') || combined.includes('qwen 3')) {
+  // 1. Qwen 3 / Qwen 3.8 / Qwen 3.5 / Raven Series
+  if (
+    metaArch === 'qwen35' ||
+    metaArch.startsWith('qwen3') ||
+    combined.includes('qwen3') ||
+    combined.includes('qwen-3') ||
+    combined.includes('qwen_3') ||
+    combined.includes('qwen 3') ||
+    combined.includes('qwen38') ||
+    combined.includes('qwen3.8') ||
+    combined.includes('rvn-') ||
+    combined.includes('rvn_') ||
+    combined.includes('raven')
+  ) {
     return {
       family: 'qwen',
       supportsReasoning: true,
@@ -173,6 +200,10 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
   const fileSizeBytes = stats.size;
   const fileSizeFormatted = formatBytes(fileSizeBytes);
 
+  const isMmprojFile = /mmproj|projector|clip/i.test(fileName);
+  // Draft files are standalone sidecars, usually small (< 3 GB) with explicit draft marker
+  const isDraftFile = !isMmprojFile && fileSizeBytes < 3 * 1024 * 1024 * 1024 && (/(?:^|[._-])(?:draft|fastmtp-draft)(?:[._-]|$)/i.test(fileName) || /-(?:draft|fastmtp)\.gguf$/i.test(fileName));
+
   const result: GgufMetadata = {
     filePath,
     fileName,
@@ -186,8 +217,8 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
     blockCount: 0,
     contextLength: 4096,
     expertCount: 0,
-    isMmproj: /mmproj|projector|clip/i.test(fileName),
-    isDraft: /fastmtp|mtp|draft/i.test(fileName),
+    isMmproj: isMmprojFile,
+    isDraft: isDraftFile,
     isFastMtp: /fastmtp/i.test(fileName),
     supportsFastMtp: false,
     rawKv: {},
@@ -196,14 +227,15 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
   let fd: number | null = null;
   try {
     fd = fs.openSync(filePath, 'r');
-    const bufferSize = Math.min(1024 * 1024 * 1.5, fileSizeBytes);
-    const buffer = Buffer.alloc(bufferSize);
+    // Buffer size: allocate up to 16 MB using allocUnsafe for zero-overhead GC performance
+    const bufferSize = Math.min(1024 * 1024 * 16, fileSizeBytes);
+    const buffer = Buffer.allocUnsafe(bufferSize);
     const bytesRead = fs.readSync(fd, buffer, 0, bufferSize, 0);
 
-    if (bytesRead >= 12 && buffer.toString('ascii', 0, 4) === 'GGUF') {
+    if (bytesRead >= 24 && buffer.toString('ascii', 0, 4) === 'GGUF') {
       result.magicValid = true;
       result.version = buffer.readUInt32LE(4);
-      const kvCount = Number(buffer.readBigUInt64LE(12));
+      const kvCount = Number(buffer.readBigUInt64LE(16));
 
       result.rawKv = readGgufKvPairs(buffer, bytesRead, kvCount);
 
@@ -247,11 +279,12 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
   result.supportsReasoning = reasoningCaps.supportsReasoning;
   result.recommendedReasoningEffort = reasoningCaps.recommendedReasoningEffort;
   result.supportedReasoningLevels = reasoningCaps.supportedReasoningLevels;
-  result.supportsFastMtp = (result.family === 'qwen' || /qwen3/i.test(fileName) || /qwen/i.test(result.modelName)) && !result.isDraft && !result.isMmproj;
+  const hasNextnPredict = Boolean(result.rawKv?.['qwen35.nextn_predict_layers'] || result.rawKv?.['qwen3.nextn_predict_layers'] || /mtp/i.test(fileName));
+  result.supportsFastMtp = (result.family === 'qwen' || hasNextnPredict || /qwen3/i.test(fileName) || /qwen/i.test(result.modelName)) && !result.isDraft && !result.isMmproj;
 
   const sizeGBNum = fileSizeBytes / (1024 * 1024 * 1024);
   const sizeGB = `${sizeGBNum.toFixed(2)} GB`;
-  const cleanTitle = formatModelTitle(result.modelName, fileName);
+  const cleanTitle = formatModelTitle(result.modelName, fileName, result.rawKv);
 
   result.cleanTitle = cleanTitle;
   result.sizeGB = sizeGB;
@@ -260,36 +293,54 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
   return result;
 }
 
-function parseGgufValue(buffer: Buffer, offset: number, type: GgufValueType): { value: any; newOffset: number } {
+function parseGgufValue(buffer: Buffer, offset: number, type: GgufValueType, maxBytes: number = buffer.length): { value: any; newOffset: number } {
+  if (offset >= maxBytes) return { value: null, newOffset: maxBytes };
+
   switch (type) {
     case GgufValueType.UINT8:
+      if (offset + 1 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readUInt8(offset), newOffset: offset + 1 };
     case GgufValueType.INT8:
+      if (offset + 1 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readInt8(offset), newOffset: offset + 1 };
     case GgufValueType.UINT16:
+      if (offset + 2 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readUInt16LE(offset), newOffset: offset + 2 };
     case GgufValueType.INT16:
+      if (offset + 2 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readInt16LE(offset), newOffset: offset + 2 };
     case GgufValueType.UINT32:
+      if (offset + 4 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readUInt32LE(offset), newOffset: offset + 4 };
     case GgufValueType.INT32:
+      if (offset + 4 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readInt32LE(offset), newOffset: offset + 4 };
     case GgufValueType.FLOAT32:
+      if (offset + 4 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readFloatLE(offset), newOffset: offset + 4 };
     case GgufValueType.BOOL:
+      if (offset + 1 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readUInt8(offset) !== 0, newOffset: offset + 1 };
     case GgufValueType.STRING: {
+      if (offset + 8 > maxBytes) return { value: '', newOffset: maxBytes };
       const strLen = Number(buffer.readBigUInt64LE(offset));
+      if (strLen < 0 || offset + 8 + strLen > maxBytes) {
+        return { value: '', newOffset: maxBytes };
+      }
       const strVal = buffer.toString('utf-8', offset + 8, offset + 8 + strLen);
       return { value: strVal, newOffset: offset + 8 + strLen };
     }
     case GgufValueType.UINT64:
+      if (offset + 8 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: Number(buffer.readBigUInt64LE(offset)), newOffset: offset + 8 };
     case GgufValueType.INT64:
+      if (offset + 8 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: Number(buffer.readBigInt64LE(offset)), newOffset: offset + 8 };
     case GgufValueType.FLOAT64:
+      if (offset + 8 > maxBytes) return { value: null, newOffset: maxBytes };
       return { value: buffer.readDoubleLE(offset), newOffset: offset + 8 };
     case GgufValueType.ARRAY: {
+      if (offset + 12 > maxBytes) return { value: [], newOffset: maxBytes };
       const elemType = buffer.readUInt32LE(offset) as GgufValueType;
       const arrayLen = Number(buffer.readBigUInt64LE(offset + 4));
       let currentOffset = offset + 12;
@@ -297,32 +348,36 @@ function parseGgufValue(buffer: Buffer, offset: number, type: GgufValueType): { 
       const previewLimit = Math.min(arrayLen, 20);
 
       // Read first previewLimit items into array
-      for (let i = 0; i < previewLimit && currentOffset < buffer.length - 4; i++) {
-        const item = parseGgufValue(buffer, currentOffset, elemType);
+      for (let i = 0; i < previewLimit && currentOffset < maxBytes - 4; i++) {
+        const item = parseGgufValue(buffer, currentOffset, elemType, maxBytes);
         arr.push(item.value);
         currentOffset = item.newOffset;
       }
 
       // Skip remaining elements if any
       const remaining = arrayLen - previewLimit;
-      if (remaining > 0 && currentOffset < buffer.length) {
+      if (remaining > 0 && currentOffset < maxBytes) {
         const fixedSize = getGgufTypeSize(elemType);
         if (fixedSize > 0) {
-          currentOffset += remaining * fixedSize;
+          currentOffset = Math.min(maxBytes, currentOffset + remaining * fixedSize);
         } else if (elemType === GgufValueType.STRING) {
-          for (let i = 0; i < remaining && currentOffset + 8 <= buffer.length; i++) {
+          for (let i = 0; i < remaining && currentOffset + 8 <= maxBytes; i++) {
             const strLen = Number(buffer.readBigUInt64LE(currentOffset));
+            if (strLen < 0 || currentOffset + 8 + strLen > maxBytes) {
+              currentOffset = maxBytes;
+              break;
+            }
             currentOffset += 8 + strLen;
           }
         } else {
-          for (let i = 0; i < remaining && currentOffset < buffer.length - 4; i++) {
-            const item = parseGgufValue(buffer, currentOffset, elemType);
+          for (let i = 0; i < remaining && currentOffset < maxBytes - 4; i++) {
+            const item = parseGgufValue(buffer, currentOffset, elemType, maxBytes);
             currentOffset = item.newOffset;
           }
         }
       }
 
-      return { value: arr, newOffset: Math.min(currentOffset, buffer.length) };
+      return { value: arr, newOffset: Math.min(currentOffset, maxBytes) };
     }
     default:
       return { value: null, newOffset: offset + 4 };

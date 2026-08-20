@@ -1,89 +1,86 @@
-# GEMINI.md — 0xAgent Quick Reference
+# GEMINI.md — 0xAgent Architecture & Developer Guide
 
-## 🚀 Проект
-**0xAgent** — автономия и веб-IDE интерфейс локального ИИ-агента (React 19 + Node.js/Express + llama.cpp).
+## 🚀 Overview
+**0xAgent** is a local-first autonomous AI coding agent and Web-IDE platform (React 19 + Node.js/Express + local llama.cpp / hybrid cloud LLMs).
 
 ---
 
-## 📁 Структура и Ключевые Файлы
+## 📁 Key File Map
 
-### Backend (`server/`)
-- `index.ts` — Главный сервер Express (порты `3001` API, WS `/ws`), управление процессом `llama-server.exe`.
-- `agent.ts` — Цикл ИИ-агента (парсер промптов, вызов инструментов, стриминг токенов).
-- `agent/` — Подмодули ИИ-агента (`agentState.ts`, `fluffSanitizer.ts`, `toolParser.ts`, `contextManager.ts`, `toolDispatcher.ts`, `promptBuilder.ts`).
-- `routes/llama/` — Модульные контроллеры сервера llama.cpp (`llamaProcessState.ts`, `llamaReleases.ts`).
-- `tools.ts` — Исполнитель инструментов (чтение/запись файлов, патчи, поиск, вызов терминала).
-- `config.ts` — Загрузка и сохранение настроек (`~/.0xagent/config.json`).
-- `session.ts` — Хранение и управление сессиями чатов.
-- `hardware.ts` — Автодетект GPU / VRAM (Win32_VideoController).
-- `ggufParser.ts` — Парсер бинарных GGUF заголовков моделей.
+### Backend Core (`server/`)
+- `index.ts` — Express API (`:3001`), WebSocket gateway (`/ws`), and process supervisor for `llama-server.exe`.
+- `agent.ts` — Autonomous agent orchestrator (prompt execution loop, streaming, tool dispatching).
+- `agent/` — Agent submodules:
+  - `llmClient.ts` — Universal LLM client (local llama.cpp & Google AI Studio).
+  - `toolDispatcher.ts` / `toolParser.ts` — Tool execution and robust XML/tag parsing (`<toolcall>`, `<tool_call>`).
+  - `promptBuilder.ts` — System prompt construction, persona injection, and context assembly.
+  - `contextManager.ts` / `compactionPipeline.ts` — 4-tier context compression and token management.
+  - `toolResultPruner.ts` — Model-free syntactic trimming of historical tool outputs.
+  - `loopBreaker.ts` — Infinite tool loop detection and breaker.
+  - `outputSpiller.ts` — Automatic spilling of massive tool outputs (>24 KB) to disk.
+  - `codeRuntime.ts` — Sandboxed Node.js VM runtime for `<code_run>` batch operations.
+  - `subagentOrchestrator.ts` — Long-running parallel subagent management and messaging.
+  - `permissionGuard.ts` — Security presets (`readonly`, `workspace-write`, `prompt`, `unrestricted`).
+  - `voiceDaemonManager.ts` / `voiceMacroService.ts` — Native voice spotting and zero-token OS macros.
+- `tools/` & `tools.ts` — Tool implementations (file system, patches, search, terminal execution).
+- `config.ts` — Application settings store (`~/.0xagent/config.json`).
+- `session.ts` — Multi-session storage, message history, and branching.
+- `hardware.ts` — GPU/VRAM hardware detection (`Win32_VideoController`).
+- `ggufParser.ts` — Binary GGUF metadata parser.
+- `fffService.ts` — High-speed fuzzy file search (`@ff-labs/fff-node`).
+- `searxngService.ts` / `webReaderService.ts` — Privacy-first web search and HTML-to-Markdown reader.
+- `ttsService.ts` — Text-to-speech audio synthesis.
 
 ### Frontend (`src/`)
-- `App.tsx` — Главный компонент, WS-подписки, роутинг видов, сплит-скрин.
-- `components/Navbar.tsx` — Верхняя панель: статус LLM-сервера, переключатель видов (Чат, Редактор, Настройки, Аналитика).
-- `components/Sidebar.tsx` — Боковое меню сессий чата и дерева файлов.
-- `components/ChatArea.tsx` — Окно чата, ход мыслей `<think>`, фоновый суммаризатор, карточки инструментов.
-- `components/CodeEditor.tsx` — Вкладки файлов и встроенный просмотр кода.
-- `components/settings/` — Раздел настроек (Основные, LLM Сервер, Личности/Personas, Темы, Безопасность).
-- `components/chat/` — Подкомпоненты чата (`ReasoningViewer.tsx`, `FloatingCommandBar.tsx`, `ChatTimelineScrubber.tsx`).
-- `components/common/` — Общие элементы (`MaterialIcon.tsx`, `AsciiCanvasEngine.tsx`).
-- `services/api.ts` — REST API клиент.
-- `services/wsService.ts` — Модуль WebSocket соединения и обработчиков событий.
-- `index.css` — Стекломорфизм и 4 темы оформления (`obsidian`, `cyber`, `graphite`, `matrix`).
+- `App.tsx` — Root component, split-screen layout, and WebSocket subscriptions.
+- `types.ts` — **Single Source of Truth** for all shared data types across frontend and backend.
+- `components/` — UI components:
+  - `Navbar.tsx` — Top control bar (server status, model/view selector, telemetry).
+  - `Sidebar.tsx` — Session history, active workspaces, and file explorer.
+  - `ChatArea.tsx` — Chat stream, tool cards, reasoning viewer (`<think>`), and live plan progress HUD.
+  - `CodeEditor.tsx` — Multi-tab Monaco-style code viewer and editor.
+  - `chat/` — Chat components (`ReasoningViewer.tsx`, `FloatingCommandBar.tsx`, `PlanProgressStrip.tsx`).
+  - `settings/` — Settings tabs (General, LLM Server, Personas, Themes, Security).
+  - `common/` — Shared UI elements (`MaterialIcon.tsx`, `AsciiCanvasEngine.tsx`).
+- `services/api.ts` & `services/wsService.ts` — REST API and WebSocket communication layers.
+- `index.css` — Glassmorphism styles and 4 color themes (`obsidian`, `cyber`, `graphite`, `matrix`).
 
-### Директория Данных (`~/.0xagent/`)
-- `config.json` — Настройки приложения.
-- `data/sessions/` — История сессий чата в JSON.
-- `personas/` — Профили персон (`SOUL.md`, `USER.md`, `TOOLS.md`).
-- `llama/` — Исполняемые бинарники `llama.cpp`.
-- `models/` — Файлы моделей `.gguf`.
-- `memory.json` / `skills/` — Память и инструкции скиллов.
-
----
-
-## 🛡 Архитектурные Правила и Стандарты Разработки
-1. **Безопасность подсветки кода (Zero XSS)**: Запрещен `dangerouslySetInnerHTML`. Подсветка кода строится через токенизацию безопасными React-элементами (`renderSafeHighlightedLine`).
-2. **Единый источник типов (Single Source of Truth)**: Файл `src/types.ts` является единственным источником типов для фронтенда и бэкенда. Бэкенд-файлы импортируют типы из него.
-3. **UI/UX Выбор файлов и моделей**: Поля ввода путей (в настройках локального сервера) должны предоставлять выпадающий список отсканированных элементов (`api.get_available_models()`), кнопку «Сканировать» и нативный диалог (`api.select_file_native`).
-4. **Модульность бэкенда**: Файлы роутеров и обработчиков поддерживаются размером до 300 строк благодаря делегированию логики в подмодули.
-5. **Стабильность патчей кода (Patch & Write Fallback)**: Все вызовы `patch_file` используют fuzzy whitespace matching. Модель принудительно обязана использовать `patch_file` (с поддержкой множественных SEARCH/REPLACE блоков в одном вызове) для любых существующих файлов >50 строк. Вызов `write_file` разрешён только для новых или маленьких файлов. Автоочистка скрывает сырые XML-патчи из чата и предотвращает дублирование объявлений variables/hooks.
-6. **Высокоскоростной нечеткий поиск файлов (FFF)**: Для поиска файлов в рабочей области используется сервис `fffService` (@ff-labs/fff-node), поддерживающий поиск за < 3 мс с фоллбеком на Node.js fs.
-7. **Интернет-поиск без затрат токенов**: Поиск выполняет `searxngService` (SearXNG / DuckDuckGo fallback), а чтение веб-страниц — `webReaderService` со сжатием HTML в Markdown.
-8. **Устойчивый парсинг тегов и защита System32**: Парсер `parseGemmaToolCalls` в `toolParser.ts` автоматически обрабатывает вариации тегов (`<toolcall>`, `<tool_call>`), невалидный JSON и смешанные XML-атрибуты (`path="..."`). Команды с деструктивными паттернами `system32` автоблокируются на уровне `tools.ts`.
-9. **Запрет синхронного блокирующего I/O и execSync**: Запрещено вызывать `fs.readFileSync`, `fs.appendFileSync` или `execSync` (особенно PowerShell/WMIC) на частых обработчиках HTTP/WS запросов и в циклах стриминга логов. Все системные и дисковые операции обязаны быть асинхронными (`fs.promises`, `fs.appendFile`, `exec`, кеширование в памяти), чтобы не фризить главный поток Event Loop.
-10. **Безопасная обработка Regex и ошибок Subagents**: Вызовы `new RegExp(...)` с вводом от пользователя или LLM всегда должны быть обёрнуты в `try/catch` с экранированием метасимволов. Запрещено возвращать фейковые успешные ответы (например, "Goal processed") в блоках `catch` при ошибках под-агентов или фоновых задач.
-11. **Изучение Документации и Валидация Моделей**: Все модели в коде (Gemini 3.6 Flash, Gemma 4 31B, Gemini 3.5 Flash Lite, Gemini 3.5 Flash, Gemini 2.5 Flash TTS и др.) перед интеграцией и использованием должны быть сверены с актуальной официальной документацией API. Каждая модель обязана иметь корректный эндпоинт, заголовки авторизации и валидатор потокового ответа. В fallback цепочках и селекторах допускаются только активные модели Google AI Studio (запрещены устаревшие `gemini-1.5-*` / `gemini-2.0-*`).
-12. **Стандарты флагов llama.cpp и VRAM-оптимизация (30B+ на 16GB)**: Параметр Flash Attention обязан передаваться с явным значением (`-fa on` / `--flash-attn on`). Для локального сервера принудительно задаётся `-np 1` (по умолчанию llama.cpp запускает 4 слота). Для 30B+ моделей на 16 ГБ VRAM обязательны Flash Attention, квантованный KV-кэш (`-ctk q8_0 -ctv q8_0`) и контекст <= 16k (или 32k с q4_0 KV). Флаг `--top-k` перед передачей в CLI обязан округляться до целого (`Math.round`). Для высокоскоростного интерактивного автономного Tool-Loop цикла по умолчанию рекомендуются квантованные 9B–12B модели (~45 tok/s), а 31B резервируются для глубокого планирования.
-13. **Строгая сериализация настроек (Zero Falsy Bug)**: Запрещено использовать проверки истинности `if (ls.property)` для чисел и булевых значений. Все параметры (`threads`, `gpu_layers`, `parallel_slots`, `batch_size`, `ubatch_size`) обязаны валидироваться через `if (val !== undefined && val !== null)`, чтобы значения `0` (автопотоки) и `false` не сбрасывались на дефолтные.
-14. **Индикация рассуждений и устойчивость опроса слотов**: При статусе агента `thinking` интерфейс обязан выводить живой индикатор с таймером реального времени и фазами обработки. Обработчики здоровья локального сервера (`/server-health`, `/server-slots`) должны иметь таймаут >= 4–5 с, чтобы исключить спам отменённых задач (`cancel task`) в логах при занятом слоте.
-15. **Стандарты UI/UX и всплывающих меню (Persona-Style Popovers)**: Все всплывающие меню (выбор моделей, персон, команд `/`, раздача LAN) оформляются строго в стиле Persona Popover: радиус `rounded-2xl` (16px), глубокий стекломорфизм (`backdrop-blur-2xl`, полупрозрачный фон `bg-[var(--theme-panel)]/95`), отсутствие многоуровневых вложенных рамок и радужных бейджей. Селекторы моделей и персон размещаются контекстно в строке ввода (`FloatingCommandBar`) и открываются вверх (`bottom-full mb-2`), оставляя верхний хедер легким и чистым.
-16. **Автоматическое высвобождение ресурсов VRAM (Auto-Free GPU)**: При выборе облачной API-модели (Google AI Studio) приложение обязано автоматически останавливать локальный процесс `llama-server.exe` для немедленного высвобождения VRAM видеокарты и потоков процессора.
-17. **Эргономика сайдбара и шрифтовой стек**: Переключатель сворачивания/разворачивания бокового меню размещается по центру (50% высоты) внешней границы панели (и плавающая кнопка на левом краю экрана в свёрнутом виде). Интерфейс использует единый современный шрифтовой стек `Inter` (UI) и `JetBrains Mono` (код и системные токены) с полным запретом архаичных шрифтов с засечками и жестко захардкоженных цветовых классов.
-18. **Строгий запрет эмодзи (Zero Emoji Policy / Pure ASCII & Material Design 3)**: В пользовательском интерфейсе, HUD-панелях, тостах, статус-барах и карточках телеметрии категорически запрещено использование Unicode-эмодзи (`⚡`, `⚙`, `📁`, `⏱`, `✋`, `🔥`, `🧠` и др.). Разрешены исключительно моноширинные ASCII-индикаторы (`::`, `[01]`, `[+]`/`[-]`, `›`, `[OK]`, `[ERR]`, `[t/s]`, `[tok]`) либо векторные иконки Material Design 3 (`MaterialIcon` / Material Symbols: `bolt`, `memory`, `storage`, `schedule`).
-19. **Изоляция памяти персон и профиля пользователя (No Workspace Pollution)**: Агенту строго запрещено создавать или модифицировать файлы `USER.md` и `SOUL.md` в корне рабочего проекта. Для сохранения информации о пользователе модель обязана вызывать специализированный инструмент `<update_user_profile trait="..." category="profile" />` (сохраняющий данные в `~/.0xagent/personas/<id>/USER.md`), а для личности — `<update_persona_file file="SOUL.md">`.
-20. **Умная адаптивность рассуждений и защита от пустых CoT-блоков**: Локальные модели (Gemma 4 Dark Thoughts, finetunes) не обязаны выводить теги `<think>` и могут отвечать прямым текстом. Карточка `ReasoningViewer` должна монтироваться только при наличии реального блока мыслей (`hasThinking`) либо до первого токена ответа (`isActivelyGenerating && !hasText`). Если модель стримит прямой ответ, блок мыслей автоматически уступает место ответу без пустых окон.
-21. **Нативный ультралегковесный лаунчер 0xAgent.exe (Zero Overhead)**: Запуск платформы на Windows производится через скомпилированный нативным C# компилятором `csc.exe` трей-лаунчер `0xAgent.exe` (~15 КБ, ~8 МБ RAM). Запрещено использовать тяжелые браузерные обертки (WebView2/Electron), чтобы сберечь оперативную память и VRAM для локальных 31B+ LLM.
-22. **Нативный системный голосовой демон (Native Voice Daemon)**: Запрещено использовать браузерный Web Speech API для фонового споттинга ключевых слов. Ожидание wake-word («джарвис») и захват голоса осуществляет системный фоновый процесс (`voice_daemon.py` на базе оффлайн Vosk RU + SoundDevice) с Gain Boost 3.2x и транскрибацией Groq Whisper. Синхронизация с UI идет через WebSocket-события.
-23. **Полная автономность и запрет облачных костылей делегации (No Cloud Delegation Crutches)**: Запрещена интеграция внешних сервисов облачной делегации задач (Google Jules и др.). Вся автономность реализуется исключительно ядром 0xAgent, локальным супервизором и прямыми LLM вызовами.
-24. **Полный тихий режим при тестах (Silent Test Executions)**: При запуске `npm test` TTS-модуль обязан быть программно заглушен (`setMuted(true)`), исключая воспроизведение аудио через системные динамики.
-25. **Ультра-минималистичный OLED дизайн авторизации и сплэш-экранов (Frameless OLED Minimal)**: Экраны блокировки/авторизации строятся бесшовными (`frameless`), на чистом pitch-black OLED фоне с платиновым интерактивным ASCII-логотипом (`AsciiCanvasEngine`). Кнопки и инпуты оформляются в строгом моноширинном терминальном стиле без иконок внутри кнопок и лишнего текста.
-26. **Системные макросы нулевого расхода токенов (Zero-Token Voice Macros)**: Базовые команды управления ОС Windows (громкость, медиа-плеер, сворачивание окон, запуск калькулятора/VS Code) перехватываются на уровне `voiceMacroService` за 1–6 мс без обращения к LLM и без расхода токенов.
-27. **Безатратное сжатие вызовов инструментов (Zero-Token Model-Free Tool Pruning)**: Исторические результаты инструментов в контексте LLM обязаны подвергаться автоматическому синтаксическому сжатию перед формированием промпта (`toolResultPruner.ts` с сохранением первых 4096 симв. и последних 1024 симв.). Это защищает контекстное окно (16k–32k) и VRAM без единого обращения к LLM и без расхода токенов. Полный результат всегда сохраняется в `session.json`.
-28. **Защита от зацикливания агента (Repeat-Tool Loop Breaker)**: Все вызовы инструментов агентом отслеживаются через `loopBreaker.ts` с канонизацией аргументов (`deepSortKeys`). При 3 одинаковых вызовах подряд агент получает контекстное предупреждение, а при 5 — принудительный разрыв цикла (`forceHalt`) для предотвращения зависания и расхода токенов. Мета-инструменты (`todo_write`) являются прозрачными для счетчика.
-29. **Динамический чеклист задач (Dynamic Todo & Live Plan HUD)**: Для многошаговых задач используется инструмент `todo_write`. Прогресс выполнения транслируется в реальном времени через WebSocket (`session-todos-updated`) и отображается в виде компактного HUD-виджета `PlanProgressStrip` с индикаторами ASCII (`[OK]`, `[>]`, `[..]`) и Material Design 3.
-30. **Сброс гигантских выводов на диск (Output Spilling to Disk)**: При объеме вывода терминала или инструмента свыше 24 КБ результат автоматически сохраняется в `~/.0xagent/spill/*.log`, а в контекст и чат передается безопасный срез (первые 50 и последние 20 строк) с локатором к файлу лога.
-31. **Изоляция рабочих пространств и авто-песочницы (Auto-Workspace Sandboxing)**: При создании диалога без привязки к конкретному проекту агент обязан использовать изолированную директорию-песочницу `~/.0xagent/workspaces/<slug>`, сгенерированную по читаемому паттерну `adjective-noun-hash`, изолируя инструменты и сборку промптов от загрязнения корня репозитория.
-32. **Интерактивные карточки решений (Interactive Question Cards)**: Для запроса уточнений и согласования планов используется инструмент `<ask_user_question>` с поддержкой single/multi-select, свободного ввода (`custom write-in`) и `plan-review` согласования, исключая флуд в чате.
-33. **Пакетное исполнение кода в песочнице (Code Mode Engine)**: Инструмент `<code_run>` позволяет агенту выполнять комплексные пакетные операции на JavaScript в изолированной песочнице `node:vm` с прямыми асинхронными вызовами `tools.*` (read, write, patch, grep, fff, web) за 1 шаг диалога.
-34. **Матрица безопасности и пресеты разрешений (Permission Presets)**: Архитектура поддерживает 4 пресета (`readonly`, `workspace-write`, `prompt`, `unrestricted`) с валидацией выхода за пределы рабочей области (`path traversal`) и блокировкой деструктивных команд.
-35. **Ветвление и проекция сессий (Session Forking & Event Projection)**: Возможность ответвления диалога с любого сообщения (`POST /api/sessions/:id/fork`) с изоляцией истории и состояний задач.
-36. **Протокол непрерывных субагентов (Continuable Subagent Orchestrator)**: Поддержка параллельных долгоживущих субагентов с возможностью отправки промежуточных указаний (`send_subagent_message`), прерывания (`interrupt_subagent`) и мониторинга статусов.
-37. **4-Уровневый конвейер сжатия контекста (4-Tier Compaction Pipeline)**: Единая координация безатратного сжатия (Tier 1: Tool Pruner, Tier 2: CoT Stripper, Tier 3: Context Windowing, Tier 4: Milestone Summarizer при 75% пороге).
+### Data Directory (`~/.0xagent/`)
+- `config.json` — Persistent configuration.
+- `data/sessions/` — Chat sessions in JSON.
+- `personas/` — Persona profiles (`SOUL.md`, `USER.md`, `TOOLS.md`).
+- `workspaces/` — Auto-generated sandbox directories for isolated tasks.
+- `spill/` — Truncated large output logs.
+- `llama/` & `models/` — Local llama.cpp binaries and GGUF model files.
 
 ---
 
-## 🛠 Команды Разработки
-- `npm run dev` — Одновременный запуск бэкенда (`:3001`) и фронтенда Vite (`:5173`).
-- `npm run build` — TypeScript проверщик (`tsc`) + Vite сборщик.
-- `npm run build:launcher` — Компиляция нативного Windows Tray лаунчера `0xAgent.exe` через `csc.exe`.
-- `npm run stop` — Очистка зависших процессов и портов (`cleanup.ps1`).
+## 🛡 Architectural Rules & Invariants
+
+1. **Single Source of Types**: `src/types.ts` is the single source of truth for all types. Both frontend and backend import from here.
+2. **Safe Code Rendering (Zero XSS)**: Never use `dangerouslySetInnerHTML`. Code and markdown are tokenized safely via React elements.
+3. **Patching Standard (`patch_file`)**: Always use `patch_file` with `SEARCH`/`REPLACE` blocks for existing files (>50 lines). `write_file` is reserved for new or small files only.
+4. **Fast File & Web Search**: Use `fffService` for workspace file discovery (<3 ms) and `searxngService`/`webReaderService` for web research without token bloat.
+5. **Strict Async I/O**: Synchronous blocking calls (`fs.readFileSync`, `execSync`) are prohibited on request/event paths. Use `fs.promises` and async child processes.
+6. **Zero-Falsy Serialization**: Never check boolean/numeric configuration via `if (prop)`. Explicitly validate `if (val !== undefined && val !== null)` so `0` and `false` are not overwritten with defaults.
+7. **Local LLM Defaults**: When spawning `llama-server.exe`, explicitly supply `-fa on`, `-np 1` (single slot), rounded integer `--top-k`, and quantized KV cache (`-ctk q8_0 -ctv q8_0`) for large models. Stop the local server automatically when switching to cloud models to free VRAM.
+8. **Token & Context Protection**:
+   - Model-free tool output pruning (`toolResultPruner.ts`) trims old tool outputs in context.
+   - Loop breaker (`loopBreaker.ts`) halts repetitive tool calls (warning at 3, halt at 5).
+   - Massive command outputs (>24 KB) spill to `~/.0xagent/spill/*.log` with truncated context references.
+9. **Zero-Emoji UI & Design Policy**: No unicode emojis in HUDs, toasts, cards, or telemetry. Use Material Design 3 icons (`MaterialIcon`) or monospaced ASCII indicators (`[OK]`, `[ERR]`, `[>]`, `::`). Popups use persona glassmorphism (`rounded-2xl`, `backdrop-blur-2xl`).
+10. **Workspace Isolation**: Never write persona files (`SOUL.md`, `USER.md`) to the user workspace root. Use `<update_user_profile>` and `<update_persona_file>` which target `~/.0xagent/personas/`.
+11. **Robust Error Handling**: Wrap user/LLM regex in `try/catch`. Never return fake success responses on caught subagent/task errors.
+
+---
+
+## 🛠 Development Commands
+
+```bash
+npm run dev              # Run backend (:3001) and Vite frontend (:5173) concurrently
+npm run build            # Typecheck (tsc) and build production frontend
+npm test                 # Run subsystem and unit tests
+npm run audit:security   # Run OPSEC and security audit script
+npm run build:launcher   # Compile native C# Windows tray launcher (0xAgent.exe)
+npm run stop             # Clean up hanging processes and ports (scripts/cleanup.ps1)
+```

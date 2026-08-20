@@ -26,6 +26,8 @@ import { listSessions, loadSession, saveSession } from '../session';
 import { executeCodeProgram } from './codeRuntime';
 import { subagentOrchestrator } from './subagentOrchestrator';
 import { userQuestionService } from './userQuestionService';
+import { isCoreSystemPath } from './permissionGuard';
+import { createStagedProposal, verifyStagedProposal } from './selfPatchEngine';
 
 export async function dispatchToolExecution(
   tc: { name: string; arguments: any },
@@ -41,11 +43,53 @@ export async function dispatchToolExecution(
     case 'read_file':
       return executeReadFile(config.workspace_dir, tc.arguments.path);
 
-    case 'write_file':
+    case 'write_file': {
+      if (isCoreSystemPath(tc.arguments.path, config.workspace_dir)) {
+        const title = `Auto-Staged Core Write: ${path.basename(tc.arguments.path)}`;
+        const description = `Direct core write to '${tc.arguments.path}' was intercepted by Core Self-Modification Protection. Staged as Pull Request for user review.`;
+        const changes = [{
+          path: tc.arguments.path,
+          newContent: tc.arguments.content,
+          changeType: 'modified' as const,
+        }];
+        const proposal = await createStagedProposal(sessionId || 'root', title, description, changes, config.workspace_dir || undefined);
+        verifyStagedProposal(proposal.id, config.workspace_dir || undefined).catch(() => {});
+        if (broadcast) {
+          broadcast('staged_proposal_created', { proposal });
+        }
+        return JSON.stringify({
+          success: true,
+          type: 'staged_proposal',
+          proposal,
+          message: `[CORE SYSTEM PROTECTION]: Direct modification of engine core file '${tc.arguments.path}' is protected. Created Staged Pull Request ${proposal.id} for safe verification and review in the UI.`,
+        }, null, 2);
+      }
       return executeWriteFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
+    }
 
-    case 'patch_file':
+    case 'patch_file': {
+      if (isCoreSystemPath(tc.arguments.path, config.workspace_dir)) {
+        const title = `Auto-Staged Core Patch: ${path.basename(tc.arguments.path)}`;
+        const description = `Direct core patch to '${tc.arguments.path}' was intercepted by Core Self-Modification Protection. Staged as Pull Request for user review.`;
+        const changes = [{
+          path: tc.arguments.path,
+          patch: tc.arguments.content,
+          changeType: 'modified' as const,
+        }];
+        const proposal = await createStagedProposal(sessionId || 'root', title, description, changes, config.workspace_dir || undefined);
+        verifyStagedProposal(proposal.id, config.workspace_dir || undefined).catch(() => {});
+        if (broadcast) {
+          broadcast('staged_proposal_created', { proposal });
+        }
+        return JSON.stringify({
+          success: true,
+          type: 'staged_proposal',
+          proposal,
+          message: `[CORE SYSTEM PROTECTION]: Direct modification of engine core file '${tc.arguments.path}' is protected. Created Staged Pull Request ${proposal.id} for safe verification and review in the UI.`,
+        }, null, 2);
+      }
       return executePatchFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
+    }
 
     case 'create_directory':
       return executeCreateDirectory(config.workspace_dir, tc.arguments.path);
@@ -327,6 +371,38 @@ export async function dispatchToolExecution(
 
       rawResult = `[ПЛАН ОБНОВЛЕН] Завершено: ${doneCount}, В процессе: ${inProgCount}, Ожидает: ${pendingCount}. Всего задач: ${validTodos.length}.`;
       return rawResult;
+    }
+
+    case 'propose_pull_request': {
+      const title = tc.arguments.title || 'Proposed Pull Request';
+      const description = tc.arguments.description || '';
+      let changes = tc.arguments.changes;
+      if (typeof changes === 'string') {
+        try {
+          changes = JSON.parse(changes);
+        } catch {}
+      }
+      if (!Array.isArray(changes) && tc.arguments.rawBody) {
+        try {
+          changes = JSON.parse(tc.arguments.rawBody);
+        } catch {}
+      }
+      if (!Array.isArray(changes)) {
+        changes = [];
+      }
+
+      const proposal = await createStagedProposal(sessionId || 'root', title, description, changes, config.workspace_dir || undefined);
+      verifyStagedProposal(proposal.id, config.workspace_dir || undefined).catch(() => {});
+      if (broadcast) {
+        broadcast('staged_proposal_created', { proposal });
+      }
+
+      return JSON.stringify({
+        success: true,
+        type: 'staged_proposal',
+        proposal,
+        message: `[PULL REQUEST CREATED]: Staged Proposal ${proposal.id} ('${title}') created with ${proposal.files.length} file(s). Background verification initiated.`,
+      }, null, 2);
     }
 
     default:

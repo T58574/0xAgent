@@ -41,6 +41,7 @@ export default defineConfig(() => {
           changeOrigin: true,
           secure: false,
           configure: (proxy) => {
+            proxy.removeAllListeners('error');
             proxy.on('error', (_err, _req, res) => {
               if (res && 'writeHead' in res && !(res as any).headersSent) {
                 try {
@@ -57,7 +58,30 @@ export default defineConfig(() => {
           changeOrigin: true,
           secure: false,
           configure: (proxy) => {
+            proxy.removeAllListeners('error');
             proxy.on('error', () => {});
+          },
+        },
+      },
+    },
+    build: {
+      chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            const norm = id.replace(/\\/g, '/');
+            if (norm.includes('/node_modules/')) {
+              if (norm.includes('/react/') || norm.includes('/react-dom/')) {
+                return 'vendor-react';
+              }
+              if (norm.includes('/marked/')) {
+                return 'vendor-marked';
+              }
+              if (norm.includes('/lucide-react/')) {
+                return 'vendor-icons';
+              }
+              return 'vendor-libs';
+            }
           },
         },
       },

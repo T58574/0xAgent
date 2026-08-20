@@ -1,6 +1,6 @@
 import React from 'react';
 import { Terminal, CheckCheck, RotateCcw } from 'lucide-react';
-import { ChatMessage, ChatSession, LiveTelemetry, AskUserQuestionItem } from '../../types';
+import { ChatMessage, ChatSession, LiveTelemetry, AskUserQuestionItem, StagedProposal } from '../../types';
 import {
   cleanContent,
   extractThinkingFromContent,
@@ -11,6 +11,7 @@ import { ToolCard } from '../ToolCard';
 import { NotionMarkdown } from '../NotionMarkdown';
 import { ReasoningViewer } from './ReasoningViewer';
 import { InteractiveQuestionCard } from './InteractiveQuestionCard';
+import { StagedProposalCard } from './StagedProposalCard';
 import * as api from '../../services/api';
 
 interface ChatMessageItemProps {
@@ -225,6 +226,31 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                             } catch (err: any) {
                               showToast(err.message || 'Ошибка отправки ответа', 'error');
                             }
+                          }}
+                        />
+                      );
+                    }
+
+                    let stagedProposal: StagedProposal | null = null;
+                    const toolPayload = tool.output || tool.result;
+                    if (tool.name === 'propose_pull_request' || (toolPayload && toolPayload.includes('staged_proposal'))) {
+                      try {
+                        const parsed = typeof toolPayload === 'string' ? JSON.parse(toolPayload) : toolPayload;
+                        if (parsed?.proposal) {
+                          stagedProposal = parsed.proposal;
+                        } else if (parsed?.id && parsed?.files) {
+                          stagedProposal = parsed as StagedProposal;
+                        }
+                      } catch {}
+                    }
+
+                    if (stagedProposal) {
+                      return (
+                        <StagedProposalCard
+                          key={tool.id}
+                          proposal={stagedProposal}
+                          onApplied={() => {
+                            showToast(`Пул-реквест ${stagedProposal?.id} успешно применен к проекту!`, 'success');
                           }}
                         />
                       );

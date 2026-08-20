@@ -100,8 +100,14 @@ export function buildLlamaServerArgs(params: BuildLlamaArgsParams): { args: stri
   let specDraftTarget = body.specDraftModel !== undefined ? body.specDraftModel : ls.spec_draft_model;
   const isDraftDisabled = specDraftTarget === 'none' || specDraftTarget === 'disabled' || specDraftTarget === false || ls.spec_type === 'none' || body.specType === 'none';
   const modelNameLower = path.basename(targetModel).toLowerCase();
-  const isQwen3 = /qwen3|qwen-3|qwen_3|qwen 3|qwen3.8/i.test(modelNameLower);
+  const isQwen3 = /qwen3|qwen-3|qwen_3|qwen 3|qwen3.8|rvn/i.test(modelNameLower);
   const isQwenModel = isQwen3 || /qwen/i.test(modelNameLower);
+  const hasNativeMtp = /mtp/i.test(modelNameLower);
+
+  // Prevent main model from ever being passed as its own draft model
+  if (specDraftTarget && path.resolve(specDraftTarget) === path.resolve(targetModel)) {
+    specDraftTarget = null;
+  }
 
   if (!isDraftDisabled) {
     if (!specDraftTarget || !fs.existsSync(specDraftTarget)) {
@@ -116,11 +122,21 @@ export function buildLlamaServerArgs(params: BuildLlamaArgsParams): { args: stri
         if (fs.existsSync(cDir)) {
           try {
             const files = fs.readdirSync(cDir);
-            const draftFiles = files.filter((f) => f.endsWith('.gguf') && /fastmtp|mtp|draft/i.test(f) && !/mmproj|projector|clip/i.test(f));
+            const draftFiles = files.filter((f) => {
+              if (!f.endsWith('.gguf') || /mmproj|projector|clip/i.test(f)) return false;
+              const abs = path.join(cDir, f);
+              if (path.resolve(abs) === path.resolve(targetModel)) return false;
+              try {
+                const stat = fs.statSync(abs);
+                if (stat.size > 3 * 1024 * 1024 * 1024) return false;
+              } catch { return false; }
+              return /(?:^|[._-])(?:draft|fastmtp-draft)(?:[._-]|$)/i.test(f) || /-(?:draft|fastmtp)\.gguf$/i.test(f);
+            });
+
             if (draftFiles.length > 0) {
               const qwenDraft = isQwenModel ? draftFiles.find((f) => /qwen3.*fastmtp|fastmtp.*qwen3|fastmtp/i.test(f)) : null;
               const selected = path.join(cDir, qwenDraft || draftFiles[0]);
-              if (fs.existsSync(selected)) {
+              if (fs.existsSync(selected) && path.resolve(selected) !== path.resolve(targetModel)) {
                 specDraftTarget = selected;
                 break;
               }
@@ -130,17 +146,22 @@ export function buildLlamaServerArgs(params: BuildLlamaArgsParams): { args: stri
       }
     }
 
-    const rawSpecType = body.specType || ls.spec_type || 'default';
+    const rawSpecType = body.specType || ls.spec_type || (hasNativeMtp ? 'draft-mtp' : 'default');
     const specDraftNgl = body.specDraftNgl !== undefined && body.specDraftNgl !== null ? body.specDraftNgl : (ls.spec_draft_ngl !== undefined && ls.spec_draft_ngl !== null ? ls.spec_draft_ngl : 'all');
-    const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : 1);
-    const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : 0);
+    const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : (hasNativeMtp ? 3 : 1));
+    const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : (hasNativeMtp ? 0.05 : 0));
 
-    if (specDraftTarget && fs.existsSync(specDraftTarget)) {
+    if (specDraftTarget && fs.existsSync(specDraftTarget) && path.resolve(specDraftTarget) !== path.resolve(targetModel)) {
       args.push('--spec-draft-model', specDraftTarget, '--spec-type', rawSpecType);
       if (specDraftNgl !== undefined && specDraftNgl !== null) args.push('--spec-draft-ngl', String(specDraftNgl));
       if (specDraftNMax !== undefined && specDraftNMax !== null) args.push('--spec-draft-n-max', String(specDraftNMax));
       if (specDraftPMin !== undefined && specDraftPMin !== null) args.push('--spec-draft-p-min', String(specDraftPMin));
       onLog?.(`[SPECULATIVE] Подключена отдельная драфт-модель: ${path.basename(specDraftTarget)} (тип: ${rawSpecType}, n-max: ${specDraftNMax}, ngl: ${specDraftNgl})`);
+    } else if (rawSpecType === 'draft-mtp' || (hasNativeMtp && rawSpecType !== 'none')) {
+      args.push('--spec-type', 'draft-mtp');
+      if (specDraftNMax !== undefined && specDraftNMax !== null) args.push('--spec-draft-n-max', String(specDraftNMax));
+      if (specDraftPMin !== undefined && specDraftPMin !== null) args.push('--spec-draft-p-min', String(specDraftPMin));
+      onLog?.(`[SPECULATIVE] Активировано встроенное MTP ускорение модели (тип: draft-mtp, n-max: ${specDraftNMax}, p-min: ${specDraftPMin})`);
     } else if (rawSpecType && rawSpecType.startsWith('ngram-')) {
       args.push('--spec-type', rawSpecType);
       if (specDraftNMax !== undefined && specDraftNMax !== null) args.push('--spec-draft-n-max', String(specDraftNMax));

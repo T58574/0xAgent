@@ -189,6 +189,7 @@ export interface ToolCallInfo {
   arguments: string; // JSON string from Rust backend
   status: 'pending' | 'approved' | 'rejected' | 'running' | 'completed' | 'error';
   output?: string | null;
+  result?: string | null;
 }
 
 export interface ToolDefinition {
