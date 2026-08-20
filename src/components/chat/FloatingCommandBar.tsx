@@ -27,6 +27,7 @@ import {
   DEFAULT_SLASH_COMMANDS,
   SlashCommandItem,
 } from './popovers';
+import { MobileMicHelpModal } from './MobileMicHelpModal';
 
 interface FloatingCommandBarProps {
   inputText: string;
@@ -70,6 +71,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   const [daemonVoiceState, setDaemonVoiceState] = useState<'idle' | 'recording' | 'processing' | 'stopped'>('idle');
   const [voicePhraseNotification, setVoicePhraseNotification] = useState<string | null>(null);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [showMicHelpModal, setShowMicHelpModal] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -223,14 +225,31 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
     // Mobile: Always record directly from the mobile device's primary microphone
     if (isMobileDevice) {
+      const isSecure = window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const hasMediaApi = Boolean(
+        navigator?.mediaDevices?.getUserMedia ||
+        (navigator as any)?.getUserMedia ||
+        (navigator as any)?.webkitGetUserMedia
+      );
+
+      if (!isSecure && !hasMediaApi) {
+        setShowMicHelpModal(true);
+        setVoiceError('Требуется HTTPS или флаг браузера для микрофона по Wi-Fi');
+        setTimeout(() => setVoiceError(null), 8000);
+        return;
+      }
+
       try {
         await startBrowserRecording();
         return;
       } catch (err: any) {
         console.warn('[WebAudio] Mobile mic error:', err);
         const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
-        setVoiceError(isDenied ? 'Доступ к микрофону заблокирован в настройках браузера' : 'Микрофон телефона недоступен');
-        setTimeout(() => setVoiceError(null), 6000);
+        if (!isSecure && !isDenied) {
+          setShowMicHelpModal(true);
+        }
+        setVoiceError(isDenied ? 'Доступ к микрофону заблокирован в настройках браузера' : 'Микрофон заблокирован браузером (откройте через HTTPS)');
+        setTimeout(() => setVoiceError(null), 8000);
         return;
       }
     }
@@ -458,13 +477,22 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             <span className="text-rose-400 font-bold">[ERR]:</span>
             <span className="truncate">{voiceError}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => setVoiceError(null)}
-            className="p-1 text-rose-400 hover:text-white rounded-md hover:bg-rose-900/50 cursor-pointer transition-colors shrink-0 ml-2"
-          >
-            <X size={14} />
-          </button>
+          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+            <button
+              type="button"
+              onClick={() => setShowMicHelpModal(true)}
+              className="px-2.5 py-1 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 text-white font-bold text-[10px] transition-colors cursor-pointer"
+            >
+              Инструкция
+            </button>
+            <button
+              type="button"
+              onClick={() => setVoiceError(null)}
+              className="p-1 text-rose-400 hover:text-white rounded-md hover:bg-rose-900/50 cursor-pointer transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -570,6 +598,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
           </button>
         </div>
       </div>
+
+      <MobileMicHelpModal isOpen={showMicHelpModal} onClose={() => setShowMicHelpModal(false)} />
     </div>
   );
 };
