@@ -44,46 +44,61 @@ async function requestBackend(
   port: number = 3001
 ): Promise<{ status: number; data: any }> {
   const token = getAuthToken();
+  const payload = body ? JSON.stringify(body) : '';
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (token) {
+    headers['Authorization'] = token;
+  }
+  if (payload) {
+    headers['Content-Length'] = String(Buffer.byteLength(payload));
+  }
 
-  return new Promise((resolve, reject) => {
-    const payload = body ? JSON.stringify(body) : '';
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-    if (token) {
-      headers['Authorization'] = token;
+  const makeReq = (useHttps: boolean): Promise<{ status: number; data: any }> => {
+    const transport = useHttps ? https : http;
+    return new Promise((resolve, reject) => {
+      const req = transport.request(
+        {
+          hostname: '127.0.0.1',
+          port,
+          path: apiPath,
+          method,
+          headers,
+          rejectUnauthorized: false,
+        },
+        (res) => {
+          let raw = '';
+          res.on('data', (chunk) => (raw += chunk));
+          res.on('end', () => {
+            try {
+              const json = JSON.parse(raw);
+              resolve({ status: res.statusCode || 200, data: json });
+            } catch {
+              resolve({ status: res.statusCode || 200, data: raw });
+            }
+          });
+        }
+      );
+
+      req.setTimeout(15000, () => {
+        req.destroy();
+        reject(new Error('Backend request timed out'));
+      });
+      req.on('error', reject);
+      if (payload) req.write(payload);
+      req.end();
+    });
+  };
+
+  try {
+    return await makeReq(true);
+  } catch (err: any) {
+    if (err?.code === 'EPROTO' || err?.message?.includes('socket hang up') || err?.message?.includes('ECONNRESET')) {
+      return await makeReq(false);
     }
-    if (payload) {
-      headers['Content-Length'] = String(Buffer.byteLength(payload));
-    }
-
-    const req = https.request(
-      {
-        hostname: '127.0.0.1',
-        port,
-        path: apiPath,
-        method,
-        headers,
-        rejectUnauthorized: false,
-      },
-      (res) => {
-        let raw = '';
-        res.on('data', (chunk) => (raw += chunk));
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(raw);
-            resolve({ status: res.statusCode || 200, data: json });
-          } catch {
-            resolve({ status: res.statusCode || 200, data: raw });
-          }
-        });
-      }
-    );
-
-    req.on('error', reject);
-    if (payload) req.write(payload);
-    req.end();
-  });
+    throw err;
+  }
 }
 
 async function runBridge(options: BridgeOptions = {}) {
@@ -206,6 +221,10 @@ async function runBridge(options: BridgeOptions = {}) {
         res.on('end', () => resolve(d));
       }
     );
+    req.setTimeout(45000, () => {
+      req.destroy();
+      reject(new Error('Inference request timed out after 45s'));
+    });
     req.on('error', reject);
     req.write(reqBody);
     req.end();

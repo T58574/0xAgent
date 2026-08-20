@@ -279,8 +279,8 @@ export function parseGgufMetadata(filePath: string): GgufMetadata {
   result.supportsReasoning = reasoningCaps.supportsReasoning;
   result.recommendedReasoningEffort = reasoningCaps.recommendedReasoningEffort;
   result.supportedReasoningLevels = reasoningCaps.supportedReasoningLevels;
-  const hasNextnPredict = Boolean(result.rawKv?.['qwen35.nextn_predict_layers'] || result.rawKv?.['qwen3.nextn_predict_layers'] || /mtp/i.test(fileName));
-  result.supportsFastMtp = (result.family === 'qwen' || hasNextnPredict || /qwen3/i.test(fileName) || /qwen/i.test(result.modelName)) && !result.isDraft && !result.isMmproj;
+  const hasNextnPredict = Boolean(result.rawKv?.['qwen35.nextn_predict_layers'] || result.rawKv?.['qwen3.nextn_predict_layers'] || /mtp/i.test(fileName) || /mtp/i.test(result.modelName));
+  result.supportsFastMtp = hasNextnPredict && !result.isDraft && !result.isMmproj;
 
   const sizeGBNum = fileSizeBytes / (1024 * 1024 * 1024);
   const sizeGB = `${sizeGBNum.toFixed(2)} GB`;

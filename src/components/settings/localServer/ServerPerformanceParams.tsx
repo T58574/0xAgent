@@ -178,7 +178,8 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
     setMtpTestResult(null);
     try {
       const t0 = Date.now();
-      const res = await fetch(`http://${host}:${port}/v1/chat/completions`, {
+      const targetHost = !host || host === '0.0.0.0' ? (typeof window !== 'undefined' ? window.location.hostname || '127.0.0.1' : '127.0.0.1') : host;
+      const res = await fetch(`http://${targetHost}:${port}/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
