@@ -181,6 +181,35 @@ namespace OxAgent.Launcher
             }
         }
 
+        public static string GetPrimaryLanAddress()
+        {
+            try
+            {
+                foreach (var netIface in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+                {
+                    if (netIface.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up &&
+                        netIface.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                    {
+                        var ipProps = netIface.GetIPProperties();
+                        foreach (var addr in ipProps.UnicastAddresses)
+                        {
+                            if (addr.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                            {
+                                string ipStr = addr.Address.ToString();
+                                if (ipStr.StartsWith("192.168.") || ipStr.StartsWith("10.") || ipStr.StartsWith("172."))
+                                {
+                                    return ipStr;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch {}
+
+            return "192.168.4.24";
+        }
+
         private void InitializeTrayIcon()
         {
             _contextMenu = new ContextMenuStrip
@@ -190,7 +219,8 @@ namespace OxAgent.Launcher
             };
 
             // 1. Open UI
-            var openItem = new ToolStripMenuItem("🌐  Открыть 0xAgent UI (https://127.0.0.1:5173)", null, (s, e) => OpenWebUI());
+            string lanIp = GetPrimaryLanAddress();
+            var openItem = new ToolStripMenuItem(string.Format("🌐  Открыть 0xAgent UI (https://{0}:5173)", lanIp), null, (s, e) => OpenWebUI());
             openItem.Font = new Font(_contextMenu.Font, FontStyle.Bold);
             _contextMenu.Items.Add(openItem);
 
@@ -414,9 +444,10 @@ namespace OxAgent.Launcher
         {
             try
             {
+                string lanIp = GetPrimaryLanAddress();
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "https://127.0.0.1:5173",
+                    FileName = string.Format("https://{0}:5173", lanIp),
                     UseShellExecute = true
                 });
             }
@@ -518,9 +549,10 @@ namespace OxAgent.Launcher
                     // Already running -> open Web UI in browser
                     try
                     {
+                        string lanIp = TrayApplicationContext.GetPrimaryLanAddress();
                         Process.Start(new ProcessStartInfo
                         {
-                            FileName = "https://127.0.0.1:5173",
+                            FileName = string.Format("https://{0}:5173", lanIp),
                             UseShellExecute = true
                         });
                     }

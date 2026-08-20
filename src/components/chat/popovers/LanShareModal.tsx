@@ -18,7 +18,7 @@ export const LanShareModal: React.FC<LanShareModalProps> = ({ isOpen, onClose })
       const res = await api.get_local_ips();
       setUrls(res.urls || []);
     } catch {
-      setUrls(['http://127.0.0.1:5173']);
+      setUrls(['https://192.168.4.24:5173', 'https://127.0.0.1:5173']);
     } finally {
       setLoading(false);
     }

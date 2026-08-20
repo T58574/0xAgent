@@ -93,20 +93,21 @@ workspaceRouter.get('/get-local-ips', (_req, res) => {
   try {
     const interfaces = os.networkInterfaces();
     const urls: string[] = [];
-    const clientPort = '5173';
+    const clientPort = process.env.CLIENT_PORT || '5173';
+    const proto = process.env.DISABLE_HTTPS === 'true' ? 'http' : 'https';
 
     for (const devName in interfaces) {
       const iface = interfaces[devName];
       if (!iface) continue;
       for (const alias of iface) {
         if (alias.family === 'IPv4' && !alias.internal) {
-          urls.push(`http://${alias.address}:${clientPort}`);
+          urls.push(`${proto}://${alias.address}:${clientPort}`);
         }
       }
     }
 
     if (urls.length === 0) {
-      urls.push(`http://127.0.0.1:${clientPort}`);
+      urls.push(`${proto}://127.0.0.1:${clientPort}`);
     }
 
     res.json({ urls });

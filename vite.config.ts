@@ -26,16 +26,17 @@ function getCerts() {
 // https://vite.dev/config/
 export default defineConfig(() => {
   const useHttps = process.env.DISABLE_HTTPS !== 'true';
+  const clientPort = Number(process.env.CLIENT_PORT || 5173);
 
   return {
     plugins: [
       react(),
       tailwindcss(),
-      ...(useHttps ? [basicSsl()] : []),
+      ...(useHttps ? [basicSsl({ domains: ['192.168.4.24', '198.18.0.1', 'localhost', '127.0.0.1'] })] : []),
     ],
     clearScreen: false,
     server: {
-      port: 5173,
+      port: clientPort,
       strictPort: false,
       host: "0.0.0.0", // Bind to all interfaces for local Wi-Fi network sharing
       https: useHttps,
