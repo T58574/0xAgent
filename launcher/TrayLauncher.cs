@@ -54,6 +54,13 @@ namespace OxAgent.Launcher
 
             Log("[0xAgent Launcher] Initializing Tray Supervisor...");
 
+            try
+            {
+                ServicePointManager.ServerCertificateValidationCallback = delegate { return true; };
+                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12 | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls;
+            }
+            catch {}
+
             InitializeTrayIcon();
             StartServices();
 
@@ -321,25 +328,49 @@ namespace OxAgent.Launcher
 
                 try
                 {
-                    HttpWebRequest req1 = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:3001/api/health");
+                    HttpWebRequest req1 = (HttpWebRequest)WebRequest.Create("https://127.0.0.1:3001/api/auth/status");
                     req1.Timeout = 1500;
                     using (HttpWebResponse res1 = (HttpWebResponse)req1.GetResponse())
                     {
                         isServerUp = (res1.StatusCode == HttpStatusCode.OK);
                     }
                 }
-                catch {}
+                catch
+                {
+                    try
+                    {
+                        HttpWebRequest req1Http = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:3001/api/auth/status");
+                        req1Http.Timeout = 1000;
+                        using (HttpWebResponse res1Http = (HttpWebResponse)req1Http.GetResponse())
+                        {
+                            isServerUp = (res1Http.StatusCode == HttpStatusCode.OK);
+                        }
+                    }
+                    catch {}
+                }
 
                 try
                 {
-                    HttpWebRequest req2 = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:5173");
+                    HttpWebRequest req2 = (HttpWebRequest)WebRequest.Create("https://127.0.0.1:5173");
                     req2.Timeout = 1500;
                     using (HttpWebResponse res2 = (HttpWebResponse)req2.GetResponse())
                     {
                         isClientUp = (res2.StatusCode == HttpStatusCode.OK);
                     }
                 }
-                catch {}
+                catch
+                {
+                    try
+                    {
+                        HttpWebRequest req2Http = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:5173");
+                        req2Http.Timeout = 1000;
+                        using (HttpWebResponse res2Http = (HttpWebResponse)req2Http.GetResponse())
+                        {
+                            isClientUp = (res2Http.StatusCode == HttpStatusCode.OK);
+                        }
+                    }
+                    catch {}
+                }
 
                 if (!_hasAutoOpenedBrowser && (isServerUp || isClientUp))
                 {
@@ -358,8 +389,8 @@ namespace OxAgent.Launcher
                             {
                                 if (isServerUp && isClientUp)
                                 {
-                                    _statusMenuItem.Text = "📊  Статус: Online (Порты 3001, 5173)";
-                                    _notifyIcon.Text = "0xAgent AI Platform — Online";
+                                    _statusMenuItem.Text = "📊  Статус: Online (HTTPS 3001, 5173)";
+                                    _notifyIcon.Text = "0xAgent AI Platform — Online (HTTPS)";
                                 }
                                 else if (isServerUp)
                                 {
@@ -385,7 +416,7 @@ namespace OxAgent.Launcher
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "http://localhost:5173",
+                    FileName = "https://localhost:5173",
                     UseShellExecute = true
                 });
             }
