@@ -143,8 +143,8 @@ GEMINI_API_KEY=your_actual_api_key_here
 ```bash
 npm run dev
 ```
-- **Web UI:** [http://localhost:5173](http://localhost:5173)
-- **Backend API:** [http://localhost:3001](http://localhost:3001)
+- **Web UI:** [https://127.0.0.1:5173](https://127.0.0.1:5173)
+- **Backend API:** [https://127.0.0.1:3001](https://127.0.0.1:3001)
 
 ### 5. Run Test Suite
 ```bash

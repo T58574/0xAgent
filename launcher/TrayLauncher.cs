@@ -190,7 +190,7 @@ namespace OxAgent.Launcher
             };
 
             // 1. Open UI
-            var openItem = new ToolStripMenuItem("🌐  Открыть 0xAgent UI (localhost:5173)", null, (s, e) => OpenWebUI());
+            var openItem = new ToolStripMenuItem("🌐  Открыть 0xAgent UI (https://127.0.0.1:5173)", null, (s, e) => OpenWebUI());
             openItem.Font = new Font(_contextMenu.Font, FontStyle.Bold);
             _contextMenu.Items.Add(openItem);
 
@@ -259,7 +259,7 @@ namespace OxAgent.Launcher
                     if (!string.IsNullOrEmpty(e.Data))
                     {
                         Log("[DEV] " + e.Data);
-                        if (!_hasAutoOpenedBrowser && (e.Data.Contains("localhost:5173") || e.Data.Contains("5173")))
+                        if (!_hasAutoOpenedBrowser && (e.Data.Contains("5173") || e.Data.Contains("Local:") || e.Data.Contains("Network:")))
                         {
                             _hasAutoOpenedBrowser = true;
                             ThreadPool.QueueUserWorkItem(_ =>
@@ -416,7 +416,7 @@ namespace OxAgent.Launcher
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "https://localhost:5173",
+                    FileName = "https://127.0.0.1:5173",
                     UseShellExecute = true
                 });
             }
@@ -520,7 +520,7 @@ namespace OxAgent.Launcher
                     {
                         Process.Start(new ProcessStartInfo
                         {
-                            FileName = "http://localhost:5173",
+                            FileName = "https://127.0.0.1:5173",
                             UseShellExecute = true
                         });
                     }

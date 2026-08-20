@@ -78,9 +78,9 @@ try {
     Write-Host "  [2/2] Launching 0xAgent Client and Server..." -ForegroundColor Yellow
     Write-Host ""
     Write-Host "  +-----------------------------------------------------------+" -ForegroundColor DarkCyan
-    Write-Host "  |  [+] Client UI:   http://localhost:5173                   |" -ForegroundColor Cyan
-    Write-Host "  |  [+] API Server:  http://localhost:3001                   |" -ForegroundColor Cyan
-    Write-Host "  |  [+] Health API:  http://localhost:3001/api/health        |" -ForegroundColor Cyan
+    Write-Host "  |  [+] Client UI:   https://127.0.0.1:5173                  |" -ForegroundColor Cyan
+    Write-Host "  |  [+] API Server:  https://127.0.0.1:3001                  |" -ForegroundColor Cyan
+    Write-Host "  |  [+] Health API:  https://127.0.0.1:3001/api/health       |" -ForegroundColor Cyan
     Write-Host "  |                                                           |" -ForegroundColor DarkCyan
     Write-Host "  |  [Ctrl+C] Stop platform and terminate all processes       |" -ForegroundColor Gray
     Write-Host "  +-----------------------------------------------------------+" -ForegroundColor DarkCyan
