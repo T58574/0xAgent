@@ -129,6 +129,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
   const isListeningForWake = Boolean(config?.tts_config?.wake_word_enabled);
 
+  const isMobileDevice = /iphone|ipad|ipod|android/i.test(navigator.userAgent) || window.innerWidth < 768;
+
   const handleMicClick = async () => {
     setVoiceError(null);
 
@@ -140,37 +142,63 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       return;
     }
 
-    const isMobileOrTouch = /iphone|ipad|ipod|android/i.test(navigator.userAgent) || window.innerWidth < 768;
+    // Helper to start in-browser WebAudio MediaRecorder (Primary for Mobile, Fallback for Desktop)
+    const startBrowserRecording = async () => {
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        throw new Error('Web Audio API недоступен в этом браузере');
+      }
 
-    // Mobile: Use direct in-browser WebAudio MediaRecorder
-    if (isMobileOrTouch && navigator?.mediaDevices?.getUserMedia) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/mp4')
-          ? 'audio/mp4'
-          : '';
-        const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-        mediaRecorderRef.current = recorder;
-        audioChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
 
-        recorder.ondataavailable = (e) => {
-          if (e.data && e.data.size > 0) {
-            audioChunksRef.current.push(e.data);
-          }
-        };
+      let chosenMime = '';
+      if (typeof MediaRecorder !== 'undefined') {
+        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+          chosenMime = 'audio/webm;codecs=opus';
+        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+          chosenMime = 'audio/mp4';
+        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
+          chosenMime = 'audio/aac';
+        } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
+          chosenMime = 'audio/ogg;codecs=opus';
+        }
+      }
 
-        recorder.onstop = async () => {
-          stream.getTracks().forEach((t) => t.stop());
-          const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
-          if (blob.size > 200) {
-            setDaemonVoiceState('processing');
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-              const resBase64 = (reader.result as string).split(',')[1];
+      const recorder = new MediaRecorder(stream, chosenMime ? { mimeType: chosenMime } : undefined);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          audioChunksRef.current.push(e.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || chosenMime || 'audio/webm' });
+        if (blob.size > 200) {
+          setDaemonVoiceState('processing');
+          const reader = new FileReader();
+          reader.onloadend = async () => {
+            const resBase64 = (reader.result as string).split(',')[1];
+            const mime = recorder.mimeType || chosenMime || 'audio/webm';
+            try {
+              // 1. Try unified Jarvis voice input (with macro and companion support)
+              const res = await api.send_voice_input(resBase64, mime);
+              if (res && res.text) {
+                setInputText(inputTextRef.current ? `${inputTextRef.current} ${res.text}` : res.text);
+                textareaRef.current?.focus();
+              }
+            } catch {
+              // 2. Fallback to direct Whisper STT transcription
               try {
-                const text = await api.transcribe_audio(resBase64, config?.groq_api_key || '');
+                const text = await api.transcribe_audio(resBase64, config?.groq_api_key || '', mime);
                 if (text && text.trim()) {
                   setInputText(inputTextRef.current ? `${inputTextRef.current} ${text.trim()}` : text.trim());
                   textareaRef.current?.focus();
@@ -178,23 +206,30 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
               } catch (err: any) {
                 setVoiceError(err.message || 'Ошибка распознавания речи');
                 setTimeout(() => setVoiceError(null), 6000);
-              } finally {
-                setDaemonVoiceState('idle');
               }
-            };
-            reader.readAsDataURL(blob);
-          } else {
-            setDaemonVoiceState('idle');
-          }
-        };
+            } finally {
+              setDaemonVoiceState('idle');
+            }
+          };
+          reader.readAsDataURL(blob);
+        } else {
+          setDaemonVoiceState('idle');
+        }
+      };
 
-        recorder.start();
-        setDaemonVoiceState('recording');
+      recorder.start(250);
+      setDaemonVoiceState('recording');
+    };
+
+    // Mobile: Always record directly from the mobile device's primary microphone
+    if (isMobileDevice) {
+      try {
+        await startBrowserRecording();
         return;
       } catch (err: any) {
-        console.warn('[WebAudio] Mic capture failed:', err);
+        console.warn('[WebAudio] Mobile mic error:', err);
         const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
-        setVoiceError(isDenied ? 'Доступ к микрофону заблокирован в настройках браузера' : 'Микрофон недоступен на этом устройстве');
+        setVoiceError(isDenied ? 'Доступ к микрофону заблокирован в настройках браузера' : 'Микрофон телефона недоступен');
         setTimeout(() => setVoiceError(null), 6000);
         return;
       }
@@ -204,50 +239,23 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     try {
       const res = await api.toggle_voice_daemon_recording();
       if (!res.success) {
-        // If desktop daemon has no mic, fallback to browser getUserMedia
-        if (navigator?.mediaDevices?.getUserMedia) {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const recorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = recorder;
-            audioChunksRef.current = [];
-            recorder.ondataavailable = (e) => { if (e.data?.size) audioChunksRef.current.push(e.data); };
-            recorder.onstop = async () => {
-              stream.getTracks().forEach((t) => t.stop());
-              const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
-              if (blob.size > 200) {
-                setDaemonVoiceState('processing');
-                const reader = new FileReader();
-                reader.onloadend = async () => {
-                  const b64 = (reader.result as string).split(',')[1];
-                  try {
-                    const text = await api.transcribe_audio(b64, config?.groq_api_key || '');
-                    if (text?.trim()) {
-                      setInputText(inputTextRef.current ? `${inputTextRef.current} ${text.trim()}` : text.trim());
-                      textareaRef.current?.focus();
-                    }
-                  } catch (e: any) {
-                    setVoiceError(e.message || 'Ошибка распознавания речи');
-                  } finally {
-                    setDaemonVoiceState('idle');
-                  }
-                };
-                reader.readAsDataURL(blob);
-              } else {
-                setDaemonVoiceState('idle');
-              }
-            };
-            recorder.start();
-            setDaemonVoiceState('recording');
-            return;
-          } catch {}
+        // If desktop daemon has no mic or fails, fallback to browser getUserMedia
+        try {
+          await startBrowserRecording();
+          return;
+        } catch {
+          setVoiceError('Устройство ввода звука недоступно. Проверьте системный микрофон.');
+          setTimeout(() => setVoiceError(null), 6000);
         }
-        setVoiceError('Устройство ввода звука недоступно. Проверьте системный микрофон.');
-        setTimeout(() => setVoiceError(null), 6000);
       }
     } catch (err: any) {
-      setVoiceError(`Ошибка микрофона: ${err?.message || err}`);
-      setTimeout(() => setVoiceError(null), 6000);
+      // If server daemon request failed, try browser mic
+      try {
+        await startBrowserRecording();
+      } catch {
+        setVoiceError(`Ошибка микрофона: ${err?.message || err}`);
+        setTimeout(() => setVoiceError(null), 6000);
+      }
     }
   };
 
@@ -407,16 +415,24 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       )}
 
       {daemonVoiceState === 'recording' && (
-        <div className="flex items-center justify-between px-4 py-2.5 mb-2 rounded-2xl bg-rose-950/80 border border-rose-500/40 text-rose-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-rose-950/50">
-          <div className="flex items-center gap-2.5">
-            <span className="relative flex h-2.5 w-2.5">
+        <div
+          onClick={handleMicClick}
+          className="flex items-center justify-between px-4 py-2.5 mb-2 rounded-2xl bg-rose-950/80 border border-rose-500/40 text-rose-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-rose-950/50 cursor-pointer"
+          title="Нажмите для остановки записи"
+        >
+          <div className="flex items-center gap-2.5 truncate">
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
             </span>
-            <span className="font-bold tracking-wider text-[11px] text-white">JARVIS :: RECORDING</span>
-            <span className="text-[11px] text-rose-300/80">{voicePhraseNotification ? `«${voicePhraseNotification}»` : 'Слушаю вас... (Скажите «Стоп» или кликните)'}</span>
+            <span className="font-bold tracking-wider text-[11px] text-white shrink-0">
+              {isMobileDevice ? 'MOBILE MIC :: RECORDING' : 'JARVIS :: RECORDING'}
+            </span>
+            <span className="text-[11px] text-rose-300/80 truncate">
+              {voicePhraseNotification ? `«${voicePhraseNotification}»` : (isMobileDevice ? 'Говорите в телефон... (Нажмите для завершения)' : 'Слушаю вас... (Скажите «Стоп» или кликните)')}
+            </span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 shrink-0 ml-2">
             <span className="w-1 h-3 bg-rose-400 rounded-full animate-pulse" />
             <span className="w-1 h-4 bg-rose-400 rounded-full animate-pulse delay-75" />
             <span className="w-1 h-2 bg-rose-400 rounded-full animate-pulse delay-150" />

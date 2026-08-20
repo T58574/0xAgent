@@ -159,8 +159,8 @@ export const respond_to_tool = (sessionId: string, toolCallId: string, approve: 
   post<void>('/respond-to-tool', { sessionId, toolCallId, approve });
 export const answer_user_question = (toolCallId: string, answers: any[]) =>
   post<void>('/answer-question', { toolCallId, answers });
-export async function transcribe_audio(audioBase64: string, apiKey: string): Promise<string> {
-  const data = await post<{ text: string }>('/transcribe-audio', { audioBase64, apiKey });
+export async function transcribe_audio(audioBase64: string, apiKey?: string, mimeType?: string): Promise<string> {
+  const data = await post<{ text: string }>('/transcribe-audio', { audioBase64, apiKey, mimeType });
   return data.text;
 }
 
@@ -289,6 +289,8 @@ export const toggle_voice_daemon = (enable: boolean) =>
 export const toggle_voice_daemon_recording = () => post<{ success: boolean }>('/jarvis/voice-record/toggle');
 export const start_voice_daemon_recording = () => post<{ success: boolean; state: string }>('/jarvis/voice-record/start');
 export const stop_voice_daemon_recording = () => post<{ success: boolean; state: string }>('/jarvis/voice-record/stop');
+export const send_voice_input = (audioBase64: string, mimeType?: string) =>
+  post<{ success: boolean; text: string; macro?: string }>('/jarvis/voice-input', { audioBase64, mimeType });
 export const get_context_breakdown = (sessionId?: string | null) =>
   get<ContextBreakdownReport>(sessionId ? `/context/breakdown?sessionId=${encodeURIComponent(sessionId)}` : '/context/breakdown');
 

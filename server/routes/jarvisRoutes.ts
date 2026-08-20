@@ -101,7 +101,7 @@ jarvisRouter.post('/jarvis/voice-wake', async (_req: Request, res: Response) => 
 // Voice Input (WAV base64) from desktop daemon for transcription
 jarvisRouter.post('/jarvis/voice-input', async (req: Request, res: Response) => {
   try {
-    const { audioBase64 } = req.body;
+    const { audioBase64, mimeType } = req.body;
     const config = loadConfig();
     const effectiveKey = (config.groq_api_key || process.env.GROQ_API_KEY || '').trim();
 
@@ -115,9 +115,20 @@ jarvisRouter.post('/jarvis/voice-input', async (req: Request, res: Response) => 
     const audioBuffer = Buffer.from(audioBase64, 'base64');
     let transcribedText = '';
 
+    let ext = 'wav';
+    let type = mimeType || 'audio/wav';
+    if (type.includes('webm')) {
+      ext = 'webm';
+    } else if (type.includes('mp4') || type.includes('m4a') || type.includes('aac')) {
+      ext = 'mp4';
+      type = 'audio/mp4';
+    } else if (type.includes('ogg')) {
+      ext = 'ogg';
+    }
+
     if (effectiveKey) {
       const formData = new FormData();
-      const file = new File([audioBuffer], 'voice_recording.wav', { type: 'audio/wav' });
+      const file = new File([audioBuffer], `voice_recording.${ext}`, { type });
       formData.append('file', file);
       formData.append('model', 'whisper-large-v3');
       formData.append('language', 'ru');
@@ -135,7 +146,7 @@ jarvisRouter.post('/jarvis/voice-input', async (req: Request, res: Response) => 
 
       if (!groqRes.ok) {
         const fallbackData = new FormData();
-        fallbackData.append('file', new File([audioBuffer], 'voice_recording.wav', { type: 'audio/wav' }));
+        fallbackData.append('file', new File([audioBuffer], `voice_recording.${ext}`, { type }));
         fallbackData.append('model', 'whisper-large-v3-turbo');
         fallbackData.append('language', 'ru');
         groqRes = await fetch(groqEndpoint, {
