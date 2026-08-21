@@ -65,6 +65,7 @@ export interface Translations {
     reasoningTitle: string;
     thinking: string;
     agentThinking: string;
+    promptPrefilling: string;
     thoughtFor: string;
     seconds: string;
     tokens: string;

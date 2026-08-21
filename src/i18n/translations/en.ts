@@ -64,6 +64,7 @@ export const en: Translations = {
     reasoningTitle: 'Model Thought Process',
     thinking: 'Thinking...',
     agentThinking: 'AI Agent is thinking...',
+    promptPrefilling: 'Processing prompt & prefilling KV cache...',
     thoughtFor: 'Thought for',
     seconds: 's',
     tokens: 'tokens',

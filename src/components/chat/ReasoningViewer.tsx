@@ -239,8 +239,9 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
                 </div>
               ))
             ) : (
-              <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic">
-                {isLive ? `[ ${t.chat.thinking} ]` : `[ ${t.chat.reasoning} ]`}
+              <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic font-mono flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] animate-ping inline-block shrink-0" />
+                <span>{isLive ? `[ ${t.chat.promptPrefilling} ]` : `[ ${t.chat.reasoning} ]`}</span>
               </div>
             )}
 
@@ -248,7 +249,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
             {isLive && (
               <div className="flex items-center gap-2 pt-1 text-[var(--theme-text)] text-xs">
                 <span className="inline-block w-2 h-3.5 bg-[var(--theme-accent)] animate-pulse" />
-                <span className="text-[10px] text-[var(--theme-text-muted)] italic font-semibold">{t.chat.thinking}</span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] italic font-semibold">{thinking.trim() ? t.chat.thinking : t.chat.promptPrefilling}</span>
               </div>
             )}
           </div>
