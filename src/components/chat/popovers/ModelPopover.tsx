@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { AvailableModelsResponse, LocalModelItem } from '../../../types';
 import { ServerStatusData } from '../../../hooks/useModelManager';
+import { useI18n } from '../../../i18n';
 
 interface ModelPopoverProps {
   modelsData: AvailableModelsResponse;
@@ -33,18 +34,24 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
   onToggleServer,
   onClose,
 }) => {
+  const { language } = useI18n();
+
   return (
     <>
       {/* Mobile Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs sm:hidden animate-fadeIn"
-        onClick={onClose}
-      />
+      {onClose && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs sm:hidden animate-fadeIn"
+          onClick={onClose}
+        />
+      )}
 
       <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:bottom-full sm:mb-3 sm:left-12 sm:w-80 max-w-[calc(100vw-24px)] bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 animate-fadeIn rounded-2xl">
         {/* Cloud API Models */}
         <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
-          <span className="font-bold text-[var(--theme-text)]">Облачные API (Google AI)</span>
+          <span className="font-bold text-[var(--theme-text)]">
+            {language === 'ru' ? 'Облачные API (Google AI)' : 'Cloud APIs (Google AI Studio)'}
+          </span>
           <button
             type="button"
             onClick={onClose}
@@ -93,7 +100,9 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
         {/* Local Models */}
         <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="font-bold text-[var(--theme-text)]">Локальные GGUF</span>
+            <span className="font-bold text-[var(--theme-text)]">
+              {language === 'ru' ? 'Локальные GGUF' : 'Local GGUF Models'}
+            </span>
             <span className="text-[9px] font-mono opacity-60">
               ({serverStatus.running ? 'online' : 'offline'})
             </span>
@@ -111,14 +120,18 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
             ) : (
               <Play size={7} fill="currentColor" />
             )}
-            <span>{serverStatus.running ? 'Стоп' : 'Старт'}</span>
+            <span>
+              {serverStatus.running
+                ? (language === 'ru' ? 'Стоп' : 'Stop')
+                : (language === 'ru' ? 'Старт' : 'Start')}
+            </span>
           </button>
         </div>
 
         <div className="max-h-44 overflow-y-auto space-y-1 scrollbar-thin">
           {modelsData.local.filter((m) => !m.isDraft && !m.isMmproj).length === 0 ? (
             <div className="text-[10px] text-[var(--theme-text-muted)] italic py-1 px-2.5 font-mono">
-              нет файлов в ~/.0xagent/models/
+              {language === 'ru' ? 'нет файлов в ~/.0xagent/models/' : 'no models in ~/.0xagent/models/'}
             </div>
           ) : (
             modelsData.local

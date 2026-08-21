@@ -63,6 +63,7 @@ export const en: Translations = {
     reasoning: 'Reasoning',
     reasoningTitle: 'Model Thought Process',
     thinking: 'Thinking...',
+    agentThinking: 'AI Agent is thinking...',
     thoughtFor: 'Thought for',
     seconds: 's',
     tokens: 'tokens',

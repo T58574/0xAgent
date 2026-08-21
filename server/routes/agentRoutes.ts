@@ -37,7 +37,7 @@ export function createAgentRouter(broadcast: BroadcastFn): Router {
         await saveSession(session);
         broadcast('agent-error', { sessionId, message: errMsg });
       } catch {}
-      broadcast('agent-status-changed', 'idle');
+      broadcast('agent-status-changed', { sessionId, status: 'idle' });
     });
 
     res.json({ success: true });

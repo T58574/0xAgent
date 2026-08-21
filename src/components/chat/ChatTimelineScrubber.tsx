@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChatMessage } from '../../types';
 import { formatTime } from '../../utils/helpers';
+import { useI18n } from '../../i18n';
 
 interface ChatTimelineScrubberProps {
   messages: ChatMessage[];
@@ -25,6 +26,7 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
   onScrollToTop,
   isGenerating = false,
 }) => {
+  const { t } = useI18n();
   const [hoveredMarker, setHoveredMarker] = useState<HoveredMarkerInfo | null>(null);
   const [activeMessageIndex, setActiveMessageIndex] = useState<number>(messages.length - 1);
   const [scrollProgress, setScrollProgress] = useState<number>(1);
@@ -247,12 +249,12 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
           >
             <div className="flex items-center justify-between gap-3 text-[11px] border-b border-[var(--theme-border)] pb-1 font-semibold text-[var(--theme-text-muted)]">
               <span className="capitalize text-[var(--theme-text)]">
-                {hoveredMarker.message.role === 'user' ? 'Пользователь' : 'Ассистент'}
+                {hoveredMarker.message.role === 'user' ? t.chat.user : t.chat.assistant}
               </span>
               <span>{formatTime(hoveredMarker.message.timestamp)}</span>
             </div>
             <p className="line-clamp-3 text-[var(--theme-text)] text-xs leading-relaxed font-normal">
-              {hoveredMarker.message.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() || '(Действие инструмента)'}
+              {hoveredMarker.message.content.replace(/<think>[\s\S]*?<\/think>/g, '').trim() || `(${t.chat.toolExecution})`}
             </p>
           </div>
         )}

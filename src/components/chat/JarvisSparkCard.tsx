@@ -1,6 +1,7 @@
 import React from 'react';
 import { JarvisSparkProposal } from '../../types';
 import { MaterialIcon } from '../common/MaterialIcon';
+import { useI18n } from '../../i18n';
 
 interface JarvisSparkCardProps {
   spark: JarvisSparkProposal;
@@ -15,22 +16,23 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
   onDismiss,
   onSpeak,
 }) => {
+  const { language } = useI18n();
   if (spark.status !== 'pending') return null;
 
   const getCategoryLabel = (category: JarvisSparkProposal['category']) => {
     switch (category) {
       case 'feature_spark':
-        return 'Идея фичи';
+        return language === 'ru' ? 'Идея фичи' : 'Feature Spark';
       case 'code_polish':
-        return 'Оптимизация';
+        return language === 'ru' ? 'Оптимизация' : 'Code Polish';
       case 'exploration':
-        return 'Исследование';
+        return language === 'ru' ? 'Исследование' : 'Exploration';
       case 'friendly_checkin':
-        return 'Напарник';
+        return language === 'ru' ? 'Напарник' : 'Companion';
       case 'error_incident':
-        return 'Перехват ошибки';
+        return language === 'ru' ? 'Перехват ошибки' : 'Error Incident';
       default:
-        return 'Предложение';
+        return language === 'ru' ? 'Предложение' : 'Proposal';
     }
   };
 
@@ -70,7 +72,7 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
         <button
           onClick={() => onDismiss(spark.id)}
           className="p-1 rounded-md text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors"
-          title="Скрыть предложение"
+          title={language === 'ru' ? 'Скрыть предложение' : 'Dismiss Proposal'}
         >
           <MaterialIcon name="close" className="text-sm" />
         </button>
@@ -86,7 +88,9 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
         </p>
         {spark.targetFiles && spark.targetFiles.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-            <span className="text-[10px] font-mono text-zinc-400">Цели:</span>
+            <span className="text-[10px] font-mono text-zinc-400">
+              {language === 'ru' ? 'Цели:' : 'Targets:'}
+            </span>
             {spark.targetFiles.map((file, idx) => (
               <span
                 key={idx}
@@ -107,10 +111,10 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
             <button
               onClick={() => onSpeak(spark.voicePhrase!)}
               className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-xs transition-colors"
-              title="Послушать реплику Джарвиса"
+              title={language === 'ru' ? 'Послушать реплику Джарвиса' : 'Listen to Jarvis Voice'}
             >
               <MaterialIcon name="volume_up" className="text-xs text-sky-400" />
-              <span>Послушать</span>
+              <span>{language === 'ru' ? 'Послушать' : 'Listen'}</span>
             </button>
           )}
         </div>
@@ -120,15 +124,15 @@ export const JarvisSparkCard: React.FC<JarvisSparkCardProps> = ({
             onClick={() => onDismiss(spark.id)}
             className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-colors font-mono"
           >
-            Отложить
+            {language === 'ru' ? 'Отложить' : 'Dismiss'}
           </button>
           <button
             onClick={() => onAccept(spark)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium shadow-md shadow-sky-950/50 transition-all active:scale-95 cursor-pointer font-mono"
-            title={spark.suggestedAction || 'Запустить задачу с полным контекстом'}
+            title={spark.suggestedAction || (language === 'ru' ? 'Запустить задачу с полным контекстом' : 'Execute task with full context')}
           >
             <MaterialIcon name="play_arrow" className="text-xs" />
-            <span>Запустить</span>
+            <span>{language === 'ru' ? 'Запустить' : 'Execute'}</span>
           </button>
         </div>
       </div>

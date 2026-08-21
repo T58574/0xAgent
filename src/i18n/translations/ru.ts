@@ -63,6 +63,7 @@ export const ru: Translations = {
     reasoning: 'Рассуждения',
     reasoningTitle: 'Мыслительный процесс модели',
     thinking: 'Размышляет...',
+    agentThinking: 'ИИ-Агент рассуждает...',
     thoughtFor: 'Думал',
     seconds: 'сек',
     tokens: 'токенов',

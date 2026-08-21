@@ -109,5 +109,5 @@ export function getSystemPromptMemoryContext(): string {
   if (memories.length === 0) return '';
 
   const lines = memories.slice(0, 10).map(m => `- [${m.category.toUpperCase()}] ${m.key}: ${m.value}`);
-  return `\n\n# Долговременная память пользователя (факты и предпочтения):\n${lines.join('\n')}\n* Примечание: Факты из памяти описывают контекст и опыт пользователя. Они не подменяют текущую активную персону.`;
+  return `\n\n# Long-Term Persistent Memory (${memories.length} facts remembered):\n${lines.join('\n')}`;
 }

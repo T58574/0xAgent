@@ -13,6 +13,7 @@ import {
 import { PersonaMetadata } from '../../types';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { useI18n } from '../../i18n';
 
 interface PersonaChatSelectorProps {
   activePersonaId?: string | null;
@@ -25,6 +26,7 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
   onPersonaChanged,
   compact = false,
 }) => {
+  const { t, language } = useI18n();
   const { showToast } = useToast();
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersona, setActivePersona] = useState<PersonaMetadata | null>(null);
@@ -109,14 +111,14 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
             ? 'px-2.5 py-1 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
             : 'px-2.5 py-1 text-[var(--theme-text)] font-medium'
         }`}
-        title="Сменить персону"
+        title={language === 'ru' ? 'Сменить персону' : 'Change Persona'}
       >
         <span className="shrink-0">
           {activePersona ? getPersonaIcon(activePersona.icon) : <User size={13} className="text-[var(--theme-text-muted)]" />}
         </span>
 
         <span className="font-medium text-xs truncate max-w-[120px] text-[var(--theme-text)]">
-          {activePersona ? activePersona.name : 'Персона'}
+          {activePersona ? activePersona.name : t.chat.persona}
         </span>
 
         <ChevronDown size={12} className={`text-[var(--theme-text-muted)] transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -129,7 +131,7 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
           <div className="flex items-center justify-between px-3 py-1.5 border-b border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)]">
             <span className="flex items-center gap-1.5">
               <User size={13} className="text-[var(--theme-text-muted)]" />
-              <span>Выбор персоны</span>
+              <span>{language === 'ru' ? 'Выбор персоны' : 'Select Persona'}</span>
             </span>
             {loading && <RefreshCw size={11} className="animate-spin text-[var(--theme-text-muted)]" />}
           </div>
@@ -161,7 +163,7 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
                         )}
                       </div>
                       <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-1 mt-0.5">
-                        {p.description || 'Пользовательская персона ИИ'}
+                        {p.description || (language === 'ru' ? 'Пользовательская персона ИИ' : 'Custom AI Persona')}
                       </p>
                     </div>
                   </div>

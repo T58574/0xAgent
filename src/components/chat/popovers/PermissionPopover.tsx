@@ -1,6 +1,7 @@
 import React from 'react';
 import { Shield, Check, X } from 'lucide-react';
 import { PermissionPreset } from '../../../types';
+import { useI18n } from '../../../i18n';
 
 interface PermissionPopoverProps {
   permissionPreset: PermissionPreset;
@@ -8,18 +9,36 @@ interface PermissionPopoverProps {
   onClose?: () => void;
 }
 
-const PRESETS = [
-  { id: 'readonly', title: 'Только чтение', desc: 'Запрещены любые изменения файлов и запуск команд' },
-  { id: 'workspace-write', title: 'Песочница проекта', desc: 'Разрешено менять файлы только внутри проекта' },
-  { id: 'prompt', title: 'Подтверждение', desc: 'Запрашивать одобрение на опасные и модифицирующие действия' },
-  { id: 'unrestricted', title: 'Полная автономия', desc: 'Автоматическое выполнение всех действий' },
-] as const;
-
 export const PermissionPopover: React.FC<PermissionPopoverProps> = ({
   permissionPreset,
   onSelectPreset,
   onClose,
 }) => {
+  const { language } = useI18n();
+
+  const presets = [
+    {
+      id: 'readonly',
+      title: language === 'ru' ? 'Только чтение' : 'Read-Only',
+      desc: language === 'ru' ? 'Запрещены любые изменения файлов и запуск команд' : 'Disallow file modifications and command execution',
+    },
+    {
+      id: 'workspace-write',
+      title: language === 'ru' ? 'Песочница проекта' : 'Workspace Sandbox',
+      desc: language === 'ru' ? 'Разрешено менять файлы только внутри проекта' : 'Allow modifications only within workspace boundary',
+    },
+    {
+      id: 'prompt',
+      title: language === 'ru' ? 'Подтверждение' : 'Prompt on Mutation',
+      desc: language === 'ru' ? 'Запрашивать одобрение на опасные и модифицирующие действия' : 'Ask for approval before executing modifying actions',
+    },
+    {
+      id: 'unrestricted',
+      title: language === 'ru' ? 'Полная автономия' : 'Unrestricted',
+      desc: language === 'ru' ? 'Автоматическое выполнение всех действий' : 'Fully autonomous execution without prompts',
+    },
+  ] as const;
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -32,7 +51,9 @@ export const PermissionPopover: React.FC<PermissionPopoverProps> = ({
 
       <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:bottom-full sm:mb-3 sm:right-2 w-auto sm:w-76 max-w-[calc(100vw-24px)] bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 animate-fadeIn rounded-2xl">
         <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
-          <span className="font-bold text-[var(--theme-text)]">Безопасность (Permission Presets)</span>
+          <span className="font-bold text-[var(--theme-text)]">
+            {language === 'ru' ? 'Безопасность (Permissions)' : 'Permissions & Security'}
+          </span>
           <div className="flex items-center gap-1.5">
             <Shield size={12} className="opacity-60" />
             {onClose && (
@@ -47,7 +68,7 @@ export const PermissionPopover: React.FC<PermissionPopoverProps> = ({
           </div>
         </div>
         <div className="space-y-1">
-          {PRESETS.map((preset) => {
+          {presets.map((preset) => {
             const isActive = permissionPreset === preset.id;
             return (
               <button

@@ -1,6 +1,7 @@
 import React from 'react';
 import { LiveTelemetry } from '../../types';
 import { MaterialIcon } from '../common/MaterialIcon';
+import { useI18n } from '../../i18n';
 
 interface TelemetryHUDProps {
   liveTelemetry?: LiveTelemetry | null;
@@ -19,6 +20,8 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
   showThinkingBanner = false,
   onOpenCustomizations,
 }) => {
+  const { t } = useI18n();
+
   return (
     <>
       {/* Live Thinking ASCII HUD banner */}
@@ -29,7 +32,7 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
               {asciiFrame}
             </span>
             <span className="font-medium text-xs text-[var(--theme-text)]">
-              ИИ-Агент рассуждает...
+              {t.chat.agentThinking}
             </span>
             <span className="inline-flex items-center gap-1 text-[10px] text-[var(--theme-text-muted)] opacity-80">
               <MaterialIcon name="schedule" size={11} />
