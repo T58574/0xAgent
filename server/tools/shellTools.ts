@@ -1,5 +1,58 @@
 import path from 'node:path';
+import fs from 'node:fs';
 import { execSync, spawn } from 'node:child_process';
+
+function resolveShellBinary(): { shell: string; shellArgs: string[] } {
+  const isWindows = process.platform === 'win32';
+  if (!isWindows) {
+    return { shell: '/bin/bash', shellArgs: ['-c'] };
+  }
+
+  const systemRoot = process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows';
+  const defaultPwsh = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+  if (fs.existsSync(defaultPwsh)) {
+    return {
+      shell: defaultPwsh,
+      shellArgs: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command'],
+    };
+  }
+
+  const pwsh7 = 'C:\\Program Files\\PowerShell\\7\\pwsh.exe';
+  if (fs.existsSync(pwsh7)) {
+    return {
+      shell: pwsh7,
+      shellArgs: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command'],
+    };
+  }
+
+  const cmdExe = process.env.ComSpec || path.join(systemRoot, 'System32', 'cmd.exe');
+  if (fs.existsSync(cmdExe)) {
+    return {
+      shell: cmdExe,
+      shellArgs: ['/d', '/s', '/c'],
+    };
+  }
+
+  return {
+    shell: 'powershell.exe',
+    shellArgs: ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command'],
+  };
+}
+
+function getSanitizedEnv(): NodeJS.ProcessEnv {
+  const env = { ...process.env };
+  if (process.platform === 'win32') {
+    const systemRoot = env.SystemRoot || env.WINDIR || 'C:\\Windows';
+    const pwshDir = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0');
+    const sys32Dir = path.join(systemRoot, 'System32');
+    const existingPath = env.PATH || env.Path || '';
+    if (!existingPath.toLowerCase().includes('windowspowershell')) {
+      env.PATH = `${pwshDir};${sys32Dir};${existingPath}`;
+      env.Path = env.PATH;
+    }
+  }
+  return env;
+}
 
 export function executeShellCommand(workspaceDir: string | null | undefined, command: string): Promise<string> {
   const root = workspaceDir && workspaceDir.trim().length > 0 ? workspaceDir : process.cwd();
@@ -22,16 +75,17 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
 
   return new Promise((resolve) => {
     const isWindows = process.platform === 'win32';
-    const shell = isWindows ? 'powershell.exe' : '/bin/bash';
-    const shellArgs = isWindows ? ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command] : ['-c', command];
+    const { shell, shellArgs } = resolveShellBinary();
+    const fullArgs = [...shellArgs, command];
 
     let stdout = '';
     let stderr = '';
     let isTimedOut = false;
 
-    const child = spawn(shell, shellArgs, {
+    const child = spawn(shell, fullArgs, {
       cwd: normalizedRoot,
-      env: { ...process.env },
+      env: getSanitizedEnv(),
+      windowsHide: true,
     });
 
     const timeoutTimer = setTimeout(() => {

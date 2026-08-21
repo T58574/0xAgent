@@ -139,7 +139,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-[10px] text-sky-600 dark:text-sky-300 font-bold">
               <MaterialIcon name="bolt" size={12} />
-              <span>{liveTelemetry.tokensPerSec.toFixed(1)} {t.chat.speed}</span>
+              <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
             </span>
           )}
 
@@ -147,7 +147,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           {liveTelemetry?.tokenCount !== undefined && liveTelemetry.tokenCount > 0 && (
             <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-semibold">
               <MaterialIcon name="memory" size={12} className="text-[var(--theme-text-muted)]" />
-              <span>{liveTelemetry.tokenCount} {t.chat.tokens}</span>
+              <span>{liveTelemetry.tokenCount} tok</span>
             </span>
           )}
 
@@ -163,7 +163,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           {(isLive || thinkingSeconds > 0) && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-bold">
               <MaterialIcon name="schedule" size={12} />
-              <span>{thinkingSeconds.toFixed(1)}{t.chat.seconds}</span>
+              <span>{thinkingSeconds.toFixed(1)}s</span>
             </span>
           )}
 

@@ -67,7 +67,7 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
             {liveTelemetry.tokenCount !== undefined && (
               <span className="flex items-center gap-1 text-[var(--theme-text)]">
                 <MaterialIcon name="memory" size={12} className="text-[var(--theme-text-muted)]" />
-                <span>{liveTelemetry.tokenCount} токенов</span>
+                <span>{liveTelemetry.tokenCount} tok</span>
               </span>
             )}
             {liveTelemetry.contextUsed !== undefined && (

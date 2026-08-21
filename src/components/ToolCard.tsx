@@ -123,7 +123,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
 
     if (blocks.length === 0) {
       return (
-        <div className="text-theme-text text-[11px] font-mono whitespace-pre-wrap p-2.5 bg-slate-950/80 rounded border border-theme-border">
+        <div className="text-slate-200 text-[11px] font-mono whitespace-pre-wrap p-2.5 bg-slate-950/80 rounded border border-theme-border">
           {patchText}
         </div>
       );
@@ -292,9 +292,9 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
       {/* Action Content Preview */}
       <div className="mt-2.5 font-mono text-xs text-theme-text">
         {tool.name === 'execute_command' && (
-          <div className="flat-input rounded-md p-2.5 bg-slate-950 border border-theme-border flex items-start gap-2">
+          <div className="flat-input rounded-md p-2.5 bg-slate-950 border border-theme-border flex items-start gap-2 text-slate-100">
             <span className="text-emerald-400 font-bold select-none">PS &gt;</span>
-            <span className="text-theme-text break-all">{parsedArgs.command}</span>
+            <span className="text-slate-100 break-all font-mono">{parsedArgs.command}</span>
           </div>
         )}
 
@@ -307,7 +307,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
               labelClosed={t.tools.viewDetails}
             />
             {showDetails && (
-              <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-3 border border-theme-border rounded-md text-theme-text">
+              <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-3 border border-theme-border rounded-md text-slate-200">
                 {parsedArgs.content}
               </div>
             )}
@@ -331,7 +331,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             <div className="text-amber-300 font-semibold text-xs flex items-center gap-1.5">
               <span>{t.chat.askQuestionTitle}:</span>
             </div>
-            <div className="text-theme-text text-xs font-medium bg-slate-950 p-3 rounded-md border border-theme-border">
+            <div className="text-slate-200 text-xs font-medium bg-slate-950 p-3 rounded-md border border-theme-border">
               {parsedArgs.question}
             </div>
             {tool.status === 'pending' && (
@@ -421,7 +421,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
         {tool.name === 'run_scratch_script' && (
           <div className="space-y-1.5">
             <div className="text-theme-muted text-[11px]">Script ({parsedArgs.language})</div>
-            <div className="text-[10px] whitespace-pre-wrap max-h-36 overflow-y-auto bg-slate-950 p-2.5 border border-theme-border rounded-md text-theme-text">
+            <div className="text-[10px] whitespace-pre-wrap max-h-36 overflow-y-auto bg-slate-950 p-2.5 border border-theme-border rounded-md text-slate-200">
               {parsedArgs.code}
             </div>
           </div>
@@ -469,7 +469,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
           </button>
 
           {showDetails && (
-            <div className="mt-2 bg-slate-950 rounded-md p-2.5 border border-theme-border text-[11px] font-mono text-theme-text whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+            <div className="mt-2 bg-slate-950 rounded-md p-2.5 border border-theme-border text-[11px] font-mono text-slate-200 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
               {tool.output}
             </div>
           )}

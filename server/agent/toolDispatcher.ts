@@ -184,17 +184,35 @@ export async function dispatchToolExecution(
       await fs.promises.writeFile(scratchFile, code, 'utf-8');
 
       return await new Promise<string>((resolve) => {
-        let executable = 'node';
+        const isWindows = process.platform === 'win32';
+        const systemRoot = process.env.SystemRoot || process.env.WINDIR || 'C:\\Windows';
+        const defaultPwsh = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+
+        let executable = process.execPath || 'node';
         let args = [scratchFile];
+
         if (lang.includes('py')) {
-          executable = 'python';
+          executable = isWindows && fs.existsSync('C:\\Python314\\python.exe')
+            ? 'C:\\Python314\\python.exe'
+            : (isWindows ? 'python' : 'python3');
           args = [scratchFile];
         } else if (lang.includes('ps') || lang.includes('shell')) {
-          executable = 'powershell';
+          executable = isWindows && fs.existsSync(defaultPwsh) ? defaultPwsh : 'powershell';
           args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scratchFile];
         }
 
-        execFile(executable, args, { timeout: 15000 }, (err: any, stdout: string, stderr: string) => {
+        const env = { ...process.env };
+        if (isWindows) {
+          const pwshDir = path.join(systemRoot, 'System32', 'WindowsPowerShell', 'v1.0');
+          const sys32Dir = path.join(systemRoot, 'System32');
+          const existingPath = env.PATH || env.Path || '';
+          if (!existingPath.toLowerCase().includes('windowspowershell')) {
+            env.PATH = `${pwshDir};${sys32Dir};${existingPath}`;
+            env.Path = env.PATH;
+          }
+        }
+
+        execFile(executable, args, { timeout: 30000, env, windowsHide: true }, (err: any, stdout: string, stderr: string) => {
           if (err) {
             resolve(`Scratch Execution Error:\n${stdout || ''}\n${stderr || err.message}`);
           } else {

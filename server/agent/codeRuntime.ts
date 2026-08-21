@@ -169,7 +169,9 @@ export async function executeCodeProgram(
     },
   };
 
-  const sandbox = {
+  const isUnrestricted = config.permission_preset === 'unrestricted';
+
+  const sandbox: Record<string, any> = {
     tools: hostTools,
     console: {
       log: (...args: any[]) => appendLog('LOG', ...args),
@@ -192,7 +194,25 @@ export async function executeCodeProgram(
     Buffer,
     setTimeout,
     clearTimeout,
+    process: {
+      platform: process.platform,
+      arch: process.arch,
+      version: process.version,
+      versions: process.versions,
+      env: { ...process.env },
+      cwd: () => (config.workspace_dir ? config.workspace_dir : process.cwd()),
+    },
   };
+
+  if (isUnrestricted) {
+    sandbox.require = (moduleName: string) => {
+      try {
+        return require(moduleName);
+      } catch (err: any) {
+        throw new Error(`Module '${moduleName}' not found or cannot be loaded in code_run sandbox: ${err.message}`);
+      }
+    };
+  }
 
   const context = vm.createContext(sandbox);
 
