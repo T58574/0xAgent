@@ -139,10 +139,10 @@ export const PersonasTab: React.FC = () => {
       setIsSaving(true);
       await save_summarizer_prompt(summarizerPrompt);
       setSaveSuccess(true);
-      showToast('SUMMARIZER.md saved!', 'success');
+      showToast(formatString(t.toasts.personaFileSaved, { file: 'SUMMARIZER.md' }), 'success');
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err: any) {
-      showToast(err.message || 'Save error', 'error');
+      showToast(err.message || t.common.error, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -153,17 +153,17 @@ export const PersonasTab: React.FC = () => {
     setToolsList(updated);
 
     const toggles: Record<string, boolean> = {};
-    for (const tool of updated) {
-      toggles[tool.id] = tool.enabled;
+    for (const t of updated) {
+      toggles[t.id] = t.enabled;
     }
 
     try {
       setIsToolsSaving(true);
       await save_tools_toggles(toggles);
       setToolsSaveSuccess(true);
-      setTimeout(() => setToolsSaveSuccess(false), 1500);
+      setTimeout(() => setToolsSaveSuccess(false), 2000);
     } catch (err: any) {
-      showToast(err.message || 'Failed to save tool state', 'error');
+      console.error('Failed to save tool toggle:', err);
     } finally {
       setIsToolsSaving(false);
     }
@@ -193,9 +193,10 @@ export const PersonasTab: React.FC = () => {
     try {
       await activate_persona(id);
       setActivePersonaId(id);
-      showToast('Persona activated', 'success');
+      const p = personas.find((item) => item.id === id);
+      showToast(formatString(t.toasts.personaActivated, { name: p?.name || id }), 'success');
     } catch (err: any) {
-      showToast(err.message || 'Activation failed', 'error');
+      showToast(err.message || t.common.error, 'error');
     }
   };
 
@@ -210,9 +211,9 @@ export const PersonasTab: React.FC = () => {
       setNewDesc('');
       await loadPersonas();
       setSelectedPersonaId(created.metadata.id);
-      showToast('Persona created', 'success');
+      showToast(t.toasts.personaCreated, 'success');
     } catch (err: any) {
-      showToast(err.message || 'Creation failed', 'error');
+      showToast(err.message || t.common.error, 'error');
     }
   };
 
@@ -223,11 +224,11 @@ export const PersonasTab: React.FC = () => {
       const targetFile: 'SOUL.md' | 'TOOLS.md' | 'USER.md' = activeFileTab === 'soul' ? 'SOUL.md' : 'USER.md';
       await save_persona_file(personaDetail.metadata.id, targetFile, fileContent);
       setSaveSuccess(true);
-      showToast(`${activeFileTab.toUpperCase()}.md saved!`, 'success');
+      showToast(formatString(t.toasts.personaFileSaved, { file: `${activeFileTab.toUpperCase()}.md` }), 'success');
       setTimeout(() => setSaveSuccess(false), 2000);
       loadDetail(personaDetail.metadata.id);
     } catch (err: any) {
-      showToast(err.message || 'Save failed', 'error');
+      showToast(err.message || t.common.error, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -241,9 +242,9 @@ export const PersonasTab: React.FC = () => {
       if (selectedPersonaId === id) {
         setSelectedPersonaId('default');
       }
-      showToast('Persona deleted', 'info');
+      showToast(t.toasts.personaDeleted, 'info');
     } catch (err: any) {
-      showToast(err.message || 'Delete failed', 'error');
+      showToast(err.message || t.common.error, 'error');
     }
   };
 

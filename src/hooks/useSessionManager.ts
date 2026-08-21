@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import * as api from '../services/api';
 import { AppConfig, ChatSession, ChatMessage, JarvisSparkProposal } from '../types';
 import { generateShortId } from '../utils/helpers';
+import { useI18n } from '../i18n';
 
 interface UseSessionManagerOptions {
   config: AppConfig | null;
@@ -24,6 +25,7 @@ export function useSessionManager({
   setActiveView,
   setIsJarvisOpen,
 }: UseSessionManagerOptions) {
+  const { t, formatString } = useI18n();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -245,11 +247,11 @@ export function useSessionManager({
       await api.save_session(updatedSession);
       await api.send_message(newSession.id);
 
-      showToast(`Инициатива запущена: ${spark.title}`, 'success');
+      showToast(formatString(t.toasts.sparkStarted, { title: spark.title }), 'success');
       addLog(`Initiative dispatched in dedicated session ${newSession.id}`);
     } catch (err: any) {
       console.error('Failed to accept spark:', err);
-      showToast(`Ошибка запуска: ${err.message || err}`, 'error');
+      showToast(formatString(t.toasts.launchError, { error: err.message || err }), 'error');
     }
   };
 

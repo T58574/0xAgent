@@ -32,7 +32,7 @@ import { useResponsive } from './hooks/useResponsive';
 export default function App() {
   const { showToast } = useToast();
   const { isMobile } = useResponsive();
-  const { language, setLanguage } = useI18n();
+  const { language, setLanguage, t, formatString } = useI18n();
 
   // Authentication & Security state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
@@ -237,12 +237,12 @@ export default function App() {
       setConfig((prev) => (prev ? { ...prev, active_persona_id: id } : prev));
       const p = updatedList.find((item) => item.id === id);
       if (p) {
-        addLog(`Активирована персона: ${p.name}`);
-        showToast(`Персона: ${p.name}`, 'success');
+        addLog(`Persona activated: ${p.name}`);
+        showToast(formatString(t.toasts.personaActivated, { name: p.name }), 'success');
       }
     } catch (err: any) {
-      addLog(`Ошибка активации персоны: ${err.message || err}`);
-      showToast(`Ошибка смены персоны: ${err.message || err}`, 'error');
+      addLog(`Failed to switch persona: ${err.message || err}`);
+      showToast(formatString(t.toasts.personaSwitchError, { error: err.message || err }), 'error');
     }
   };
 
@@ -267,15 +267,15 @@ export default function App() {
         // Create clean dedicated session with project title
         const baseName = getWorkspaceBaseName(dirPath);
         await handleCreateSession(baseName, dirPath);
-        showToast(`Проект "${baseName}" открыт в новом чате`, 'success');
+        showToast(formatString(t.toasts.workspaceOpenedNewChat, { name: baseName }), 'success');
       } else if (currentSessionId) {
         await handleUpdateCurrentSessionWorkspace(dirPath);
-        showToast(`Папка привязана к текущему чату`, 'info');
+        showToast(t.toasts.workspaceLinked, 'info');
       }
       addLog(`Workspace opened: ${dirPath}`);
     } catch (err: any) {
       addLog(`Failed to open workspace directory: ${err.message || err}`);
-      showToast(`Ошибка открытия проекта: ${err.message || err}`, 'error');
+      showToast(formatString(t.toasts.workspaceOpenError, { error: err.message || err }), 'error');
     }
   };
 

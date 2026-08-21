@@ -65,7 +65,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
   isServerOffline,
   onStartServer,
 }) => {
-  const { t } = useI18n();
+  const { t, formatString } = useI18n();
   const { showToast } = useToast();
 
   // Personal workspace state
@@ -175,7 +175,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
       setIsCreatingNote(false);
       await loadJarvisFiles();
       await handleFileClick(notePath, noteFileName);
-      showToast(`Note ${noteFileName} created`, 'success');
+      showToast(formatString(t.toasts.noteCreated, { file: noteFileName }), 'success');
     } catch (err: any) {
       showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
@@ -345,7 +345,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
                   if (selectedFile?.path === filePath) {
                     setSelectedFile({ ...selectedFile, content: newContent });
                   }
-                  showToast('File saved', 'success');
+                  showToast(t.toasts.fileSaved, 'success');
                 }}
               />
             ) : (

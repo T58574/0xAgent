@@ -59,7 +59,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
       await api.add_memory(newMemKey.trim(), newMemVal.trim(), newMemCategory);
       setNewMemKey('');
       setNewMemVal('');
-      showToast('Fact added to memory!', 'success');
+      showToast(t.toasts.factAdded, 'success');
       await loadData();
     } catch (err: any) {
       showToast(`${t.common.error}: ${err.message || err}`, 'error');
@@ -69,7 +69,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
   const handleDeleteMemory = async (id: string) => {
     try {
       await api.delete_memory(id);
-      showToast('Fact deleted from memory.', 'success');
+      showToast(t.toasts.factDeleted, 'success');
       await loadData();
     } catch (err: any) {
       showToast(`${t.common.error}: ${err.message || err}`, 'error');
@@ -90,7 +90,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
     if (!selectedSkillName) return;
     try {
       await api.save_skill(selectedSkillName, skillContent);
-      showToast('Skill saved!', 'success');
+      showToast(t.toasts.skillSaved, 'success');
       await loadData();
     } catch (err: any) {
       showToast(`${t.common.error}: ${err.message || err}`, 'error');
@@ -107,7 +107,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
       setNewSkillNameInput('');
       await loadData();
       await handleSelectSkill(name);
-      showToast(`Skill "${name}" created!`, 'success');
+      showToast(formatString(t.toasts.skillCreated, { name }), 'success');
     } catch (err: any) {
       showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
@@ -122,7 +122,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
         setSkillContent('');
       }
       await loadData();
-      showToast(`Skill ${name} deleted.`, 'success');
+      showToast(formatString(t.toasts.skillDeleted, { name }), 'success');
     } catch (err: any) {
       showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }

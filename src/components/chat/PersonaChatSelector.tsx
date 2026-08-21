@@ -26,7 +26,7 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
   onPersonaChanged,
   compact = false,
 }) => {
-  const { t, language } = useI18n();
+  const { t, language, formatString } = useI18n();
   const { showToast } = useToast();
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersona, setActivePersona] = useState<PersonaMetadata | null>(null);
@@ -72,13 +72,13 @@ export const PersonaChatSelector: React.FC<PersonaChatSelectorProps> = ({
       await api.activate_persona(p.id);
       setActivePersona(p);
       setIsOpen(false);
-      showToast(`Персона: ${p.name}`, 'success');
+      showToast(formatString(t.toasts.personaActivated, { name: p.name }), 'success');
       if (onPersonaChanged) {
         onPersonaChanged(p);
       }
     } catch (err: any) {
       console.error('Failed to switch persona:', err);
-      showToast(`Ошибка смены личности: ${err.message || err}`, 'error');
+      showToast(formatString(t.toasts.personaSwitchError, { error: err.message || err }), 'error');
     }
   };
 

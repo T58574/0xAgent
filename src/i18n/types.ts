@@ -694,6 +694,43 @@ export interface Translations {
     filterHighSpeed: string;
   };
 
+  // Toasts & Notifications
+  toasts: {
+    personaActivated: string;
+    personaCreated: string;
+    personaDeleted: string;
+    personaFileSaved: string;
+    personaSwitchError: string;
+    workspaceOpenedNewChat: string;
+    workspaceLinked: string;
+    workspaceOpenError: string;
+    selectImageFile: string;
+    fileSizeExceedsLimit: string;
+    launchError: string;
+    modelSelected: string;
+    modelServerStopped: string;
+    modelSwitchError: string;
+    startingLlama: string;
+    serverReady: string;
+    serverStartError: string;
+    localModelSelected: string;
+    serverStopped: string;
+    serverStopError: string;
+    serverRunning: string;
+    sparkStarted: string;
+    factAdded: string;
+    factDeleted: string;
+    skillSaved: string;
+    skillCreated: string;
+    skillDeleted: string;
+    entryUpdated: string;
+    entrySaved: string;
+    entryDeleted: string;
+    titleContentRequired: string;
+    noteCreated: string;
+    fileSaved: string;
+  };
+
   // Common
   common: {
     ok: string;

@@ -98,7 +98,7 @@ export const KnowledgeVault: React.FC = () => {
 
   const handleSaveEdit = async () => {
     if (!selectedEntry || !editTitle.trim() || !editContent.trim()) {
-      showToast('Title and content are required', 'error');
+      showToast(t.toasts.titleContentRequired, 'error');
       return;
     }
 
@@ -119,7 +119,7 @@ export const KnowledgeVault: React.FC = () => {
         source: selectedEntry.source || 'User Directive',
       });
 
-      showToast('Entry updated!', 'success');
+      showToast(t.toasts.entryUpdated, 'success');
       setSelectedEntry(updated);
       setIsEditing(false);
       fetchKnowledge();
@@ -133,7 +133,7 @@ export const KnowledgeVault: React.FC = () => {
   const handleCreateEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) {
-      showToast('Title and content are required', 'error');
+      showToast(t.toasts.titleContentRequired, 'error');
       return;
     }
 
@@ -153,7 +153,7 @@ export const KnowledgeVault: React.FC = () => {
         source: 'User Directive',
       });
 
-      showToast(`Entry "${created.title}" saved!`, 'success');
+      showToast(formatString(t.toasts.entrySaved, { title: created.title }), 'success');
       setModalOpen(false);
       setNewTitle('');
       setNewSummary('');
@@ -175,7 +175,7 @@ export const KnowledgeVault: React.FC = () => {
 
     try {
       await api.delete_knowledge_entry(id);
-      showToast(`Entry "${title}" deleted.`, 'success');
+      showToast(formatString(t.toasts.entryDeleted, { title }), 'success');
       if (selectedEntry?.id === id) {
         setSelectedEntry(null);
         setIsEditing(false);

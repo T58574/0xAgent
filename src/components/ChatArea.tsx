@@ -70,7 +70,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onOpenCustomizations,
 }) => {
   const { showToast } = useToast();
-  const { t } = useI18n();
+  const { t, formatString } = useI18n();
   const [inputText, setInputText] = useState('');
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -209,11 +209,11 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   const processImageFiles = (files: FileList | File[]) => {
     Array.from(files).forEach((file) => {
       if (!file.type.startsWith('image/')) {
-        showToast('Выберите файл изображения (PNG, JPEG, WEBP)', 'info');
+        showToast(t.toasts.selectImageFile, 'info');
         return;
       }
       if (file.size > 15 * 1024 * 1024) {
-        showToast('Размер файла превышает 15 МБ', 'error');
+        showToast(t.toasts.fileSizeExceedsLimit, 'error');
         return;
       }
       const reader = new FileReader();
@@ -277,9 +277,9 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
     try {
       const updatedList = await api.activate_persona(p.id);
       setLocalPersonas(updatedList);
-      showToast(`Персона: ${p.name}`, 'success');
+      showToast(formatString(t.toasts.personaActivated, { name: p.name }), 'success');
     } catch (err: any) {
-      showToast(`Ошибка смены персоны: ${err.message || err}`, 'error');
+      showToast(formatString(t.toasts.personaSwitchError, { error: err.message || err }), 'error');
     }
   };
 
@@ -294,7 +294,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       const directive = spark.directivePrompt || spark.suggestedAction || spark.description;
       onSendMessage(directive);
     } catch (err: any) {
-      showToast(`Ошибка запуска: ${err.message || err}`, 'error');
+      showToast(formatString(t.toasts.launchError, { error: err.message || err }), 'error');
     }
   };
 

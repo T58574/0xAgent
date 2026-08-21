@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppConfig, AvailableModelsResponse } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useI18n } from '../i18n';
 
 export interface ServerStatusData {
   running: boolean;
@@ -16,6 +17,7 @@ export function useModelManager(
   onModelChanged?: (newModelId: string) => void
 ) {
   const { showToast } = useToast();
+  const { t, formatString } = useI18n();
   const [isStartingServer, setIsStartingServer] = useState(false);
   const [serverStatus, setServerStatus] = useState<ServerStatusData>({
     running: false,
@@ -82,17 +84,17 @@ export function useModelManager(
         try {
           await api.stop_local_server();
           setServerStatus((prev) => ({ ...prev, running: false }));
-          showToast(`Модель: ${modelId}. Сервер остановлен.`, 'info');
+          showToast(formatString(t.toasts.modelServerStopped, { model: modelId }), 'info');
         } catch {
-          showToast(`Модель: ${modelId}`, 'success');
+          showToast(formatString(t.toasts.modelSelected, { model: modelId }), 'success');
         }
       } else {
-        showToast(`Модель: ${modelId}`, 'success');
+        showToast(formatString(t.toasts.modelSelected, { model: modelId }), 'success');
       }
     } catch (err: any) {
-      showToast(`Ошибка смены модели: ${err.message || err}`, 'error');
+      showToast(formatString(t.toasts.modelSwitchError, { error: err.message || err }), 'error');
     }
-  }, [config, onModelChanged, serverStatus.running, showToast]);
+  }, [config, onModelChanged, serverStatus.running, showToast, t, formatString]);
 
   const selectLocalModel = useCallback(async (model: any) => {
     try {
@@ -112,7 +114,7 @@ export function useModelManager(
 
       if (!serverStatus.running || !isModelRunning(model)) {
         setIsStartingServer(true);
-        showToast(`Запуск llama.cpp (${model.title || model.fileName})...`, 'info');
+        showToast(formatString(t.toasts.startingLlama, { model: model.title || model.fileName }), 'info');
         try {
           const ls = updatedCfg.local_server;
           await api.start_local_server({
@@ -139,19 +141,19 @@ export function useModelManager(
             modelPath: model.filePath,
             modelName: model.title || model.fileName,
           }));
-          showToast('Локальный сервер готов!', 'success');
+          showToast(t.toasts.serverReady, 'success');
         } catch (serverErr: any) {
-          showToast(`Ошибка старта сервера: ${serverErr.message || serverErr}`, 'error');
+          showToast(formatString(t.toasts.serverStartError, { error: serverErr.message || serverErr }), 'error');
         } finally {
           setIsStartingServer(false);
         }
       } else {
-        showToast(`Локальная модель: ${model.title || model.fileName}`, 'success');
+        showToast(formatString(t.toasts.localModelSelected, { model: model.title || model.fileName }), 'success');
       }
     } catch (err: any) {
-      showToast(`Ошибка смены модели: ${err.message || err}`, 'error');
+      showToast(formatString(t.toasts.modelSwitchError, { error: err.message || err }), 'error');
     }
-  }, [config, isModelRunning, onModelChanged, serverStatus.running, showToast]);
+  }, [config, isModelRunning, onModelChanged, serverStatus.running, showToast, t, formatString]);
 
   const toggleServer = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -159,9 +161,9 @@ export function useModelManager(
       try {
         await api.stop_local_server();
         setServerStatus((prev) => ({ ...prev, running: false }));
-        showToast('Сервер llama.cpp остановлен', 'info');
+        showToast(t.toasts.serverStopped, 'info');
       } catch (err: any) {
-        showToast(`Ошибка остановки: ${err.message || err}`, 'error');
+        showToast(formatString(t.toasts.serverStopError, { error: err.message || err }), 'error');
       }
     } else {
       setIsStartingServer(true);
@@ -189,15 +191,15 @@ export function useModelManager(
         });
         if (res?.success) {
           setServerStatus((prev) => ({ ...prev, running: true }));
-          showToast('Сервер llama.cpp запущен!', 'success');
+          showToast(t.toasts.serverRunning, 'success');
         }
       } catch (err: any) {
-        showToast(`Ошибка запуска: ${err.message || err}`, 'error');
+        showToast(formatString(t.toasts.launchError, { error: err.message || err }), 'error');
       } finally {
         setIsStartingServer(false);
       }
     }
-  }, [config, serverStatus.running, showToast]);
+  }, [config, serverStatus.running, showToast, t, formatString]);
 
   const getDisplayTitle = useCallback((id: string): string => {
     const cloudMatch = modelsData.cloud.find((m) => m.id === id);
