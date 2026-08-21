@@ -216,7 +216,18 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
             ref={scrollRef}
             className="p-4 space-y-3 max-h-80 overflow-y-auto scrollbar-thin text-[11.5px] leading-relaxed text-[var(--theme-text)]"
           >
-            {thinking.trim() ? (
+            {isLive ? (
+              thinking.trim() ? (
+                <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11.5px] text-[var(--theme-text)] font-mono whitespace-pre-wrap leading-relaxed select-text shadow-sm">
+                  {thinking}
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic font-mono flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] animate-ping inline-block shrink-0" />
+                  <span>[ {t.chat.promptPrefilling} ]</span>
+                </div>
+              )
+            ) : thinking.trim() ? (
               steps.map((step) => (
                 <div
                   key={step.stepNumber}
@@ -239,9 +250,8 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
                 </div>
               ))
             ) : (
-              <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic font-mono flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] animate-ping inline-block shrink-0" />
-                <span>{isLive ? `[ ${t.chat.promptPrefilling} ]` : `[ ${t.chat.reasoning} ]`}</span>
+              <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic font-mono">
+                [ {t.chat.reasoning} ]
               </div>
             )}
 
