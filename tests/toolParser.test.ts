@@ -190,4 +190,47 @@ return {dir, mem};
     assert.ok(calls[0].arguments.code.includes('tools.recall_memories'));
     assert.ok(calls[0].arguments.program.includes('return {dir, mem};'));
   });
+
+  it('should parse Qwen-Fixed-Chat-Templates XML and stringified JSON tool calls', () => {
+    // 1. Qwen XML Function syntax
+    const qwenXmlText = `
+<tool_call>
+<function=read_file>
+<parameter=path>package.json</parameter>
+</function>
+</tool_call>
+`;
+    const calls1 = parseToolCalls(qwenXmlText);
+    assert.equal(calls1.length, 1);
+    assert.equal(calls1[0].name, 'read_file');
+    assert.equal(calls1[0].arguments.path, 'package.json');
+
+    // 2. Qwen stringified JSON arguments in tool_call
+    const qwenJsonText = `
+<tool_call>
+{"name": "execute_command", "arguments": "{\\"command\\": \\"npm test\\"}"}
+</tool_call>
+`;
+    const calls2 = parseToolCalls(qwenJsonText);
+    assert.equal(calls2.length, 1);
+    assert.equal(calls2[0].name, 'execute_command');
+    assert.equal(calls2[0].arguments.command, 'npm test');
+
+    // 3. Qwen embedded XML inside toolcall wrapper
+    const qwenEmbeddedText = `
+<toolcall>
+<patch_file path="src/App.tsx">
+<<<<<<< SEARCH
+const a = 1;
+=======
+const a = 2;
+>>>>>>> REPLACE
+</patch_file>
+</toolcall>
+`;
+    const calls3 = parseToolCalls(qwenEmbeddedText);
+    assert.equal(calls3.length, 1);
+    assert.equal(calls3[0].name, 'patch_file');
+    assert.equal(calls3[0].arguments.path, 'src/App.tsx');
+  });
 });

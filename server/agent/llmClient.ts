@@ -86,10 +86,12 @@ export async function fetchLlmResponse(
     const localHost = config.local_server?.host || '127.0.0.1';
     const localPort = config.local_server?.port || 11434;
     const apiEndpoint = `http://${localHost}:${localPort}/v1/chat/completions`;
+    const ctxLimit = config.local_server?.ctx_size || 16384;
     const requestBody: any = {
       model: selectedModel.replace(/^local:/, ''),
       messages,
       stream: true,
+      max_tokens: config.max_tokens || Math.min(8192, Math.floor(ctxLimit / 2)),
       temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
       frequency_penalty: loopRetryCount > 0 ? 0.5 : (config.local_server?.frequency_penalty ?? 0.3),
       presence_penalty: config.local_server?.presence_penalty ?? 0.1,
@@ -362,7 +364,7 @@ export async function readLlmStream(
       if (reasoningChunk) {
         const rawReasoning = String(reasoningChunk);
         if (!isInReasoning) {
-          if (rawReasoning.startsWith('<think>')) {
+          if (/^\s*<think>/i.test(rawReasoning)) {
             emitToken(rawReasoning);
           } else {
             emitToken('<think>' + rawReasoning);
@@ -376,7 +378,7 @@ export async function readLlmStream(
       if (contentChunk) {
         const rawContent = String(contentChunk);
         if (isInReasoning) {
-          if (rawContent.startsWith('</think>')) {
+          if (/^\s*<\/think>/i.test(rawContent)) {
             emitToken(rawContent);
           } else {
             emitToken('</think>' + rawContent);

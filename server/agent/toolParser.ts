@@ -124,9 +124,10 @@ const DECLARATIVE_RULES: ToolRule[] = [
     },
   },
   { regex: /<update_?persona_?file\b(?:\s+file=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/update_?persona_?file>/gi, handler: (m) => ({ idPrefix: 'persona', name: 'update_persona_file', args: { file: m[1] || 'SOUL.md', content: m[2] ? m[2].trim() : '' } }) },
-  // 9. Exec & Interactive tools
-  { regex: /<(?:execute_command|executecommand|run_command|runcommand)\s+command=["']([^"']+)["']\s*\/?>/gi, handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1] } }) },
-  { regex: /<(?:execute_command|executecommand|run_command|runcommand)\s*>([\s\S]*?)<\/(?:execute_command|executecommand|run_command|runcommand)>/gi, handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1].trim() } }) },
+// 9. Exec & Interactive tools
+  { regex: /<(?:execute_command|executecommand|run_command|runcommand|exec|shell)\s+(?:command|cmd)=["']([^"']+)["']\s*\/?>/gi, handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1] } }) },
+  { regex: /<(?:execute_command|executecommand|run_command|runcommand|exec|shell)\s*>([\s\S]*?)<\/(?:execute_command|executecommand|run_command|runcommand|exec|shell)>/gi, handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1].trim() } }) },
+  { regex: /<(?:bash|powershell|shell)\s*>([\s\S]*?)<\/(?:bash|powershell|shell)>/gi, handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1].trim() } }) },
   { regex: /<ask_user\s+question=["']([^"']+)["'](?:\s+options=["']([^"']+)["'])?\s*\/?>/gi, handler: (m) => ({ idPrefix: 'ask', name: 'ask_user', args: { question: m[1], options: m[2] ? m[2].split(',').map((o) => o.trim()).filter(Boolean) : undefined } }) },
   {
     regex: /<ask_?user_?questions?\b([^>]*?)(?:\/>|>([\s\S]*?)<\/ask_?user_?questions?>|>)/gi,
@@ -199,45 +200,123 @@ const DECLARATIVE_RULES: ToolRule[] = [
 function stripThinkingForToolParsing(text: string): string {
   if (!text) return '';
   return text
-    .replace(/<(?:think|thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?(?:<\/(?:think|thought|thinking|\|thought\||\|end_thought\|)>|$)/gi, '')
-    .replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>|$)/gi, '')
-    .replace(/\[(?:think|thinking|thought)\][\s\S]*?(?:\[\/(?:think|thinking|thought)\]|$)/gi, '')
+    .replace(/<(?:think|thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?<\/(?:think|thought|thinking|\|thought\||\|end_thought\|)>/gi, '')
+    .replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?channel\|?>|<\/channel>|<channel\|>|<\|channel\|>)/gi, '')
+    .replace(/\[(?:think|thinking|thought)\][\s\S]*?\[\/(?:think|thinking|thought)\]/gi, '')
     .trim();
 }
 
-function parseGemmaToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
-  const reToolCall = /<tool_?call>([\s\S]*?)<\/tool_?call>/gi;
+/**
+ * Parses Qwen, DeepSeek, Gemma and OpenAI JSON/XML tool calls wrapped in:
+ * <tool_call>...</tool_call>, <toolcall>...</toolcall>, <tool-call>...</tool-call>, <function_call>...</function_call>
+ */
+function parseWrapperToolCalls(text: string, toolCalls: ParsedToolCall[]): void {
+  const reWrapper = /<(?:tool_?call|tool-call|function_?call)>([\s\S]*?)<\/(?:tool_?call|tool-call|function_?call)>/gi;
   let match: RegExpExecArray | null;
 
-  while ((match = reToolCall.exec(text)) !== null) {
+  while ((match = reWrapper.exec(text)) !== null) {
     const raw = match[1].trim();
-    let name = '', args: any = {};
-    const parsed = tryParseJson(raw);
-    if (parsed && typeof parsed === 'object') {
-      name = parsed.name || parsed.function || '';
-      args = parsed.arguments || parsed.parameters || {};
-    } else {
-      name = /["']?name["']?\s*[:=]\s*["']([^"']+)["']/i.exec(raw)?.[1] || '';
-      if (!name) {
-        for (const candidateKey of Object.keys(TOOL_NAME_MAP)) {
-          if (new RegExp(`\\b${candidateKey}\\b`, 'i').test(raw)) { name = candidateKey; break; }
+    const fullMatch = match[0];
+
+    // Check if this tool call was already parsed
+    if (toolCalls.some((tc) => tc.raw_content === fullMatch || fullMatch.includes(tc.raw_content) || tc.raw_content.includes(fullMatch))) {
+      continue;
+    }
+
+    // 1. Check if tool call wrapper embeds a standard XML tool tag (e.g. <tool_call><read_file path="..." /></tool_call>)
+    let embeddedFound = false;
+    for (const rule of DECLARATIVE_RULES) {
+      const innerRe = new RegExp(rule.regex.source, rule.regex.flags);
+      const innerMatch = innerRe.exec(raw);
+      if (innerMatch) {
+        const res = rule.handler(innerMatch, toolCalls);
+        if (res && !toolCalls.some((tc) => tc.raw_content === fullMatch || fullMatch.includes(tc.raw_content))) {
+          toolCalls.push({
+            id: `${res.idPrefix}_${uuidv4().substring(0, 8)}`,
+            name: res.name,
+            arguments: res.args,
+            raw_content: fullMatch,
+          });
+          embeddedFound = true;
+          break;
         }
       }
-      for (const k of ['path', 'pattern', 'query', 'url', 'command', 'content', 'trait', 'category', 'file']) {
-        const valMatch = new RegExp(`${k}=["']([^"']*)["']`, 'i').exec(raw);
-        if (valMatch) args[k] = valMatch[1];
+    }
+    if (embeddedFound) continue;
+
+    // 2. Qwen XML Function syntax: <function=read_file>\n<parameter=path>package.json</parameter>\n</function>
+    const qwenFuncMatch = /<function=([a-z0-9_-]+)>([\s\S]*?)<\/function>/i.exec(raw) ||
+                          /<function\s+name=["']([a-z0-9_-]+)["']>([\s\S]*?)<\/function>/i.exec(raw);
+    if (qwenFuncMatch) {
+      const rawName = qwenFuncMatch[1].trim();
+      const funcBody = qwenFuncMatch[2];
+      const args: Record<string, any> = {};
+
+      const paramRe = /<parameter=([a-z0-9_-]+)>([\s\S]*?)<\/parameter>/gi;
+      let pMatch: RegExpExecArray | null;
+      while ((pMatch = paramRe.exec(funcBody)) !== null) {
+        args[pMatch[1].trim()] = pMatch[2].trim();
+      }
+
+      const paramNamedRe = /<parameter\s+name=["']([a-z0-9_-]+)["']>([\s\S]*?)<\/parameter>/gi;
+      while ((pMatch = paramNamedRe.exec(funcBody)) !== null) {
+        args[pMatch[1].trim()] = pMatch[2].trim();
+      }
+
+      const mappedName = TOOL_NAME_MAP[rawName.toLowerCase()] || rawName;
+      if (mappedName && !toolCalls.some((tc) => tc.raw_content === match![0])) {
+        toolCalls.push({
+          id: `qwen_${uuidv4().substring(0, 8)}`,
+          name: mappedName,
+          arguments: args,
+          raw_content: match[0],
+        });
+        continue;
       }
     }
 
-    if (!name) {
-      for (const candidateKey of Object.keys(TOOL_NAME_MAP)) {
-        if (new RegExp(`\\b${candidateKey}\\b`, 'i').test(raw)) { name = candidateKey; break; }
+    // 3. JSON tool call format (Qwen, Gemma, DeepSeek, OpenAI)
+    let name = '', args: any = {};
+    const parsed = tryParseJson(raw);
+    if (parsed && typeof parsed === 'object') {
+      name = parsed.name || parsed.function || parsed.action || '';
+      const rawArgs = parsed.arguments !== undefined ? parsed.arguments : (parsed.parameters !== undefined ? parsed.parameters : parsed.action_input);
+      if (typeof rawArgs === 'string') {
+        const parsedInner = tryParseJson(rawArgs);
+        args = parsedInner !== null && typeof parsedInner === 'object' ? parsedInner : { input: rawArgs };
+      } else if (typeof rawArgs === 'object' && rawArgs !== null) {
+        args = rawArgs;
+      } else {
+        args = parsed;
+      }
+    } else {
+      name = /["']?name["']?\s*[:=]\s*["']([^"']+)["']/i.exec(raw)?.[1] ||
+             /["']?function["']?\s*[:=]\s*["']([^"']+)["']/i.exec(raw)?.[1] ||
+             /["']?action["']?\s*[:=]\s*["']([^"']+)["']/i.exec(raw)?.[1] || '';
+
+      if (!name) {
+        for (const candidateKey of Object.keys(TOOL_NAME_MAP)) {
+          if (new RegExp(`\\b${candidateKey}\\b`, 'i').test(raw)) {
+            name = candidateKey;
+            break;
+          }
+        }
+      }
+
+      for (const k of ['path', 'pattern', 'query', 'url', 'command', 'content', 'trait', 'category', 'file', 'script']) {
+        const valMatch = new RegExp(`${k}\\s*[:=]\\s*["']([^"']*)["']`, 'i').exec(raw);
+        if (valMatch) args[k] = valMatch[1];
       }
     }
 
     const mappedName = TOOL_NAME_MAP[name.toLowerCase()] || TOOL_NAME_MAP[name] || name;
     if (mappedName && !toolCalls.some((tc) => tc.raw_content === match![0])) {
-      toolCalls.push({ id: `gemma_${uuidv4().substring(0, 8)}`, name: mappedName, arguments: args, raw_content: match[0] });
+      toolCalls.push({
+        id: `wrapper_${uuidv4().substring(0, 8)}`,
+        name: mappedName,
+        arguments: args,
+        raw_content: match[0],
+      });
     }
   }
 }
@@ -267,15 +346,11 @@ function maskIllustrativeCodeBlocks(text: string): string {
   });
 }
 
-export function parseToolCalls(text: string): ParsedToolCall[] {
-  const toolCalls: ParsedToolCall[] = [];
-  const textWithoutThinking = stripThinkingForToolParsing(text);
-  const sanitizedText = maskIllustrativeCodeBlocks(textWithoutThinking);
-
+function executeParsingPass(targetText: string, toolCalls: ParsedToolCall[]): void {
   for (const rule of DECLARATIVE_RULES) {
     const re = new RegExp(rule.regex.source, rule.regex.flags);
     let match: RegExpExecArray | null;
-    while ((match = re.exec(sanitizedText)) !== null) {
+    while ((match = re.exec(targetText)) !== null) {
       const raw = match[0];
       const res = rule.handler(match, toolCalls);
       if (!res) continue;
@@ -286,7 +361,28 @@ export function parseToolCalls(text: string): ParsedToolCall[] {
     }
   }
 
-  parseGemmaToolCalls(sanitizedText, toolCalls);
+  parseWrapperToolCalls(targetText, toolCalls);
+}
+
+export function parseToolCalls(text: string): ParsedToolCall[] {
+  if (!text) return [];
+  const toolCalls: ParsedToolCall[] = [];
+  const textWithoutThinking = stripThinkingForToolParsing(text);
+  const sanitizedText = maskIllustrativeCodeBlocks(textWithoutThinking);
+
+  // Pass 1: Parse from sanitized text (outside closed thinking blocks)
+  executeParsingPass(sanitizedText, toolCalls);
+
+  // Pass 2: If no tools found in sanitized text, fallback to unmasked textWithoutThinking
+  if (toolCalls.length === 0 && textWithoutThinking !== sanitizedText) {
+    executeParsingPass(textWithoutThinking, toolCalls);
+  }
+
+  // Pass 3: If still no tools found, fallback to parsing full raw text (salvages tool calls placed inside unclosed thinking)
+  if (toolCalls.length === 0) {
+    executeParsingPass(text, toolCalls);
+  }
+
   return toolCalls;
 }
 

@@ -102,6 +102,7 @@ export function buildLlamaServerArgs(params: BuildLlamaArgsParams): { args: stri
   const modelNameLower = path.basename(targetModel).toLowerCase();
   const isQwen3 = /qwen3|qwen-3|qwen_3|qwen 3|qwen3.8|rvn/i.test(modelNameLower);
   const isQwenModel = isQwen3 || /qwen/i.test(modelNameLower);
+  const isReasoningModel = isQwen3 || /qwq|deepseek|r1|reasoning/i.test(modelNameLower);
   const hasNativeMtp = /mtp/i.test(modelNameLower);
 
   // Prevent main model from ever being passed as its own draft model
@@ -171,12 +172,12 @@ export function buildLlamaServerArgs(params: BuildLlamaArgsParams): { args: stri
 
   // 3. Jinja & Reasoning template flags
   const jinja = body.jinja !== undefined ? body.jinja : ls.jinja;
-  if (jinja || (jinja === undefined && isQwen3)) args.push('--jinja');
+  if (jinja || (jinja === undefined && (isQwenModel || isReasoningModel))) args.push('--jinja');
 
   const reasoningPreserve = body.reasoningPreserve !== undefined ? body.reasoningPreserve : ls.reasoning_preserve;
-  if (reasoningPreserve || (reasoningPreserve === undefined && isQwen3)) args.push('--reasoning-preserve');
+  if (reasoningPreserve || (reasoningPreserve === undefined && (isQwenModel || isReasoningModel))) args.push('--reasoning-preserve');
 
-  const reasoningFormat = body.reasoningFormat || ls.reasoning_format || (isQwen3 ? 'deepseek' : null);
+  const reasoningFormat = body.reasoningFormat || ls.reasoning_format || (isReasoningModel ? 'deepseek' : null);
   if (reasoningFormat) args.push('--reasoning-format', reasoningFormat);
 
   const reasoningEffort = body.reasoningEffort || ls.reasoning_effort || (isQwen3 ? 'medium' : null);
