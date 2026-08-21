@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Shield, KeyRound, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
 import * as api from '../../services/api';
+import { useI18n } from '../../i18n';
 
 export const SecurityTab: React.FC = () => {
+  const { t } = useI18n();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -15,15 +17,15 @@ export const SecurityTab: React.FC = () => {
     setStatusMsg(null);
 
     if (!currentPassword) {
-      setStatusMsg({ type: 'error', text: 'Укажите текущий пароль' });
+      setStatusMsg({ type: 'error', text: t.settings.general.enterCurrentPassword });
       return;
     }
     if (newPassword.trim().length < 4) {
-      setStatusMsg({ type: 'error', text: 'Новый пароль должен содержать минимум 4 символа' });
+      setStatusMsg({ type: 'error', text: t.settings.general.passwordMinLength });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setStatusMsg({ type: 'error', text: 'Новые пароли не совпадают' });
+      setStatusMsg({ type: 'error', text: t.settings.general.passwordMismatch });
       return;
     }
 
@@ -31,15 +33,15 @@ export const SecurityTab: React.FC = () => {
     try {
       const res = await api.change_password(currentPassword, newPassword.trim());
       if (res.success) {
-        setStatusMsg({ type: 'success', text: 'Мастер-пароль успешно изменён!' });
+        setStatusMsg({ type: 'success', text: t.settings.general.passwordSuccess });
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setStatusMsg({ type: 'error', text: res.error || 'Не удалось изменить пароль' });
+        setStatusMsg({ type: 'error', text: res.error || t.settings.general.passwordError });
       }
     } catch (err: any) {
-      setStatusMsg({ type: 'error', text: `Ошибка: ${err.message || err}` });
+      setStatusMsg({ type: 'error', text: `${t.common.error}: ${err.message || err}` });
     } finally {
       setIsSubmitting(false);
     }
@@ -59,8 +61,8 @@ export const SecurityTab: React.FC = () => {
           <Shield size={18} />
         </div>
         <div>
-          <h3 className="text-xs font-semibold text-[var(--theme-text)]">Защита LAN и авторизация</h3>
-          <p className="text-xs text-[var(--theme-text-muted)]">Безопасность доступа к веб-интерфейсу 0xAgent.</p>
+          <h3 className="text-xs font-semibold text-[var(--theme-text)]">{t.settings.security.title}</h3>
+          <p className="text-xs text-[var(--theme-text-muted)]">{t.settings.security.subtitle}</p>
         </div>
       </div>
 
@@ -69,32 +71,32 @@ export const SecurityTab: React.FC = () => {
         <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
           <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <div>
-            <div className="text-xs font-medium text-[var(--theme-text)]">PBKDF2 Хеширование</div>
-            <div className="text-[11px] text-[var(--theme-text-muted)]">100 000 итераций SHA-256</div>
+            <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.pbkdf2Title}</div>
+            <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.pbkdf2Desc}</div>
           </div>
         </div>
 
         <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
           <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <div>
-            <div className="text-xs font-medium text-[var(--theme-text)]">Защита от брутфорса</div>
-            <div className="text-[11px] text-[var(--theme-text-muted)]">Ограничение попыток ввода</div>
+            <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.bruteForceTitle}</div>
+            <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.bruteForceDesc}</div>
           </div>
         </div>
 
         <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
           <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <div>
-            <div className="text-xs font-medium text-[var(--theme-text)]">Авторизация WebSocket</div>
-            <div className="text-[11px] text-[var(--theme-text-muted)]">Канал обмена данными защищён</div>
+            <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.wsTitle}</div>
+            <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.wsDesc}</div>
           </div>
         </div>
 
         <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
           <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
           <div>
-            <div className="text-xs font-medium text-[var(--theme-text)]">Изоляция REST API</div>
-            <div className="text-[11px] text-[var(--theme-text-muted)]">Bearer токен аутентификация</div>
+            <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.apiTitle}</div>
+            <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.apiDesc}</div>
           </div>
         </div>
       </div>
@@ -103,7 +105,7 @@ export const SecurityTab: React.FC = () => {
       <div className="p-4 rounded-xl bento-card flex flex-col gap-3">
         <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-2 text-xs font-medium text-[var(--theme-text)]">
           <KeyRound size={14} className="text-[var(--theme-text-muted)]" />
-          <span>Смена мастер-пароля</span>
+          <span>{t.settings.security.changePasswordTitle}</span>
         </div>
 
         {statusMsg && (
@@ -125,7 +127,7 @@ export const SecurityTab: React.FC = () => {
 
         <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--theme-text-muted)]">Текущий пароль</label>
+            <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.settings.security.currentPasswordLabel}</label>
             <input
               type="password"
               value={currentPassword}
@@ -138,19 +140,19 @@ export const SecurityTab: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-[var(--theme-text-muted)]">Новый пароль</label>
+              <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.settings.security.newPasswordLabel}</label>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Минимум 4 символа"
+                placeholder="••••••••"
                 className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none"
                 required
               />
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-medium text-[var(--theme-text-muted)]">Повторите новый пароль</label>
+              <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.settings.security.confirmPasswordLabel}</label>
               <input
                 type="password"
                 value={confirmPassword}
@@ -168,7 +170,7 @@ export const SecurityTab: React.FC = () => {
               disabled={isSubmitting}
               className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] transition-colors cursor-pointer disabled:opacity-50"
             >
-              {isSubmitting ? 'Сохранение...' : 'Обновить пароль'}
+              {isSubmitting ? t.settings.saving : t.settings.security.updatePasswordBtn}
             </button>
           </div>
         </form>
@@ -177,8 +179,8 @@ export const SecurityTab: React.FC = () => {
       {/* Logout Session */}
       <div className="p-4 rounded-xl bento-card flex items-center justify-between">
         <div>
-          <div className="text-xs font-medium text-[var(--theme-text)]">Завершить сеанс</div>
-          <div className="text-[11px] text-[var(--theme-text-muted)]">Сброс токена авторизации в браузере</div>
+          <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.logoutTitle}</div>
+          <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.logoutDesc}</div>
         </div>
 
         <button
@@ -187,7 +189,7 @@ export const SecurityTab: React.FC = () => {
           className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors"
         >
           <LogOut size={13} />
-          <span>Выйти</span>
+          <span>{t.settings.security.logoutBtn}</span>
         </button>
       </div>
 

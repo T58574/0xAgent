@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { StagedProposal } from '../../types';
 import * as api from '../../services/api';
 import { MaterialIcon } from '../common/MaterialIcon';
+import { useI18n } from '../../i18n';
 
 interface StagedProposalCardProps {
   proposal: StagedProposal;
@@ -9,6 +10,7 @@ interface StagedProposalCardProps {
 }
 
 export const StagedProposalCard: React.FC<StagedProposalCardProps> = ({ proposal: initialProposal, onApplied }) => {
+  const { t } = useI18n();
   const [proposal, setProposal] = useState<StagedProposal>(initialProposal);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
@@ -22,10 +24,10 @@ export const StagedProposalCard: React.FC<StagedProposalCardProps> = ({ proposal
       const res = await api.verify_proposal(proposal.id);
       if (res.proposal) {
         setProposal(res.proposal);
-        setMessage(res.proposal.verificationResult?.passed ? '[OK] Проверка TypeScript и сборки успешно пройдена!' : '[ERR] Обнаружены ошибки типизации при проверке');
+        setMessage(res.proposal.verificationResult?.passed ? `[OK] ${t.common.success}` : `[ERR] ${t.common.error}`);
       }
     } catch (err: any) {
-      setMessage(`[ERR] Ошибка проверки: ${err?.message || err}`);
+      setMessage(`[ERR] ${t.common.error}: ${err?.message || err}`);
     } finally {
       setIsVerifying(false);
     }
@@ -38,11 +40,11 @@ export const StagedProposalCard: React.FC<StagedProposalCardProps> = ({ proposal
       const res = await api.apply_proposal(proposal.id);
       if (res.success) {
         setProposal((prev) => ({ ...prev, status: 'applied' }));
-        setMessage(res.message);
+        setMessage(res.message || t.chat.changesApplied);
         onApplied?.();
       }
     } catch (err: any) {
-      setMessage(`[ERR] Ошибка применения: ${err?.message || err}`);
+      setMessage(`[ERR] ${t.common.error}: ${err?.message || err}`);
     } finally {
       setIsApplying(false);
     }
@@ -78,7 +80,7 @@ export const StagedProposalCard: React.FC<StagedProposalCardProps> = ({ proposal
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors p-1"
+          className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors p-1 cursor-pointer"
         >
           <MaterialIcon name={isExpanded ? 'expand_less' : 'expand_more'} className="text-sm" />
         </button>
@@ -96,7 +98,7 @@ export const StagedProposalCard: React.FC<StagedProposalCardProps> = ({ proposal
         {/* Files list */}
         <div className="space-y-1 bg-[var(--theme-panel)]/50 rounded-xl p-2.5 border border-[var(--theme-border)]">
           <div className="text-[10px] uppercase tracking-wider text-[var(--theme-text-muted)] mb-1">
-            Изменяемые файлы ({proposal.files.length}):
+            {t.sidebar.files} ({proposal.files.length}):
           </div>
           {proposal.files.map((f, i) => (
             <div key={i} className="flex items-center justify-between text-[11px] text-[var(--theme-text)]">
@@ -126,7 +128,7 @@ export const StagedProposalCard: React.FC<StagedProposalCardProps> = ({ proposal
             }`}
           >
             <div className="font-bold mb-1">
-              {proposal.verificationResult.passed ? '[OK] Проверка сборки пройдена' : '[ERR] Ошибки при проверке'}
+              {proposal.verificationResult.passed ? `[OK] ${t.common.success}` : `[ERR] ${t.common.error}`}
             </div>
             {proposal.verificationResult.typecheckOutput && (
               <pre className="text-[10px] overflow-x-auto whitespace-pre-wrap max-h-32 opacity-80">
@@ -150,7 +152,7 @@ export const StagedProposalCard: React.FC<StagedProposalCardProps> = ({ proposal
               className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-panel)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] disabled:opacity-50 transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <MaterialIcon name="verified" className="text-xs" />
-              <span>{isVerifying ? 'Проверка...' : 'Проверить (tsc)'}</span>
+              <span>{isVerifying ? `${t.common.loading}...` : `${t.common.confirm} (tsc)`}</span>
             </button>
 
             <button
@@ -160,7 +162,7 @@ export const StagedProposalCard: React.FC<StagedProposalCardProps> = ({ proposal
               className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-black font-bold hover:brightness-110 disabled:opacity-50 transition-all cursor-pointer flex items-center gap-1.5 shadow-md shadow-[var(--theme-accent)]/20"
             >
               <MaterialIcon name="publish" className="text-xs" />
-              <span>{isApplying ? 'Применение...' : 'Применить изменения'}</span>
+              <span>{isApplying ? `${t.common.loading}...` : t.chat.applyChanges}</span>
             </button>
           </div>
         )}

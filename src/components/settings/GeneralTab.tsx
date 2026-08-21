@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sliders, Shield, Volume2, Save, LayoutGrid, Globe, Key, KeyRound, LogOut, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
 import * as api from '../../services/api';
+import { useI18n } from '../../i18n';
 
 interface SettingToggleCardProps {
   icon: React.ReactNode;
@@ -8,6 +9,8 @@ interface SettingToggleCardProps {
   desc: string;
   active: boolean;
   onToggle: () => void;
+  statusOnText: string;
+  statusOffText: string;
 }
 
 const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
@@ -16,6 +19,8 @@ const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
   desc,
   active,
   onToggle,
+  statusOnText,
+  statusOffText,
 }) => (
   <div
     onClick={onToggle}
@@ -45,7 +50,7 @@ const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
                 : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]'
             }`}
           >
-            {active ? '[ВКЛ]' : '[ВЫКЛ]'}
+            {active ? statusOnText : statusOffText}
           </span>
         </div>
         <div className="text-[11px] text-[var(--theme-text-muted)] leading-tight mt-1">{desc}</div>
@@ -66,6 +71,7 @@ const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
 );
 
 interface GeneralTabProps {
+  onLanguageSelect?: (lang: 'en' | 'ru') => void;
   apiUrl: string;
   setApiUrl: (val: string) => void;
   groqApiKey: string;
@@ -97,6 +103,7 @@ interface GeneralTabProps {
 }
 
 export const GeneralTab: React.FC<GeneralTabProps> = ({
+  onLanguageSelect,
   apiUrl,
   setApiUrl,
   groqApiKey,
@@ -126,6 +133,8 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   proactiveCompanionEnabled = true,
   setProactiveCompanionEnabled,
 }) => {
+  const { language, setLanguage, t } = useI18n();
+
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -138,15 +147,15 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
     setStatusMsg(null);
 
     if (!currentPassword) {
-      setStatusMsg({ type: 'error', text: 'Укажите текущий пароль' });
+      setStatusMsg({ type: 'error', text: t.settings.general.enterCurrentPassword });
       return;
     }
     if (newPassword.trim().length < 4) {
-      setStatusMsg({ type: 'error', text: 'Новый пароль должен содержать минимум 4 символа' });
+      setStatusMsg({ type: 'error', text: t.settings.general.passwordMinLength });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setStatusMsg({ type: 'error', text: 'Новые пароли не совпадают' });
+      setStatusMsg({ type: 'error', text: t.settings.general.passwordMismatch });
       return;
     }
 
@@ -154,15 +163,15 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
     try {
       const res = await api.change_password(currentPassword, newPassword.trim());
       if (res.success) {
-        setStatusMsg({ type: 'success', text: 'Мастер-пароль успешно изменён!' });
+        setStatusMsg({ type: 'success', text: t.settings.general.passwordSuccess });
         setCurrentPassword('');
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        setStatusMsg({ type: 'error', text: res.error || 'Не удалось изменить пароль' });
+        setStatusMsg({ type: 'error', text: res.error || t.settings.general.passwordError });
       }
     } catch (err: any) {
-      setStatusMsg({ type: 'error', text: `Ошибка: ${err.message || err}` });
+      setStatusMsg({ type: 'error', text: `${t.common.error}: ${err.message || err}` });
     } finally {
       setIsSubmittingPassword(false);
     }
@@ -178,18 +187,72 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
       <div>
         <h3 className="text-sm font-bold text-[var(--theme-text)] flex items-center gap-2">
           <Sliders size={15} className="text-[var(--theme-text-muted)]" />
-          <span>Основные параметры</span>
+          <span>{t.settings.general.title}</span>
         </h3>
         <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-          Конфигурация подключения к API, поведение интерфейса и безопасность
+          {t.settings.general.subtitle}
         </p>
+      </div>
+
+      {/* 0. Interface Language Selector */}
+      <div className="p-4 rounded-2xl bento-card space-y-3 border border-[var(--theme-border)]">
+        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
+            <Globe size={14} className="text-[var(--theme-text-muted)]" />
+            <span>{t.settings.general.languageTitle}</span>
+          </div>
+          <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
+            :: UI Language
+          </span>
+        </div>
+        <p className="text-xs text-[var(--theme-text-muted)]">
+          {t.settings.general.languageDesc}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setLanguage('en');
+              onLanguageSelect?.('en');
+            }}
+            className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+              language === 'en'
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm'
+                : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-[var(--theme-border-subtle)] border border-[var(--theme-border)]">[EN]</span>
+              <span>{t.settings.general.langEn}</span>
+            </div>
+            {language === 'en' && <CheckCircle2 size={16} className="text-[var(--theme-accent)]" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setLanguage('ru');
+              onLanguageSelect?.('ru');
+            }}
+            className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
+              language === 'ru'
+                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm'
+                : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-[var(--theme-border-subtle)] border border-[var(--theme-border)]">[RU]</span>
+              <span>{t.settings.general.langRu}</span>
+            </div>
+            {language === 'ru' && <CheckCircle2 size={16} className="text-[var(--theme-accent)]" />}
+          </button>
+        </div>
       </div>
 
       {/* 1. Connection Card */}
       <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
         <div className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5 border-b border-[var(--theme-border)] pb-2.5">
           <Globe size={14} className="text-[var(--theme-text-muted)]" />
-          <span>Параметры API подключения</span>
+          <span>{t.settings.general.connectionTitle}</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -197,7 +260,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
               <Globe size={12} />
-              <span>Ссылка API</span>
+              <span>{t.settings.general.apiUrl}</span>
             </label>
             <input
               type="text"
@@ -212,7 +275,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
               <Key size={12} />
-              <span>Google Gemini API Key</span>
+              <span>{t.settings.general.geminiApiKey}</span>
             </label>
             <input
               type="password"
@@ -227,7 +290,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
               <Key size={12} />
-              <span>Groq API Key (Whisper)</span>
+              <span>{t.settings.general.groqApiKey}</span>
             </label>
             <input
               type="password"
@@ -245,7 +308,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         <div className="text-xs font-bold text-[var(--theme-text)] flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
           <div className="flex items-center gap-1.5">
             <Sliders size={14} className="text-[var(--theme-text-muted)]" />
-            <span>Поведение и интерфейс</span>
+            <span>{t.settings.general.behaviorTitle}</span>
           </div>
           <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
             :: Preferences
@@ -255,34 +318,42 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <SettingToggleCard
             icon={<Shield size={16} />}
-            title="Цепочка рассуждений"
-            desc="Отображать блок мыслей <think> в ответах"
+            title={t.settings.general.reasoningTitle}
+            desc={t.settings.general.reasoningDesc}
             active={reasoningEnabled}
             onToggle={() => setReasoningEnabled(!reasoningEnabled)}
+            statusOnText={t.settings.general.statusOn}
+            statusOffText={t.settings.general.statusOff}
           />
 
           <SettingToggleCard
             icon={<Save size={16} />}
-            title="Автосохранение истории"
-            desc="Синхронизация истории диалогов на диск"
+            title={t.settings.general.autoSaveTitle}
+            desc={t.settings.general.autoSaveDesc}
             active={autoSaveHistory}
             onToggle={() => setAutoSaveHistory(!autoSaveHistory)}
+            statusOnText={t.settings.general.statusOn}
+            statusOffText={t.settings.general.statusOff}
           />
 
           <SettingToggleCard
             icon={<Volume2 size={16} />}
-            title="Звуковые сигналы"
-            desc="Звук по завершению генерации ответа"
+            title={t.settings.general.soundTitle}
+            desc={t.settings.general.soundDesc}
             active={soundNotifications}
             onToggle={() => setSoundNotifications(!soundNotifications)}
+            statusOnText={t.settings.general.statusOn}
+            statusOffText={t.settings.general.statusOff}
           />
 
           <SettingToggleCard
             icon={<LayoutGrid size={16} />}
-            title="Компактный вид чата"
-            desc="Уменьшенные отступы в сообщениях диалога"
+            title={t.settings.general.compactTitle}
+            desc={t.settings.general.compactDesc}
             active={compactChat}
             onToggle={() => setCompactChat(!compactChat)}
+            statusOnText={t.settings.general.statusOn}
+            statusOffText={t.settings.general.statusOff}
           />
         </div>
       </div>
@@ -292,7 +363,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
           <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
             <Volume2 size={14} className="text-[var(--theme-text-muted)]" />
-            <span>Голосовой интерком Jarvis и автономный напарник</span>
+            <span>{t.settings.general.jarvisVoiceTitle}</span>
           </div>
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
             :: Push-Driven Engine
@@ -302,18 +373,22 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <SettingToggleCard
             icon={<Volume2 size={16} />}
-            title="Голосовой интерком (Edge-TTS)"
-            desc="Короткие реплики вслух через системные динамики"
+            title={t.settings.general.edgeTtsTitle}
+            desc={t.settings.general.edgeTtsDesc}
             active={Boolean(ttsVoiceEnabled)}
             onToggle={() => setTtsVoiceEnabled && setTtsVoiceEnabled(!ttsVoiceEnabled)}
+            statusOnText={t.settings.general.statusOn}
+            statusOffText={t.settings.general.statusOff}
           />
 
           <SettingToggleCard
             icon={<Sparkles size={16} />}
-            title="Фоновый напарник Jarvis (Sparks)"
-            desc="Генерация идей, аудит и предложения без спама"
+            title={t.settings.general.sparksTitle}
+            desc={t.settings.general.sparksDesc}
             active={Boolean(proactiveCompanionEnabled)}
             onToggle={() => setProactiveCompanionEnabled && setProactiveCompanionEnabled(!proactiveCompanionEnabled)}
+            statusOnText={t.settings.general.statusOn}
+            statusOffText={t.settings.general.statusOff}
           />
         </div>
 
@@ -323,31 +398,33 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--theme-border)]">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] block font-mono">
-                  Голос (Edge-TTS)
+                  {t.settings.general.voiceLabel}
                 </label>
                 <select
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice && setTtsVoice(e.target.value)}
                   className="w-full text-xs px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] cursor-pointer transition-colors"
                 >
-                  <option value="ru-RU-SvetlanaNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Светлана (Женский, четкий)</option>
-                  <option value="ru-RU-DmitryNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Дмитрий (Мужской, глубокий)</option>
+                  <option value="ru-RU-SvetlanaNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Svetlana (RU, Female)</option>
+                  <option value="ru-RU-DmitryNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Dmitry (RU, Male)</option>
+                  <option value="en-US-GuyNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Guy (EN, Male)</option>
+                  <option value="en-US-JennyNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Jenny (EN, Female)</option>
                 </select>
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] block font-mono">
-                  Скорость речи
+                  {t.settings.general.voiceRateLabel}
                 </label>
                 <select
                   value={ttsRate}
                   onChange={(e) => setTtsRate && setTtsRate(e.target.value)}
                   className="w-full text-xs px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] cursor-pointer transition-colors"
                 >
-                  <option value="+0%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Стандартная (+0%)</option>
-                  <option value="+15%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Быстрая (+15%)</option>
-                  <option value="+20%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Оптимальная (+20%)</option>
-                  <option value="+30%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Ультра (+30%)</option>
+                  <option value="+0%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Standard (+0%)</option>
+                  <option value="+15%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Fast (+15%)</option>
+                  <option value="+20%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Optimal (+20%)</option>
+                  <option value="+30%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Ultra (+30%)</option>
                 </select>
               </div>
 
@@ -356,7 +433,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                   type="button"
                   onClick={async () => {
                     try {
-                      await api.speak_text('На связи, сэр. Все системы активны.', {
+                      await api.speak_text('Jarvis systems fully operational, sir.', {
                         voice: ttsVoice,
                         rate: ttsRate,
                         playOnSpeaker: ttsPlayOnSpeaker,
@@ -369,7 +446,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                   className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-xs transition-all hover:opacity-90 shadow-sm cursor-pointer"
                 >
                   <Volume2 size={14} />
-                  <span>Тест голоса</span>
+                  <span>{t.settings.general.testVoiceBtn}</span>
                 </button>
               </div>
             </div>
@@ -382,7 +459,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                   onChange={(e) => setTtsPlayOnSpeaker && setTtsPlayOnSpeaker(e.target.checked)}
                   className="rounded accent-[var(--theme-accent)] cursor-pointer"
                 />
-                <span>Воспроизводить через системные динамики (MCI)</span>
+                <span>{t.settings.general.playSpeakerLabel}</span>
               </label>
 
               <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none font-medium">
@@ -392,7 +469,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                   onChange={(e) => setTtsPlayInBrowser && setTtsPlayInBrowser(e.target.checked)}
                   className="rounded accent-[var(--theme-accent)] cursor-pointer"
                 />
-                <span>Воспроизводить в активной вкладке браузера</span>
+                <span>{t.settings.general.playBrowserLabel}</span>
               </label>
 
               <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] sm:col-span-2 select-none font-medium">
@@ -402,7 +479,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                   onChange={(e) => setWakeWordEnabled && setWakeWordEnabled(e.target.checked)}
                   className="rounded accent-[var(--theme-accent)] cursor-pointer"
                 />
-                <span>Бесконтактная активация голосом (Wake-Word «Джарвис»)</span>
+                <span>{t.settings.general.wakeWordLabel}</span>
               </label>
             </div>
           </>
@@ -414,17 +491,17 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
           <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
             <KeyRound size={14} className="text-[var(--theme-text-muted)]" />
-            <span>Мастер-пароль и безопасность</span>
+            <span>{t.settings.general.securityTitle}</span>
           </div>
 
           <button
             type="button"
             onClick={handleLogout}
             className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-xs text-[var(--theme-text-muted)] flex items-center gap-1.5 cursor-pointer transition-all font-medium"
-            title="Сбросить токен авторизации в браузере"
+            title={t.settings.security.logoutDesc}
           >
             <LogOut size={13} />
-            <span>Выйти из сеанса</span>
+            <span>{t.settings.general.logoutBtn}</span>
           </button>
         </div>
 
@@ -448,7 +525,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         <form onSubmit={handleChangePassword} className="space-y-3 pt-1">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">Текущий пароль</label>
+              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">{t.settings.general.currentPassword}</label>
               <input
                 type="password"
                 value={currentPassword}
@@ -460,19 +537,19 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">Новый пароль</label>
+              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">{t.settings.general.newPassword}</label>
               <input
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Мин. 4 символа"
+                placeholder="••••••••"
                 className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
                 required
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">Повторите пароль</label>
+              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">{t.settings.general.confirmPassword}</label>
               <input
                 type="password"
                 value={confirmPassword}
@@ -490,7 +567,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               disabled={isSubmittingPassword}
               className="px-4 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-xs transition-all hover:opacity-90 shadow-sm cursor-pointer disabled:opacity-50"
             >
-              {isSubmittingPassword ? 'Сохранение...' : 'Обновить пароль'}
+              {isSubmittingPassword ? t.settings.saving : t.settings.general.updatePasswordBtn}
             </button>
           </div>
         </form>

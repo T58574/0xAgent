@@ -97,6 +97,7 @@ export function getDefaultConfig(): AppConfig {
     system_prompt: DEFAULT_PROMPT_CONTENT,
     active_prompt_file: 'default.md',
     workspace_dir: null,
+    language: 'en',
     groq_api_key: null,
     gemini_api_key: null,
     theme_colors: {

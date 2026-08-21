@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { JarvisState, JarvisSparkProposal } from '../types';
 import { MaterialIcon } from './common/MaterialIcon';
+import { useI18n } from '../i18n';
 
 interface JarvisWidgetProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
   onAcceptSpark,
   onDismissSpark,
 }) => {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'sparks' | 'workers' | 'activity'>('sparks');
 
   if (!isOpen) return null;
@@ -39,14 +41,14 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono font-bold tracking-wider text-[var(--theme-text)]">
-                  JARVIS :: TELEMETRY & WORKSPACE
+                  {t.jarvis.telemetryTitle}
                 </span>
                 <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  [ONLINE]
+                  {t.jarvis.onlineBadge}
                 </span>
               </div>
               <p className="text-[11px] text-[var(--theme-text-muted)] font-mono">
-                Autonomous workshop supervisor & proactivity engine
+                {t.jarvis.supervisorDesc}
               </p>
             </div>
           </div>
@@ -72,7 +74,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
             }`}
           >
             <MaterialIcon name="bolt" size={14} />
-            <span>Sparks</span>
+            <span>{t.jarvis.sparksTab}</span>
             {pendingSparks.length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full bg-sky-500/20 text-sky-300 text-[10px] font-bold">
                 {pendingSparks.length}
@@ -90,7 +92,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
             }`}
           >
             <MaterialIcon name="memory" size={14} />
-            <span>Workers ({workers.length})</span>
+            <span>{t.jarvis.workersTab} ({workers.length})</span>
           </button>
 
           <button
@@ -103,7 +105,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
             }`}
           >
             <MaterialIcon name="schedule" size={14} />
-            <span>Log ({activities.length})</span>
+            <span>{t.jarvis.logTab} ({activities.length})</span>
           </button>
         </div>
 
@@ -115,7 +117,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
               {pendingSparks.length === 0 ? (
                 <div className="py-12 text-center text-xs font-mono text-[var(--theme-text-muted)] space-y-2">
                   <MaterialIcon name="check_circle" size={28} className="mx-auto text-sky-400/50" />
-                  <p>No active sparks pending. Jarvis is monitoring workspace in the background.</p>
+                  <p>{t.jarvis.noSparksPending}</p>
                 </div>
               ) : (
                 pendingSparks.map((spark) => (
@@ -138,7 +140,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
                         </p>
                         {spark.targetFiles && spark.targetFiles.length > 0 && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                            <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">Target:</span>
+                            <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">{t.jarvis.targetLabel}</span>
                             {spark.targetFiles.map((file, idx) => (
                               <span
                                 key={idx}
@@ -168,7 +170,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
                         onClick={() => onDismissSpark?.(spark.id)}
                         className="px-2.5 py-1 rounded-lg text-xs font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 transition-colors cursor-pointer"
                       >
-                        [Dismiss]
+                        {t.jarvis.dismissBtn}
                       </button>
                       <button
                         type="button"
@@ -179,7 +181,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
                         className="flex items-center gap-1 px-3 py-1 rounded-lg bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-xs font-mono font-medium transition-colors cursor-pointer active:scale-95"
                       >
                         <MaterialIcon name="play_arrow" size={14} />
-                        <span>[Run Task]</span>
+                        <span>{t.jarvis.runTaskBtn}</span>
                       </button>
                     </div>
                   </div>
@@ -210,7 +212,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
                         </span>
                       </div>
                       <p className="text-[11px] text-[var(--theme-text-muted)] font-mono mt-0.5">
-                        {worker.currentTask || 'Idle / Monitoring'}
+                        {worker.currentTask || t.jarvis.idleMonitoring}
                       </p>
                     </div>
                   </div>
@@ -236,7 +238,7 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
             <div className="space-y-2">
               {activities.length === 0 ? (
                 <p className="py-8 text-center text-xs font-mono text-[var(--theme-text-muted)]">
-                  No activity logs recorded yet.
+                  {t.jarvis.noActivities}
                 </p>
               ) : (
                 activities.map((act) => (
@@ -270,8 +272,8 @@ export const JarvisWidget: React.FC<JarvisWidgetProps> = ({
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-[var(--theme-border)]/60 bg-[var(--theme-sidebar)]/20 flex items-center justify-between text-xs font-mono text-[var(--theme-text-muted)]">
-          <span>STATUS: OPERATIONAL</span>
-          <span>AUTONOMY: LOCAL & AGENTIC</span>
+          <span>{t.jarvis.statusOperational}</span>
+          <span>{t.jarvis.autonomyLocal}</span>
         </div>
       </div>
     </div>

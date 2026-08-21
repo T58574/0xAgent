@@ -109,12 +109,15 @@ const getFileIcon = (fileName: string) => {
   }
 };
 
+import { useI18n } from '../i18n';
+
 export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
   workspaceDir,
   treeNodes,
   onSelectWorkspace,
   onFileClick,
 }) => {
+  const { t } = useI18n();
   const [filterText, setFilterText] = useState('');
 
   // Recursively filter tree nodes by name
@@ -148,18 +151,18 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
       {/* Directory Path Selector Header */}
       <div className="p-2.5 bg-[var(--theme-panel)] border-b border-[var(--theme-border)] text-xs space-y-2">
         <div className="text-[var(--theme-text-muted)] text-[10px] font-bold uppercase tracking-wider flex items-center justify-between">
-          <span>Воркспейс</span>
+          <span>{t.nav.workspace}</span>
           <FolderSearch size={12} className="text-[var(--theme-accent)]" />
         </div>
 
         <button 
           onClick={onSelectWorkspace}
           className="w-full px-2.5 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:border-[var(--theme-accent)] cursor-pointer transition-all text-left flex items-center gap-2 group shadow-sm"
-          title={workspaceDir || "Выбрать рабочую папку"}
+          title={workspaceDir || t.sidebar.openWorkspace}
         >
           <Folder size={14} className="text-amber-400 shrink-0 group-hover:scale-105 transition-transform" />
           <span className="truncate text-xs font-mono font-medium flex-1">
-            {workspaceDir ? workspaceDir.split('\\').pop() || workspaceDir.split('/').pop() : "Выбрать папку..."}
+            {workspaceDir ? workspaceDir.split('\\').pop() || workspaceDir.split('/').pop() : `${t.sidebar.openWorkspace}...`}
           </span>
         </button>
 
@@ -169,7 +172,7 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
             type="text"
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
-            placeholder="Фильтр файлов..."
+            placeholder={t.sidebar.searchPlaceholder}
             className="w-full pl-6 pr-5 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-accent)] font-mono transition-colors"
           />
           <Search size={11} className="absolute left-2 top-3 text-[var(--theme-text-muted)]" />
@@ -198,9 +201,9 @@ export const WorkspaceTree: React.FC<WorkspaceTreeProps> = ({
           <div className="text-center py-8 px-3 text-xs text-[var(--theme-text-muted)] font-sans leading-relaxed">
             {workspaceDir
               ? filterText
-                ? 'Файлы не найдены'
-                : 'Папка пуста'
-              : 'Выберите папку для чтения файлов.'}
+                ? t.sidebar.noSessionsFound
+                : t.sidebar.noSessionsFound
+              : `${t.sidebar.openWorkspace}...`}
           </div>
         )}
       </div>

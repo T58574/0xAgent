@@ -1,5 +1,6 @@
 import React from 'react';
 import { Download, RefreshCw } from 'lucide-react';
+import { useI18n } from '../../../i18n';
 
 interface LlamaInstallerSectionProps {
   githubReleases: any[];
@@ -30,6 +31,7 @@ export const LlamaInstallerSection: React.FC<LlamaInstallerSectionProps> = ({
   isSelectedVersionInstalled,
   onInstall,
 }) => {
+  const { t } = useI18n();
   const currentRel = githubReleases.find((r) => r.tag === selectedTag);
 
   return (
@@ -38,16 +40,16 @@ export const LlamaInstallerSection: React.FC<LlamaInstallerSectionProps> = ({
         <div>
           <div className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5">
             <Download size={14} className="text-[var(--theme-text-muted)]" />
-            <span>Официальный установщик Llama.cpp с GitHub</span>
+            <span>{t.settings.localServer.installer.githubInstallerTitle}</span>
           </div>
           <div className="text-[11px] text-[var(--theme-text-muted)] mt-0.5">
-            Выбирайте версию релиза llama.cpp и сохраняйте её локально на диске
+            {t.settings.localServer.installer.githubInstallerDesc}
           </div>
         </div>
         {isLoadingReleases && (
           <div className="flex items-center gap-1.5 text-xs text-[var(--theme-text-muted)]">
             <RefreshCw size={12} className="animate-spin" />
-            <span>Загрузка релизов...</span>
+            <span>{t.settings.localServer.installer.loadingReleases}</span>
           </div>
         )}
       </div>
@@ -56,7 +58,7 @@ export const LlamaInstallerSection: React.FC<LlamaInstallerSectionProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
         <div className="space-y-1.5">
           <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
-            Версия релиза (GitHub Tag)
+            {t.settings.localServer.installer.releaseTagLabel}
           </label>
           <select
             value={selectedTag}
@@ -74,7 +76,7 @@ export const LlamaInstallerSection: React.FC<LlamaInstallerSectionProps> = ({
 
         <div className="space-y-1.5">
           <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
-            Бинарный файл релиза (Asset)
+            {t.settings.localServer.installer.assetLabel}
           </label>
           <select
             value={selectedAssetUrl}
@@ -104,13 +106,13 @@ export const LlamaInstallerSection: React.FC<LlamaInstallerSectionProps> = ({
             onChange={(e) => setAutoCleanupOld(e.target.checked)}
             className="rounded accent-[var(--theme-accent)]"
           />
-          <span>Автоматически удалять предыдущую установку при скачивании новой</span>
+          <span>{t.settings.localServer.installer.autoCleanupLabel}</span>
         </label>
 
         <div className="flex items-center gap-2 shrink-0">
           {justDownloadedTag === selectedTag && (
             <span className="px-2.5 py-1 rounded-lg bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)] text-[10px] font-mono font-semibold">
-              Установлено
+              {t.settings.localServer.installer.installedBadge}
             </span>
           )}
           <button
@@ -122,12 +124,12 @@ export const LlamaInstallerSection: React.FC<LlamaInstallerSectionProps> = ({
             {isInstallingLlama ? (
               <>
                 <RefreshCw size={13} className="animate-spin" />
-                <span>Загрузка и распаковка...</span>
+                <span>{t.settings.localServer.installer.installingStatus}</span>
               </>
             ) : (
               <>
                 <Download size={13} />
-                <span>{isSelectedVersionInstalled ? 'Переустановить' : 'Скачать и установить'}</span>
+                <span>{isSelectedVersionInstalled ? t.settings.localServer.installer.reinstallBtn : t.settings.localServer.installer.downloadInstallBtn}</span>
               </>
             )}
           </button>

@@ -21,9 +21,10 @@ import {
   Menu,
   Plus,
 } from 'lucide-react';
-import { AppConfig, ChatSession, PersonaMetadata } from '../types';
+import { AppConfig, AppLanguage, ChatSession, PersonaMetadata } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useI18n } from '../i18n';
 import { MaterialIcon } from './common/MaterialIcon';
 import {
   getWorkspaceBaseName,
@@ -66,12 +67,15 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentPersona: _currentPersona,
   has0xAgentMd: _has0xAgentMd = false,
   onToggleLogs,
+  isServerOffline,
+  onStartServer,
   onModelChanged: _onModelChanged,
   onOpenJarvis: _onOpenJarvis,
   onNewChat,
   onOpenMemorySkills,
 }) => {
   const { showToast } = useToast();
+  const { language, setLanguage, t } = useI18n();
 
   // LAN Sharing state
   const [lanOpen, setLanOpen] = useState(false);
@@ -85,6 +89,19 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [copiedLog, setCopiedLog] = useState(false);
   const wsMenuRef = useRef<HTMLDivElement>(null);
 
+  // Handle language switcher
+  const handleToggleLanguage = async () => {
+    const nextLang: AppLanguage = language === 'en' ? 'ru' : 'en';
+    setLanguage(nextLang);
+    if (config) {
+      try {
+        await api.save_config({ ...config, language: nextLang });
+      } catch (err) {
+        console.error('Failed to save language setting:', err);
+      }
+    }
+  };
+
   // Handle LAN menu
   const handleToggleLan = async () => {
     if (!lanOpen) {
@@ -94,7 +111,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         const info = await api.get_lan_info();
         setLanUrls(info.urls || []);
       } catch (err: any) {
-        showToast('Не удалось получить LAN IP адреса', 'error');
+        showToast(t.nav.lanEmpty, 'error');
       } finally {
         setLanLoading(false);
       }
@@ -106,13 +123,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   const handleCopyUrl = (url: string) => {
     navigator.clipboard.writeText(url);
     setCopiedUrl(url);
-    showToast('Ссылка скопирована в буфер обмена', 'success');
+    showToast(t.nav.lanCopied, 'success');
     setTimeout(() => setCopiedUrl(null), 2000);
   };
 
   const handleCopySessionLog = (e: React.MouseEvent) => {
     if (!currentSession) {
-      showToast('Нет активной сессии для копирования', 'info');
+      showToast(t.sidebar.noSessionsFound, 'info');
       return;
     }
     try {
@@ -124,12 +141,12 @@ export const Navbar: React.FC<NavbarProps> = ({
       navigator.clipboard.writeText(textToCopy);
       setCopiedLog(true);
       showToast(
-        isAltOrShift ? 'Сырой JSON сессии скопирован в буфер' : 'Лог сессии скопирован в буфер обмена',
+        isAltOrShift ? t.nav.logsCopied : t.nav.logsCopied,
         'success'
       );
       setTimeout(() => setCopiedLog(false), 2000);
     } catch (err: any) {
-      showToast(`Ошибка копирования: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
@@ -166,7 +183,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="button"
             onClick={onToggleSidebar}
             className="p-2 -ml-1 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] active:scale-95 transition-all cursor-pointer flex items-center justify-center shrink-0"
-            title="Открыть список диалогов"
+            title={t.nav.toggleSidebar}
           >
             <Menu size={19} className="text-[var(--theme-text)]" />
           </button>
@@ -188,7 +205,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         <div className="flex items-center gap-2 min-w-0 overflow-hidden">
           <div className="flex items-center gap-1.5 text-[var(--theme-text)] font-semibold text-xs sm:text-sm truncate max-w-[140px] xs:max-w-[180px] sm:max-w-[240px] md:max-w-[320px]">
             <MessageSquare size={13} className="text-[var(--theme-text-muted)] shrink-0 hidden sm:inline" />
-            <span className="truncate">{currentSession?.title || 'Новый диалог'}</span>
+            <span className="truncate">{currentSession?.title || t.nav.newChat}</span>
           </div>
 
           {/* Workspace Pill Dropdown */}
@@ -197,7 +214,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={() => setWsMenuOpen(!wsMenuOpen)}
               className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[11px] sm:text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer shadow-sm font-semibold"
-              title="Рабочая папка текущего диалога"
+              title={t.nav.workspaceMenu}
             >
               {isAutoWs ? (
                 <>
@@ -212,7 +229,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               ) : (
                 <>
                   <Folder size={11} />
-                  <span>Без воркспейса</span>
+                  <span>{t.sidebar.standalone}</span>
                 </>
               )}
               <ChevronDown size={11} className={`transition-transform duration-200 ${wsMenuOpen ? 'rotate-180' : ''}`} />
@@ -222,7 +239,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {wsMenuOpen && (
               <div className="absolute left-0 top-full mt-2 w-72 rounded-2xl bento-card p-2 shadow-2xl z-50 border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl animate-fadeIn space-y-1">
                 <div className="px-2.5 py-1 text-[11px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
-                  <span>Воркспейс Диалога</span>
+                  <span>{t.nav.workspaceMenu}</span>
                   <button
                     type="button"
                     onClick={() => setWsMenuOpen(false)}
@@ -233,7 +250,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
 
                 <div className="px-2.5 py-1.5 text-xs text-[var(--theme-text)] bg-[var(--theme-input-bg)] rounded-xl border border-[var(--theme-border)] truncate font-mono">
-                  {currentSessionWorkspace || 'Изолированная авто-песочница'}
+                  {currentSessionWorkspace || t.sidebar.autoWorkspace}
                 </div>
 
                 <button
@@ -245,7 +262,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   className="w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-2 transition-colors cursor-pointer text-left"
                 >
                   <FolderPlus size={14} className="text-[var(--theme-text)]" />
-                  <span>Выбрать локальную папку проекта</span>
+                  <span>{t.nav.changeWorkspace}</span>
                 </button>
 
                 <button
@@ -257,17 +274,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                         const res = await api.create_auto_workspace();
                         if (res.path && onUpdateSessionWorkspace) {
                           onUpdateSessionWorkspace(res.path);
-                          showToast(`Создана изолированная песочница ${res.slug}`, 'success');
+                          showToast(`${t.sidebar.autoWorkspace} ${res.slug}`, 'success');
                         }
                       } catch (err: any) {
-                        showToast(`Ошибка создания песочницы: ${err.message || err}`, 'error');
+                        showToast(`${t.common.error}: ${err.message || err}`, 'error');
                       }
                     }
                   }}
                   className="w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-2 transition-colors cursor-pointer text-left"
                 >
                   <Sparkles size={14} className="text-[var(--theme-accent)]" />
-                  <span>Создать новую авто-песочницу</span>
+                  <span>{t.sidebar.autoWorkspace}</span>
                 </button>
 
                 {hasWs && (
@@ -276,12 +293,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                     onClick={() => {
                       setWsMenuOpen(false);
                       onUpdateSessionWorkspace?.(null);
-                      showToast('Диалог отвязан от воркспейса', 'info');
+                      showToast(t.nav.unlinkWorkspace, 'info');
                     }}
                     className="w-full px-2.5 py-2 rounded-xl text-xs font-semibold text-rose-500 hover:bg-rose-500/10 flex items-center gap-2 transition-colors cursor-pointer text-left"
                   >
                     <Unlink size={14} />
-                    <span>Отвязать от папки (Авто-режим)</span>
+                    <span>{t.nav.unlinkWorkspace}</span>
                   </button>
                 )}
               </div>
@@ -294,7 +311,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={handleCopySessionLog}
               className="p-1.5 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer hidden md:flex items-center"
-              title="Скопировать лог диалога (Shift+Клик для полного JSON)"
+              title={t.nav.copyLogs}
             >
               {copiedLog ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
             </button>
@@ -311,22 +328,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="button"
             onClick={onNewChat}
             className="md:hidden p-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold text-xs flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
-            title="Новый диалог"
+            title={t.nav.newChat}
           >
             <Plus size={16} />
-            <span className="hidden xs:inline text-[11px]">Новый</span>
+            <span className="hidden xs:inline text-[11px]">{t.common.ok}</span>
           </button>
         )}
 
         {/* Desktop View Switcher Bento Tabs */}
         <div className="hidden md:flex items-center bg-[var(--theme-card-bg)] p-1 rounded-full border border-[var(--theme-border)] shadow-sm">
           {[
-            { id: 'chat', label: 'Чат', icon: MessageSquare },
-            { id: 'workspace', label: 'Редактор', icon: Code },
-            { id: 'jarvis', label: 'Jarvis', icon: Bot },
-            { id: 'knowledge', label: 'Знания', icon: BookOpen },
-            { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
-            { id: 'settings', label: 'Настройки', icon: SettingsIcon },
+            { id: 'chat', label: t.nav.chat, icon: MessageSquare },
+            { id: 'workspace', label: t.nav.workspace, icon: Code },
+            { id: 'jarvis', label: t.nav.jarvis, icon: Bot },
+            { id: 'knowledge', label: t.nav.knowledge, icon: BookOpen },
+            { id: 'analytics', label: t.nav.analytics, icon: BarChart2 },
+            { id: 'settings', label: t.nav.settings, icon: SettingsIcon },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeView === tab.id;
@@ -353,13 +370,26 @@ export const Navbar: React.FC<NavbarProps> = ({
               type="button"
               onClick={onOpenMemorySkills}
               className="px-3.5 py-1.5 rounded-full font-bold text-sm flex items-center gap-2 transition-all cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
-              title="Память & Скиллы ИИ"
+              title={t.nav.memorySkills}
             >
               <Brain size={14} />
-              <span className="hidden lg:inline">Память</span>
+              <span className="hidden lg:inline">{t.nav.memorySkills}</span>
             </button>
           )}
         </div>
+
+        {/* Start Server Quick Action Button if offline */}
+        {isServerOffline && onStartServer && (
+          <button
+            type="button"
+            onClick={() => onStartServer()}
+            className="px-2.5 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 hover:bg-rose-500/25 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+            title={t.nav.startServer}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+            <span className="hidden xl:inline">{t.nav.startServer}</span>
+          </button>
+        )}
 
         {/* Voice Intercom Quick Trigger */}
         {config?.tts_config?.enabled && (
@@ -373,7 +403,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }
             }}
             className="p-2 rounded-full bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-mono border border-[var(--theme-border)] shadow-sm"
-            title="Голосовой интерком Jarvis. Клик — проверить связь."
+            title="Jarvis Voice Intercom"
           >
             <MaterialIcon name="volume_up" size={15} />
             <span className="hidden xl:inline text-xs font-bold">:: [VOICE]</span>
@@ -390,7 +420,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] text-[var(--theme-accent-text)]'
                 : 'bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
             }`}
-            title="Раздача в локальную сеть Wi-Fi"
+            title={t.nav.lanShare}
           >
             <Wifi size={14} />
             <span className="hidden xl:inline">LAN</span>
@@ -401,7 +431,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <div className="px-3 py-1.5 text-xs font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between font-bold">
                 <div className="flex items-center gap-1.5">
                   <Wifi size={13} />
-                  <span>Раздача в LAN</span>
+                  <span>{t.nav.lanTitle}</span>
                 </div>
                 <button
                   type="button"
@@ -416,11 +446,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 {lanLoading ? (
                   <div className="flex items-center justify-center gap-2 py-3">
                     <RefreshCw size={13} className="text-[var(--theme-text-muted)] animate-spin" />
-                    <span className="text-xs text-[var(--theme-text-muted)]">Определение IP...</span>
+                    <span className="text-xs text-[var(--theme-text-muted)]">{t.common.loading}...</span>
                   </div>
                 ) : lanUrls.length === 0 ? (
                   <div className="py-2 px-1 text-xs text-[var(--theme-text-muted)] text-center">
-                    Нет доступных сетевых интерфейсов
+                    {t.nav.lanEmpty}
                   </div>
                 ) : (
                   <div className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -436,7 +466,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                           type="button"
                           onClick={() => handleCopyUrl(url)}
                           className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
-                          title="Скопировать ссылку"
+                          title={t.nav.lanCopy}
                         >
                           {copiedUrl === url ? (
                             <Check size={13} className="text-emerald-500" />
@@ -453,16 +483,28 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
         </div>
 
+        {/* Quick Language Switcher Toggle */}
+        <button
+          type="button"
+          onClick={handleToggleLanguage}
+          className="px-2.5 py-1 rounded-full bento-card text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-bold font-mono transition-all cursor-pointer shadow-sm flex items-center gap-1 shrink-0"
+          title={t.nav.switchLanguage}
+        >
+          <span className={language === 'en' ? 'text-[var(--theme-accent)] font-extrabold' : 'text-[var(--theme-text-muted)]'}>EN</span>
+          <span className="text-[var(--theme-border)]">|</span>
+          <span className={language === 'ru' ? 'text-[var(--theme-accent)] font-extrabold' : 'text-[var(--theme-text-muted)]'}>RU</span>
+        </button>
+
         {/* Server Logs Toggle Button */}
         {onToggleLogs && (
           <button
             type="button"
             onClick={onToggleLogs}
             className="p-2 rounded-full bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer flex items-center gap-1.5 text-xs font-bold border border-[var(--theme-border)] shadow-sm"
-            title="Открыть / закрыть логи LLM сервера"
+            title={t.nav.viewLogs}
           >
             <Terminal size={14} />
-            <span className="hidden sm:inline">Логи</span>
+            <span className="hidden sm:inline">{t.nav.viewLogs}</span>
           </button>
         )}
       </div>

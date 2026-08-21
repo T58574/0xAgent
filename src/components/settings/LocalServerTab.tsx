@@ -3,6 +3,7 @@ import { Cpu, Folder, AlertTriangle, Zap, Activity, RefreshCw, HardDrive, Play, 
 import { GgufMetadata, HardwareInfo, LocalModelItem } from '../../types';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { useI18n } from '../../i18n';
 import { LlamaInstallerSection } from './localServer/LlamaInstallerSection';
 import { InstalledVersionsSection } from './localServer/InstalledVersionsSection';
 import { ServerPerformanceParams } from './localServer/ServerPerformanceParams';
@@ -159,6 +160,8 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
   setServerLogsAutoScroll,
   setApiUrl: _setApiUrl,
 }) => {
+  void _setApiUrl;
+  const { t, formatString } = useI18n();
   const { showToast } = useToast();
   const [logFilePath, setLogFilePath] = useState<string>('');
   const [isCopiedLogs, setIsCopiedLogs] = useState(false);
@@ -489,7 +492,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     setCacheReuse(256);
     setCtxSize(16384);
     setCustomArgs('-ctk q8_0 -ctv q8_0');
-    showToast('Применен быстрый пресет (Flash Attention + Q8 KV + 1 слот)!', 'success');
+    showToast(t.settings.localServer.fastPresetApplied, 'success');
   };
 
   const handleApplyFastMtpPreset = () => {
@@ -518,14 +521,14 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     if (draftModel) {
       setSpecDraftModel(draftModel.filePath);
     }
-    showToast('Применен пресет спекулятивного декодирования (Speculative Draft / MTP)!', 'success');
+    showToast(t.settings.localServer.fastMtpPresetApplied, 'success');
   };
 
   const [isActionLoading, setIsActionLoading] = useState(false);
 
   const handleStartLocalServer = async () => {
     if (!modelPath) {
-      showToast('Выберите модель GGUF для запуска', 'error');
+      showToast(t.settings.localServer.selectGgufToStart, 'error');
       return;
     }
     setIsActionLoading(true);
@@ -567,12 +570,12 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       });
       if (res && res.success) {
         setServerStatus('running');
-        showToast('Сервер llama.cpp успешно запущен', 'success');
+        showToast(t.settings.localServer.serverStartedSuccess, 'success');
       } else {
-        showToast((res && res.message) || 'Ошибка запуска сервера', 'error');
+        showToast((res && res.message) || 'Server start failed', 'error');
       }
     } catch (err: any) {
-      showToast(err.message || 'Не удалось запустить сервер', 'error');
+      showToast(err.message || 'Failed to start server', 'error');
     } finally {
       setIsActionLoading(false);
     }
@@ -583,9 +586,9 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
     try {
       await api.stop_local_server();
       setServerStatus('stopped');
-      showToast('Сервер llama.cpp остановлен', 'info');
+      showToast(t.settings.localServer.serverStoppedSuccess, 'info');
     } catch (err: any) {
-      showToast(err.message || 'Не удалось остановить сервер', 'error');
+      showToast(err.message || 'Failed to stop server', 'error');
     } finally {
       setIsActionLoading(false);
     }
@@ -598,7 +601,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       await new Promise((r) => setTimeout(r, 600));
       await handleStartLocalServer();
     } catch (err: any) {
-      showToast(err.message || 'Не удалось перезапустить сервер', 'error');
+      showToast(err.message || 'Failed to restart server', 'error');
     } finally {
       setIsActionLoading(false);
     }
@@ -618,10 +621,10 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
         <div>
           <h3 className="text-sm font-semibold text-[var(--theme-text)] flex items-center gap-2">
             <Cpu size={16} className="text-[var(--theme-accent)]" />
-            <span>Параметры и Логи ИИ-Сервера Llama.cpp</span>
+            <span>{t.settings.localServer.title}</span>
           </h3>
           <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-            Настройка локального ИИ-движка, выбор релизов и просмотр реальных логов работы.
+            {t.settings.localServer.subtitle}
           </p>
         </div>
 
@@ -631,10 +634,10 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
             <Activity size={13} className="text-emerald-500 animate-pulse" />
             <span className="text-[var(--theme-text)] font-medium">
               {healthStatus === 'loading'
-                ? 'Загрузка в GPU...'
+                ? t.settings.localServer.loadingToGpu
                 : healthStatus === 'ok'
-                ? `Готов | Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 1}`
-                : 'Инициализация...'}
+                ? formatString(t.settings.localServer.onlineSlots, { active: slotMetrics.activeSlots, total: slotMetrics.totalSlots || 1 })
+                : t.settings.localServer.initializing}
             </span>
           </div>
         )}
@@ -662,12 +665,12 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2 font-bold text-xs text-[var(--theme-text)]">
-                  <span>Видеокарта:</span>
+                  <span>GPU:</span>
                   <span className="font-mono text-[var(--theme-text)]">
-                    {hardwareInfo?.gpuName || 'Автоопределение GPU'}
+                    {hardwareInfo?.gpuName || t.settings.localServer.gpuNameAuto}
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono text-[10px] font-semibold">
-                    Full GPU Offload (-ngl 999)
+                    {t.settings.localServer.fullGpuOffload}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-mono text-[var(--theme-text-muted)]">
@@ -675,11 +678,11 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                     <span className={`w-2 h-2 rounded-full ${serverStatus === 'running' ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
                     {serverStatus === 'running'
                       ? healthStatus === 'loading'
-                        ? 'Загрузка модели в GPU...'
+                        ? t.settings.localServer.loadingToGpu
                         : healthStatus === 'ok'
-                        ? `Онлайн • Слоты: ${slotMetrics.activeSlots}/${slotMetrics.totalSlots || 1}`
-                        : 'Инициализация...'
-                      : 'Сервер остановлен'}
+                        ? formatString(t.settings.localServer.onlineSlots, { active: slotMetrics.activeSlots, total: slotMetrics.totalSlots || 1 })
+                        : t.settings.localServer.initializing
+                      : t.settings.localServer.serverStopped}
                   </span>
                 </div>
               </div>
@@ -694,10 +697,10 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                     disabled={isActionLoading}
                     onClick={handleRestartLocalServer}
                     className="px-4 py-2.5 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                    title="Перезапустить сервер с текущими параметрами"
+                    title={t.settings.localServer.restartBtn}
                   >
                     <RefreshCw size={15} className={isActionLoading ? 'animate-spin' : ''} />
-                    <span>Перезапуск</span>
+                    <span>{t.settings.localServer.restartBtn}</span>
                   </button>
 
                   <button
@@ -705,10 +708,10 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                     disabled={isActionLoading}
                     onClick={handleStopLocalServer}
                     className="px-4.5 py-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                    title="Остановить сервер"
+                    title={t.settings.localServer.stopBtn}
                   >
                     <Square size={15} className="fill-current" />
-                    <span>Остановить</span>
+                    <span>{t.settings.localServer.stopBtn}</span>
                   </button>
                 </>
               ) : (
@@ -717,10 +720,10 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                   disabled={isActionLoading || !modelPath}
                   onClick={handleStartLocalServer}
                   className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center gap-2.5 transition-all cursor-pointer shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                  title={modelPath ? "Запустить сервер llama.cpp" : "Выберите модель GGUF для запуска"}
+                  title={modelPath ? t.settings.localServer.startBtn : t.settings.localServer.selectGgufToStart}
                 >
                   <Play size={16} className={isActionLoading ? 'animate-spin fill-current' : 'fill-current'} />
-                  <span>{isActionLoading ? 'Запуск...' : 'Запустить сервер'}</span>
+                  <span>{isActionLoading ? t.settings.localServer.startingBtn : t.settings.localServer.startBtn}</span>
                 </button>
               )}
             </div>
@@ -760,14 +763,14 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
           <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-[var(--theme-text)] flex items-center justify-between">
-                <span>Исполняемый файл (llama-server.exe)</span>
+                <span>{t.settings.localServer.exePath}</span>
                 <button
                   type="button"
                   onClick={handleSelectExe}
                   className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
                 >
                   <Folder size={12} />
-                  <span>Обзор...</span>
+                  <span>{t.settings.localServer.browse}</span>
                 </button>
               </label>
               <input
@@ -783,26 +786,26 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5">
                   <HardDrive size={14} className="text-[var(--theme-text-muted)]" />
-                  <span>Файл GGUF Модели (.gguf)</span>
+                  <span>{t.settings.localServer.modelPath}</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={refreshScannedModels}
                     className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
-                    title="Пересканировать папку models/"
+                    title="Rescan models"
                   >
                     <RefreshCw size={11} />
-                    <span>Сканировать</span>
+                    <span>{t.settings.localServer.rescanModels}</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleSelectModel}
                     className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
-                    title="Выбрать файл через проводник"
+                    title="Select model file"
                   >
                     <Folder size={12} />
-                    <span>Обзор...</span>
+                    <span>{t.settings.localServer.browse}</span>
                   </button>
                 </div>
               </div>
@@ -822,14 +825,14 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
                 }}
                 className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none cursor-pointer transition-colors"
               >
-                <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">-- Выберите локальную GGUF модель из ~/.0xagent/models/ --</option>
+                <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">{t.settings.localServer.selectModelPlaceholder}</option>
                 {mainLocalModels.map((m) => (
                   <option key={m.id || m.filePath} value={m.filePath} className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
                     {m.title || m.fileName} ({m.quantization} • {m.sizeGB})
                   </option>
                 ))}
                 {modelPath && !mainLocalModels.some((m) => m.filePath.toLowerCase() === modelPath.toLowerCase()) && (
-                  <option value="custom" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Пользовательский путь: {modelPath}</option>
+                  <option value="custom" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">{formatString(t.settings.localServer.customPath, { path: modelPath })}</option>
                 )}
               </select>
 
@@ -860,21 +863,21 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
-                    <span>Семейство:</span>
+                    <span>{t.settings.localServer.modelMeta.family}</span>
                     <span className="text-[var(--theme-text)] font-bold uppercase">{modelMeta.family || 'GGUF'}</span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
-                    <span>Контекст обучения:</span>
+                    <span>{t.settings.localServer.modelMeta.trainContext}</span>
                     <span className="text-[var(--theme-text)] font-bold">{modelMeta.contextLength.toLocaleString()} tok</span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
-                    <span>Рассуждения &lt;think&gt;:</span>
+                    <span>{t.settings.localServer.modelMeta.reasoningSpec}</span>
                     <span className={modelMeta.supportsReasoning ? 'text-sky-600 dark:text-sky-400 font-bold' : 'text-[var(--theme-text-muted)]'}>
-                      {modelMeta.supportsReasoning ? 'Поддерживается' : 'Instruct / Direct'}
+                      {modelMeta.supportsReasoning ? t.settings.localServer.modelMeta.supported : t.settings.localServer.modelMeta.instructDirect}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
-                    <span>Реком. режим:</span>
+                    <span>{t.settings.localServer.modelMeta.recomMode}</span>
                     <span className="text-[var(--theme-text)] font-bold uppercase">
                       {modelMeta.recommendedReasoningEffort || 'AUTO'}
                     </span>
@@ -883,9 +886,9 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
 
                 {modelMeta.supportsFastMtp && (
                   <div className="flex items-center justify-between text-[11px] border-t border-[var(--theme-border)] pt-2 mt-1">
-                    <span className="text-sky-600 dark:text-sky-300 font-semibold">FastMTP Ускорение:</span>
+                    <span className="text-sky-600 dark:text-sky-300 font-semibold">{t.settings.localServer.modelMeta.fastMtpSupport}</span>
                     <span className="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/30 text-[10px] font-bold">
-                      СОВМЕСТИМО (3x Speed)
+                      {t.settings.localServer.modelMeta.fastMtpBadge}
                     </span>
                   </div>
                 )}

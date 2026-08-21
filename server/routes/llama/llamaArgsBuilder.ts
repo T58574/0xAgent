@@ -148,8 +148,8 @@ export function buildLlamaServerArgs(params: BuildLlamaArgsParams): { args: stri
 
     const rawSpecType = body.specType || ls.spec_type || (hasNativeMtp ? 'draft-mtp' : 'default');
     const specDraftNgl = body.specDraftNgl !== undefined && body.specDraftNgl !== null ? body.specDraftNgl : (ls.spec_draft_ngl !== undefined && ls.spec_draft_ngl !== null ? ls.spec_draft_ngl : 'all');
-    const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : (hasNativeMtp ? 3 : 1));
-    const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : (hasNativeMtp ? 0.05 : 0));
+    const specDraftNMax = body.specDraftNMax !== undefined && body.specDraftNMax !== null ? body.specDraftNMax : (ls.spec_draft_n_max !== undefined && ls.spec_draft_n_max !== null ? ls.spec_draft_n_max : (hasNativeMtp ? 2 : 1));
+    const specDraftPMin = body.specDraftPMin !== undefined && body.specDraftPMin !== null ? body.specDraftPMin : (ls.spec_draft_p_min !== undefined && ls.spec_draft_p_min !== null ? ls.spec_draft_p_min : (hasNativeMtp ? 0.2 : 0));
 
     if (specDraftTarget && fs.existsSync(specDraftTarget) && path.resolve(specDraftTarget) !== path.resolve(targetModel)) {
       args.push('--spec-draft-model', specDraftTarget, '--spec-type', rawSpecType);

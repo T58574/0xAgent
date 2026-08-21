@@ -18,8 +18,10 @@ import { KnowledgeEntry, KnowledgeCategory } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { NotionMarkdown } from './NotionMarkdown';
+import { useI18n } from '../i18n';
 
 export const KnowledgeVault: React.FC = () => {
+  const { t, formatString } = useI18n();
   const { showToast } = useToast();
 
   const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
@@ -69,7 +71,7 @@ export const KnowledgeVault: React.FC = () => {
       }
     } catch (err: any) {
       console.error('Failed to load Knowledge Vault:', err);
-      showToast('Ошибка загрузки Базы Знаний: ' + (err.message || err), 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -96,7 +98,7 @@ export const KnowledgeVault: React.FC = () => {
 
   const handleSaveEdit = async () => {
     if (!selectedEntry || !editTitle.trim() || !editContent.trim()) {
-      showToast('Заголовок и содержимое обязательны для заполнения', 'error');
+      showToast('Title and content are required', 'error');
       return;
     }
 
@@ -117,12 +119,12 @@ export const KnowledgeVault: React.FC = () => {
         source: selectedEntry.source || 'User Directive',
       });
 
-      showToast('Запись успешно обновлена!', 'success');
+      showToast('Entry updated!', 'success');
       setSelectedEntry(updated);
       setIsEditing(false);
       fetchKnowledge();
     } catch (err: any) {
-      showToast('Ошибка сохранения записи: ' + (err.message || err), 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     } finally {
       setEditSaving(false);
     }
@@ -131,7 +133,7 @@ export const KnowledgeVault: React.FC = () => {
   const handleCreateEntry = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim() || !newContent.trim()) {
-      showToast('Заголовок и содержимое обязательны для заполнения', 'error');
+      showToast('Title and content are required', 'error');
       return;
     }
 
@@ -151,7 +153,7 @@ export const KnowledgeVault: React.FC = () => {
         source: 'User Directive',
       });
 
-      showToast(`Запись "${created.title}" успешно сохранена!`, 'success');
+      showToast(`Entry "${created.title}" saved!`, 'success');
       setModalOpen(false);
       setNewTitle('');
       setNewSummary('');
@@ -160,27 +162,27 @@ export const KnowledgeVault: React.FC = () => {
       setSelectedEntry(created);
       fetchKnowledge();
     } catch (err: any) {
-      showToast('Ошибка при сохранении статьи: ' + (err.message || err), 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!window.confirm(`Вы уверены, что хотите удалить запись "${title}" из Базы Знаний?`)) {
+    if (!window.confirm(`Delete "${title}"?`)) {
       return;
     }
 
     try {
       await api.delete_knowledge_entry(id);
-      showToast(`Запись "${title}" удалена.`, 'success');
+      showToast(`Entry "${title}" deleted.`, 'success');
       if (selectedEntry?.id === id) {
         setSelectedEntry(null);
         setIsEditing(false);
       }
       fetchKnowledge();
     } catch (err: any) {
-      showToast('Ошибка при удалении: ' + (err.message || err), 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
@@ -188,19 +190,19 @@ export const KnowledgeVault: React.FC = () => {
     if (!selectedEntry) return;
     navigator.clipboard.writeText(selectedEntry.content).then(() => {
       setCopied(true);
-      showToast('Текст скопирован в буфер обмена!', 'success');
+      showToast(t.common.copied, 'success');
       setTimeout(() => setCopied(false), 2000);
     });
   };
 
   const categoriesList = [
-    { id: 'all', label: 'Все' },
-    { id: 'strategy', label: 'Стратегия' },
-    { id: 'architecture', label: 'Архитектура' },
-    { id: 'research', label: 'Исследования' },
-    { id: 'user_directive', label: 'Указания' },
-    { id: 'market_insight', label: 'Рынок' },
-    { id: 'general', label: 'Общее' },
+    { id: 'all', label: t.knowledge.catAll },
+    { id: 'strategy', label: t.knowledge.catStrategy },
+    { id: 'architecture', label: t.knowledge.catArchitecture },
+    { id: 'research', label: t.knowledge.catResearch },
+    { id: 'user_directive', label: t.knowledge.catDirective },
+    { id: 'market_insight', label: t.knowledge.catMarket },
+    { id: 'general', label: t.knowledge.catGeneral },
   ];
 
   return (
@@ -213,12 +215,12 @@ export const KnowledgeVault: React.FC = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider">База знаний</h2>
+              <h2 className="text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider">{t.knowledge.title}</h2>
               <span className="text-[10px] px-2 py-0.2 rounded-md bg-white/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono">
                 {entries.length}
               </span>
             </div>
-            <p className="text-[11px] text-[var(--theme-text-muted)]">Архив стратегических инсайтов, архитектурных решений и указаний</p>
+            <p className="text-[11px] text-[var(--theme-text-muted)]">{t.knowledge.subtitle}</p>
           </div>
         </div>
 
@@ -228,7 +230,7 @@ export const KnowledgeVault: React.FC = () => {
             type="button"
             onClick={fetchKnowledge}
             className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer transition-colors"
-            title="Обновить список"
+            title={t.knowledge.refreshTooltip}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -238,7 +240,7 @@ export const KnowledgeVault: React.FC = () => {
             className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
           >
             <Plus size={14} />
-            <span>Добавить запись</span>
+            <span>{t.knowledge.addEntry}</span>
           </button>
         </div>
       </div>
@@ -254,7 +256,7 @@ export const KnowledgeVault: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Поиск по статьям и тегам..."
+                placeholder={t.knowledge.searchPlaceholder}
                 className="w-full pl-8 pr-3 py-1.5 rounded-lg bento-card text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] bg-black/40 focus:outline-none"
               />
               <Search size={13} className="absolute left-2.5 top-2 text-[var(--theme-text-muted)]" />
@@ -284,13 +286,13 @@ export const KnowledgeVault: React.FC = () => {
             {loading ? (
               <div className="flex flex-col items-center justify-center h-48 gap-2 text-[var(--theme-text-muted)] text-xs">
                 <RefreshCw size={16} className="animate-spin text-[var(--theme-text-muted)]" />
-                <span>Загрузка записей...</span>
+                <span>{t.common.loading}</span>
               </div>
             ) : entries.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-center p-4">
                 <BookOpen size={24} className="text-[var(--theme-text-muted)] mb-2" />
-                <span className="text-xs text-[var(--theme-text)] font-medium">Записей не найдено</span>
-                <p className="text-[11px] text-[var(--theme-text-muted)] mt-1">Добавьте новую запись или измените фильтр</p>
+                <span className="text-xs text-[var(--theme-text)] font-medium">{t.knowledge.emptyVault}</span>
+                <p className="text-[11px] text-[var(--theme-text-muted)] mt-1">{t.knowledge.emptyVaultDesc}</p>
               </div>
             ) : (
               entries.map(item => {
@@ -363,29 +365,29 @@ export const KnowledgeVault: React.FC = () => {
                         type="button"
                         onClick={handleStartEdit}
                         className="px-2.5 py-1 rounded-lg bento-card text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition-colors cursor-pointer"
-                        title="Редактировать запись"
+                        title="Edit Entry"
                       >
                         <Edit3 size={13} />
-                        <span>Изменить</span>
+                        <span>{t.knowledge.editBtn}</span>
                       </button>
                     )}
                     <button
                       type="button"
                       onClick={handleCopyContent}
                       className="px-2.5 py-1 rounded-lg bento-card text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition-colors cursor-pointer"
-                      title="Скопировать контент"
+                      title="Copy content"
                     >
                       {copied ? <Check size={13} className="text-[var(--theme-text)]" /> : <Copy size={13} />}
-                      <span>{copied ? 'Скопировано' : 'Копировать'}</span>
+                      <span>{copied ? t.knowledge.copied : t.knowledge.copyBtn}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleDelete(selectedEntry.id, selectedEntry.title)}
                       className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 transition-colors cursor-pointer"
-                      title="Удалить запись"
+                      title="Delete entry"
                     >
                       <Trash2 size={13} />
-                      <span>Удалить</span>
+                      <span>{t.knowledge.deleteBtn}</span>
                     </button>
                   </div>
                 </div>
@@ -394,7 +396,7 @@ export const KnowledgeVault: React.FC = () => {
                   /* IN-PLACE EDIT MODE */
                   <div className="space-y-3 pt-2 animate-fadeIn">
                     <div>
-                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Заголовок</label>
+                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">{t.knowledge.titleLabel}</label>
                       <input
                         type="text"
                         value={editTitle}
@@ -405,23 +407,23 @@ export const KnowledgeVault: React.FC = () => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Категория</label>
+                        <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">{t.knowledge.category}</label>
                         <select
                           value={editCategory}
                           onChange={e => setEditCategory(e.target.value as KnowledgeCategory)}
                           className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40 cursor-pointer"
                         >
-                          <option value="strategy">Strategy (Стратегия)</option>
-                          <option value="architecture">Architecture (Архитектура)</option>
-                          <option value="research">Research (Исследования)</option>
-                          <option value="user_directive">User Directive (Указание пользователя)</option>
-                          <option value="market_insight">Market Insight (Анализ рынка)</option>
-                          <option value="general">General (Общее)</option>
+                          <option value="strategy">Strategy</option>
+                          <option value="architecture">Architecture</option>
+                          <option value="research">Research</option>
+                          <option value="user_directive">User Directive</option>
+                          <option value="market_insight">Market Insight</option>
+                          <option value="general">General</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Теги (через запятую)</label>
+                        <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">{t.knowledge.tagsLabel}</label>
                         <input
                           type="text"
                           value={editTags}
@@ -433,18 +435,18 @@ export const KnowledgeVault: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Краткое резюме / Summary</label>
+                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">{t.knowledge.summaryLabel}</label>
                       <input
                         type="text"
                         value={editSummary}
                         onChange={e => setEditSummary(e.target.value)}
-                        placeholder="Краткое описание сути..."
+                        placeholder={t.knowledge.summaryPlaceholder}
                         className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40"
                       />
                     </div>
 
                     <div>
-                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">Содержимое (Markdown)</label>
+                      <label className="text-xs font-medium text-[var(--theme-text-muted)] block mb-1">{t.knowledge.contentLabel}</label>
                       <textarea
                         rows={12}
                         value={editContent}
@@ -459,7 +461,7 @@ export const KnowledgeVault: React.FC = () => {
                         onClick={() => setIsEditing(false)}
                         className="px-3.5 py-1.5 rounded-lg bento-card text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
                       >
-                        Отмена
+                        {t.knowledge.cancel}
                       </button>
                       <button
                         type="button"
@@ -468,7 +470,7 @@ export const KnowledgeVault: React.FC = () => {
                         className="px-4 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                       >
                         {editSaving ? <RefreshCw size={13} className="animate-spin" /> : <Save size={13} />}
-                        <span>Сохранить изменения</span>
+                        <span>{t.knowledge.saveChanges}</span>
                       </button>
                     </div>
                   </div>
@@ -480,7 +482,7 @@ export const KnowledgeVault: React.FC = () => {
                     <div className="flex items-center gap-4 text-xs text-[var(--theme-text-muted)] font-mono">
                       <span className="flex items-center gap-1">
                         <Calendar size={13} />
-                        <span>Добавлено: {new Date(selectedEntry.createdAt).toLocaleString()}</span>
+                        <span>{formatString(t.knowledge.addedDate, { date: new Date(selectedEntry.createdAt).toLocaleString() })}</span>
                       </span>
                     </div>
 
@@ -503,7 +505,7 @@ export const KnowledgeVault: React.FC = () => {
                   {selectedEntry.summary && (
                     <div className="p-4 rounded-xl bento-card space-y-1 bg-black/30">
                       <span className="text-[10px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider font-mono block">
-                        Резюме записи
+                        {t.knowledge.summaryTitle}
                       </span>
                       <p className="text-xs text-[var(--theme-text)] leading-relaxed">{selectedEntry.summary}</p>
                     </div>
@@ -519,8 +521,8 @@ export const KnowledgeVault: React.FC = () => {
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center text-[var(--theme-text-muted)]">
               <Sparkles size={32} className="text-[var(--theme-text-muted)] mb-3 opacity-60" />
-              <span className="text-sm font-medium text-[var(--theme-text)]">Выберите запись для чтения</span>
-              <p className="text-xs text-[var(--theme-text-muted)] mt-1 max-w-sm">Или сохраните новый инсайт через ИИ-агента или форму добавления</p>
+              <span className="text-sm font-medium text-[var(--theme-text)]">{t.knowledge.selectToRead}</span>
+              <p className="text-xs text-[var(--theme-text-muted)] mt-1 max-w-sm">{t.knowledge.selectToReadDesc}</p>
             </div>
           )}
         </div>
@@ -534,7 +536,7 @@ export const KnowledgeVault: React.FC = () => {
             <div className="px-5 py-3.5 border-b border-[var(--theme-border)] flex items-center justify-between bg-black/40">
               <div className="flex items-center gap-2">
                 <BookOpen size={16} className="text-[var(--theme-text-muted)]" />
-                <h3 className="text-xs font-semibold text-[var(--theme-text)]">Добавить запись в Базу Знаний</h3>
+                <h3 className="text-xs font-semibold text-[var(--theme-text)]">{t.knowledge.newEntryTitle}</h3>
               </div>
               <button
                 type="button"
@@ -545,16 +547,16 @@ export const KnowledgeVault: React.FC = () => {
               </button>
             </div>
 
-            {/* Form Form */}
+            {/* Form */}
             <form onSubmit={handleCreateEntry} className="p-5 space-y-3.5 overflow-y-auto flex-1 text-xs">
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[var(--theme-text-muted)]">Заголовок статьи / инсайта *</label>
+                <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.knowledge.titleLabel}</label>
                 <input
                   type="text"
                   required
                   value={newTitle}
                   onChange={e => setNewTitle(e.target.value)}
-                  placeholder="Например: Парадигма AI как усилителя стратегического оператора..."
+                  placeholder={t.knowledge.titlePlaceholder}
                   className="w-full px-3 py-2 rounded-lg bento-card text-xs font-medium text-[var(--theme-text)] focus:outline-none bg-black/40"
                   autoFocus
                 />
@@ -562,52 +564,52 @@ export const KnowledgeVault: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-[var(--theme-text-muted)]">Категория</label>
+                  <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.knowledge.category}</label>
                   <select
                     value={newCategory}
                     onChange={e => setNewCategory(e.target.value as KnowledgeCategory)}
                     className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40 cursor-pointer"
                   >
-                    <option value="strategy">Strategy (Стратегия)</option>
-                    <option value="architecture">Architecture (Архитектура)</option>
-                    <option value="research">Research (Исследования)</option>
-                    <option value="user_directive">User Directive (Указание пользователя)</option>
-                    <option value="market_insight">Market Insight (Анализ рынка)</option>
-                    <option value="general">General (Общее)</option>
+                    <option value="strategy">Strategy</option>
+                    <option value="architecture">Architecture</option>
+                    <option value="research">Research</option>
+                    <option value="user_directive">User Directive</option>
+                    <option value="market_insight">Market Insight</option>
+                    <option value="general">General</option>
                   </select>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-[var(--theme-text-muted)]">Теги (через запятую)</label>
+                  <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.knowledge.tagsLabel}</label>
                   <input
                     type="text"
                     value={newTags}
                     onChange={e => setNewTags(e.target.value)}
-                    placeholder="strategy, hitl, 0xagent"
+                    placeholder={t.knowledge.tagsPlaceholder}
                     className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
                   />
                 </div>
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[var(--theme-text-muted)]">Краткое резюме / Summary</label>
+                <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.knowledge.summaryLabel}</label>
                 <input
                   type="text"
                   value={newSummary}
                   onChange={e => setNewSummary(e.target.value)}
-                  placeholder="Краткое описание сути для списков..."
+                  placeholder={t.knowledge.summaryPlaceholder}
                   className="w-full px-3 py-2 rounded-lg bento-card text-xs text-[var(--theme-text)] focus:outline-none bg-black/40"
                 />
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-[var(--theme-text-muted)]">Полный контент статьи (Markdown) *</label>
+                <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.knowledge.contentLabel}</label>
                 <textarea
                   required
                   rows={8}
                   value={newContent}
                   onChange={e => setNewContent(e.target.value)}
-                  placeholder="Вставьте полный текст статьи, выводы или стратегический план..."
+                  placeholder={t.knowledge.contentPlaceholder}
                   className="w-full p-3 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
                 />
               </div>
@@ -618,7 +620,7 @@ export const KnowledgeVault: React.FC = () => {
                   onClick={() => setModalOpen(false)}
                   className="px-3.5 py-1.5 rounded-lg bento-card text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
                 >
-                  Отмена
+                  {t.knowledge.cancel}
                 </button>
                 <button
                   type="submit"
@@ -626,7 +628,7 @@ export const KnowledgeVault: React.FC = () => {
                   className="px-4 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors"
                 >
                   {saving ? <RefreshCw size={13} className="animate-spin" /> : <Check size={13} />}
-                  <span>Сохранить в Архив</span>
+                  <span>{t.knowledge.saveToArchive}</span>
                 </button>
               </div>
             </form>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Zap, Folder, Sparkles } from 'lucide-react';
 import { LocalModelItem, GgufMetadata } from '../../../types';
+import { useI18n } from '../../../i18n';
 import {
   InfoTooltip,
   ParamNumberInput,
@@ -160,6 +161,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
   modelMeta,
   serverStatus: _serverStatus,
 }) => {
+  const { t, formatString } = useI18n();
   const isMtpEnabled = specType !== 'none' && specDraftModel !== 'none';
 
   const handleToggleMtp = () => {
@@ -178,88 +180,88 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
   const toggleItems = [
     {
       label: 'Flash Attention (-fa)',
-      sub: 'Ускорение внимания на GPU',
+      sub: t.settings.localServer.flashAttention,
       tooltip: {
         title: 'Flash Attention (-fa)',
-        text: 'Оптимизирует вычисление слоя внимания в VRAM. Ускоряет генерацию в 1.5–2 раза и снижает нагрев видеокарты.',
-        benefit: '+50-100% к скорости генерации',
+        text: 'Optimizes attention layer calculation in VRAM. Accelerates generation by 1.5-2x.',
+        benefit: '+50-100% speed',
       },
       value: flashAttn,
       toggle: () => setFlashAttn(!flashAttn),
     },
     {
       label: 'Jinja Template (--jinja)',
-      sub: 'Шаблоны промптов и мыслей',
+      sub: 'Prompt template formatting',
       tooltip: {
         title: 'Jinja Template (--jinja)',
-        text: 'Включает нативный рендеринг системных шаблонов чата и формата рассуждений для современных моделей (Qwen, DeepSeek).',
-        benefit: 'Идеальное форматирование мыслей',
+        text: 'Enables native template rendering for chat models (Qwen, DeepSeek).',
+        benefit: 'Ideal prompt & thought structure',
       },
       value: jinja,
       toggle: () => setJinja(!jinja),
     },
     {
       label: 'Preserve Reasoning',
-      sub: 'Отображение хода мыслей',
+      sub: 'Output thought process in chat',
       tooltip: {
         title: 'Preserve Reasoning',
-        text: 'Сохраняет и выводит цепочку мыслей <think>...</think> в интерфейсе чата, позволяя видеть логику агента перед кодом.',
-        benefit: 'Прозрачность решений ассистента',
+        text: 'Preserves and renders <think>...</think> reasoning blocks in dialogue UI.',
+        benefit: 'Full agent transparency',
       },
       value: reasoningPreserve,
       toggle: () => setReasoningPreserve(!reasoningPreserve),
     },
     {
       label: 'Prompt Cache',
-      sub: 'Кэширование истории в ОЗУ',
+      sub: 'RAM prompt caching',
       tooltip: {
         title: 'Prompt Cache',
-        text: 'Сохраняет неизменную часть системного промпта и контекста в оперативной памяти, избавляя от повторного чтения при каждом вопросе.',
-        benefit: 'Мгновенный старт генерации',
+        text: 'Keeps invariant prompt prefix in RAM for instant turns.',
+        benefit: 'Instant response initiation',
       },
       value: promptCache,
       toggle: () => setPromptCache(!promptCache),
     },
     {
       label: 'Use Memory Map (--mmap)',
-      sub: 'Быстрая загрузка файла модели',
+      sub: 'Fast model file mapping',
       tooltip: {
         title: 'Memory Map (--mmap)',
-        text: 'Загружает модель напрямую через виртуальную память Windows без полного дублирования файла в оперативную память.',
-        benefit: 'Запуск сервера за 1–2 секунды',
+        text: 'Maps model file directly to virtual memory without RAM duplication.',
+        benefit: 'Sub-second model loading',
       },
       value: mmap,
       toggle: () => setMmap(!mmap),
     },
     {
       label: 'Lock Memory (--mlock)',
-      sub: 'Запрет сброса в файл подкачки',
+      sub: 'Prevent swapping to disk',
       tooltip: {
         title: 'Lock Memory (--mlock)',
-        text: 'Блокирует память модели в физической RAM, запрещая Windows сбрасывать её на жесткий диск/SSD при нехватке памяти.',
-        benefit: 'Защита от фризов при нагрузке',
+        text: 'Locks model memory in physical RAM, preventing paging to disk swap.',
+        benefit: 'Prevents stutter under memory load',
       },
       value: mlock,
       toggle: () => setMlock(!mlock),
     },
     {
       label: 'Continuous Batching',
-      sub: 'Параллельная обработка запросов',
+      sub: 'Non-blocking requests',
       tooltip: {
         title: 'Continuous Batching',
-        text: 'Позволяет серверу обрабатывать новые входящие запросы в фоне без блокировки главного потока.',
-        benefit: 'Многозадачность без ожидания',
+        text: 'Enables concurrent background request processing.',
+        benefit: 'Multi-turn non-blocking queue',
       },
       value: contBatching,
       toggle: () => setContBatching(!contBatching),
     },
     {
       label: 'Embeddings Output',
-      sub: 'Векторные эмбеддинги',
+      sub: 'Vector embeddings',
       tooltip: {
         title: 'Embeddings Output',
-        text: 'Включает генерацию числовых векторных представлений текста для семантического поиска по коду и памяти.',
-        benefit: 'Векторный поиск по проекту',
+        text: 'Outputs numeric vector embeddings for semantic search.',
+        benefit: 'Semantic code retrieval',
       },
       value: embedding,
       toggle: () => setEmbedding(!embedding),
@@ -271,8 +273,8 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
       {/* Header & Quick Profiles */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--theme-border)] pb-3">
         <div>
-          <span className="text-xs font-bold text-[var(--theme-text)]">Параметры производительности</span>
-          <p className="text-[11px] text-[var(--theme-text-muted)]">Конфигурация потоков, VRAM слоев и контекста</p>
+          <span className="text-xs font-bold text-[var(--theme-text)]">{t.settings.localServer.params.perfParamsTitle}</span>
+          <p className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.localServer.params.perfParamsDesc}</p>
         </div>
         <div className="flex items-center gap-2">
           {onApplyFastMtpPreset && (
@@ -280,10 +282,10 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               type="button"
               onClick={onApplyFastMtpPreset}
               className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
-              title="Применить пресет для спекулятивного декодирования (Speculative Draft / MTP)"
+              title={t.settings.localServer.params.presetFastMtp}
             >
               <Sparkles size={13} className="text-[var(--theme-text-muted)]" />
-              <span>Пресет MTP / Draft</span>
+              <span>{t.settings.localServer.params.presetFastMtp}</span>
             </button>
           )}
           <button
@@ -292,7 +294,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
           >
             <Zap size={13} className="text-[var(--theme-text-muted)]" />
-            <span>Быстрый пресет (Flash Attention)</span>
+            <span>{t.settings.localServer.params.presetFast}</span>
           </button>
         </div>
       </div>
@@ -300,29 +302,29 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
       {/* Host & Port */}
       <div className="grid grid-cols-2 gap-3">
         <ParamTextInput
-          label="Host (IP-адрес)"
+          label={t.settings.localServer.params.hostLabel}
           value={host}
           onChange={setHost}
           tooltip={{
-            title: 'Host (Сетевой адрес)',
-            text: 'IP-адрес, на котором локальный сервер слушает входящие запросы. 127.0.0.1 доступен только с вашего ПК, 0.0.0.0 открывает доступ в локальной сети.',
-            benefit: 'Локальная изоляция или раздача по LAN',
+            title: 'Host',
+            text: '127.0.0.1 (local only) or 0.0.0.0 (LAN access).',
+            benefit: 'Local isolation or LAN network distribution',
           }}
         />
         <ParamNumberInput
-          label="Port (Порт)"
+          label={t.settings.localServer.params.portLabel}
           value={port}
           onChange={setPort}
           tooltip={{
-            title: 'Port (Сетевой порт)',
-            text: 'Сетевой порт API сервера. По умолчанию 11434 (стандарт OpenAI/Ollama) или 8080.',
+            title: 'Port',
+            text: 'Server API port (default 11434).',
           }}
         />
       </div>
 
       {/* Context Size -c with quick presets */}
       <ParamSlider
-        label="Размер контекста (-c)"
+        label={t.settings.localServer.params.ctxSizeLabel}
         value={ctxSize}
         onChange={setCtxSize}
         min={512}
@@ -330,34 +332,34 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         step={512}
         presets={CTX_PRESETS}
         tooltip={{
-          title: 'Размер контекста (-c)',
-          text: 'Максимальное количество токенов истории диалога и кода, которые модель может удерживать в памяти одновременно.',
-          benefit: '16k–32k достаточно для 95% проектов',
+          title: 'Context Window Size',
+          text: 'Maximum tokens model retains in memory across turns.',
+          benefit: '16k-32k fits 95% of software projects',
         }}
       />
 
       {/* GPU Layers & CPU Threads */}
       <div className="grid grid-cols-2 gap-3 pt-1">
         <ParamNumberInput
-          label="GPU Layers (-ngl)"
+          label={t.settings.localServer.params.gpuLayersLabel}
           value={gpuLayers}
           onChange={setGpuLayers}
           tooltip={{
-            title: 'Слои GPU (-ngl)',
-            text: 'Сколько слоев нейросети выгрузить в видеопамять (VRAM). Значение 99 выгружает всю модель на видеокарту для максимальной скорости.',
-            benefit: 'Максимальная скорость на GPU',
+            title: 'GPU Offload Layers (-ngl)',
+            text: 'Number of model layers loaded into VRAM. Set 99 to offload entirely to GPU.',
+            benefit: 'Max speed on GPU',
           }}
         />
         <ParamNumberInput
-          label="CPU Threads (-t)"
+          label={t.settings.localServer.params.threadsLabel}
           value={threads}
           min={0}
-          placeholder="0 = Авто"
-          badge={threads === 0 ? 'Авто' : `${threads} потоков`}
+          placeholder={t.settings.localServer.params.threadsAuto}
+          badge={threads === 0 ? t.settings.localServer.params.threadsAuto : formatString(t.settings.localServer.params.threadsCount, { count: threads })}
           onChange={setThreads}
           tooltip={{
-            title: 'Потоки процессора (-t)',
-            text: 'Количество потоков CPU для вычислений. 0 — автоматический подбор под физические ядра вашего процессора.',
+            title: 'CPU Threads (-t)',
+            text: 'CPU compute threads. 0 chooses physical cores automatically.',
           }}
         />
       </div>
@@ -365,21 +367,21 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
       {/* Batch & Micro-Batch */}
       <div className="grid grid-cols-2 gap-3 pt-1">
         <ParamNumberInput
-          label="Batch Size (-b)"
+          label={t.settings.localServer.params.batchSizeLabel}
           value={batchSize}
           onChange={setBatchSize}
           tooltip={{
-            title: 'Размер батча (-b)',
-            text: 'Размер пакета токенов для одновременной обработки промпта. Значение 2048 оптимально для быстрого чтения длинного кода.',
+            title: 'Batch Size (-b)',
+            text: 'Prompt processing token batch size.',
           }}
         />
         <ParamNumberInput
-          label="Micro-Batch (-ub)"
+          label={t.settings.localServer.params.ubatchSizeLabel}
           value={ubatchSize}
           onChange={setUbatchSize}
           tooltip={{
-            title: 'Микро-батч (-ub)',
-            text: 'Размер подпакета вычислений внутри VRAM. 512 обеспечивает идеальный баланс между скоростью и экономией видеопамяти.',
+            title: 'Micro-Batch (-ub)',
+            text: 'Internal compute sub-batch in VRAM.',
           }}
         />
       </div>
@@ -387,7 +389,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
       {/* Temperature & Predict */}
       <div className="grid grid-cols-2 gap-3 pt-1">
         <ParamNumberInput
-          label="Температура (Креативность)"
+          label={t.settings.localServer.params.tempLabel}
           value={temp}
           min={0}
           max={2}
@@ -395,18 +397,18 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           badge={temp.toFixed(2)}
           onChange={setTemp}
           tooltip={{
-            title: 'Температура',
-            text: 'Степень случайности и креативности модели. Для программирования рекомендуется 0.2–0.7 (строгая логика), для идей — 0.8–1.0.',
+            title: 'Temperature',
+            text: 'Sampling randomness. 0.2-0.7 recommended for coding.',
           }}
         />
         <ParamNumberInput
-          label="Макс. токенов ответа (-n)"
+          label={t.settings.localServer.params.predictLabel}
           value={predict}
-          placeholder="-1 = Без лимита"
+          placeholder={t.settings.localServer.params.predictUnlimited}
           onChange={setPredict}
           tooltip={{
-            title: 'Лимит токенов ответа (-n)',
-            text: 'Максимальная длина одного ответа модели. -1 или большие значения позволяют писать длинные файлы без обрезки.',
+            title: 'Max Output Tokens (-n)',
+            text: 'Maximum generation length per response.',
           }}
         />
       </div>
@@ -414,28 +416,28 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
       {/* Sampling Parameters: Min-P, Top-K, Top-P, Repeat Penalty */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
         <ParamNumberInput
-          label="Min-P"
+          label={t.settings.localServer.params.minPLabel}
           value={minP}
           min={0}
           max={1}
           step={0.01}
           onChange={setMinP}
           tooltip={{
-            title: 'Min-P сэмплинг',
-            text: 'Отсекает маловероятные токены относительно самого вероятного. Значение 0.05 отсекает мусорные варианты и защищает от галлюцинаций.',
+            title: 'Min-P Sampling',
+            text: 'Trims low-probability tokens relative to top token.',
           }}
         />
         <ParamNumberInput
-          label="Top-K"
+          label={t.settings.localServer.params.topKLabel}
           value={topK}
           onChange={setTopK}
           tooltip={{
-            title: 'Top-K сэмплинг',
-            text: 'Ограничивает выборку K наиболее вероятными токенами на каждом шаге генерации. 20–40 идеально для точного кода.',
+            title: 'Top-K Sampling',
+            text: 'Restricts candidate pool to top K tokens.',
           }}
         />
         <ParamNumberInput
-          label="Top-P"
+          label={t.settings.localServer.params.topPLabel}
           value={topP}
           min={0}
           max={1}
@@ -443,19 +445,19 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           onChange={setTopP}
           tooltip={{
             title: 'Top-P (Nucleus Sampling)',
-            text: 'Суммарная вероятность пула токенов для выбора. 0.95 сохраняет вариативность языка без потери строгости.',
+            text: 'Cumulative probability threshold for token candidate set.',
           }}
         />
         <ParamNumberInput
-          label="Штраф повторов"
+          label={t.settings.localServer.params.repeatPenaltyLabel}
           value={repeatPenalty}
           min={1}
           max={2}
           step={0.05}
           onChange={setRepeatPenalty}
           tooltip={{
-            title: 'Штраф за повторы (Repeat Penalty)',
-            text: 'Предотвращает зацикливание модели на одних и тех же словах. Для кода рекомендуется 1.0 (без штрафа, чтобы не ломать синтаксис).',
+            title: 'Repeat Penalty',
+            text: 'Penalizes repeated tokens. 1.0 recommended for syntax-precise code.',
           }}
         />
       </div>
@@ -463,31 +465,31 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
       {/* Parallel Slots & Cache Reuse */}
       <div className="grid grid-cols-2 gap-3 pt-1">
         <ParamNumberInput
-          label="Параллельные слоты (-np)"
+          label={t.settings.localServer.params.slotsLabel}
           value={parallelSlots}
           min={1}
           max={8}
           onChange={setParallelSlots}
           tooltip={{
-            title: 'Параллельные слоты (-np)',
-            text: 'Количество одновременно обрабатываемых диалогов. Для персонального локального использования рекомендуется строго 1 слот для экономии VRAM.',
-            benefit: '1 слот экономит до 70% видеопамяти',
+            title: 'Parallel Slots (-np)',
+            text: 'Concurrent dialogue slots. Single slot (1) saves VRAM.',
+            benefit: '1 slot saves up to 70% VRAM',
           }}
         />
         <ParamNumberInput
-          label="Cache Reuse (KV Chunk)"
+          label={t.settings.localServer.params.cacheReuseLabel}
           value={cacheReuse}
           onChange={setCacheReuse}
           tooltip={{
-            title: 'Повторное использование кэша',
-            text: 'Минимальный размер блока кэша для переиспользования между запросами. 256 ускоряет повторные запросы.',
+            title: 'Cache Reuse (KV Chunk)',
+            text: 'Minimum chunk size for KV prompt cache reuse.',
           }}
         />
       </div>
 
       {/* Slot Save Path */}
       <ParamTextInput
-        label="Папка сохранения слотов (--slot-save-path)"
+        label={t.settings.localServer.params.slotSavePathLabel}
         value={slotSavePath}
         onChange={setSlotSavePath}
         placeholder="~/.0xagent/slots or C:\path\to\slots"
@@ -498,12 +500,12 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
           >
             <Folder size={12} />
-            <span>Обзор...</span>
+            <span>{t.common.browse}</span>
           </button>
         }
         tooltip={{
-          title: 'Сохранение состояния слотов',
-          text: 'Путь к директории, в которую сервер сохраняет состояние KV-кэша для мгновенного восстановления контекста после перезагрузки.',
+          title: 'Slot State Directory',
+          text: 'Directory where server state and KV cache are saved across sessions.',
         }}
       />
 
@@ -514,16 +516,16 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             <div className="flex items-center gap-2">
               <Sparkles size={16} className="text-[var(--theme-accent)]" />
               <span className="text-xs font-bold text-[var(--theme-text)]">
-                Ускорение генерации (MTP)
+                {t.settings.localServer.params.mtpTitle}
               </span>
               <InfoTooltip
-                title="Аппаратное MTP ускорение"
-                text="Спекулятивное декодирование токенов за 1 шаг GPU. Для моделей со встроенными MTP-слоями ускорение работает нативно на весах основной модели без дополнительных файлов."
-                benefit="Спекулятивное предсказание токенов за шаг"
+                title="Hardware MTP"
+                text="Multi-Token Prediction accelerates token generation in 1 GPU step."
+                benefit="Hardware multi-token prediction"
               />
             </div>
             <p className="text-[11px] text-[var(--theme-text-muted)]">
-              Аппаратное предугадывание следующих токенов через встроенный MTP-слой модели
+              {t.settings.localServer.params.mtpDesc}
             </p>
           </div>
 
@@ -533,7 +535,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             className={`w-12 h-6.5 rounded-full p-1 flex items-center transition-all cursor-pointer shrink-0 shadow-inner ${
               isMtpEnabled ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30' : 'bg-zinc-300 dark:bg-zinc-700'
             }`}
-            title={isMtpEnabled ? 'Отключить MTP ускорение' : 'Включить MTP ускорение'}
+            title={isMtpEnabled ? 'Disable MTP' : 'Enable MTP'}
           >
             <div
               className={`w-4.5 h-4.5 rounded-full bg-white transition-transform shadow-md ${
@@ -549,20 +551,20 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
                   <Zap size={14} className="animate-pulse text-emerald-500" />
-                  <span>Встроенный MTP-слой активен (Native draft-mtp)</span>
+                  <span>{t.settings.localServer.params.mtpNativeDraft}</span>
                 </div>
                 <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                  Определены аппаратные MTP-головы (<code className="font-mono text-emerald-600 dark:text-emerald-300 font-semibold">nextn_predict_layers = 1</code>). Ускорение работает нативно на весах модели.
+                  {t.settings.localServer.params.mtpNativeDraftDesc}
                 </p>
               </div>
             ) : (
               <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
                   <Zap size={14} className="text-emerald-500" />
-                  <span>Спекулятивное ускорение активно</span>
+                  <span>{t.settings.localServer.params.mtpActive}</span>
                 </div>
                 <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                  Аппаратное предугадывание следующих токенов включено.
+                  {t.settings.localServer.params.mtpActiveDesc}
                 </p>
               </div>
             )}
@@ -575,12 +577,12 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center">
             <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
-              Дополнительные CLI флаги (Custom Args)
+              {t.settings.localServer.params.customArgsLabel}
             </label>
             <InfoTooltip
-              title="Дополнительные CLI флаги"
-              text="Прямые параметры командной строки llama.cpp. Например, квантование контекста -ctk q8_0 -ctv q8_0 экономит до 50% видеопамяти VRAM."
-              benefit="Квантование KV-кэша удваивает доступный контекст"
+              title="CLI Custom Args"
+              text="Direct CLI arguments for llama-server.exe. e.g. -ctk q8_0 -ctv q8_0 saves 50% VRAM."
+              benefit="KV quantization doubles context capacity"
             />
           </div>
           <div className="flex gap-1.5">
@@ -592,7 +594,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
                   ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] font-bold shadow-sm'
                   : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border-[var(--theme-border)] hover:text-[var(--theme-text)]'
               }`}
-              title="Сжатие KV-кэша в 8-бит (экономит 50% VRAM контекста)"
+              title="8-bit KV cache quantization (saves 50% VRAM)"
             >
               Q8_0 KV
             </button>
@@ -604,7 +606,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
                   ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] font-bold shadow-sm'
                   : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border-[var(--theme-border)] hover:text-[var(--theme-text)]'
               }`}
-              title="Сжатие KV-кэша в 4-бит (максимальная экономия VRAM)"
+              title="4-bit KV cache quantization (max VRAM savings)"
             >
               Q4_0 KV
             </button>
@@ -613,7 +615,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
                 type="button"
                 onClick={() => setCustomArgs('')}
                 className="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-rose-500 border border-[var(--theme-border)] cursor-pointer"
-                title="Очистить"
+                title={t.settings.localServer.params.clearBtn}
               >
                 [x]
               </button>
@@ -624,7 +626,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           type="text"
           value={customArgs}
           onChange={(e) => setCustomArgs(e.target.value)}
-          placeholder="Например: -ctk q8_0 -ctv q8_0"
+          placeholder="-ctk q8_0 -ctv q8_0"
           className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
         />
       </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AsciiCanvasEngine } from './common/AsciiCanvasEngine';
 import * as api from '../services/api';
+import { useI18n } from '../i18n';
 
 interface LockScreenProps {
   isPasswordSet: boolean;
@@ -8,6 +9,7 @@ interface LockScreenProps {
 }
 
 export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthenticated }) => {
+  const { t } = useI18n();
   const [mode, setMode] = useState<'setup' | 'login'>(isPasswordSet ? 'login' : 'setup');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -43,11 +45,11 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
   const handleSetup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password.trim().length < 4) {
-      setErrorMsg('Пароль должен содержать не менее 4 символов');
+      setErrorMsg(t.settings.general.passwordMinLength);
       return;
     }
     if (password !== confirmPassword) {
-      setErrorMsg('Пароли не совпадают');
+      setErrorMsg(t.settings.general.passwordMismatch);
       return;
     }
 
@@ -59,10 +61,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
       if (res.success) {
         onAuthenticated();
       } else {
-        setErrorMsg(res.error || 'Не удалось установить пароль');
+        setErrorMsg(res.error || 'Failed to setup password');
       }
     } catch (err: any) {
-      setErrorMsg(`Ошибка сети: ${err.message || err}`);
+      setErrorMsg(`${t.common.error}: ${err.message || err}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -71,7 +73,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) {
-      setErrorMsg('Введите мастер-пароль');
+      setErrorMsg(t.settings.general.enterCurrentPassword);
       return;
     }
 
@@ -87,10 +89,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
           setIsLockedOut(true);
           setLockoutRemainingSec(res.remainingSec);
         }
-        setErrorMsg(res.error || 'Неверный мастер-пароль');
+        setErrorMsg(res.error || 'Invalid master password');
       }
     } catch (err: any) {
-      setErrorMsg(`Ошибка сервера: ${err.message || err}`);
+      setErrorMsg(`${t.common.error}: ${err.message || err}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -122,7 +124,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
 
         {/* Security Gateway Badge */}
         <div className="text-[11px] font-mono tracking-widest text-[var(--theme-text-muted)] uppercase text-center">
-          :: [SECURITY_GATEWAY]
+          {t.lockScreen.securityGateway}
         </div>
 
         {/* Error Alert */}
@@ -146,7 +148,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Новый мастер-пароль"
+              placeholder={t.lockScreen.newPasswordPlaceholder}
               className="w-full px-3.5 py-2.5 rounded-lg bg-white/5 border border-white/10 text-xs font-mono text-white placeholder-white/30 focus:border-white/30 focus:outline-none transition-colors"
               autoFocus
               required
@@ -156,7 +158,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Повторите пароль"
+              placeholder={t.lockScreen.confirmPasswordPlaceholder}
               className="w-full px-3.5 py-2.5 rounded-lg bg-white/5 border border-white/10 text-xs font-mono text-white placeholder-white/30 focus:border-white/30 focus:outline-none transition-colors"
               required
             />
@@ -166,7 +168,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
               disabled={isSubmitting}
               className="w-full mt-1 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 active:scale-[0.99] border border-white/15 text-xs font-mono font-medium tracking-wider text-white transition-all cursor-pointer disabled:opacity-40"
             >
-              [Установить пароль]
+              {t.lockScreen.setPasswordBtn}
             </button>
           </form>
         ) : (
@@ -175,7 +177,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Мастер-пароль"
+              placeholder={t.lockScreen.masterPasswordPlaceholder}
               disabled={isLockedOut}
               className="w-full px-3.5 py-2.5 rounded-lg bg-white/5 border border-white/10 text-xs font-mono text-white placeholder-white/30 focus:border-white/30 focus:outline-none transition-colors disabled:opacity-40"
               autoFocus
@@ -187,7 +189,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({ isPasswordSet, onAuthent
               disabled={isSubmitting || isLockedOut}
               className="w-full mt-1 py-2.5 rounded-lg bg-white/10 hover:bg-white/20 active:scale-[0.99] border border-white/15 text-xs font-mono font-medium tracking-wider text-white transition-all cursor-pointer disabled:opacity-40"
             >
-              [Войти]
+              {t.lockScreen.loginBtn}
             </button>
           </form>
         )}

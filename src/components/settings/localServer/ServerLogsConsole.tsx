@@ -1,5 +1,6 @@
 import React from 'react';
 import { Terminal, Check, Copy, FileText, Trash2 } from 'lucide-react';
+import { useI18n } from '../../../i18n';
 
 interface ServerLogsConsoleProps {
   serverLogs: string[];
@@ -26,6 +27,8 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
   logsContainerRef,
   logsEndRef,
 }) => {
+  const { t } = useI18n();
+
   return (
     <div className="bento-card border border-[var(--theme-border)] rounded-2xl overflow-hidden flex flex-col h-[680px] max-h-[calc(100vh-140px)] shadow-2xl font-sans bg-[var(--theme-panel)]">
       {/* Terminal Header Bar */}
@@ -36,7 +39,7 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
           </div>
           <div>
             <div className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-2">
-              <span>Логи Сервера Llama.cpp</span>
+              <span>{t.settings.localServer.logs.title}</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             {logFilePath && (
@@ -56,37 +59,37 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
               onChange={(e) => setServerLogsAutoScroll(e.target.checked)}
               className="rounded accent-[var(--theme-accent)]"
             />
-            <span>Auto-scroll</span>
+            <span>{t.settings.localServer.logs.autoScroll}</span>
           </label>
 
           <button
             type="button"
             onClick={onCopyLogs}
             className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-[var(--theme-text)] flex items-center gap-1.5 transition-all cursor-pointer text-[11px] font-medium shadow-sm"
-            title="Копировать все логи"
+            title="Copy logs"
           >
             {isCopiedLogs ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-            <span>{isCopiedLogs ? 'Скопировано' : 'Копия'}</span>
+            <span>{isCopiedLogs ? t.settings.localServer.logs.copied : t.settings.localServer.logs.copy}</span>
           </button>
 
           <button
             type="button"
             onClick={onDownloadLogs}
             className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-[var(--theme-text)] flex items-center gap-1.5 transition-all cursor-pointer text-[11px] font-medium shadow-sm"
-            title="Скачать файл логов"
+            title="Download log file"
           >
             <FileText size={12} />
-            <span>Файл</span>
+            <span>{t.settings.localServer.logs.file}</span>
           </button>
 
           <button
             type="button"
             onClick={onClearLogs}
             className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-[var(--theme-text-muted)] cursor-pointer transition-all text-[11px] font-medium flex items-center gap-1"
-            title="Очистить экран логов"
+            title="Clear console logs"
           >
             <Trash2 size={12} />
-            <span>Очистить</span>
+            <span>{t.settings.localServer.logs.clear}</span>
           </button>
         </div>
       </div>
@@ -125,7 +128,7 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
         ) : (
           <div className="text-zinc-400 italic p-6 text-center text-xs flex flex-col items-center justify-center h-full gap-2 select-none">
             <Terminal size={24} className="opacity-30 mb-1" />
-            <span>Логи сервера будут автоматически сохранены и отображены в этом окне при запуске llama-server.exe.</span>
+            <span>{t.settings.localServer.logs.emptyLogs}</span>
           </div>
         )}
         <div ref={logsEndRef} />

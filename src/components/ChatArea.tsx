@@ -18,6 +18,7 @@ import { TelemetryHUD } from './chat/TelemetryHUD';
 import { ChatMessageItem } from './chat/ChatMessageItem';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useI18n } from '../i18n';
 import { sounds } from '../services/soundEffects';
 
 interface ChatAreaProps {
@@ -69,6 +70,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   onOpenCustomizations,
 }) => {
   const { showToast } = useToast();
+  const { t } = useI18n();
   const [inputText, setInputText] = useState('');
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
@@ -79,7 +81,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Summarization state
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [summarizePhase, setSummarizePhase] = useState('Инициализация суммаризации...');
+  const [summarizePhase, setSummarizePhase] = useState(t.chat.summarizedContext);
   const [summarizePercent, setSummarizePercent] = useState(0);
   const [summarizeMetrics, setSummarizeMetrics] = useState<{ oldTokens?: number; newTokens?: number }>({});
 
@@ -363,7 +365,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                 <span className="font-bold text-[var(--theme-text)]">{summarizePhase}</span>
                 {summarizeMetrics.oldTokens && (
                   <span className="text-[var(--theme-text-muted)] text-[11px] hidden sm:inline">
-                    ({summarizeMetrics.oldTokens.toLocaleString()} токенов)
+                    ({summarizeMetrics.oldTokens.toLocaleString()} {t.chat.tokens})
                   </span>
                 )}
               </div>

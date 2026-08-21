@@ -91,6 +91,8 @@ export type AppTheme =
   | 'sky_industrial'
   | 'terracotta_dust';
 
+export type AppLanguage = 'en' | 'ru';
+
 export interface AppConfig {
   api_url: string;
   model_name: string;
@@ -98,6 +100,7 @@ export interface AppConfig {
   active_prompt_file?: string | null;
   active_persona_id?: string | null;
   workspace_dir?: string | null;
+  language?: AppLanguage | null;
   groq_api_key?: string | null;
   gemini_api_key?: string | null;
   active_theme?: AppTheme | string | null;

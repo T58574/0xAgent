@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Activity, Zap, Database, CheckCircle2, RefreshCw, Layers, Search, Terminal } from 'lucide-react';
 import { MaterialIcon } from '../common/MaterialIcon';
 import { ChatSession, ChatMessage } from '../../types';
+import { useI18n } from '../../i18n';
 
 interface AnalyticsPageProps {
   sessions: ChatSession[];
@@ -10,6 +11,7 @@ interface AnalyticsPageProps {
 }
 
 export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLogs, onRefresh }) => {
+  const { t, formatString } = useI18n();
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'high_speed' | 'high_context' | 'errors'>('all');
 
@@ -100,10 +102,10 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         <div>
           <h1 className="text-lg sm:text-xl font-bold text-[var(--theme-text)] flex items-center gap-2.5">
             <Activity size={22} className="text-[var(--theme-accent)]" />
-            <span>Аналитика & Телеметрия Производительности</span>
+            <span>{t.analytics.title}</span>
           </h1>
           <p className="text-xs text-[var(--theme-text-muted)] mt-1 font-mono">
-            Мониторинг скорости токенов (t/s), заполнения контекста, объема диалогов и надежности в реальном времени.
+            {t.analytics.subtitle}
           </p>
         </div>
 
@@ -114,7 +116,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
             className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text)] flex items-center gap-2 cursor-pointer shadow-sm transition-colors"
           >
             <RefreshCw size={13} />
-            <span>Обновить данные</span>
+            <span>{t.analytics.refreshBtn}</span>
           </button>
         )}
       </div>
@@ -125,36 +127,36 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         {/* KPI 1: Speed */}
         <div className="p-4.5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-2 text-xs font-bold uppercase tracking-wider">
-            <span>Средняя Скорость (t/s)</span>
+            <span>{t.analytics.avgSpeed}</span>
             <Zap size={16} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-accent)] transition-colors" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold font-mono text-[var(--theme-text)] tracking-tight">
-            {stats.avgSpeed} <span className="text-xs font-sans text-[var(--theme-text-muted)] font-normal">т/сек</span>
+            {stats.avgSpeed} <span className="text-xs font-sans text-[var(--theme-text-muted)] font-normal">{t.analytics.speedUnit}</span>
           </div>
           <div className="text-xs text-[var(--theme-text-muted)] mt-2 flex items-center gap-1 font-mono">
-            <span className="font-bold text-[var(--theme-text)]">Живой расчет</span> генерации токенов
+            {t.analytics.liveCalc}
           </div>
         </div>
 
         {/* KPI 2: Tokens */}
         <div className="p-4.5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-2 text-xs font-bold uppercase tracking-wider">
-            <span>Обработано Токенов</span>
+            <span>{t.analytics.tokensProcessed}</span>
             <Database size={16} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-accent)] transition-colors" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold font-mono text-[var(--theme-text)] tracking-tight">
             {stats.totalTokens.toLocaleString()}
           </div>
           <div className="text-xs text-[var(--theme-text-muted)] mt-2 flex items-center justify-between font-mono">
-            <span>Промпт: {stats.totalPromptTokens.toLocaleString()}</span>
-            <span>Вывод: {stats.totalEvalTokens.toLocaleString()}</span>
+            <span>{t.analytics.promptTokens}: {stats.totalPromptTokens.toLocaleString()}</span>
+            <span>{t.analytics.evalTokens}: {stats.totalEvalTokens.toLocaleString()}</span>
           </div>
         </div>
 
         {/* KPI 3: Context Peak */}
         <div className="p-4.5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-2 text-xs font-bold uppercase tracking-wider">
-            <span>Пик Контекстного Окна</span>
+            <span>{t.analytics.contextPeak}</span>
             <MaterialIcon name="psychology" size={18} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-accent)] transition-colors" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold font-mono text-[var(--theme-text)] tracking-tight">
@@ -171,15 +173,15 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         {/* KPI 4: Reliability */}
         <div className="p-4.5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm relative overflow-hidden group">
           <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-2 text-xs font-bold uppercase tracking-wider">
-            <span>Надежность Исполнения</span>
+            <span>{t.analytics.reliability}</span>
             <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-accent)] transition-colors" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold font-mono text-[var(--theme-text)] tracking-tight">
             {stats.successRate}%
           </div>
           <div className="text-xs text-[var(--theme-text-muted)] mt-2 flex items-center justify-between font-mono">
-            <span>Всего ответов: {stats.totalCount}</span>
-            <span className={stats.errorCount > 0 ? 'text-rose-500 font-bold' : ''}>Ошибок: {stats.errorCount}</span>
+            <span>{t.analytics.totalResponses}: {stats.totalCount}</span>
+            <span className={stats.errorCount > 0 ? 'text-rose-500 font-bold' : ''}>{t.analytics.errorsCount}: {stats.errorCount}</span>
           </div>
         </div>
 
@@ -191,10 +193,10 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
           <div className="flex items-center gap-2">
             <Layers className="text-[var(--theme-accent)]" size={18} />
             <h2 className="text-xs font-bold text-[var(--theme-text)] uppercase tracking-wider">
-              Логи Телеметрии Сообщений
+              {t.analytics.logsTitle}
             </h2>
             <span className="px-2 py-0.5 rounded-md text-[11px] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] font-mono border border-[var(--theme-border)] font-bold">
-              {filteredMessages.length} записей
+              {formatString(t.analytics.recordsCount, { count: filteredMessages.length })}
             </span>
           </div>
 
@@ -206,7 +208,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="Поиск по тексту или модели..."
+                placeholder={t.analytics.searchPlaceholder}
                 className="pl-8.5 pr-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] focus:outline-none w-48 sm:w-56 font-medium"
               />
             </div>
@@ -220,7 +222,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
                   : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
               }`}
             >
-              Все
+              {t.analytics.filterAll}
             </button>
             <button
               type="button"
@@ -231,7 +233,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
                   : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
               }`}
             >
-              Высокая скорость (≥30 t/s)
+              {t.analytics.filterSpeed}
             </button>
             <button
               type="button"
@@ -242,7 +244,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
                   : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)]'
               }`}
             >
-              Ошибки ({stats.errorCount})
+              {formatString(t.analytics.filterErrors, { count: stats.errorCount })}
             </button>
           </div>
         </div>
@@ -252,19 +254,19 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
           <table className="w-full text-xs text-left border-collapse font-sans">
             <thead className="bg-[var(--theme-border-subtle)] text-[var(--theme-text)] font-bold border-b border-[var(--theme-border)] uppercase tracking-wider text-[10.5px]">
               <tr>
-                <th className="p-3.5">Время / Сессия</th>
-                <th className="p-3.5">Модель</th>
-                <th className="p-3.5">Скорость (t/s)</th>
-                <th className="p-3.5">Токены (Промпт / Вывод)</th>
-                <th className="p-3.5">Заполнение Контекста</th>
-                <th className="p-3.5">Время (мс)</th>
+                <th className="p-3.5">{t.analytics.thTime}</th>
+                <th className="p-3.5">{t.analytics.thModel}</th>
+                <th className="p-3.5">{t.analytics.thSpeed}</th>
+                <th className="p-3.5">{t.analytics.thTokens}</th>
+                <th className="p-3.5">{t.analytics.thContext}</th>
+                <th className="p-3.5">{t.analytics.thDuration}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--theme-border)] bg-[var(--theme-card-bg)] font-mono text-[var(--theme-text)]">
               {filteredMessages.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-[var(--theme-text-muted)] font-sans">
-                    Записи телеметрии не найдены.
+                    {t.analytics.noRecords}
                   </td>
                 </tr>
               ) : (
@@ -333,12 +335,12 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         <div className="flex items-center gap-2">
           <Terminal className="text-[var(--theme-text-muted)]" size={18} />
           <h2 className="text-xs font-bold text-[var(--theme-text)] uppercase tracking-wider">
-            Живой Терминал и Системный Лог Сервера
+            {t.analytics.serverLogsTitle}
           </h2>
         </div>
         <div className="bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] p-3.5 rounded-xl border border-[var(--theme-border)] font-mono text-xs max-h-52 overflow-y-auto whitespace-pre-wrap leading-relaxed">
           {serverLogs.length === 0 ? (
-            <span className="text-[var(--theme-text-muted)]">Логи сервера пока отсутствуют.</span>
+            <span className="text-[var(--theme-text-muted)]">{t.analytics.noServerLogs}</span>
           ) : (
             serverLogs.slice(-50).map((log, idx) => (
               <div key={idx} className={log.includes('[ERROR]') || log.includes('Ошибка') ? 'text-rose-500 font-bold' : ''}>

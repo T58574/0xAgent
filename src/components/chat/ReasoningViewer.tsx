@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { LiveTelemetry } from '../../types';
 import { extractThoughtSteps, ThoughtStep } from '../../utils/helpers';
 import { MaterialIcon } from '../common/MaterialIcon';
+import { useI18n } from '../../i18n';
 
 interface ReasoningViewerProps {
   thinking: string;
@@ -20,6 +21,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
   liveTelemetry,
   defaultExpanded = false,
 }) => {
+  const { language, t } = useI18n();
   const [isOpen, setIsOpen] = useState(defaultExpanded);
   const [copied, setCopied] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -45,13 +47,13 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
   // Extract dynamic last thought line for live ticker preview while collapsed (memoized)
   const lastThoughtSnippet = useMemo(() => {
     if (!thinking || !thinking.trim()) {
-      return isLive ? 'Инициализация контекста и генерация рассуждений...' : 'Ход мыслей модели';
+      return isLive ? t.chat.thinking : t.chat.reasoningTitle;
     }
     const lines = thinking.trim().split('\n');
     const lastLine = lines[lines.length - 1] || '';
     const clean = lastLine.replace(/^[-*#\d\.\)\s]+/, '').trim();
-    return clean.length > 75 ? `${clean.substring(0, 72)}...` : (clean || 'Анализ контекста и планирование действий...');
-  }, [thinking, isLive]);
+    return clean.length > 75 ? `${clean.substring(0, 72)}...` : (clean || t.chat.thinking);
+  }, [thinking, isLive, t]);
 
   // Extract structured steps lazily only when expanded or when short
   const steps: ThoughtStep[] = useMemo(() => {
@@ -98,19 +100,19 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           <div className="flex flex-col text-left min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap text-xs">
               <span className="font-bold text-[var(--theme-text)]">
-                {isLive ? 'ИИ-Агент рассуждает...' : 'Ход мыслей модели'}
+                {isLive ? t.chat.thinking : t.chat.reasoningTitle}
               </span>
 
               {/* Status / Step Badges */}
               {!isLive && steps.length > 1 && (
                 <span className="px-2 py-0.5 rounded-md text-[10px] bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border border-[var(--theme-border)] font-semibold">
-                  {steps.length} этапа
+                  {steps.length} {language === 'ru' ? 'этапа' : 'steps'}
                 </span>
               )}
 
               {!isLive && wordCount > 0 && (
                 <span className="px-2 py-0.5 rounded-md text-[10px] bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)] hidden sm:inline">
-                  {wordCount} слов
+                  {wordCount} {language === 'ru' ? 'слов' : 'words'}
                 </span>
               )}
             </div>
@@ -137,7 +139,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-[10px] text-sky-600 dark:text-sky-300 font-bold">
               <MaterialIcon name="bolt" size={12} />
-              <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
+              <span>{liveTelemetry.tokensPerSec.toFixed(1)} {t.chat.speed}</span>
             </span>
           )}
 
@@ -145,7 +147,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           {liveTelemetry?.tokenCount !== undefined && liveTelemetry.tokenCount > 0 && (
             <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-semibold">
               <MaterialIcon name="memory" size={12} className="text-[var(--theme-text-muted)]" />
-              <span>{liveTelemetry.tokenCount} tok</span>
+              <span>{liveTelemetry.tokenCount} {t.chat.tokens}</span>
             </span>
           )}
 
@@ -161,7 +163,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           {(isLive || thinkingSeconds > 0) && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-bold">
               <MaterialIcon name="schedule" size={12} />
-              <span>{thinkingSeconds.toFixed(1)}s</span>
+              <span>{thinkingSeconds.toFixed(1)}{t.chat.seconds}</span>
             </span>
           )}
 
@@ -179,7 +181,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           <div className="px-4 py-2 bg-[var(--theme-card-bg)] border-b border-[var(--theme-border)] flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] select-none">
             <div className="flex items-center gap-2">
               <span className="text-sky-500 font-bold">›</span>
-              <span className="font-bold text-[11px] text-[var(--theme-text)]">Chain-of-Thought Stream</span>
+              <span className="font-bold text-[11px] text-[var(--theme-text)]">{t.chat.reasoningTitle}</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -192,7 +194,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
                       ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
                       : 'bg-[var(--theme-card-bg)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                   }`}
-                  title="Автопрокрутка к новым рассуждениям"
+                  title={autoScroll ? '[SCROLL: ON]' : '[SCROLL: OFF]'}
                 >
                   <span>{autoScroll ? '[SCROLL: ON]' : '[SCROLL: OFF]'}</span>
                 </button>
@@ -202,9 +204,9 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
                 type="button"
                 onClick={handleCopy}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-all cursor-pointer shadow-sm"
-                title="Скопировать текст рассуждений"
+                title={t.chat.copyCode}
               >
-                <span>{copied ? '[COPIED!]' : '[COPY]'}</span>
+                <span>{copied ? `[${t.chat.copied.toUpperCase()}]` : `[${t.common.copy.toUpperCase()}]`}</span>
               </button>
             </div>
           </div>
@@ -238,7 +240,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
               ))
             ) : (
               <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic">
-                {isLive ? '[ Ожидание входящего потока рассуждений... ]' : '[ Рассуждения отсутствуют ]'}
+                {isLive ? `[ ${t.chat.thinking} ]` : `[ ${t.chat.reasoning} ]`}
               </div>
             )}
 
@@ -246,7 +248,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
             {isLive && (
               <div className="flex items-center gap-2 pt-1 text-[var(--theme-text)] text-xs">
                 <span className="inline-block w-2 h-3.5 bg-[var(--theme-accent)] animate-pulse" />
-                <span className="text-[10px] text-[var(--theme-text-muted)] italic font-semibold">Генерация мыслей...</span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] italic font-semibold">{t.chat.thinking}</span>
               </div>
             )}
           </div>

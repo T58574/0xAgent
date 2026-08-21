@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { ContextBreakdownReport, AppConfig } from '../../types';
 import * as api from '../../services/api';
+import { useI18n } from '../../i18n';
 
 interface CustomizationsTabProps {
   config: AppConfig | null;
@@ -25,6 +26,7 @@ interface CustomizationsTabProps {
 }
 
 export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, currentSessionId }) => {
+  const { t, formatString } = useI18n();
   const [report, setReport] = useState<ContextBreakdownReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [showBreakdowns, setShowBreakdowns] = useState(true);
@@ -92,23 +94,23 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
   };
 
   const translateCategoryName = (name: string, catKey: string) => {
-    if (name.toLowerCase().includes('спецификации инструментов') || catKey === 'tools') return 'Спецификации инструментов';
-    if (name.toLowerCase().includes('личность') || catKey === 'persona') return 'Личность и директивы (SOUL.md)';
-    if (name.toLowerCase().includes('профиль') || catKey === 'user_profile') return 'Профиль пользователя (USER.md)';
-    if (name.toLowerCase().includes('окружение') || catKey === 'environment') return 'Окружение ОС и PowerShell';
-    if (name.toLowerCase().includes('планирования') || catKey === 'planning') return 'Режим планирования (Planning Mode)';
-    if (name.toLowerCase().includes('правила проекта') || catKey === 'workspace_rules') return 'Правила проекта (.0xagent.md)';
-    if (name.toLowerCase().includes('память') || catKey === 'memory') return 'Долгосрочная память';
-    if (name.toLowerCase().includes('история') || catKey === 'history') return 'История сообщений диалога';
-    if (name.toLowerCase().includes('скиллы') || catKey === 'skills') return 'Скиллы и навыки';
+    if (catKey === 'tools' || name.toLowerCase().includes('tools')) return t.settings.customizations.catTools;
+    if (catKey === 'persona' || name.toLowerCase().includes('soul')) return t.settings.customizations.catPersona;
+    if (catKey === 'user_profile' || name.toLowerCase().includes('user')) return t.settings.customizations.catUser;
+    if (catKey === 'environment' || name.toLowerCase().includes('environment') || name.toLowerCase().includes('окружение')) return t.settings.customizations.catEnv;
+    if (catKey === 'planning' || name.toLowerCase().includes('planning')) return t.settings.customizations.catPlanning;
+    if (catKey === 'workspace_rules' || name.toLowerCase().includes('rules') || name.toLowerCase().includes('правила')) return t.settings.customizations.catRules;
+    if (catKey === 'memory' || name.toLowerCase().includes('memory') || name.toLowerCase().includes('память')) return t.settings.customizations.catMemory;
+    if (catKey === 'history' || name.toLowerCase().includes('history') || name.toLowerCase().includes('история')) return t.settings.customizations.catHistory;
+    if (catKey === 'skills' || name.toLowerCase().includes('skills') || name.toLowerCase().includes('скиллы')) return t.settings.customizations.catSkills;
     return name;
   };
 
   const translateScope = (scope?: string) => {
     if (!scope) return null;
     const lower = scope.toLowerCase();
-    if (lower === 'global') return 'Глобально';
-    if (lower === 'workspace') return 'Проект';
+    if (lower === 'global') return t.settings.customizations.scopeGlobal;
+    if (lower === 'workspace') return t.settings.customizations.scopeWorkspace;
     return scope;
   };
 
@@ -118,10 +120,10 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
       <div className="flex items-center justify-between pb-3 border-b border-[var(--theme-border)]">
         <div>
           <h1 className="text-base md:text-lg font-bold text-[var(--theme-text)]">
-            Кастомизации и Расход Токенов
+            {t.settings.customizations.title}
           </h1>
           <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-            Настройка системного поведения, скиллов, промптов и детальный аудит расхода контекста ИИ.
+            {t.settings.customizations.subtitle}
           </p>
         </div>
         <button
@@ -129,49 +131,49 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
           onClick={fetchBreakdown}
           disabled={loading}
           className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] text-xs font-bold transition-colors cursor-pointer flex items-center gap-2 shadow-sm"
-          title="Обновить аналитику токенов"
+          title={t.settings.customizations.refreshBtn}
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-          <span>Обновить</span>
+          <span>{t.settings.customizations.refreshBtn}</span>
         </button>
       </div>
 
       {/* Main Token Usage Infographic Card */}
       <div className="space-y-3">
         <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--theme-text-muted)]">
-          Инфографика контекстного бюджета
+          {t.settings.customizations.budgetTitle}
         </h2>
 
         {report ? (
           <div className="p-5 rounded-2xl bento-card space-y-4 border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm">
             <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed">
-              Детализация расхода токенов на кастомизации и системные инструкции. При заполнении окна свыше 75% активируется фоновый 4-уровневый конвейер сжатия.
+              {t.settings.customizations.budgetDesc}
             </p>
 
             {/* Availability Percentage & Quick Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
               <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">Свободно</span>
+                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">{t.settings.customizations.available}</span>
                 <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
                   {report.availablePercentage}%
                 </span>
-                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">от лимита контекста</span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">{t.settings.customizations.limitContext}</span>
               </div>
 
               <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">Занято токенов</span>
+                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">{t.settings.customizations.usedTokens}</span>
                 <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
                   {report.totalUsed.toLocaleString()} <span className="text-xs font-normal text-[var(--theme-text-muted)]">/ {report.totalBudget.toLocaleString()}</span>
                 </span>
-                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">системные инструкции</span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">{t.settings.customizations.systemInst}</span>
               </div>
 
               <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">Категорий</span>
+                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">{t.settings.customizations.categoriesCount}</span>
                 <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
                   {report.categories.length}
                 </span>
-                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">активных директив</span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">{t.settings.customizations.activeDirectives}</span>
               </div>
             </div>
 
@@ -187,7 +189,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                       backgroundColor: cat.color,
                     }}
                     className="h-full first:rounded-l-full last:rounded-r-full transition-all duration-500 hover:brightness-125"
-                    title={`${translateCategoryName(cat.name, cat.category)}: ${cat.tokens.toLocaleString()} токенов (${cat.percentage}%)`}
+                    title={`${translateCategoryName(cat.name, cat.category)}: ${cat.tokens.toLocaleString()} (${cat.percentage}%)`}
                   />
                 );
               })}
@@ -219,7 +221,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                 onClick={() => setShowBreakdowns(!showBreakdowns)}
                 className="text-xs font-bold text-[var(--theme-text)] hover:underline transition-colors cursor-pointer flex items-center gap-1 shrink-0 ml-auto"
               >
-                <span>{showBreakdowns ? 'Свернуть категории' : `Показать все (${report.categories.length})`}</span>
+                <span>{showBreakdowns ? t.settings.customizations.collapseCategories : formatString(t.settings.customizations.showAllCategories, { count: report.categories.length })}</span>
                 <ChevronDown size={14} className={`transition-transform duration-200 ${showBreakdowns ? 'rotate-180' : ''}`} />
               </button>
             </div>
@@ -227,7 +229,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
         ) : (
           <div className="p-8 rounded-2xl bento-card text-center text-xs text-[var(--theme-text-muted)] flex items-center justify-center gap-2 border border-[var(--theme-border)]">
             <RefreshCw size={14} className="animate-spin" />
-            <span>Анализ контекста...</span>
+            <span>{t.common.loading}</span>
           </div>
         )}
       </div>
@@ -236,7 +238,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
       {showBreakdowns && report && (
         <div className="space-y-3">
           <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--theme-text-muted)]">
-            Структура категорий
+            {t.settings.customizations.structureTitle}
           </h2>
 
           <div className="space-y-2.5">
@@ -272,7 +274,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
 
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-mono text-[var(--theme-text-muted)] font-semibold">
-                        {cat.tokens.toLocaleString()} токенов <span className="text-[10px] opacity-70">({cat.percentage}%)</span>
+                        {cat.tokens.toLocaleString()} tok <span className="text-[10px] opacity-70">({cat.percentage}%)</span>
                       </span>
                       <div
                         className="w-2.5 h-2.5 rounded-full"
@@ -310,7 +312,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                                   )}
                                   {detail.enabled !== undefined && (
                                     <span className={`text-[9px] font-mono px-2 py-0.5 rounded-md font-bold ${detail.enabled ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'}`}>
-                                      {detail.enabled ? '[АКТИВЕН]' : '[ВЫКЛ]'}
+                                      {detail.enabled ? t.settings.customizations.activeBadge : t.settings.customizations.inactiveBadge}
                                     </span>
                                   )}
                                 </div>
@@ -330,7 +332,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                                     type="button"
                                     onClick={() => handleCopy(detail.id, detail.preview!)}
                                     className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer border border-[var(--theme-border)]"
-                                    title="Скопировать директиву"
+                                    title={t.settings.customizations.copyTooltip}
                                   >
                                     {copiedId === detail.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
                                   </button>
@@ -345,14 +347,14 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                       {!hasDetails && cat.contentPreview && (
                         <div className="space-y-2 pt-1">
                           <div className="flex items-center justify-between text-[10px] font-mono text-[var(--theme-text-muted)] font-bold">
-                            <span>ПРЕДПРОСМОТР СОДЕРЖИМОГО</span>
+                            <span>{t.settings.customizations.contentPreview}</span>
                             <button
                               type="button"
                               onClick={() => handleCopy(cat.id, cat.contentPreview!)}
                               className="flex items-center gap-1 hover:text-[var(--theme-text)] cursor-pointer"
                             >
                               {copiedId === cat.id ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
-                              <span>Копировать</span>
+                              <span>{t.common.copy}</span>
                             </button>
                           </div>
                           <pre className="p-3 rounded-xl bg-[var(--theme-code-bg)] border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-code-text)] overflow-x-auto max-h-48 whitespace-pre-wrap leading-relaxed">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ToolCallInfo } from '../types';
 import { MaterialIcon } from './common/MaterialIcon';
+import { useI18n } from '../i18n';
 
 interface ToolCardProps {
   tool: ToolCallInfo;
@@ -70,6 +71,7 @@ function getFileTypeBadge(filePath: string): { label: string; color: string } {
 }
 
 export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileInEditor }) => {
+  const { language, t } = useI18n();
   const [showDetails, setShowDetails] = useState(false);
   const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified');
   const [customAnswer, setCustomAnswer] = useState('');
@@ -94,15 +96,15 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
   const getStatusInfo = () => {
     switch (tool.status) {
       case 'completed':
-        return { label: 'УСПЕШНО', color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10', iconName: 'check_circle' };
+        return { label: t.tools.statusSuccess, color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10', iconName: 'check_circle' };
       case 'error':
-        return { label: 'ОШИБКА', color: 'text-rose-400 border-rose-500/30 bg-rose-500/10', iconName: 'error' };
+        return { label: t.tools.statusError, color: 'text-rose-400 border-rose-500/30 bg-rose-500/10', iconName: 'error' };
       case 'running':
-        return { label: 'ВЫПОЛНЕНИЕ', color: 'text-theme-accent border-[var(--theme-accent)]/30 bg-[var(--theme-accent)]/10 animate-pulse', iconName: 'progress_activity' };
+        return { label: t.tools.statusRunning, color: 'text-theme-accent border-[var(--theme-accent)]/30 bg-[var(--theme-accent)]/10 animate-pulse', iconName: 'progress_activity' };
       case 'rejected':
-        return { label: 'ОТКЛОНЕНО', color: 'text-theme-muted border-theme-border bg-white/5', iconName: 'cancel' };
+        return { label: t.tools.statusRejected, color: 'text-theme-muted border-theme-border bg-white/5', iconName: 'cancel' };
       case 'pending':
-        return { label: 'ОЖИДАЕТ ПОДТВЕРЖДЕНИЯ', color: 'text-amber-400 border-amber-500/30 bg-amber-500/10', iconName: 'warning' };
+        return { label: t.tools.pendingApproval, color: 'text-amber-400 border-amber-500/30 bg-amber-500/10', iconName: 'warning' };
       default:
         return { label: tool.status.toUpperCase(), color: 'text-theme-muted border-theme-border bg-white/5', iconName: 'info' };
     }
@@ -131,7 +133,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
       <div className="space-y-3 font-mono text-[11px] mt-2">
         {/* Toggle Mode Control Bar */}
         <div className="flex items-center justify-between pb-1 border-b border-theme-border text-[10px]">
-          <span className="text-theme-muted font-sans font-medium">Просмотр изменений патча:</span>
+          <span className="text-theme-muted font-sans font-medium">{t.tools.showDiff}:</span>
           <div className="flex items-center gap-1 bg-black/40 p-0.5 rounded border border-theme-border">
             <button
               type="button"
@@ -166,7 +168,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
                   {/* Left Column: SEARCH (Deletions) */}
                   <div className="bg-rose-950/30 text-rose-300 p-2 overflow-x-auto">
                     <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1 border-b border-rose-500/20 pb-1">
-                      <span>- УДАЛЯЕМЫЕ СТРОКИ</span>
+                      <span>- {language === 'ru' ? 'УДАЛЯЕМЫЕ СТРОКИ' : 'DELETED LINES'}</span>
                     </div>
                     {Array.from({ length: maxLines }).map((_, lIdx) => {
                       const line = searchLines[lIdx];
@@ -182,7 +184,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
                   {/* Right Column: REPLACE (Additions) */}
                   <div className="bg-emerald-950/30 text-emerald-300 p-2 overflow-x-auto">
                     <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1 border-b border-emerald-500/20 pb-1">
-                      <span>+ НОВЫЕ СТРОКИ</span>
+                      <span>+ {language === 'ru' ? 'НОВЫЕ СТРОКИ' : 'ADDED LINES'}</span>
                     </div>
                     {Array.from({ length: maxLines }).map((_, lIdx) => {
                       const line = replaceLines[lIdx];
@@ -205,7 +207,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
               {b.search && (
                 <div className="bg-rose-950/40 text-rose-300 p-2.5 border-b border-rose-500/20 whitespace-pre-wrap">
                   <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
-                    <span>- УДАЛЯЕМЫЕ СТРОКИ</span>
+                    <span>- {language === 'ru' ? 'УДАЛЯЕМЫЕ СТРОКИ' : 'DELETED LINES'}</span>
                   </div>
                   {searchLines.map((line, lIdx) => (
                     <div key={lIdx} className="flex gap-2">
@@ -218,7 +220,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
               {b.replace && (
                 <div className="bg-emerald-950/40 text-emerald-300 p-2.5 whitespace-pre-wrap">
                   <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
-                    <span>+ НОВЫЕ СТРОКИ</span>
+                    <span>+ {language === 'ru' ? 'НОВЫЕ СТРОКИ' : 'ADDED LINES'}</span>
                   </div>
                   {replaceLines.map((line, lIdx) => (
                     <div key={lIdx} className="flex gap-2">
@@ -301,8 +303,8 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             <DetailToggle
               isOpen={showDetails}
               onToggle={() => setShowDetails(!showDetails)}
-              labelOpen="Скрыть содержимое файла"
-              labelClosed="Показать создаваемый файл"
+              labelOpen={t.tools.hideDetails}
+              labelClosed={t.tools.viewDetails}
             />
             {showDetails && (
               <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-3 border border-theme-border rounded-md text-theme-text">
@@ -317,8 +319,8 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             <DetailToggle
               isOpen={showDetails}
               onToggle={() => setShowDetails(!showDetails)}
-              labelOpen="Скрыть разницу строк (diff)"
-              labelClosed="Просмотреть изменения строк (diff)"
+              labelOpen={t.tools.hideDiff}
+              labelClosed={t.tools.showDiff}
             />
             {showDetails && renderPatchDiffFormatted(parsedArgs.content)}
           </div>
@@ -327,7 +329,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
         {tool.name === 'ask_user' && (
           <div className="space-y-2 font-sans">
             <div className="text-amber-300 font-semibold text-xs flex items-center gap-1.5">
-              <span>Вопрос от Агента:</span>
+              <span>{t.chat.askQuestionTitle}:</span>
             </div>
             <div className="text-theme-text text-xs font-medium bg-slate-950 p-3 rounded-md border border-theme-border">
               {parsedArgs.question}
@@ -363,7 +365,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
                     value={customAnswer}
                     disabled={isSubmitting}
                     onChange={(e) => setCustomAnswer(e.target.value)}
-                    placeholder="Введите ваш ответ..."
+                    placeholder={t.chat.customAnswerPlaceholder}
                     className="flex-1 px-3 py-1.5 rounded-md flat-input text-xs text-theme-text focus:outline-none"
                   />
                   <button
@@ -372,7 +374,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
                     className="flat-btn px-3.5 py-1.5 rounded-md text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
                   >
                     {isSubmitting && <MaterialIcon name="progress_activity" size={13} className="animate-spin text-emerald-400" />}
-                    <span>{isSubmitting ? 'Отправка...' : 'Отправить'}</span>
+                    <span>{isSubmitting ? `${t.common.loading}...` : t.chat.submitAnswer}</span>
                   </button>
                 </form>
               </div>
@@ -385,13 +387,13 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             <MaterialIcon name="person" size={16} className="text-theme-accent shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1 space-y-1 font-sans">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-theme-text text-[11.5px]">Обновление профиля пользователя:</span>
+                <span className="font-semibold text-theme-text text-[11.5px]">USER.md:</span>
                 <span className="px-1.5 py-0.2 rounded bg-white/5 border border-theme-border text-[10px] font-mono text-theme-muted uppercase">
                   {parsedArgs.category || 'profile'}
                 </span>
               </div>
               <div className="text-[12px] text-theme-text font-mono bg-black/30 p-1.5 rounded border border-white/5">
-                {parsedArgs.trait || parsedArgs.content || '(пусто)'}
+                {parsedArgs.trait || parsedArgs.content || '(empty)'}
               </div>
             </div>
           </div>
@@ -402,7 +404,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             <MaterialIcon name="psychology" size={16} className="text-theme-accent shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1 space-y-1 font-sans">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-theme-text text-[11.5px]">Обновление файла персоны:</span>
+                <span className="font-semibold text-theme-text text-[11.5px]">SOUL.md:</span>
                 <span className="px-1.5 py-0.2 rounded bg-white/5 border border-theme-border text-[10px] font-mono text-theme-muted">
                   {parsedArgs.file || 'SOUL.md'}
                 </span>
@@ -418,7 +420,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
 
         {tool.name === 'run_scratch_script' && (
           <div className="space-y-1.5">
-            <div className="text-theme-muted text-[11px]">Скрипт ({parsedArgs.language})</div>
+            <div className="text-theme-muted text-[11px]">Script ({parsedArgs.language})</div>
             <div className="text-[10px] whitespace-pre-wrap max-h-36 overflow-y-auto bg-slate-950 p-2.5 border border-theme-border rounded-md text-theme-text">
               {parsedArgs.code}
             </div>
@@ -436,7 +438,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             className="px-3.5 py-1.5 rounded-md text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 border border-rose-500/30"
           >
             <MaterialIcon name="close" size={14} />
-            <span>Отклонить</span>
+            <span>{t.tools.reject}</span>
           </button>
           <button
             type="button"
@@ -449,7 +451,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             ) : (
               <MaterialIcon name="check" size={14} />
             )}
-            <span>{isSubmitting ? 'Выполняется...' : 'Подтвердить'}</span>
+            <span>{isSubmitting ? `${t.common.loading}...` : t.tools.approve}</span>
           </button>
         </div>
       )}
@@ -462,7 +464,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             onClick={() => setShowDetails(!showDetails)}
             className="flex items-center gap-1.5 text-[11px] text-theme-muted hover:text-theme-text cursor-pointer transition-colors"
           >
-            <span>{showDetails ? 'Скрыть лог выполнения' : 'Показать результат выполнения'}</span>
+            <span>{showDetails ? t.tools.hideDetails : t.tools.viewDetails}</span>
             <MaterialIcon name={showDetails ? 'expand_less' : 'expand_more'} size={14} />
           </button>
 

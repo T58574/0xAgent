@@ -14,21 +14,21 @@ export function buildFullSystemPrompt(config: AppConfig): string {
   const thinkTrigger = isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
 
   const memoryContext = getSystemPromptMemoryContext();
-  const envContext = `\n\n# ОКРУЖЕНИЕ СИСТЕМЫ
-- ОС: Windows (${process.platform})
-- Оболочка: PowerShell
-- Рабочая директория: ${config.workspace_dir || process.cwd()}
-- Команды исполняются напрямую в PowerShell. Не оборачивай в 'powershell -Command' или 'cd'. Не запускай блокирующие фоновые серверы разработки.
-- ВСЕГДА используй компактные относительные пути (напр. 'src/App.tsx', 'server/agent.ts', '.') в вызовах инструментов и командах.`;
+  const envContext = `\n\n# SYSTEM ENVIRONMENT
+- OS: Windows (${process.platform})
+- Shell: PowerShell
+- Active Workspace: ${config.workspace_dir || process.cwd()}
+- Execution: Commands run directly in PowerShell in workspace root. Do NOT wrap in 'powershell -Command' or 'cd'. Do NOT launch blocking background dev servers (e.g. 'npm run dev', 'vite').
+- Paths: ALWAYS use compact relative paths (e.g. 'src/App.tsx', 'server/agent.ts', '.') in tool calls and commands.`;
 
   const isPlanningMode = config.planning_mode !== false;
   const planningContext = isPlanningMode
-    ? `\n\n# РЕЖИМ ПЛАНИРОВАНИЯ
-Перед изменением файлов сначала изучи кодовую базу (<read_file>, <list_dir>, <grep_search>), сформулируй краткий план и проверь изменения.`
+    ? `\n\n# PLANNING & EXPLORATION
+Before modifying files, inspect the codebase first (<read_file>, <list_dir>, <grep_search>), formulate a concise plan, and verify changes after editing.`
     : '';
 
   const activePersona = getActivePersona();
-  const personaContext = `\n\n# ПЕРСОНА АГЕНТА: ${activePersona.metadata.name} (${activePersona.metadata.id})
+  const personaContext = `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
 
 ## SOUL.md
 ${activePersona.soul}
@@ -36,41 +36,38 @@ ${activePersona.soul}
 ## USER.md (${activePersona.metadata.user_id})
 ${activePersona.user}
 
-## ПРАВИЛА ИЗОЛЯЦИИ И ПАМЯТИ:
-- Каждый диалог строго изолирован. Не переноси контекст из прошлых несвязанных сессий.
-- Вызывай <update_user_profile> только когда пользователь явно просит запомнить личные предпочтения.
-- Никогда не создавай файлы USER.md или SOUL.md в корне рабочего пространства.`;
+## ISOLATION & MEMORY RULES:
+- Each conversation is isolated. Do not carry over unrelated past session state.
+- Call <update_user_profile> only when the user explicitly requests remembering personal preferences.
+- Never write USER.md or SOUL.md files to the workspace root directory.`;
 
-  const toolExecutionDirective = `\n\n# ПРОТОКОЛ ВЫЗОВА ИНСТРУМЕНТОВ
-1. Давай краткое пояснение перед вызовом XML-тегов инструментов.
-2. ПРИОРИТЕТ АТОМАРНЫХ ИНСТРУМЕНТОВ:
-   - Для создания файлов ВСЕГДА используй <write_file path="...">...</write_file> (родительские директории создаются автоматически).
-   - Для модификации существующих файлов ВСЕГДА используй <patch_file path="..."> с компактными SEARCH/REPLACE блоками (3-8 строк).
-   - Для базы знаний используй <save_knowledge>, для профиля пользователя — <update_user_profile>.
-   - Инструмент <code_run> используй ТОЛЬКО для алгоритмических расчетов, парсинга данных или сложных пакетных операций. НЕ оборачивай простое создание 1-2 файлов в громоздкие JS-скрипты.
-3. Используй относительные пути (напр. path="src/index.ts" или path="notes/profiles/identity.md").
-4. Закрывай все XML-теги инструментов корректно.
-5. ОСТАНАВЛИВАЙ ГЕНЕРАЦИЮ сразу после закрывающего тега инструмента. Среда исполнит команду в реальной ОС и вернет ответ в <tool_response name="...">...</tool_response>.
-6. НИКОГДА не выдумывай и не симулируй результаты инструментов самостоятельно.`;
+  const toolExecutionDirective = `\n\n# TOOL EXECUTION PROTOCOL
+1. Provide a brief explanation before emitting XML tool tags.
+2. TOOL PRIORITIES:
+   - Creating files: ALWAYS use <write_file path="...">...</write_file> (parent directories are created automatically).
+   - Modifying existing files: ALWAYS use <patch_file path="..."> with compact SEARCH/REPLACE blocks (3-8 lines).
+   - Knowledge Base: use <save_knowledge>. User profile: use <update_user_profile>.
+   - JS runtime (<code_run>): use ONLY for algorithmic calculations, data parsing, or multi-step batch operations. Do NOT wrap simple file creation in JS scripts.
+3. Use relative paths (e.g. path="src/index.ts").
+4. Close all XML tags properly.
+5. STOP GENERATION immediately after the closing XML tag of a tool. The environment will execute it in the real OS and return output in <tool_response name="...">...</tool_response>.
+6. NEVER fabricate, simulate, or mock tool outputs yourself.`;
 
   const gemmaToolDirective = isGemmaModel
-    ? `\n\n# JSON ФОРМАТ ИНСТРУМЕНТОВ (Gemma 4)\nТы также можешь вызывать инструменты в формате JSON внутри тегов <tool_call>.`
+    ? `\n\n# JSON TOOL FORMAT (Gemma 4)\nYou may also invoke tools in JSON format inside <tool_call> tags.`
     : '';
 
   const reasoningDirective = !isReasoningExplicitlyOff && !isGemmaModel
-    ? `\n\n# ИНСТРУКЦИИ ДЛЯ БЛОКА РАССУЖДЕНИЙ <THINK>
-1. Веди весь процесс размышления, анализа задачи и формулирования плана ИСКЛЮЧИТЕЛЬНО НА РУССКОМ ЯЗЫКЕ.
-2. АРХИТЕКТУРНЫЙ ФОКУС: В блоке рассуждений формулируй стратегию, логику и выбор инструментов.
-3. ЗАПРЕТ ЧЕРНОВИКОВ ФАЙЛОВ В МЫСЛЯХ: Категорически запрещено прописывать полный текст файлов, шаблоны или длинные патчи внутри блока рассуждений. Текст файлов сразу пишется в тело целевого инструмента (<write_file>, <patch_file>, <save_knowledge>).
-4. ЭФФЕКТИВНОСТЬ: Избегай зацикливания и многократного повторения одних и тех же мыслей.
-5. ТЕГИ ИНСТРУМЕНТОВ ВНЕ МЫСЛЕЙ: Всегда закрывай блок размышлений тегом </think> ПЕРЕД вызовом XML-тегов инструментов! Вызовы инструментов ВСЕГДА должны быть снаружи блока <think>.`
+    ? `\n\n# INSTRUCTIONS FOR REASONING BLOCK <THINK>
+1. FREEDOM OF THOUGHT: Reason naturally, concisely, and directly in English, pseudo-code, or mixed technical language — whichever produces the highest problem-solving speed and clarity. Focus on logic, architecture, tool selection, edge cases, and verification.
+2. NO CODE/FILE DRAFTS IN THINKING: Never output full file contents, boilerplate, or long patches inside <think>. Write file modifications directly into the target tool tags (<write_file>, <patch_file>).
+3. DECISIVENESS: Avoid looping, second-guessing trivial points, or debating linguistic rules. Decide the plan and execute.
+4. TOOLS OUTSIDE THINK: Always close the thinking block with </think> BEFORE emitting tool tags. Tool XML tags must ALWAYS be placed outside <think>.`
     : '';
 
-  const languageProtocolDirective = `\n\n# ГЛАВНЫЙ ЯЗЫКОВОЙ СТАНДАРТ (СТРОЖАЙШИЙ ЗАПРЕТ СМЕШИВАНИЯ ЯЗЫКОВ):
-1. ВСЕ рассуждения (<think>), весь диалог, все объяснения и заголовки формулируй ИСКЛЮЧИТЕЛЬНО НА ЧИСТОМ И ГРАМОТНОМ РУССКОМ ЯЗЫКЕ.
-2. КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО использовать английские слова, фразы, заголовки или предложения внутри русского текста (полный запрет на рунглиш/Chinglish).
-3. Все термины формулируй по-русски или сопровождай понятным русским пояснением.
-4. Английский язык разрешен СТРОГО И ТОЛЬКО для: программного кода, имен переменных/функций/типов, команд терминала и официальных названий компаний/моделей (OpenAI, Anthropic, Gemma, Qwen, DeepSeek).`;
+  const languageProtocolDirective = `\n\n# CONVERSATION & LANGUAGE STANDARD:
+1. Final responses to the user, explanations, and conversational dialogue must ALWAYS be delivered in the user's language (default: Russian). Speak naturally, clearly, and concisely.
+2. Program code, file paths, terminal commands, library names, variable and type names are strictly in English.`;
 
   const unifiedToolsContext = getUnifiedToolsContext();
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);

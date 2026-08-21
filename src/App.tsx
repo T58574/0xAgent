@@ -21,6 +21,7 @@ const JarvisSanctuary = lazy(() => import('./components/JarvisSanctuary').then((
 const JarvisWidget = lazy(() => import('./components/JarvisWidget').then((m) => ({ default: m.JarvisWidget })));
 import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
 import { useToast } from './context/ToastContext';
+import { useI18n } from './i18n';
 import { useAppWebSocket } from './hooks/useAppWebSocket';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useSessionManager } from './hooks/useSessionManager';
@@ -31,6 +32,7 @@ import { useResponsive } from './hooks/useResponsive';
 export default function App() {
   const { showToast } = useToast();
   const { isMobile } = useResponsive();
+  const { language, setLanguage } = useI18n();
 
   // Authentication & Security state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
@@ -38,6 +40,12 @@ export default function App() {
 
   // App Config & Persona state
   const [config, setConfig] = useState<AppConfig | null>(null);
+
+  useEffect(() => {
+    if (config?.language && config.language !== language) {
+      setLanguage(config.language);
+    }
+  }, [config?.language]);
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersonaId, setActivePersonaId] = useState<string>('default');
 

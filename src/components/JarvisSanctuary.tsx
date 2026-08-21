@@ -24,6 +24,7 @@ import { CodeEditor, EditorTabItem } from './CodeEditor';
 import { ResizableSplitter } from './ResizableSplitter';
 import { useToast } from '../context/ToastContext';
 import * as api from '../services/api';
+import { useI18n } from '../i18n';
 
 const JARVIS_WORKSPACE_PATH = 'c:\\Users\\user\\.0xagent\\workspaces\\Jarvis';
 
@@ -64,6 +65,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
   isServerOffline,
   onStartServer,
 }) => {
+  const { t } = useI18n();
   const { showToast } = useToast();
 
   // Personal workspace state
@@ -78,23 +80,23 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
   // Quick Action Starter Prompts
   const quickConsultations = [
     {
-      title: 'Личный фокус и цели',
-      prompt: 'Джарвис, давай структурируем мои ключевые приоритеты и задачи на сегодня. С чего начнем?',
+      title: t.jarvis.consult1Title,
+      prompt: t.jarvis.consult1Prompt,
       icon: Compass,
     },
     {
-      title: 'Архив знаний и инсайты',
-      prompt: 'Джарвис, посмотри в нашей базе знаний и архивах последние записи. Какие ключевые выжимки актуальны?',
+      title: t.jarvis.consult2Title,
+      prompt: t.jarvis.consult2Prompt,
       icon: BookOpen,
     },
     {
-      title: 'Стратегический совет',
-      prompt: 'Джарвис, мне нужен твой независимый совет по важному решению. Помоги взвесить плюсы, минусы и альтернативы.',
+      title: t.jarvis.consult3Title,
+      prompt: t.jarvis.consult3Prompt,
       icon: Zap,
     },
     {
-      title: 'Записать личную мысль',
-      prompt: 'Джарвис, давай зафиксируем новую идею в мои личные заметки notes/. Помоги сформулировать и сохранить.',
+      title: t.jarvis.consult4Title,
+      prompt: t.jarvis.consult4Prompt,
       icon: FileText,
     },
   ];
@@ -138,7 +140,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
       if (existing) {
         onSelectSession(existing.id);
       } else {
-        onCreateSession('Джарвис: Личный Консультант', JARVIS_WORKSPACE_PATH);
+        onCreateSession('Jarvis: Personal Sanctuary', JARVIS_WORKSPACE_PATH);
       }
     }
   }, []);
@@ -155,7 +157,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
       });
       setSelectedFile(newFile);
     } catch (err: any) {
-      showToast(`Ошибка открытия файла: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
@@ -166,16 +168,16 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
       const slug = newNoteTitle.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9а-яё\-]/gi, '');
       const noteFileName = `${slug || 'note'}.md`;
       const notePath = `${JARVIS_WORKSPACE_PATH}\\notes\\${noteFileName}`;
-      const initialText = `# ${newNoteTitle.trim()}\n\n*Создано: ${new Date().toLocaleString()}*\n\n`;
+      const initialText = `# ${newNoteTitle.trim()}\n\n*Created: ${new Date().toLocaleString()}*\n\n`;
 
       await api.write_file_raw(notePath, initialText);
       setNewNoteTitle('');
       setIsCreatingNote(false);
       await loadJarvisFiles();
       await handleFileClick(notePath, noteFileName);
-      showToast(`Заметка ${noteFileName} создана`, 'success');
+      showToast(`Note ${noteFileName} created`, 'success');
     } catch (err: any) {
-      showToast(`Ошибка создания заметки: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
@@ -190,13 +192,13 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-[var(--theme-text)] tracking-tight">Личный Уголок Джарвиса</h2>
+              <h2 className="text-sm font-bold text-[var(--theme-text)] tracking-tight">{t.jarvis.sanctuaryTitle}</h2>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--theme-accent)]/15 border border-[var(--theme-accent)]/30 text-[var(--theme-accent)] font-semibold">
-                Private Advisory Sanctuary
+                {t.jarvis.sanctuaryBadge}
               </span>
             </div>
             <p className="text-xs text-[var(--theme-text-muted)] font-medium">
-              Приватное пространство для консультаций, личных архивов и доверенного общения
+              {t.jarvis.sanctuaryDesc}
             </p>
           </div>
         </div>
@@ -205,12 +207,12 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onCreateSession('Джарвис: Личный Консультант', config?.workspace_dir || JARVIS_WORKSPACE_PATH)}
+            onClick={() => onCreateSession('Jarvis: Personal Sanctuary', config?.workspace_dir || JARVIS_WORKSPACE_PATH)}
             className="px-3 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:opacity-90"
-            title="Создать новый диалог в личной папке Джарвиса"
+            title="Create new session in Jarvis workspace"
           >
             <Plus size={14} className="text-[var(--theme-accent-text)]" />
-            <span>Новый диалог</span>
+            <span>{t.jarvis.newSessionBtn}</span>
           </button>
 
           {config?.tts_config?.enabled && (
@@ -222,10 +224,10 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
                 } catch {}
               }}
               className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-              title="Проверить голосовую связь"
+              title="Test Voice Intercom"
             >
               <Volume2 size={14} className="text-[var(--theme-accent)]" />
-              <span>Голосовой статус</span>
+              <span>{t.jarvis.voiceStatusBtn}</span>
             </button>
           )}
 
@@ -234,7 +236,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
             onClick={loadJarvisFiles}
             disabled={isLoadingFiles}
             className="p-2 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer shadow-sm disabled:opacity-50"
-            title="Обновить файлы личного воркспейса"
+            title={t.jarvis.refreshFiles}
           >
             <RefreshCw size={14} className={isLoadingFiles ? 'animate-spin' : ''} />
           </button>
@@ -245,7 +247,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
       <div className="px-5 py-2.5 bg-[var(--theme-panel)]/50 border-b border-[var(--theme-border)] flex items-center gap-2 overflow-x-auto scrollbar-none shrink-0">
         <span className="text-[11px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
           <Sparkles size={12} className="text-[var(--theme-accent)]" />
-          <span>Консультации:</span>
+          <span>{t.jarvis.consultationsTitle}</span>
         </span>
 
         {quickConsultations.map((item, idx) => {
@@ -276,13 +278,13 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
           <div className="px-4 py-2.5 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-card-bg)] shrink-0">
             <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
               <FolderTree size={14} className="text-[var(--theme-accent)]" />
-              <span>Архивы & Заметки Jarvis</span>
+              <span>{t.jarvis.archivesTitle}</span>
             </div>
             <button
               type="button"
               onClick={() => setIsCreatingNote(!isCreatingNote)}
               className="p-1 rounded-lg hover:bg-[var(--theme-border-subtle)] text-[var(--theme-accent)] transition-colors cursor-pointer"
-              title="Создать новую заметку"
+              title="Create note"
             >
               <Plus size={15} />
             </button>
@@ -295,7 +297,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
                 type="text"
                 value={newNoteTitle}
                 onChange={(e) => setNewNoteTitle(e.target.value)}
-                placeholder="Название заметки (напр. План на неделю)..."
+                placeholder={t.jarvis.newNotePlaceholder}
                 className="w-full px-3 py-1.5 rounded-lg border border-[var(--theme-border)] text-xs text-[var(--theme-text)] bg-[var(--theme-input-bg)] focus:outline-none focus:border-[var(--theme-accent)]"
                 autoFocus
               />
@@ -305,14 +307,14 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
                   onClick={() => setIsCreatingNote(false)}
                   className="px-2.5 py-1 rounded-md text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
                 >
-                  Отмена
+                  {t.common.cancel}
                 </button>
                 <button
                   type="submit"
                   disabled={!newNoteTitle.trim()}
                   className="px-3 py-1 rounded-md bg-[var(--theme-accent)] text-[var(--theme-accent-text)] text-[11px] font-bold disabled:opacity-40"
                 >
-                  Создать
+                  {t.jarvis.createNoteBtn}
                 </button>
               </div>
             </form>
@@ -343,13 +345,13 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
                   if (selectedFile?.path === filePath) {
                     setSelectedFile({ ...selectedFile, content: newContent });
                   }
-                  showToast('Файл сохранен', 'success');
+                  showToast('File saved', 'success');
                 }}
               />
             ) : (
               <div className="p-3 overflow-y-auto h-full space-y-1 scrollbar-thin">
                 <div className="text-[11px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider mb-2 px-1">
-                  Файловая система Sanctuary
+                  {t.jarvis.sanctuaryFsTitle}
                 </div>
 
                 {workspaceTree.map((node) => (

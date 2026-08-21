@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, CheckCircle2, Circle, Clock } from 'lucide-react';
 import { TodoItem } from '../../types';
+import { useI18n } from '../../i18n';
 
 interface PlanProgressStripProps {
   todos?: TodoItem[];
 }
 
 export const PlanProgressStrip: React.FC<PlanProgressStripProps> = ({ todos = [] }) => {
+  const { t } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
 
   if (!todos || todos.length === 0) return null;
@@ -28,7 +30,7 @@ export const PlanProgressStrip: React.FC<PlanProgressStripProps> = ({ todos = []
           {/* Left Title & Status */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
             <span className="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-mono font-semibold text-[var(--theme-text)] shrink-0 border border-white/10">
-              :: ПЛАН [{completed}/{total}]
+              :: {t.chat.planProgress.toUpperCase()} [{completed}/{total}]
             </span>
 
             {inProgress ? (
@@ -37,9 +39,9 @@ export const PlanProgressStrip: React.FC<PlanProgressStripProps> = ({ todos = []
                 <span className="truncate font-medium text-xs">{inProgress.content}</span>
               </div>
             ) : completed === total ? (
-              <span className="text-xs text-emerald-400 font-medium">Все задачи плана успешно завершены</span>
+              <span className="text-xs text-emerald-400 font-medium">{t.chat.planComplete}</span>
             ) : (
-              <span className="text-xs text-[var(--theme-text-muted)]">План сформирован ({pending} ожидают)</span>
+              <span className="text-xs text-[var(--theme-text-muted)]">{t.chat.planProgress} ({pending} {t.tools.pendingApproval})</span>
             )}
           </div>
 

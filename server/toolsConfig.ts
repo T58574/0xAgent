@@ -17,290 +17,290 @@ export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
   {
     id: 'read_file',
     name: 'read_file',
-    description: 'Read file contents in current workspace.',
+    description: 'Чтение содержимого файла в рабочей директории.',
     category: 'files',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `1. <read_file path="..." />
-   - Read exact file content.`,
+   - Читает точное содержимое файла по относительному пути.`,
   },
   {
     id: 'patch_file',
     name: 'patch_file',
-    description: 'Apply one or more SEARCH/REPLACE diff blocks to modify existing files.',
+    description: 'Применение SEARCH/REPLACE блоков для точечного изменения существующих файлов.',
     category: 'files',
     requiresApproval: true,
     enabled: true,
     xmlSpec: `2. <patch_file path="...">
 <<<<<<< SEARCH
-exact lines to replace (3-8 lines)
+точные строки для замены (3-8 строк)
 =======
-new replacement lines
+новые строки
 >>>>>>> REPLACE
 </patch_file>
-   - MUST use for modifying existing files. Supports multiple SEARCH/REPLACE blocks.`,
+   - ОБЯЗАТЕЛЕН для изменения существующих файлов. Поддерживает несколько блоков SEARCH/REPLACE.`,
   },
   {
     id: 'write_file',
     name: 'write_file',
-    description: 'Create a new file or write tiny config (<50 lines).',
+    description: 'Создание нового файла или запись небольшого конфига (<50 строк).',
     category: 'files',
     requiresApproval: true,
     enabled: true,
-    xmlSpec: `3. <write_file path="...">content</write_file>
-   - Create new files only. Use patch_file for existing files.`,
+    xmlSpec: `3. <write_file path="...">содержимое</write_file>
+   - Только для создания новых файлов. Для существующих используй patch_file.`,
   },
   {
     id: 'list_dir',
     name: 'list_dir',
-    description: 'List files and directories.',
+    description: 'Просмотр списка файлов и директорий.',
     category: 'files',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `4. <list_dir path="..." />
-   - List directory entries.`,
+   - Возвращает дерево файлов и папок в директории.`,
   },
   {
     id: 'grep_search',
     name: 'grep_search',
-    description: 'Search regex pattern across files.',
+    description: 'Поиск по регулярному выражению во всех файлах проекта.',
     category: 'files',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `5. <grep_search pattern="..." path="..." />
-   - Fast regex text search.`,
+   - Быстрый поиск вхождений текста или regex по кодовой базе.`,
   },
   {
     id: 'fff_search',
     name: 'fff_search',
-    description: 'Fast fuzzy file finder.',
+    description: 'Мгновенный нечеткий поиск файлов по имени и пути.',
     category: 'files',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `6. <fff_search query="..." />
-   - Fast fuzzy path search.`,
+   - Высокоскоростной нечеткий поиск путей файлов.`,
   },
   {
     id: 'execute_command',
     name: 'execute_command',
-    description: 'Execute PowerShell command in workspace (build, test, git).',
+    description: 'Выполнение команд PowerShell в рабочей директории (сборка, тесты, git).',
     category: 'terminal',
     requiresApproval: true,
     enabled: true,
-    xmlSpec: `7. <execute_command>cmd</execute_command>
-   - Run one-off PowerShell command. No long-running background servers.`,
+    xmlSpec: `7. <execute_command>команда</execute_command>
+   - Одноразовые команды PowerShell. Запрещен запуск блокирующих фоновых серверов.`,
   },
   {
     id: 'create_directory',
     name: 'create_directory',
-    description: 'Create directory recursively.',
+    description: 'Рекурсивное создание директорий.',
     category: 'files',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `8. <create_directory path="..." />
-   - Create folder path.`,
+   - Создает структуру папок по указанному пути.`,
   },
   {
     id: 'get_file_info',
     name: 'get_file_info',
-    description: 'Get file metadata (size, lines, modified).',
+    description: 'Получение метаданных файла (размер, число строк, дата изменения).',
     category: 'files',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `9. <get_file_info path="..." />
-   - File metadata.`,
+   - Возвращает размер, тип и количество строк файла.`,
   },
   {
     id: 'web_search',
     name: 'web_search',
-    description: 'Search web via SearXNG / DuckDuckGo.',
+    description: 'Поиск в интернете через локальный SearXNG или DuckDuckGo.',
     category: 'web',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `10. <web_search query="..." />
-   - Search web for docs/info.`,
+   - Поиск документации, статей и свежих данных в интернете.`,
   },
   {
     id: 'read_web_page',
     name: 'read_web_page',
-    description: 'Fetch webpage converted to Markdown.',
+    description: 'Загрузка и конвертация веб-страницы в чистый Markdown.',
     category: 'web',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `11. <read_web_page url="..." />
-   - Fetch URL as clean Markdown.`,
+   - Читает страницу по ссылке и возвращает очищенный текст.`,
   },
   {
     id: 'remember_fact',
     name: 'remember_fact',
-    description: 'Save permanent fact to long-term memory.',
+    description: 'Сохранение важного факта в долговременную память агента.',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `12. <remember_fact key="..." value="..." category="..." />
-   - Save persistent memory fact.`,
+   - Сохраняет персистентный факт в долгосрочную память.`,
   },
   {
     id: 'recall_memories',
     name: 'recall_memories',
-    description: 'Search long-term memories.',
+    description: 'Поиск фактов и предпочтений в долговременной памяти.',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `13. <recall_memories query="..." />
-   - Search memory.`,
+   - Семантический поиск по сохраненным воспоминаниям.`,
   },
   {
     id: 'update_user_profile',
     name: 'update_user_profile',
-    description: 'Save user preferences into persona USER.md.',
+    description: 'Обновление профиля пользователя в USER.md активной персоны.',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `14. <update_user_profile trait="..." category="preferences|profile" />
-   - Update user profile in persona. Do not write USER.md in workspace!`,
+   - Записывает предпочтения в USER.md персоны. Никогда не создавай USER.md в корне проекта!`,
   },
   {
     id: 'update_persona_file',
     name: 'update_persona_file',
-    description: 'Update persona file (SOUL.md, USER.md, TOOLS.md).',
+    description: 'Редактирование файлов персоны (SOUL.md, USER.md, TOOLS.md).',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
-    xmlSpec: `15. <update_persona_file file="SOUL.md|USER.md|TOOLS.md">content</update_persona_file>
-   - Update persona file.`,
+    xmlSpec: `15. <update_persona_file file="SOUL.md|USER.md|TOOLS.md">текст</update_persona_file>
+   - Точечное обновление файлов текущей персоны.`,
   },
   {
     id: 'todo_write',
     name: 'todo_write',
-    description: 'Update live task checklist in UI HUD.',
+    description: 'Интерактивный список шагов и задач в интерфейсе (HUD).',
     category: 'interactive',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `16. <todo_write todos='[{"content":"...","status":"pending|in_progress|completed"}]' />
-   - Update task checklist.`,
+   - Отображает и обновляет шкалу прогресса и шагов в чате.`,
   },
   {
     id: 'ask_user_question',
     name: 'ask_user_question',
-    description: 'Prompt interactive question card (single/multi-select, write-in).',
+    description: 'Интерактивная карточка вопроса с выбором вариантов или вводом ответа.',
     category: 'interactive',
     requiresApproval: false,
     enabled: true,
-    xmlSpec: `17. <ask_user_question questions='[{"id":"q1","question":"...","options":[{"label":"A"},{"label":"B"}]}]' />
-   - Ask user question in UI.`,
+    xmlSpec: `17. <ask_user_question questions='[{"id":"q1","question":"...","options":[{"label":"А"},{"label":"Б"}]}]' />
+   - Задает вопрос пользователю в виде интерактивной формы.`,
   },
   {
     id: 'code_run',
     name: 'code_run',
-    description: 'Run batch JS code in sandbox with tools.* bindings.',
+    description: 'Изолированное выполнение JS-скриптов в песочнице с объектом tools.*.',
     category: 'interactive',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `18. <code_run>const res = await tools.list_dir({path: '.'}); return res;</code_run>
-   - Execute JS code with tools.* in 1 turn.`,
+   - Пакетное выполнение нескольких вызовов инструментов в один шаг.`,
   },
   {
     id: 'spawn_subagent',
     name: 'spawn_subagent',
-    description: 'Spawn background autonomous subagent.',
+    description: 'Запуск фонового автономного субагента для изолированной задачи.',
     category: 'agents',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `19. <spawn_subagent role="..." goal="..." />
-   - Spawn subagent for isolated subtask.`,
+   - Создает параллельного субагента для исследования или тестирования.`,
   },
   {
     id: 'send_subagent_message',
     name: 'send_subagent_message',
-    description: 'Send message to running subagent.',
+    description: 'Отправка сообщения или указания запущенному субагенту.',
     category: 'agents',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `20. <send_subagent_message subagent_id="..." message="..." />
-   - Send instruction to subagent.`,
+   - Передает новые инструкции работающему субагенту.`,
   },
   {
     id: 'interrupt_subagent',
     name: 'interrupt_subagent',
-    description: 'Interrupt running subagent.',
+    description: 'Остановка и прерывание работы субагента.',
     category: 'agents',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `21. <interrupt_subagent subagent_id="..." />
-   - Stop subagent.`,
+   - Немедленно завершает работу субагента.`,
   },
   {
     id: 'list_subagents',
     name: 'list_subagents',
-    description: 'List subagents in current session.',
+    description: 'Список активных субагентов текущей сессии.',
     category: 'agents',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `22. <list_subagents />
-   - List subagents.`,
+   - Возвращает статус всех запущенных субагентов.`,
   },
   {
     id: 'save_knowledge',
     name: 'save_knowledge',
-    description: 'Save article to Knowledge Vault.',
+    description: 'Сохранение структурированной статьи в Базу Знаний.',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
-    xmlSpec: `23. <save_knowledge title="..." category="..." summary="...">content</save_knowledge>
-   - Save to Knowledge Vault.`,
+    xmlSpec: `23. <save_knowledge title="..." category="..." summary="...">текст</save_knowledge>
+   - Сохраняет постоянную статью в Базу Знаний проекта.`,
   },
   {
     id: 'search_knowledge',
     name: 'search_knowledge',
-    description: 'Search Knowledge Vault.',
+    description: 'Поиск статей и заметок в Базе Знаний.',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `24. <search_knowledge query="..." />
-   - Search Knowledge Vault.`,
+   - Находит релевантные статьи в Базе Знаний.`,
   },
   {
     id: 'list_knowledge',
     name: 'list_knowledge',
-    description: 'List Knowledge Vault entries.',
+    description: 'Список всех статей в Базе Знаний.',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `25. <list_knowledge />
-   - List Knowledge Vault items.`,
+   - Возвращает оглавление Базы Знаний.`,
   },
   {
     id: 'propose_pull_request',
     name: 'propose_pull_request',
-    description: 'Propose a staged pull request for modifying engine core or complex multi-file features without direct overwriting.',
+    description: 'Формирование атомарного Pull Request для проверки архитектурных правок.',
     category: 'interactive',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `26. <propose_pull_request title="..." description="...">
 [{"path":"server/routes/api.ts","newContent":"..."}]
 </propose_pull_request>
-   - Create a Staged Pull Request for review with background TypeScript verification.`,
+   - Создает предложение изменений с фоновой проверкой TypeScript перед слиянием.`,
   },
   {
     id: 'search_sessions',
     name: 'search_sessions',
-    description: 'Search past chat sessions.',
+    description: 'Поиск по истории прошлых сессий диалога.',
     category: 'sessions',
     requiresApproval: false,
     enabled: true,
-    xmlSpec: `26. <search_sessions query="..." />
-   - Search past sessions.`,
+    xmlSpec: `27. <search_sessions query="..." />
+   - Поиск сообщений в архиве диалогов.`,
   },
   {
     id: 'run_scratch_script',
     name: 'run_scratch_script',
-    description: 'Run scratch script (Node, Python, PowerShell).',
+    description: 'Запуск временного скрипта проверки (Node.js, Python, PowerShell).',
     category: 'terminal',
     requiresApproval: true,
     enabled: true,
-    xmlSpec: `27. <run_scratch_script language="...">code</run_scratch_script>
-   - Run scratch test script.`,
+    xmlSpec: `28. <run_scratch_script language="...">код</run_scratch_script>
+   - Исполняет тестовый код в изолированном временном файле.`,
   },
 ];
 

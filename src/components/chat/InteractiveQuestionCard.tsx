@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { AskUserQuestionItem, AskUserQuestionAnswerItem } from '../../types';
 import { Check, Send, HelpCircle } from 'lucide-react';
+import { useI18n } from '../../i18n';
 
 interface InteractiveQuestionCardProps {
   toolCallId: string;
@@ -15,6 +16,8 @@ export const InteractiveQuestionCard: React.FC<InteractiveQuestionCardProps> = (
   onSubmitAnswers,
   disabled = false,
 }) => {
+  const { t } = useI18n();
+
   // State: questionId -> selected labels
   const [selectedMap, setSelectedMap] = useState<Record<string, string[]>>(() => {
     const initial: Record<string, string[]> = {};
@@ -80,15 +83,15 @@ export const InteractiveQuestionCard: React.FC<InteractiveQuestionCardProps> = (
       <div className="flex items-center justify-between pb-3 border-b border-[var(--theme-border)]/50">
         <div className="flex items-center gap-2">
           <span className="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-mono font-semibold text-[var(--theme-text)] border border-white/10">
-            :: ВОПРОС АГЕНТА
+            :: {t.chat.askQuestionTitle.toUpperCase()}
           </span>
           <span className="text-[11px] text-[var(--theme-text-muted)]">
-            {disabled ? 'Вопрос завершен' : 'Агенту требуется ваше уточнение для продолжения задачи'}
+            {disabled ? t.chat.submitAnswer : t.chat.askQuestionTitle}
           </span>
         </div>
         {disabled && (
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
-            [OK] ОТВЕЧЕНО
+            [OK]
           </span>
         )}
       </div>
@@ -168,7 +171,7 @@ export const InteractiveQuestionCard: React.FC<InteractiveQuestionCardProps> = (
                     className="flex-1 py-2 px-4 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 font-medium text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg active:scale-95 disabled:opacity-50"
                   >
                     <Check size={14} />
-                    <span>{q.intent.approve || 'Утвердить план и продолжить'}</span>
+                    <span>{q.intent.approve || t.tools.approve}</span>
                   </button>
 
                   <button
@@ -177,7 +180,7 @@ export const InteractiveQuestionCard: React.FC<InteractiveQuestionCardProps> = (
                     disabled={disabled}
                     className="py-2 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-500/30 font-medium text-xs flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
                   >
-                    <span>Отклонить</span>
+                    <span>{t.tools.reject}</span>
                   </button>
                 </div>
               )}
@@ -187,7 +190,7 @@ export const InteractiveQuestionCard: React.FC<InteractiveQuestionCardProps> = (
                 <div className="pt-1">
                   <input
                     type="text"
-                    placeholder="Или напишите свой вариант ответа..."
+                    placeholder={t.chat.customAnswerPlaceholder}
                     value={customMap[q.id] || ''}
                     onChange={(e) => handleCustomChange(q.id, e.target.value)}
                     disabled={disabled}
@@ -210,7 +213,7 @@ export const InteractiveQuestionCard: React.FC<InteractiveQuestionCardProps> = (
             className="px-4 py-1.5 rounded-xl bg-white/15 hover:bg-white/25 text-[var(--theme-text)] border border-white/20 font-medium text-xs flex items-center gap-1.5 transition-all shadow-md active:scale-95 disabled:opacity-50"
           >
             <Send size={12} />
-            <span>Отправить ответ</span>
+            <span>{t.chat.submitAnswer}</span>
           </button>
         </div>
       )}

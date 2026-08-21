@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User, Sparkles } from 'lucide-react';
 import { AppConfig } from '../../types';
+import { useI18n } from '../../i18n';
 import { GeneralTab } from './GeneralTab';
 import { PersonasTab } from './PersonasTab';
 import { ThemesTab } from './ThemesTab';
@@ -24,6 +25,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   currentSessionId,
 }) => {
   const s = useSettingsState(config, onSaveConfig, initialSubtab);
+  const { t } = useI18n();
 
   return (
     <div className="w-full h-full bg-[var(--theme-bg)] text-[var(--theme-text)] flex flex-col overflow-hidden font-sans select-text">
@@ -34,7 +36,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             type="button"
             onClick={onCancel}
             className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
-            title="Вернуться в чат"
+            title={t.settings.backToChat}
           >
             <ChevronLeft size={16} />
           </button>
@@ -43,7 +45,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             alt="0xAgent Logo"
             className="w-5 h-5 rounded-md object-cover border border-[var(--theme-border)] shrink-0"
           />
-          <h2 className="text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider">Настройки</h2>
+          <h2 className="text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider">{t.settings.title}</h2>
         </div>
 
         {/* Auto-save Indicator */}
@@ -51,12 +53,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           {s.saveStatus === 'saving' ? (
             <>
               <RefreshCw size={12} className="animate-spin text-[var(--theme-text-muted)]" />
-              <span>Сохранение...</span>
+              <span>{t.settings.saving}</span>
             </>
           ) : (
             <>
               <Check size={12} className="text-[var(--theme-text)]" />
-              <span>Сохранено</span>
+              <span>{t.settings.saved}</span>
             </>
           )}
         </div>
@@ -67,11 +69,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         {/* Left Vertical Navigation Menu */}
         <div className="w-full md:w-60 bg-[var(--theme-panel)] border-r border-[var(--theme-border)] p-3 shrink-0 flex flex-row md:flex-col gap-1.5 select-none overflow-x-auto scrollbar-none">
           {[
-            { id: 'general', label: 'Основные', icon: Sliders },
-            { id: 'customizations', label: 'Кастомизации & Токены', icon: Sparkles },
-            { id: 'personas', label: 'Личности (Personas)', icon: User },
-            { id: 'themes', label: 'Темы оформления', icon: Palette },
-            { id: 'local_server', label: 'Сервер LLM', icon: Cpu },
+            { id: 'general', label: t.settings.tabs.general, icon: Sliders },
+            { id: 'customizations', label: t.settings.tabs.customizations, icon: Sparkles },
+            { id: 'personas', label: t.settings.tabs.personas, icon: User },
+            { id: 'themes', label: t.settings.tabs.themes, icon: Palette },
+            { id: 'local_server', label: t.settings.tabs.localServer, icon: Cpu },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = s.activeSubtab === tab.id;
@@ -110,6 +112,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         <div className="flex-1 h-full overflow-y-auto p-4 md:p-8 pb-28 scrollbar-none">
           {s.activeSubtab === 'general' && (
             <GeneralTab
+              onLanguageSelect={(lang) => {
+                s.setLanguage(lang);
+              }}
               apiUrl={s.apiUrl}
               setApiUrl={s.setApiUrl}
               groqApiKey={s.groqApiKey}

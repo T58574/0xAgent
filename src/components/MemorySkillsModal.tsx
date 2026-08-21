@@ -3,6 +3,7 @@ import { Brain, Sparkles, X, Plus, Trash2, Save, Search } from 'lucide-react';
 import { MemoryItem, SkillInfo } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useI18n } from '../i18n';
 
 interface MemorySkillsModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface MemorySkillsModalProps {
 }
 
 export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, onClose }) => {
+  const { t, formatString } = useI18n();
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'memory' | 'skills'>('memory');
   const [memories, setMemories] = useState<MemoryItem[]>([]);
@@ -57,20 +59,20 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
       await api.add_memory(newMemKey.trim(), newMemVal.trim(), newMemCategory);
       setNewMemKey('');
       setNewMemVal('');
-      showToast('Факт успешно сохранен в память!', 'success');
+      showToast('Fact added to memory!', 'success');
       await loadData();
     } catch (err: any) {
-      showToast(`Ошибка добавления памяти: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
   const handleDeleteMemory = async (id: string) => {
     try {
       await api.delete_memory(id);
-      showToast('Факт удален из памяти.', 'success');
+      showToast('Fact deleted from memory.', 'success');
       await loadData();
     } catch (err: any) {
-      showToast(`Ошибка удаления: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
@@ -88,10 +90,10 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
     if (!selectedSkillName) return;
     try {
       await api.save_skill(selectedSkillName, skillContent);
-      showToast('Скилл сохранен!', 'success');
+      showToast('Skill saved!', 'success');
       await loadData();
     } catch (err: any) {
-      showToast(`Ошибка сохранения: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
@@ -105,14 +107,14 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
       setNewSkillNameInput('');
       await loadData();
       await handleSelectSkill(name);
-      showToast(`Скилл "${name}" успешно создан!`, 'success');
+      showToast(`Skill "${name}" created!`, 'success');
     } catch (err: any) {
-      showToast(`Ошибка создания: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
   const handleDeleteSkill = async (name: string) => {
-    if (!confirm(`Вы уверены, что хотите удалить скилл ${name}?`)) return;
+    if (!confirm(`Delete skill ${name}?`)) return;
     try {
       await api.delete_skill(name);
       if (selectedSkillName === name) {
@@ -120,9 +122,9 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
         setSkillContent('');
       }
       await loadData();
-      showToast(`Скилл ${name} удален.`, 'success');
+      showToast(`Skill ${name} deleted.`, 'success');
     } catch (err: any) {
-      showToast(`Ошибка удаления: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
@@ -150,7 +152,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
               }`}
             >
               <Brain size={14} className="text-[var(--theme-text-muted)]" />
-              <span>Память (memory.json)</span>
+              <span>{t.modals.memorySkills.memoryTab}</span>
             </button>
 
             <button
@@ -163,7 +165,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
               }`}
             >
               <Sparkles size={14} className="text-[var(--theme-text-muted)]" />
-              <span>Реестр Скиллов (skills/)</span>
+              <span>{t.modals.memorySkills.skillsTab}</span>
             </button>
           </div>
 
@@ -186,7 +188,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
               <div className="p-4 rounded-xl bento-card space-y-3">
                 <div className="text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5">
                   <Plus size={13} className="text-[var(--theme-text-muted)]" />
-                  <span>Добавить факт в память</span>
+                  <span>{t.modals.memorySkills.addFactTitle}</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -194,14 +196,14 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                     type="text"
                     value={newMemKey}
                     onChange={(e) => setNewMemKey(e.target.value)}
-                    placeholder="Ключ (e.g. preferred_db)"
+                    placeholder={t.modals.memorySkills.keyPlaceholder}
                     className="px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
                   />
                   <input
                     type="text"
                     value={newMemVal}
                     onChange={(e) => setNewMemVal(e.target.value)}
-                    placeholder="Значение (e.g. PostgreSQL with Prisma)"
+                    placeholder={t.modals.memorySkills.valPlaceholder}
                     className="px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none bg-black/40"
                   />
                   <div className="flex gap-2">
@@ -220,7 +222,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                       onClick={handleAddMemory}
                       className="px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] cursor-pointer shrink-0 transition-colors"
                     >
-                      Сохранить
+                      {t.modals.memorySkills.saveFact}
                     </button>
                   </div>
                 </div>
@@ -229,14 +231,14 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
               {/* Memory List */}
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-xs font-medium text-[var(--theme-text-muted)]">
-                  <span>Сохраненные факты ({filteredMemories.length})</span>
+                  <span>{formatString(t.modals.memorySkills.savedFactsCount, { count: filteredMemories.length })}</span>
                   <div className="relative w-48">
                     <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--theme-text-muted)]" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Поиск..."
+                      placeholder={t.modals.memorySkills.searchPlaceholder}
                       className="w-full pl-7 pr-2 py-1 rounded-lg bento-card text-[11px] text-[var(--theme-text)] focus:outline-none bg-black/40"
                     />
                   </div>
@@ -262,7 +264,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                         type="button"
                         onClick={() => handleDeleteMemory(mem.id)}
                         className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer transition-colors"
-                        title="Удалить факт"
+                        title={t.modals.memorySkills.deleteFactTooltip}
                       >
                         <Trash2 size={13} />
                       </button>
@@ -280,7 +282,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
               <div className="md:col-span-4 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-[var(--theme-text-muted)] uppercase tracking-wider">
-                    Скиллы ({skills.length})
+                    {formatString(t.modals.memorySkills.skillsCount, { count: skills.length })}
                   </span>
                   <button
                     type="button"
@@ -288,7 +290,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                     className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/15 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1 cursor-pointer transition-colors"
                   >
                     <Plus size={12} />
-                    <span>Создать</span>
+                    <span>{t.modals.memorySkills.createSkillBtn}</span>
                   </button>
                 </div>
 
@@ -298,7 +300,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                       type="text"
                       value={newSkillNameInput}
                       onChange={(e) => setNewSkillNameInput(e.target.value)}
-                      placeholder="Имя скилла (e.g. docker_expert)"
+                      placeholder={t.modals.memorySkills.skillNamePlaceholder}
                       className="w-full px-2.5 py-1.5 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none"
                       autoFocus
                     />
@@ -308,14 +310,14 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                         onClick={() => setIsCreatingSkill(false)}
                         className="px-2.5 py-1 rounded-lg bento-card text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
                       >
-                        Отмена
+                        {t.modals.memorySkills.cancel}
                       </button>
                       <button
                         type="button"
                         onClick={handleCreateSkill}
                         className="px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] cursor-pointer"
                       >
-                        Создать
+                        {t.modals.memorySkills.createConfirm}
                       </button>
                     </div>
                   </div>
@@ -342,7 +344,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                             handleDeleteSkill(skill.name);
                           }}
                           className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 opacity-0 group-hover:opacity-100 cursor-pointer"
-                          title="Удалить скилл"
+                          title={t.modals.memorySkills.deleteSkillTooltip}
                         >
                           <Trash2 size={12} />
                         </button>
@@ -364,7 +366,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                         className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors"
                       >
                         <Save size={13} />
-                        <span>Сохранить</span>
+                        <span>{t.modals.memorySkills.saveSkillBtn}</span>
                       </button>
                     </div>
 
@@ -377,7 +379,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
                   </div>
                 ) : (
                   <div className="p-12 rounded-xl bento-card text-center text-xs text-[var(--theme-text-muted)]">
-                    Выберите скилл для редактирования или создайте новый
+                    {t.modals.memorySkills.selectSkillPrompt}
                   </div>
                 )}
               </div>

@@ -24,6 +24,7 @@ import {
 import { ChatSession, FileNode } from '../types';
 import { WorkspaceTree } from './WorkspaceTree';
 import { getWorkspaceBaseName, formatRelativeTime, isAutoWorkspace } from '../utils/helpers';
+import { useI18n } from '../i18n';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -56,6 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeView,
   onChangeView,
 }) => {
+  const { t } = useI18n();
   const [showFileExplorer, setShowFileExplorer] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [searchFilter, setSearchFilter] = useState('');
@@ -130,7 +132,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={onToggleOpen}
           className="hidden md:flex absolute -right-3.5 top-1/2 -translate-y-1/2 z-50 w-7 h-12 rounded-full bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] items-center justify-center shadow-xl transition-all cursor-pointer group hover:scale-110 opacity-100"
           style={{ backgroundColor: 'var(--theme-panel-solid)' }}
-          title="Свернуть боковое меню"
+          title={t.nav.toggleSidebar}
         >
           <ChevronLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
         </button>
@@ -154,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onToggleOpen}
                 className="p-1.5 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors"
-                title="Закрыть меню"
+                title={t.common.close}
               >
                 <X size={18} />
               </button>
@@ -167,23 +169,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClick={() => {
                   if (workspaceDir && !isAutoWorkspace(workspaceDir)) {
                     const folderName = getWorkspaceBaseName(workspaceDir);
-                    handleCreateAndCloseOnMobile(`Чат (${folderName})`, workspaceDir);
+                    handleCreateAndCloseOnMobile(`${t.nav.chat} (${folderName})`, workspaceDir);
                   } else {
-                    handleCreateAndCloseOnMobile('Новый диалог', 'auto');
+                    handleCreateAndCloseOnMobile(t.nav.newChat, 'auto');
                   }
                 }}
                 className="flex-1 py-2.5 px-3 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer group"
-                title="Создать новый диалог (Ctrl+N)"
+                title={t.sidebar.newChatTooltip}
               >
                 <Plus size={15} className="transition-transform group-hover:rotate-90 text-[var(--theme-accent-text)]" />
-                <span>Новый диалог</span>
+                <span>{t.nav.newChat}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowNewChatMenu(!showNewChatMenu)}
                 className="p-2.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-panel)] transition-colors cursor-pointer shadow-sm"
-                title="Параметры создания диалога"
+                title={t.nav.workspaceMenu}
               >
                 <ChevronDown size={14} className={`transition-transform duration-200 ${showNewChatMenu ? 'rotate-180' : ''}`} />
               </button>
@@ -195,14 +197,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     type="button"
                     onClick={() => {
                       setShowNewChatMenu(false);
-                      handleCreateAndCloseOnMobile('Быстрый чат', 'auto');
+                      handleCreateAndCloseOnMobile(t.sidebar.autoWorkspace, 'auto');
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-colors cursor-pointer"
                   >
                     <Sparkles size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-bold">Авто-воркспейс</span>
-                      <span className="text-[10px] text-[var(--theme-text-muted)]">Изолированная песочница ~/.0xagent</span>
+                      <span className="font-bold">{t.sidebar.autoWorkspace}</span>
+                      <span className="text-[10px] text-[var(--theme-text-muted)]">~/.0xagent/workspaces</span>
                     </div>
                   </button>
 
@@ -210,14 +212,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     type="button"
                     onClick={() => {
                       setShowNewChatMenu(false);
-                      handleCreateAndCloseOnMobile('Общий диалог', null);
+                      handleCreateAndCloseOnMobile(t.sidebar.standalone, null);
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-colors cursor-pointer"
                   >
                     <MessageSquare size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-bold">Общий диалог</span>
-                      <span className="text-[10px] text-[var(--theme-text-muted)]">Без привязки к папке на диске</span>
+                      <span className="font-bold">{t.sidebar.standalone}</span>
+                      <span className="text-[10px] text-[var(--theme-text-muted)]">{t.chat.context}</span>
                     </div>
                   </button>
 
@@ -231,8 +233,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <FolderPlus size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-bold">Открыть проект с диска...</span>
-                      <span className="text-[10px] text-[var(--theme-text-muted)]">Выбрать локальную папку</span>
+                      <span className="font-bold">{t.sidebar.openWorkspace}...</span>
+                      <span className="text-[10px] text-[var(--theme-text-muted)]">{t.nav.changeWorkspace}</span>
                     </div>
                   </button>
                 </div>
@@ -245,7 +247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="text"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder="Поиск по диалогам..."
+                placeholder={t.sidebar.searchPlaceholder}
                 className="w-full pl-8 pr-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-accent)] transition-all font-sans"
               />
               <Search size={13} className="absolute left-2.5 top-2.5 text-[var(--theme-text-muted)]" />
@@ -297,10 +299,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCreateAndCloseOnMobile(`Чат (${folderName})`, dir);
+                          handleCreateAndCloseOnMobile(`${t.nav.chat} (${folderName})`, dir);
                         }}
                         className="p-1 rounded-lg hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer text-[var(--theme-text-muted)]"
-                        title="Новый диалог в этой папке"
+                        title={t.sidebar.newChatTooltip}
                       >
                         <Plus size={12} />
                       </button>
@@ -339,7 +341,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                                   type="button"
                                   onClick={(e) => onDeleteSession(session.id, e)}
                                   className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
-                                  title="Удалить"
+                                  title={t.sidebar.deleteSession}
                                 >
                                   <Trash2 size={11} />
                                 </button>
@@ -349,7 +351,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         })
                       ) : (
                         <div className="text-[10px] text-[var(--theme-text-muted)] italic py-1 px-2 font-mono">
-                          нет диалогов
+                          {t.sidebar.noSessionsFound}
                         </div>
                       )}
                     </div>
@@ -372,7 +374,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <ChevronDown size={13} className="shrink-0" />
                     )}
                     <Sparkles size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                    <span>Авто-воркспейсы</span>
+                    <span>{t.sidebar.autoWorkspace}</span>
                   </div>
                   <span className="text-[10px] font-mono opacity-60">({autoWorkspaceSessions.length})</span>
                 </div>
@@ -407,7 +409,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               type="button"
                               onClick={(e) => onDeleteSession(session.id, e)}
                               className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
-                              title="Удалить"
+                              title={t.sidebar.deleteSession}
                             >
                               <Trash2 size={11} />
                             </button>
@@ -434,7 +436,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <ChevronDown size={13} className="shrink-0" />
                     )}
                     <MessageSquare size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                    <span>Общие диалоги</span>
+                    <span>{t.sidebar.standalone}</span>
                   </div>
                   <span className="text-[10px] font-mono opacity-60">({standaloneSessions.length})</span>
                 </div>
@@ -469,7 +471,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               type="button"
                               onClick={(e) => onDeleteSession(session.id, e)}
                               className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
-                              title="Удалить"
+                              title={t.sidebar.deleteSession}
                             >
                               <Trash2 size={11} />
                             </button>
@@ -492,7 +494,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <div className="flex items-center gap-2">
                     <FolderTree size={14} className="text-[var(--theme-text-muted)]" />
-                    <span>Дерево файлов проекта</span>
+                    <span>{t.editor.workspaceFiles}</span>
                   </div>
                   {showFileExplorer ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                 </button>
@@ -515,16 +517,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {onChangeView && (
             <div className="p-2 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-card-bg)] md:hidden space-y-1">
               <div className="px-2 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider font-bold">
-                Навигация
+                {t.nav.settings}
               </div>
               <div className="grid grid-cols-3 gap-1">
                 {[
-                  { id: 'chat', label: 'Чат', icon: MessageSquare },
-                  { id: 'workspace', label: 'Код', icon: Code },
-                  { id: 'jarvis', label: 'Jarvis', icon: Bot },
-                  { id: 'knowledge', label: 'Знания', icon: BookOpen },
-                  { id: 'analytics', label: 'Аналитика', icon: BarChart2 },
-                  { id: 'settings', label: 'Опции', icon: SettingsIcon },
+                  { id: 'chat', label: t.nav.chat, icon: MessageSquare },
+                  { id: 'workspace', label: t.nav.workspace, icon: Code },
+                  { id: 'jarvis', label: t.nav.jarvis, icon: Bot },
+                  { id: 'knowledge', label: t.nav.knowledge, icon: BookOpen },
+                  { id: 'analytics', label: t.nav.analytics, icon: BarChart2 },
+                  { id: 'settings', label: t.nav.settings, icon: SettingsIcon },
                 ].map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeView === tab.id;
@@ -565,7 +567,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div className="relative z-10 flex items-center justify-between text-xs text-[var(--theme-text-muted)] font-medium">
               <div className="flex items-center gap-2">
                 <History size={15} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors" />
-                <span className="group-hover:text-[var(--theme-text)] transition-colors font-semibold">История сессий</span>
+                <span className="group-hover:text-[var(--theme-text)] transition-colors font-semibold">{t.sidebar.sessions}</span>
               </div>
               <span className="px-2.5 py-0.5 rounded-md bg-[var(--theme-border-subtle)] text-[var(--theme-text)] font-bold text-xs border border-[var(--theme-border)]">
                 {sessions.length}

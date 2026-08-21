@@ -13,6 +13,7 @@ import { ReasoningViewer } from './ReasoningViewer';
 import { InteractiveQuestionCard } from './InteractiveQuestionCard';
 import { StagedProposalCard } from './StagedProposalCard';
 import * as api from '../../services/api';
+import { useI18n } from '../../i18n';
 
 interface ChatMessageItemProps {
   msg: ChatMessage;
@@ -46,6 +47,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
     onSetInputText,
     showToast,
   }) => {
+    const { t } = useI18n();
     const isUser = msg.role === 'user';
     const isSystem = msg.role === 'system';
 
@@ -130,16 +132,16 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                             const res = await api.rollback_session(currentSession.id, msg.id, 'to_user_edit');
                             onSetInputText(res.restoredContent || msg.content || '');
                           }
-                          showToast('Контекст сброшен. Запрос загружен в строку ввода для редактирования', 'info');
+                          showToast(t.chat.editMessage, 'info');
                         } catch (err: any) {
-                          showToast(err.message || 'Ошибка отката диалога', 'error');
+                          showToast(err.message || t.common.error, 'error');
                         }
                       }}
                       className="px-1.5 py-0.5 rounded-md hover:bg-white/15 text-[var(--theme-text-muted)] hover:text-white transition-all inline-flex items-center gap-1 cursor-pointer"
-                      title="Откатить диалог сюда и отредактировать этот запрос"
+                      title={t.chat.editMessage}
                     >
                       <RotateCcw size={10} />
-                      <span className="text-[9.5px]">Изменить</span>
+                      <span className="text-[9.5px]">{t.chat.editMessage}</span>
                     </button>
                   )}
                 </span>
@@ -178,16 +180,16 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                             } else {
                               await api.rollback_session(currentSession.id, msg.id, 'to_assistant');
                             }
-                            showToast('Контекст диалога сброшен до этого ответа', 'info');
+                            showToast(t.chat.retryMessage, 'info');
                           } catch (err: any) {
-                            showToast(err.message || 'Ошибка отката диалога', 'error');
+                            showToast(err.message || t.common.error, 'error');
                           }
                         }}
                         className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 px-1.5 py-0.5 rounded-md transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
-                        title="Откатить контекст диалога до этого ответа"
+                        title={t.chat.retryMessage}
                       >
                         <RotateCcw size={10} />
-                        <span>Откатить досюда</span>
+                        <span>{t.chat.retryMessage}</span>
                       </button>
                     )}
                   </div>
@@ -217,14 +219,14 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                           questions={
                             questions.length > 0
                               ? questions
-                              : [{ id: 'q1', question: 'Пожалуйста, ответьте на вопрос:' }]
+                              : [{ id: 'q1', question: t.chat.askQuestionTitle }]
                           }
                           onSubmitAnswers={async (answers) => {
                             try {
                               await api.answer_user_question(tool.id, answers);
-                              showToast('Ответ отправлен агенту', 'success');
+                              showToast(t.chat.submitAnswer, 'success');
                             } catch (err: any) {
-                              showToast(err.message || 'Ошибка отправки ответа', 'error');
+                              showToast(err.message || t.common.error, 'error');
                             }
                           }}
                         />
@@ -250,7 +252,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                           key={tool.id}
                           proposal={stagedProposal}
                           onApplied={() => {
-                            showToast(`Пул-реквест ${stagedProposal?.id} успешно применен к проекту!`, 'success');
+                            showToast(`${t.chat.changesApplied} (${stagedProposal?.id})`, 'success');
                           }}
                         />
                       );

@@ -24,8 +24,10 @@ import {
   listen,
 } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { useI18n } from '../../i18n';
 
 export const PersonasTab: React.FC = () => {
+  const { t, formatString } = useI18n();
   const { showToast } = useToast();
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersonaId, setActivePersonaId] = useState<string>('default');
@@ -137,69 +139,10 @@ export const PersonasTab: React.FC = () => {
       setIsSaving(true);
       await save_summarizer_prompt(summarizerPrompt);
       setSaveSuccess(true);
-      showToast('SUMMARIZER.md успешно сохранен!', 'success');
+      showToast('SUMMARIZER.md saved!', 'success');
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (err: any) {
-      showToast(`Ошибка сохранения SUMMARIZER.md: ${err.message}`, 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleActivate = async (id: string) => {
-    try {
-      const updatedList = await activate_persona(id);
-      setPersonas(updatedList);
-      setActivePersonaId(id);
-      showToast('Персона успешно активирована!', 'success');
-    } catch (err: any) {
-      showToast(`Ошибка активации: ${err.message}`, 'error');
-    }
-  };
-
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-    try {
-      const created = await create_persona(newName.trim(), newDesc.trim(), 'User');
-      setPersonas((prev) => [...prev, created.metadata]);
-      setSelectedPersonaId(created.metadata.id);
-      setIsCreateOpen(false);
-      setNewName('');
-      setNewDesc('');
-      showToast(`Персона "${created.metadata.name}" создана!`, 'success');
-    } catch (err: any) {
-      showToast(`Ошибка создания: ${err.message}`, 'error');
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (id === 'default') {
-      showToast('Нельзя удалить стандартную персону', 'error');
-      return;
-    }
-    if (!confirm('Вы уверены, что хотите удалить эту персону?')) return;
-    try {
-      await delete_persona(id);
-      setPersonas((prev) => prev.filter((p) => p.id !== id));
-      if (selectedPersonaId === id) setSelectedPersonaId('default');
-      showToast('Персона удалена', 'info');
-    } catch (err: any) {
-      showToast(`Ошибка удаления: ${err.message}`, 'error');
-    }
-  };
-
-  const handleSavePersonaFile = async () => {
-    if (!personaDetail) return;
-    const filename = activeFileTab === 'soul' ? 'SOUL.md' : 'USER.md';
-    try {
-      setIsSaving(true);
-      await save_persona_file(personaDetail.metadata.id, filename, fileContent);
-      setSaveSuccess(true);
-      showToast(`${filename} успешно сохранен!`, 'success');
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (err: any) {
-      showToast(`Ошибка сохранения: ${err.message}`, 'error');
+      showToast(err.message || 'Save error', 'error');
     } finally {
       setIsSaving(false);
     }
@@ -209,40 +152,98 @@ export const PersonasTab: React.FC = () => {
     const updated = toolsList.map((t) => (t.id === toolId ? { ...t, enabled: !t.enabled } : t));
     setToolsList(updated);
 
-    const togglesMap: Record<string, boolean> = {};
-    updated.forEach((t) => {
-      togglesMap[t.id] = t.enabled;
-    });
+    const toggles: Record<string, boolean> = {};
+    for (const tool of updated) {
+      toggles[tool.id] = tool.enabled;
+    }
 
     try {
       setIsToolsSaving(true);
-      await save_tools_toggles(togglesMap);
+      await save_tools_toggles(toggles);
       setToolsSaveSuccess(true);
       setTimeout(() => setToolsSaveSuccess(false), 1500);
     } catch (err: any) {
-      showToast(`Ошибка сохранения: ${err.message}`, 'error');
+      showToast(err.message || 'Failed to save tool state', 'error');
     } finally {
       setIsToolsSaving(false);
     }
   };
 
-  const handleBulkToggleAll = async (enabledState: boolean) => {
-    const updated = toolsList.map((t) => ({ ...t, enabled: enabledState }));
+  const handleBulkToggleAll = async (enabled: boolean) => {
+    const updated = toolsList.map((t) => ({ ...t, enabled }));
     setToolsList(updated);
 
-    const togglesMap: Record<string, boolean> = {};
-    updated.forEach((t) => {
-      togglesMap[t.id] = enabledState;
-    });
+    const toggles: Record<string, boolean> = {};
+    for (const tool of updated) {
+      toggles[tool.id] = enabled;
+    }
 
     try {
       setIsToolsSaving(true);
-      await save_tools_toggles(togglesMap);
-      showToast(enabledState ? 'Все инструменты включены!' : 'Все инструменты отключены!', 'info');
+      await save_tools_toggles(toggles);
+      showToast(enabled ? t.settings.personas.enableAll : t.settings.personas.disableAll, 'info');
     } catch (err: any) {
-      showToast(`Ошибка группового изменения: ${err.message}`, 'error');
+      showToast(err.message || 'Failed to update tools', 'error');
     } finally {
       setIsToolsSaving(false);
+    }
+  };
+
+  const handleActivate = async (id: string) => {
+    try {
+      await activate_persona(id);
+      setActivePersonaId(id);
+      showToast('Persona activated', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Activation failed', 'error');
+    }
+  };
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+
+    try {
+      const created = await create_persona(newName.trim(), newDesc.trim());
+      setIsCreateOpen(false);
+      setNewName('');
+      setNewDesc('');
+      await loadPersonas();
+      setSelectedPersonaId(created.metadata.id);
+      showToast('Persona created', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Creation failed', 'error');
+    }
+  };
+
+  const handleSavePersonaFile = async () => {
+    if (!personaDetail) return;
+    try {
+      setIsSaving(true);
+      const targetFile: 'SOUL.md' | 'TOOLS.md' | 'USER.md' = activeFileTab === 'soul' ? 'SOUL.md' : 'USER.md';
+      await save_persona_file(personaDetail.metadata.id, targetFile, fileContent);
+      setSaveSuccess(true);
+      showToast(`${activeFileTab.toUpperCase()}.md saved!`, 'success');
+      setTimeout(() => setSaveSuccess(false), 2000);
+      loadDetail(personaDetail.metadata.id);
+    } catch (err: any) {
+      showToast(err.message || 'Save failed', 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (id === 'default') return;
+    try {
+      await delete_persona(id);
+      await loadPersonas();
+      if (selectedPersonaId === id) {
+        setSelectedPersonaId('default');
+      }
+      showToast('Persona deleted', 'info');
+    } catch (err: any) {
+      showToast(err.message || 'Delete failed', 'error');
     }
   };
 
@@ -260,7 +261,7 @@ export const PersonasTab: React.FC = () => {
           }`}
         >
           <User size={14} />
-          <span>Персоны и роли</span>
+          <span>{t.settings.personas.personasTab}</span>
         </button>
 
         <button
@@ -273,7 +274,7 @@ export const PersonasTab: React.FC = () => {
           }`}
         >
           <Sliders size={14} />
-          <span>Инструменты (TOOLS.md)</span>
+          <span>{t.settings.personas.toolsTab}</span>
         </button>
 
         <button
@@ -286,7 +287,7 @@ export const PersonasTab: React.FC = () => {
           }`}
         >
           <Sparkles size={14} />
-          <span>Суммаризатор (SUMMARIZER.md)</span>
+          <span>{t.settings.personas.summarizerTab}</span>
         </button>
       </div>
 
@@ -300,13 +301,13 @@ export const PersonasTab: React.FC = () => {
               </div>
               <div>
                 <h2 className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-2">
-                  <span>Система инструментов Агента</span>
+                  <span>{t.settings.personas.toolsTitle}</span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] font-semibold">
                     TOOLS.md
                   </span>
                 </h2>
                 <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 max-w-2xl">
-                  Управляйте активными инструментами ИИ. Отключение лишних функций сокращает системный промпт и экономит контекст.
+                  {t.settings.personas.toolsDesc}
                 </p>
               </div>
             </div>
@@ -318,7 +319,7 @@ export const PersonasTab: React.FC = () => {
                 disabled={isToolsSaving}
                 className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] text-xs font-bold border border-[var(--theme-border)] transition-colors cursor-pointer"
               >
-                Включить все
+                {t.settings.personas.enableAll}
               </button>
               <button
                 type="button"
@@ -326,7 +327,7 @@ export const PersonasTab: React.FC = () => {
                 disabled={isToolsSaving}
                 className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] text-xs font-bold border border-[var(--theme-border)] transition-colors cursor-pointer"
               >
-                Отключить все
+                {t.settings.personas.disableAll}
               </button>
             </div>
           </div>
@@ -348,7 +349,7 @@ export const PersonasTab: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs font-bold text-[var(--theme-text)]">&lt;{tool.name}&gt;</span>
                       <span className="text-[9px] px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] font-mono border border-[var(--theme-border)]">
-                        {tool.requiresApproval ? 'Подтверждение' : 'Авто'}
+                        {tool.requiresApproval ? t.settings.personas.requiresApproval : t.settings.personas.auto}
                       </span>
                     </div>
                     <p className="text-xs text-[var(--theme-text-muted)] mt-1.5 leading-relaxed">{tool.description}</p>
@@ -383,13 +384,13 @@ export const PersonasTab: React.FC = () => {
             </div>
             <div>
               <h2 className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-2">
-                <span>Системный суммаризатор контекста</span>
+                <span>{t.settings.personas.summarizerTitle}</span>
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] font-semibold">
                   SUMMARIZER.md
                 </span>
               </h2>
               <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 leading-relaxed">
-                Этот промпт используется при фоновом сжатии контекста диалога при переполнении контекстного окна.
+                {t.settings.personas.summarizerDesc}
               </p>
             </div>
           </div>
@@ -398,7 +399,7 @@ export const PersonasTab: React.FC = () => {
             <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
               <div className="flex items-center gap-2">
                 <FileText size={14} className="text-[var(--theme-text-muted)]" />
-                <span className="text-xs font-bold text-[var(--theme-text)]">Промпт сжатия</span>
+                <span className="text-xs font-bold text-[var(--theme-text)]">{t.settings.personas.summarizerPromptTitle}</span>
               </div>
               <button
                 type="button"
@@ -407,7 +408,7 @@ export const PersonasTab: React.FC = () => {
                 className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
               >
                 {saveSuccess ? <Check size={13} /> : <Save size={13} />}
-                <span>{saveSuccess ? 'Сохранено' : 'Сохранить'}</span>
+                <span>{saveSuccess ? t.settings.personas.saved : t.settings.personas.save}</span>
               </button>
             </div>
             <textarea
@@ -427,7 +428,7 @@ export const PersonasTab: React.FC = () => {
           <div className="lg:col-span-4 space-y-3">
             <div className="flex items-center justify-between px-1">
               <span className="text-xs font-bold text-[var(--theme-text-muted)] uppercase tracking-wider">
-                Список персон ({personas.length})
+                {formatString(t.settings.personas.personasCount, { count: personas.length })}
               </span>
               <button
                 type="button"
@@ -435,7 +436,7 @@ export const PersonasTab: React.FC = () => {
                 className="px-2.5 py-1 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
               >
                 <Plus size={13} />
-                <span>Создать</span>
+                <span>{t.settings.personas.createBtn}</span>
               </button>
             </div>
 
@@ -460,7 +461,7 @@ export const PersonasTab: React.FC = () => {
                       </div>
                       {isActive && (
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--theme-accent)] text-[var(--theme-accent-text)]">
-                          активна
+                          {t.settings.personas.activeBadge}
                         </span>
                       )}
                     </div>
@@ -488,7 +489,7 @@ export const PersonasTab: React.FC = () => {
                         onClick={() => handleActivate(personaDetail.metadata.id)}
                         className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold cursor-pointer transition-colors shadow-sm"
                       >
-                        Активировать
+                        {t.settings.personas.activateBtn}
                       </button>
                     )}
                     {personaDetail.metadata.id !== 'default' && (
@@ -496,7 +497,7 @@ export const PersonasTab: React.FC = () => {
                         type="button"
                         onClick={() => handleDelete(personaDetail.metadata.id)}
                         className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 cursor-pointer transition-colors"
-                        title="Удалить персону"
+                        title={t.settings.personas.deleteTooltip}
                       >
                         <Trash2 size={15} />
                       </button>
@@ -538,7 +539,7 @@ export const PersonasTab: React.FC = () => {
                     className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
                   >
                     {saveSuccess ? <Check size={13} /> : <Save size={13} />}
-                    <span>{saveSuccess ? 'Сохранено' : 'Сохранить'}</span>
+                    <span>{saveSuccess ? t.settings.personas.saved : t.settings.personas.save}</span>
                   </button>
                 </div>
 
@@ -551,7 +552,7 @@ export const PersonasTab: React.FC = () => {
               </div>
             ) : (
               <div className="p-8 rounded-2xl bento-card text-center text-xs text-[var(--theme-text-muted)] border border-[var(--theme-border)] font-medium">
-                Выберите персону для редактирования
+                {t.settings.personas.selectPersonaPrompt}
               </div>
             )}
           </div>
@@ -562,15 +563,15 @@ export const PersonasTab: React.FC = () => {
       {isCreateOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="w-full max-w-md p-6 rounded-2xl bento-card bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] shadow-xl space-y-4">
-            <h3 className="text-sm font-bold text-[var(--theme-text)]">Новая персона</h3>
+            <h3 className="text-sm font-bold text-[var(--theme-text)]">{t.settings.personas.newPersonaTitle}</h3>
             <form onSubmit={handleCreate} className="space-y-3.5">
               <div className="space-y-1">
-                <label className="text-xs font-bold text-[var(--theme-text-muted)]">Имя персоны</label>
+                <label className="text-xs font-bold text-[var(--theme-text-muted)]">{t.settings.personas.personaNameLabel}</label>
                 <input
                   type="text"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  placeholder="Например: Архитектор"
+                  placeholder={t.settings.personas.personaNamePlaceholder}
                   className="w-full px-3.5 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] focus:outline-none"
                   required
                   autoFocus
@@ -578,12 +579,12 @@ export const PersonasTab: React.FC = () => {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-[var(--theme-text-muted)]">Краткое описание</label>
+                <label className="text-xs font-bold text-[var(--theme-text-muted)]">{t.settings.personas.personaDescLabel}</label>
                 <input
                   type="text"
                   value={newDesc}
                   onChange={(e) => setNewDesc(e.target.value)}
-                  placeholder="Например: Эксперт по чистому коду и паттернам"
+                  placeholder={t.settings.personas.personaDescPlaceholder}
                   className="w-full px-3.5 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] focus:outline-none"
                 />
               </div>
@@ -594,13 +595,13 @@ export const PersonasTab: React.FC = () => {
                   onClick={() => setIsCreateOpen(false)}
                   className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
                 >
-                  Отмена
+                  {t.settings.personas.cancelBtn}
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold cursor-pointer transition-colors shadow-sm"
                 >
-                  Создать
+                  {t.settings.personas.createConfirmBtn}
                 </button>
               </div>
             </form>

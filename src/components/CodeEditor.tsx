@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { useI18n } from '../i18n';
 
 export interface EditorTabItem {
   path: string;
@@ -42,6 +43,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   workspaceDir,
 }) => {
   const { showToast } = useToast();
+  const { t } = useI18n();
   const [editorContent, setEditorContent] = useState<string>('');
   const [isEditing, setIsEditing] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
@@ -72,13 +74,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     setIsSaving(true);
     try {
       await api.write_file_raw(selectedFile.path, editorContent, workspaceDir);
-      showToast(`Файл "${selectedFile.name}" успешно сохранен`, 'success');
+      showToast(`${t.editor.fileSaved}: "${selectedFile.name}"`, 'success');
       if (onFileSaved) {
         onFileSaved(selectedFile.path, editorContent);
       }
     } catch (err: any) {
       console.error('Failed to save file:', err);
-      showToast(`Ошибка сохранения: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     } finally {
       setIsSaving(false);
     }
@@ -101,99 +103,51 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         });
       }
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedFile, editorContent]);
+  }, [selectedFile, editorContent, workspaceDir]);
 
-  // Copy code to clipboard
+  // Handle copy entire code
   const handleCopyCode = () => {
     if (!editorContent) return;
-    navigator.clipboard.writeText(editorContent).then(() => {
-      setCopied(true);
-      showToast('Код скопирован в буфер обмена', 'success');
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(editorContent);
+    setCopied(true);
+    showToast(t.editor.copied, 'success');
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  // Detect file language
-  const detectLanguage = (fileName: string): string => {
-    const lower = fileName.toLowerCase();
-    const ext = lower.split('.').pop() || '';
-
-    if (lower === 'dockerfile' || lower.startsWith('.docker')) return 'Dockerfile';
-    if (lower === 'makefile') return 'Makefile';
-    if (lower.startsWith('.env')) return 'Environment Config';
-
+  // Detect language for badge
+  const detectLanguage = (filename: string): string => {
+    const ext = filename.split('.').pop()?.toLowerCase();
     switch (ext) {
       case 'ts':
       case 'tsx':
         return 'TypeScript';
       case 'js':
       case 'jsx':
-      case 'mjs':
-      case 'cjs':
         return 'JavaScript';
-      case 'py':
-      case 'ipynb':
-        return 'Python';
+      case 'json':
+        return 'JSON';
+      case 'md':
+        return 'Markdown';
+      case 'css':
+        return 'CSS';
+      case 'html':
+        return 'HTML';
       case 'rs':
         return 'Rust';
+      case 'py':
+        return 'Python';
       case 'go':
         return 'Go';
-      case 'java':
-      case 'kt':
-        return 'Java/Kotlin';
-      case 'cs':
-        return 'C#';
-      case 'json':
-      case 'jsonc':
-        return 'JSON';
-      case 'yaml':
-      case 'yml':
-        return 'YAML';
-      case 'toml':
-        return 'TOML';
-      case 'xml':
-      case 'svg':
-        return 'XML/SVG';
-      case 'sql':
-        return 'SQL';
-      case 'css':
-      case 'scss':
-      case 'sass':
-      case 'less':
-        return 'CSS/SCSS';
-      case 'html':
-      case 'htm':
-        return 'HTML';
-      case 'md':
-      case 'markdown':
-      case 'mdx':
-        return 'Markdown';
       case 'sh':
       case 'bash':
-      case 'zsh':
-      case 'ps1':
-      case 'bat':
-      case 'cmd':
-        return 'Shell Script';
-      case 'cpp':
-      case 'c':
-      case 'h':
-      case 'hpp':
-      case 'cc':
-        return 'C/C++';
-      case 'txt':
-      case 'log':
-      case 'ini':
-      case 'cfg':
-      case 'conf':
-        return 'Plain Text';
-      case 'gguf':
-        return 'GGUF Binary Model';
+        return 'Shell';
+      case 'yml':
+      case 'yaml':
+        return 'YAML';
       default:
-        return ext ? `${ext.toUpperCase()} File` : 'Plain Text';
+        return ext ? ext.toUpperCase() : 'Plain Text';
     }
   };
 
@@ -293,7 +247,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
                 {/* Dirty Unsaved Dot */}
                 {tabIsDirty && (
-                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title="Несохраненные изменения" />
+                  <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" title={t.editor.unsavedChanges} />
                 )}
 
                 {/* Close Tab Button */}
@@ -301,7 +255,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   type="button"
                   onClick={(e) => onCloseTab(tab.path, e)}
                   className="p-0.5 rounded hover:bg-rose-500/20 text-[var(--theme-text-muted)] hover:text-rose-500 transition-colors cursor-pointer"
-                  title="Закрыть вкладку"
+                  title={t.editor.closeTab}
                 >
                   <X size={13} />
                 </button>
@@ -324,10 +278,10 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)]'
                   : 'text-[var(--theme-text-muted)] opacity-50 cursor-not-allowed border border-[var(--theme-border)]'
               }`}
-              title="Сохранить файл (Ctrl+S)"
+              title={`${t.editor.save} (Ctrl+S)`}
             >
               <Save size={13} className={isSaving ? 'animate-spin' : ''} />
-              <span className="hidden lg:inline">{isSaving ? 'Сохранение...' : 'Сохранить'}</span>
+              <span className="hidden lg:inline">{isSaving ? `${t.common.loading}...` : t.editor.save}</span>
             </button>
 
             {/* Mode Toggle (Edit / View) */}
@@ -339,7 +293,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border-[var(--theme-border)]'
                   : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent'
               }`}
-              title={isEditing ? 'Режим: Редактирование' : 'Режим: Просмотр (Read-Only)'}
+              title={isEditing ? t.editor.editing : t.editor.readOnly}
             >
               {isEditing ? <Eye size={14} /> : <Edit3 size={14} />}
             </button>
@@ -353,7 +307,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border-[var(--theme-border)]'
                   : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent'
               }`}
-              title="Поиск в файле (Ctrl+F)"
+              title={`${t.editor.search} (Ctrl+F)`}
             >
               <Search size={14} />
             </button>
@@ -367,7 +321,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
                   ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border-[var(--theme-border)]'
                   : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent'
               }`}
-              title={wordWrap ? 'Перенос строк: Вкл' : 'Перенос строк: Выкл'}
+              title={t.editor.wordWrap}
             >
               <WrapText size={14} />
             </button>
@@ -377,7 +331,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               type="button"
               onClick={() => setFontSize((prev) => Math.max(10, prev - 1))}
               className="p-1.5 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
-              title="Уменьшить шрифт"
+              title={t.editor.zoomOut}
             >
               <ZoomOut size={14} />
             </button>
@@ -385,7 +339,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               type="button"
               onClick={() => setFontSize((prev) => Math.min(22, prev + 1))}
               className="p-1.5 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
-              title="Увеличить шрифт"
+              title={t.editor.zoomIn}
             >
               <ZoomIn size={14} />
             </button>
@@ -395,7 +349,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               type="button"
               onClick={handleCopyCode}
               className="p-1.5 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
-              title="Скопировать весь код"
+              title={t.editor.copyCode}
             >
               {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
             </button>
@@ -425,8 +379,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             <span className="px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text)]">
               {detectLanguage(selectedFile.name)}
             </span>
-            <span>{lines.length} строк</span>
-            <span>{editorContent.length.toLocaleString()} симв.</span>
+            <span>{lines.length} {t.editor.lines}</span>
+            <span>{editorContent.length.toLocaleString()} {t.editor.chars}</span>
           </div>
         </div>
       )}
@@ -440,13 +394,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Найти в файле..."
+            placeholder={t.editor.searchPlaceholder}
             className="flex-1 bg-transparent text-[var(--theme-text)] text-xs placeholder-[var(--theme-text-muted)] focus:outline-none"
             autoFocus
           />
           {searchQuery && (
             <span className="text-xs font-semibold text-[var(--theme-text-muted)]">
-              {searchMatchesCount} совпадений
+              {searchMatchesCount} {t.editor.matches}
             </span>
           )}
           <button
@@ -534,9 +488,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               <FileCode size={26} />
             </div>
             <div className="space-y-1">
-              <div className="text-base font-bold text-[var(--theme-text)]">Редактор файлов пуст</div>
+              <div className="text-base font-bold text-[var(--theme-text)]">{t.editor.noFilesOpen}</div>
               <div className="text-xs text-[var(--theme-text-muted)] max-w-xs leading-relaxed font-medium">
-                Выберите файл в дереве файлов слева или откройте воркспейс для работы с проектом.
+                {t.editor.selectFileToView}
               </div>
             </div>
           </div>

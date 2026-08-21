@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Folder, FolderPlus, X, AlertCircle, ArrowRight, Sparkles, Link as LinkIcon } from 'lucide-react';
 import * as api from '../services/api';
 import { getWorkspaceBaseName } from '../utils/helpers';
+import { useI18n } from '../i18n';
 
 interface WorkspacePickerModalProps {
   isOpen: boolean;
@@ -18,6 +19,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
   currentWorkspaceDir,
   recentWorkspaces = [],
 }) => {
+  const { t } = useI18n();
   const [inputPath, setInputPath] = useState('');
   const [isLoadingNative, setIsLoadingNative] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
       }
     } catch (err: any) {
       console.error('Native folder select error:', err);
-      setErrorMsg(`Не удалось открыть проводник: ${err.message || err}`);
+      setErrorMsg(`${t.common.error}: ${err.message || err}`);
     } finally {
       setIsLoadingNative(false);
     }
@@ -57,7 +59,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
       await onSelectWorkspaceDir(targetPath.trim(), true);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Ошибка открытия проекта');
+      setErrorMsg(err.message || 'Failed to open project');
     }
   };
 
@@ -68,7 +70,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
       await onSelectWorkspaceDir(targetPath.trim(), false);
       onClose();
     } catch (err: any) {
-      setErrorMsg(err.message || 'Ошибка привязки воркспейса');
+      setErrorMsg(err.message || 'Failed to bind workspace');
     }
   };
 
@@ -92,8 +94,8 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
               <FolderPlus size={16} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[var(--theme-text)]">Выбор Рабочего Проекта (Workspace)</h3>
-              <p className="text-[11px] text-[var(--theme-text-muted)] font-medium">Открытие папки проекта на диске в чистом контексте</p>
+              <h3 className="text-sm font-bold text-[var(--theme-text)]">{t.modals.workspacePicker.title}</h3>
+              <p className="text-[11px] text-[var(--theme-text-muted)] font-medium">{t.modals.workspacePicker.subtitle}</p>
             </div>
           </div>
           <button
@@ -118,7 +120,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
           {/* Path Input Form */}
           <div className="space-y-3">
             <label className="block text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider">
-              Путь к папке проекта на диске
+              {t.modals.workspacePicker.inputLabel}
             </label>
 
             <div className="flex gap-2">
@@ -133,7 +135,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                       handleOpenProjectInNewChat(inputPath);
                     }
                   }}
-                  placeholder="C:\Projects\my-app or ~/projects/my-app"
+                  placeholder={t.modals.workspacePicker.inputPlaceholder}
                   className="w-full pl-3.5 pr-4 py-2.5 rounded-xl border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] bg-[var(--theme-input-bg)] shadow-inner transition-colors"
                   autoFocus
                 />
@@ -144,10 +146,10 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                 onClick={handleNativeBrowse}
                 disabled={isLoadingNative}
                 className="px-4 py-2.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-2 shrink-0 cursor-pointer disabled:opacity-50 transition-all shadow-sm"
-                title="Открыть стандартный Проводник Windows"
+                title="Browse Windows Explorer"
               >
                 <Folder size={14} className="text-[var(--theme-accent)]" />
-                <span>{isLoadingNative ? 'Открытие...' : 'Проводник'}</span>
+                <span>{isLoadingNative ? t.modals.workspacePicker.opening : t.modals.workspacePicker.browseWindows}</span>
               </button>
             </div>
 
@@ -158,10 +160,10 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                 onClick={() => handleBindToCurrentChat(inputPath)}
                 disabled={!inputPath.trim()}
                 className="px-3.5 py-2 rounded-xl border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-all cursor-pointer disabled:opacity-30 flex items-center gap-1.5"
-                title="Привязать выбранную папку к текущему открытому диалогу"
+                title={t.modals.workspacePicker.bindToCurrentChat}
               >
                 <LinkIcon size={13} />
-                <span>Привязать к текущему чату</span>
+                <span>{t.modals.workspacePicker.bindToCurrentChat}</span>
               </button>
 
               <div className="flex items-center gap-2 ml-auto">
@@ -170,7 +172,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                   onClick={onClose}
                   className="px-4 py-2 rounded-xl text-xs font-medium text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] cursor-pointer transition-colors"
                 >
-                  Отмена
+                  {t.modals.workspacePicker.cancel}
                 </button>
                 <button
                   type="button"
@@ -179,7 +181,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                   className="px-4.5 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] text-xs font-bold transition-all shadow-md cursor-pointer disabled:opacity-40 flex items-center gap-1.5 hover:opacity-90 active:scale-95"
                 >
                   <Sparkles size={13} />
-                  <span>Открыть проект (Чистый чат)</span>
+                  <span>{t.modals.workspacePicker.openProjectNewChat}</span>
                 </button>
               </div>
             </div>
@@ -189,7 +191,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
           {uniqueRecent.length > 0 && (
             <div className="pt-3 border-t border-[var(--theme-border)] space-y-2">
               <span className="text-[11px] font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider block">
-                Недавние проекты и рабочие пространства
+                {t.modals.workspacePicker.recentTitle}
               </span>
 
               <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 scrollbar-thin">
@@ -223,7 +225,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                             <span>{baseName}</span>
                             {isJarvisSanctuary && (
                               <span className="text-[9.5px] px-1.5 py-0.2 rounded-md font-mono bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30">
-                                Уголок Jarvis
+                                {t.modals.workspacePicker.jarvisCornerBadge}
                               </span>
                             )}
                           </div>
@@ -234,7 +236,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                       <div className="flex items-center gap-1.5 shrink-0">
                         {isActive && (
                           <span className="text-[10px] px-2 py-0.5 rounded-md font-mono bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30">
-                            Текущий
+                            {t.modals.workspacePicker.currentBadge}
                           </span>
                         )}
                         <button
@@ -244,7 +246,7 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                             handleOpenProjectInNewChat(dir);
                           }}
                           className="p-1.5 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-all cursor-pointer"
-                          title="Открыть проект в чистом диалоге"
+                          title={t.modals.workspacePicker.openTooltip}
                         >
                           <ArrowRight size={14} />
                         </button>

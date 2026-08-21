@@ -20,6 +20,7 @@ import {
 } from '../../utils/helpers';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { useI18n } from '../../i18n';
 
 interface ChatHeaderBarProps {
   currentSession?: ChatSession | null;
@@ -37,6 +38,7 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
   onUpdateSessionWorkspace,
 }) => {
   const { showToast } = useToast();
+  const { t } = useI18n();
   const [wsMenuOpen, setWsMenuOpen] = useState(false);
   const [copiedLog, setCopiedLog] = useState(false);
   const wsMenuRef = useRef<HTMLDivElement | null>(null);
@@ -53,7 +55,7 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
 
   const handleCopySessionLog = (e: React.MouseEvent) => {
     if (!currentSession) {
-      showToast('Нет активной сессии для копирования', 'info');
+      showToast(t.sidebar.noSessionsFound, 'info');
       return;
     }
     try {
@@ -65,12 +67,12 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
       navigator.clipboard.writeText(textToCopy);
       setCopiedLog(true);
       showToast(
-        isAltOrShift ? 'Сырой JSON сессии скопирован в буфер' : 'Лог сессии скопирован в буфер обмена',
+        isAltOrShift ? t.nav.logsCopied : t.nav.logsCopied,
         'success'
       );
       setTimeout(() => setCopiedLog(false), 2000);
     } catch (err: any) {
-      showToast(`Ошибка копирования: ${err.message || err}`, 'error');
+      showToast(`${t.common.error}: ${err.message || err}`, 'error');
     }
   };
 
@@ -88,7 +90,7 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
       <div className="flex items-center gap-2.5 min-w-0">
         <div className="flex items-center gap-1.5 text-[var(--theme-text)] font-bold truncate max-w-[160px] sm:max-w-[260px]">
           <MessageSquare size={14} className="text-[var(--theme-text-muted)] shrink-0" />
-          <span className="truncate">{currentSession?.title || 'Диалог'}</span>
+          <span className="truncate">{currentSession?.title || t.nav.chat}</span>
         </div>
 
         {/* Workspace Pill */}
@@ -97,7 +99,7 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
             type="button"
             onClick={() => setWsMenuOpen(!wsMenuOpen)}
             className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer shadow-sm font-semibold"
-            title="Рабочая папка текущего диалога"
+            title={t.nav.workspaceMenu}
           >
             {isAutoWs ? (
               <>
@@ -112,7 +114,7 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
             ) : (
               <>
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-text-muted)]" />
-                <span>Без папки</span>
+                <span>{t.sidebar.standalone}</span>
               </>
             )}
             <ChevronDown
@@ -125,7 +127,7 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
           {wsMenuOpen && (
             <div className="absolute top-full left-0 mt-2 w-68 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 rounded-2xl space-y-1 animate-fadeIn font-sans text-xs">
               <div className="px-2.5 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] border-b border-[var(--theme-border)] mb-1 font-bold">
-                Контекст рабочей директории
+                {t.nav.workspaceMenu}
               </div>
 
               <button
@@ -138,8 +140,8 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
               >
                 <FolderPlus size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-bold text-xs">Сменить папку проекта...</span>
-                  <span className="text-[10px] text-[var(--theme-text-muted)]">Привязать каталог на диске</span>
+                  <span className="font-bold text-xs">{t.nav.changeWorkspace}...</span>
+                  <span className="text-[10px] text-[var(--theme-text-muted)]">{t.sidebar.openWorkspace}</span>
                 </div>
               </button>
 
@@ -151,9 +153,9 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
                     try {
                       const autoWs = await api.create_auto_workspace();
                       onUpdateSessionWorkspace(autoWs.path);
-                      showToast(`Создан авто-воркспейс: ${autoWs.slug}`, 'success');
+                      showToast(`${t.sidebar.autoWorkspace}: ${autoWs.slug}`, 'success');
                     } catch (e: any) {
-                      showToast(`Ошибка: ${e.message}`, 'error');
+                      showToast(`${t.common.error}: ${e.message}`, 'error');
                     }
                   }
                 }}
@@ -161,8 +163,8 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
               >
                 <Sparkles size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                 <div className="flex flex-col">
-                  <span className="font-bold text-xs">Создать авто-воркспейс</span>
-                  <span className="text-[10px] text-[var(--theme-text-muted)]">Изолированная песочница ~/.0xagent</span>
+                  <span className="font-bold text-xs">{t.sidebar.autoWorkspace}</span>
+                  <span className="text-[10px] text-[var(--theme-text-muted)]">~/.0xagent/workspaces</span>
                 </div>
               </button>
 
@@ -173,13 +175,13 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
                     setWsMenuOpen(false);
                     if (onUpdateSessionWorkspace) {
                       onUpdateSessionWorkspace(null);
-                      showToast('Сессия переведена в общий режим (без файлов)', 'info');
+                      showToast(t.nav.unlinkWorkspace, 'info');
                     }
                   }}
                   className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left hover:bg-rose-500/10 text-rose-500 transition-colors cursor-pointer border-t border-[var(--theme-border)] mt-0.5 pt-2"
                 >
                   <Unlink size={14} className="shrink-0" />
-                  <span className="text-xs font-semibold">Отвязать папку (Без файлов)</span>
+                  <span className="text-xs font-semibold">{t.nav.unlinkWorkspace}</span>
                 </button>
               )}
             </div>
@@ -198,17 +200,17 @@ export const ChatHeaderBar: React.FC<ChatHeaderBarProps> = ({
                 ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/40 font-bold'
                 : 'bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-[var(--theme-border)] font-semibold'
             }`}
-            title="Скопировать лог диалога для отладки (Shift/Alt для JSON)"
+            title={t.nav.copyLogs}
           >
             {copiedLog ? (
               <>
                 <Check size={12} className="text-emerald-500" />
-                <span className="hidden sm:inline text-[10px] font-bold">Скопировано!</span>
+                <span className="hidden sm:inline text-[10px] font-bold">{t.common.copied}</span>
               </>
             ) : (
               <>
                 <Copy size={12} className="text-[var(--theme-text-muted)]" />
-                <span className="hidden sm:inline text-[10px]">Копировать лог</span>
+                <span className="hidden sm:inline text-[10px]">{t.nav.copyLogs}</span>
               </>
             )}
           </button>

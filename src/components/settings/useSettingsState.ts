@@ -9,6 +9,7 @@ export function useSettingsState(
   const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'customizations' | 'themes' | 'local_server'>(initialSubtab || 'general');
 
   // General state
+  const [language, setLanguage] = useState<'en' | 'ru'>((config?.language as 'en' | 'ru') || 'en');
   const [apiUrl, setApiUrl] = useState('');
   const [modelName, setModelName] = useState('');
   const [groqApiKey, setGroqApiKey] = useState('');
@@ -80,6 +81,7 @@ export function useSettingsState(
   // Populate state on config change
   useEffect(() => {
     if (config) {
+      if (config.language) setLanguage(config.language);
       setApiUrl(config.api_url || 'http://127.0.0.1:11434/v1');
       setModelName(config.model_name || 'gemini-3.6-flash');
       setGroqApiKey(config.groq_api_key || '');
@@ -164,6 +166,7 @@ export function useSettingsState(
       try {
         await onSaveConfig({
           ...config,
+          language,
           api_url: apiUrl,
           model_name: modelName,
           groq_api_key: groqApiKey.trim() || null,
@@ -233,6 +236,7 @@ export function useSettingsState(
 
     return () => clearTimeout(timer);
   }, [
+    language,
     apiUrl,
     modelName,
     groqApiKey,
@@ -299,6 +303,8 @@ export function useSettingsState(
   return {
     activeSubtab,
     setActiveSubtab,
+    language,
+    setLanguage,
     apiUrl,
     setApiUrl,
     modelName,

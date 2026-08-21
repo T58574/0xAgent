@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { AppConfig, PersonaMetadata, PermissionPreset, ReasoningEffortLevel } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
+import { useI18n } from '../../i18n';
 import * as api from '../../services/api';
 import {
   PersonaPopover,
@@ -62,6 +63,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   config,
   onModelChanged,
 }) => {
+  const { t } = useI18n();
   const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash' | 'permission' | 'reasoning'>('none');
   const [permissionPreset, setPermissionPreset] = useState<PermissionPreset>((config?.permission_preset as PermissionPreset) || 'prompt');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortLevel>((config?.reasoning_effort as ReasoningEffortLevel) || 'auto');
@@ -498,7 +500,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
       <form onSubmit={handleFormSubmit}>
         <div className={`bento-card rounded-3xl p-1.5 sm:p-2 px-3 sm:px-4 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-[var(--theme-accent)] transition-all duration-200 ease-out flex items-end gap-2 sm:gap-3 shadow-xl ${isExpanded ? 'ring-1 ring-[var(--theme-accent)]/30' : ''}`}>
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-1.5 sm:p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title="Прикрепить изображение">
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-1.5 sm:p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title={t.chat.attachFile}>
             <Plus size={18} className="sm:w-[19px] sm:h-[19px]" />
           </button>
 
@@ -508,12 +510,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             onChange={(e) => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
-            placeholder="Спросите что угодно или введите / для команд..."
+            placeholder={t.chat.inputPlaceholder}
             className="w-full bg-transparent text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] text-[16px] sm:text-[15px] focus:outline-none resize-none min-h-[34px] max-h-[300px] py-1.5 px-1 leading-normal font-sans font-medium scrollbar-thin transition-[height] duration-200 ease-out"
           />
 
           {inputText.length > 30 && (
-            <button type="button" onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 sm:p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title={isExpanded ? 'Свернуть поле ввода' : 'Развернуть поле ввода'}>
+            <button type="button" onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 sm:p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title={isExpanded ? '[-]' : '[+]'}>
               {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
           )}
@@ -529,7 +531,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
                 ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)] cursor-wait animate-pulse'
                 : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
             }`}
-            title={daemonVoiceState === 'recording' ? 'Идет запись речи...' : isListeningForWake ? 'Голосовой демон активен (Скажите "Джарвис" или кликните)' : 'Голосовой ввод'}
+            title={daemonVoiceState === 'recording' ? t.chat.voiceListening : t.chat.voiceInput}
           >
             {daemonVoiceState === 'recording' ? (
               <>
@@ -553,11 +555,11 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
 
           <div className="flex items-center shrink-0 self-center">
             {isBusy && onCancelAgent ? (
-              <button type="button" onClick={onCancelAgent} className="w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/30 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95" title="Остановить выполнение">
+              <button type="button" onClick={onCancelAgent} className="w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/30 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95" title={t.chat.stopTooltip}>
                 <Square size={13} fill="currentColor" />
               </button>
             ) : (
-              <button type="submit" disabled={!canSubmit} className={`w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full flex items-center justify-center transition-all shadow-sm ${canSubmit ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 shadow-md hover:scale-105 active:scale-95 cursor-pointer font-bold' : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-40'}`} title="Отправить сообщение (Enter)">
+              <button type="submit" disabled={!canSubmit} className={`w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full flex items-center justify-center transition-all shadow-sm ${canSubmit ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 shadow-md hover:scale-105 active:scale-95 cursor-pointer font-bold' : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-40'}`} title={t.chat.sendTooltip}>
                 <ArrowUp size={17} strokeWidth={2.5} />
               </button>
             )}
@@ -569,30 +571,30 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       <div className="flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none px-2 pt-2 text-xs text-[var(--theme-text-muted)] font-mono touch-pan-x w-full">
         <div className="flex items-center gap-1.5 shrink-0">
           {personas.length > 0 && (
-            <button type="button" onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'persona' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title="Сменить персону">
+            <button type="button" onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'persona' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={t.chat.persona}>
               <User size={13} />
               <span className="truncate max-w-[90px] text-xs">{currentPersona.name}</span>
             </button>
           )}
 
-          <button type="button" onClick={() => { fetchModelsAndStatus(); setOpenMenu(openMenu === 'model' ? 'none' : 'model'); }} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'model' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title="Выбрать модель">
+          <button type="button" onClick={() => { fetchModelsAndStatus(); setOpenMenu(openMenu === 'model' ? 'none' : 'model'); }} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'model' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={t.chat.model}>
             {isLocalActive ? <Cpu size={13} /> : <Cloud size={13} />}
             <span className="truncate max-w-[120px] text-xs font-semibold">{getDisplayTitle(activeModelId)}</span>
           </button>
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <button type="button" onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'reasoning' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={`Глубина рассуждений <think>: ${reasoningEffort.toUpperCase()}`}>
+          <button type="button" onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'reasoning' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`}>
             <Sparkles size={13} className="opacity-70" />
             <span className="text-[11px] uppercase font-bold">{reasoningEffort}</span>
           </button>
 
-          <button type="button" onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'permission' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={`Режим безопасности: ${permissionPreset}`}>
+          <button type="button" onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'permission' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={`${t.chat.permission}: ${permissionPreset}`}>
             <Shield size={13} />
             <span className="text-[11px] hidden sm:inline font-semibold capitalize">{permissionPreset === 'workspace-write' ? 'project' : permissionPreset}</span>
           </button>
 
-          <button type="button" onClick={() => { setSlashFilter(''); setSelectedSlashIndex(0); setOpenMenu(openMenu === 'slash' ? 'none' : 'slash'); }} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'slash' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title="Быстрые команды (/goal, /search, /patch, /clear)">
+          <button type="button" onClick={() => { setSlashFilter(''); setSelectedSlashIndex(0); setOpenMenu(openMenu === 'slash' ? 'none' : 'slash'); }} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'slash' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={t.chat.slashCommands}>
             <Terminal size={13} />
             <span className="text-xs font-bold">/</span>
           </button>
