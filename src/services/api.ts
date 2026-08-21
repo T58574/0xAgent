@@ -206,6 +206,7 @@ export async function get_server_slots(host: string, port: number): Promise<{ ok
 export const start_local_server = (params?: any) =>
   post<{ success: boolean; message: string }>('/start-local-server', params || {});
 export const stop_local_server = () => post<{ success: boolean; message: string }>('/stop-local-server');
+export const purge_vram = () => post<{ success: boolean; message: string; killedCount?: number }>('/purge-vram');
 export const get_server_status = () => get<ServerStatusInfo>('/server-status');
 export const get_server_logs = () => get<{ logs: string[]; logFilePath: string; running: boolean }>('/server-logs');
 export const get_lan_info = () => get<{ urls: string[] }>('/get-local-ips');

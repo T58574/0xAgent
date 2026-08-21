@@ -22,6 +22,36 @@ if (!fs.existsSync(LLAMA_LOG_DIR)) {
   try { fs.mkdirSync(LLAMA_LOG_DIR, { recursive: true }); } catch {}
 }
 
+export function purgeGpuVramAndProcesses(broadcast?: BroadcastFn): { success: boolean; message: string; killedCount: number } {
+  isIntentionalStop = true;
+  stopLlamaServerProcess(broadcast);
+
+  let killedCount = 0;
+  if (process.platform === 'win32') {
+    const targets = ['llama-server.exe', 'llama.exe', 'llama-bench.exe'];
+    for (const target of targets) {
+      try {
+        execSync(`taskkill /F /T /IM ${target}`, { stdio: 'ignore' });
+        killedCount++;
+      } catch {}
+    }
+  } else {
+    try {
+      execSync('killall -9 llama-server llama 2>/dev/null', { stdio: 'ignore' });
+      killedCount++;
+    } catch {}
+  }
+
+  killProcessOnPort(11434);
+  killProcessOnPort(8080);
+
+  if (broadcast) {
+    broadcast('llama-server-status', { status: 'stopped' });
+  }
+
+  return { success: true, message: 'GPU VRAM очищена, процессы llama-server принудительно остановлены.', killedCount };
+}
+
 export function stopLlamaServerProcess(broadcast?: BroadcastFn) {
   isIntentionalStop = true;
   if (activeLlamaProcess) {
@@ -136,7 +166,7 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
 
   router.post('/start-local-server', (req, res) => {
     try {
-      stopLlamaServerProcess(broadcast);
+      purgeGpuVramAndProcesses(broadcast);
       const cfg = loadConfig();
       const body = req.body || {};
       const host = body.host || cfg.local_server?.host || '127.0.0.1';
@@ -207,6 +237,11 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
   router.post('/stop-local-server', (_req, res) => {
     stopLlamaServerProcess(broadcast);
     res.json({ success: true, message: 'Локальный сервер остановлен' });
+  });
+
+  router.post('/purge-vram', (_req, res) => {
+    const result = purgeGpuVramAndProcesses(broadcast);
+    res.json(result);
   });
 
   router.get('/installed-llama-versions', (_req, res) => {

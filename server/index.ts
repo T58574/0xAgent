@@ -26,6 +26,13 @@ import { jarvisSupervisor } from './agent/jarvisSupervisor';
 import { voiceDaemonManager } from './agent/voiceDaemonManager';
 import { cleanupOrphanWorkspaces } from './session';
 import { reconcileInterruptedSessions } from './agent/selfPatchEngine';
+import { ensureEnvironmentHealth } from './envSanitizer';
+
+// 1. Run Self-Healing Environment diagnostics and path repair on boot
+const envHealth = ensureEnvironmentHealth();
+if (envHealth.healed) {
+  process.stdout.write(`[ENV HEALTH] [OK] Self-healed process environment PATH with ${envHealth.injectedPaths.length} missing system paths.\n`);
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;

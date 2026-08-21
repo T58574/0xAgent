@@ -16,7 +16,12 @@ namespace OxAgent.Launcher
     {
         private NotifyIcon _notifyIcon;
         private ContextMenuStrip _contextMenu;
+        private ToolStripMenuItem _openMenuItem;
         private ToolStripMenuItem _statusMenuItem;
+        private ToolStripMenuItem _purgeVramMenuItem;
+        private ToolStripMenuItem _logsMenuItem;
+        private ToolStripMenuItem _restartMenuItem;
+        private ToolStripMenuItem _exitMenuItem;
         private Process _devProcess;
         private System.Windows.Forms.Timer _healthTimer;
         private string _projectDir;
@@ -210,6 +215,137 @@ namespace OxAgent.Launcher
             return "192.168.4.24";
         }
 
+        private string GetAppLanguage()
+        {
+            try
+            {
+                string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string configPath = Path.Combine(userHome, ".0xagent", "config.json");
+                if (File.Exists(configPath))
+                {
+                    string json = File.ReadAllText(configPath);
+                    if (json.Contains("\"language\": \"en\"") || json.Contains("\"language\":\"en\""))
+                    {
+                        return "en";
+                    }
+                }
+            }
+            catch {}
+            return "ru";
+        }
+
+        private void UpdateMenuLocalization()
+        {
+            try
+            {
+                bool isEn = GetAppLanguage() == "en";
+                string lanIp = GetPrimaryLanAddress();
+
+                if (_openMenuItem != null)
+                {
+                    _openMenuItem.Text = isEn
+                        ? string.Format("🌐  Open 0xAgent UI (https://{0}:5173)", lanIp)
+                        : string.Format("🌐  Открыть 0xAgent UI (https://{0}:5173)", lanIp);
+                }
+                if (_purgeVramMenuItem != null)
+                {
+                    _purgeVramMenuItem.Text = isEn
+                        ? "⚡  Purge GPU VRAM (llama-server)"
+                        : "⚡  Очистить GPU VRAM (llama-server)";
+                }
+                if (_logsMenuItem != null)
+                {
+                    _logsMenuItem.Text = isEn
+                        ? "📜  Show Logs"
+                        : "📜  Показать логи";
+                }
+                if (_restartMenuItem != null)
+                {
+                    _restartMenuItem.Text = isEn
+                        ? "🔄  Restart Platform"
+                        : "🔄  Перезапустить платформу";
+                }
+                if (_exitMenuItem != null)
+                {
+                    _exitMenuItem.Text = isEn
+                        ? "🛑  Exit (Stop all processes)"
+                        : "🛑  Выход (Остановить все процессы)";
+                }
+            }
+            catch {}
+        }
+
+        private void PurgeGpuVram()
+        {
+            bool isEn = GetAppLanguage() == "en";
+            Log("[0xAgent Launcher] Purging GPU VRAM and stopping llama-server processes...");
+
+            ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    // 1. Call REST API if server is up
+                    try
+                    {
+                        HttpWebRequest req = (HttpWebRequest)WebRequest.Create("https://127.0.0.1:3001/api/purge-vram");
+                        req.Method = "POST";
+                        req.Timeout = 1500;
+                        req.ContentLength = 0;
+                        using (var res = req.GetResponse()) {}
+                    }
+                    catch
+                    {
+                        try
+                        {
+                            HttpWebRequest reqHttp = (HttpWebRequest)WebRequest.Create("http://127.0.0.1:3001/api/purge-vram");
+                            reqHttp.Method = "POST";
+                            reqHttp.Timeout = 1000;
+                            reqHttp.ContentLength = 0;
+                            using (var resHttp = reqHttp.GetResponse()) {}
+                        }
+                        catch {}
+                    }
+
+                    // 2. Direct process kill on Windows to ensure 0 orphaned handles
+                    string[] targets = new string[] { "llama-server.exe", "llama.exe", "llama-bench.exe" };
+                    foreach (string t in targets)
+                    {
+                        try
+                        {
+                            ProcessStartInfo psi = new ProcessStartInfo
+                            {
+                                FileName = "taskkill.exe",
+                                Arguments = string.Format("/F /T /IM {0}", t),
+                                CreateNoWindow = true,
+                                UseShellExecute = false,
+                                WindowStyle = ProcessWindowStyle.Hidden
+                            };
+                            using (Process p = Process.Start(psi))
+                            {
+                                if (p != null) p.WaitForExit(1500);
+                            }
+                        }
+                        catch {}
+                    }
+
+                    Log("[0xAgent Launcher] GPU VRAM purged successfully.");
+
+                    if (_notifyIcon != null)
+                    {
+                        string title = isEn ? "0xAgent GPU Memory" : "0xAgent Память GPU";
+                        string msg = isEn
+                            ? "GPU VRAM purged: All local llama-server processes terminated and VRAM freed."
+                            : "VRAM очищена: Процессы llama-server остановлены, видеопамять освобождена.";
+                        _notifyIcon.ShowBalloonTip(2500, title, msg, ToolTipIcon.Info);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log("[0xAgent Launcher] Error purging VRAM: " + ex.Message);
+                }
+            });
+        }
+
         private void InitializeTrayIcon()
         {
             _contextMenu = new ContextMenuStrip
@@ -217,35 +353,42 @@ namespace OxAgent.Launcher
                 ShowImageMargin = false,
                 RenderMode = ToolStripRenderMode.System
             };
+            _contextMenu.Opening += (s, e) => UpdateMenuLocalization();
 
             // 1. Open UI
             string lanIp = GetPrimaryLanAddress();
-            var openItem = new ToolStripMenuItem(string.Format("🌐  Открыть 0xAgent UI (https://{0}:5173)", lanIp), null, (s, e) => OpenWebUI());
-            openItem.Font = new Font(_contextMenu.Font, FontStyle.Bold);
-            _contextMenu.Items.Add(openItem);
+            bool isEn = GetAppLanguage() == "en";
+
+            _openMenuItem = new ToolStripMenuItem(isEn ? string.Format("🌐  Open 0xAgent UI (https://{0}:5173)", lanIp) : string.Format("🌐  Открыть 0xAgent UI (https://{0}:5173)", lanIp), null, (s, e) => OpenWebUI());
+            _openMenuItem.Font = new Font(_contextMenu.Font, FontStyle.Bold);
+            _contextMenu.Items.Add(_openMenuItem);
 
             _contextMenu.Items.Add(new ToolStripSeparator());
 
             // 2. Status item
-            _statusMenuItem = new ToolStripMenuItem("📊  Статус: Инициализация...")
+            _statusMenuItem = new ToolStripMenuItem(isEn ? "📊  Status: Initializing..." : "📊  Статус: Инициализация...")
             {
                 Enabled = false
             };
             _contextMenu.Items.Add(_statusMenuItem);
 
-            // 3. Show Logs
-            var logsItem = new ToolStripMenuItem("📜  Показать логи", null, (s, e) => OpenLogs());
-            _contextMenu.Items.Add(logsItem);
+            // 3. Purge GPU VRAM
+            _purgeVramMenuItem = new ToolStripMenuItem(isEn ? "⚡  Purge GPU VRAM (llama-server)" : "⚡  Очистить GPU VRAM (llama-server)", null, (s, e) => PurgeGpuVram());
+            _contextMenu.Items.Add(_purgeVramMenuItem);
+
+            // 4. Show Logs
+            _logsMenuItem = new ToolStripMenuItem(isEn ? "📜  Show Logs" : "📜  Показать логи", null, (s, e) => OpenLogs());
+            _contextMenu.Items.Add(_logsMenuItem);
 
             _contextMenu.Items.Add(new ToolStripSeparator());
 
-            // 4. Restart
-            var restartItem = new ToolStripMenuItem("🔄  Перезапустить платформу", null, (s, e) => RestartServices());
-            _contextMenu.Items.Add(restartItem);
+            // 5. Restart
+            _restartMenuItem = new ToolStripMenuItem(isEn ? "🔄  Restart Platform" : "🔄  Перезапустить платформу", null, (s, e) => RestartServices());
+            _contextMenu.Items.Add(_restartMenuItem);
 
-            // 5. Exit
-            var exitItem = new ToolStripMenuItem("🛑  Выход (Остановить все процессы)", null, (s, e) => ExitApplication());
-            _contextMenu.Items.Add(exitItem);
+            // 6. Exit
+            _exitMenuItem = new ToolStripMenuItem(isEn ? "🛑  Exit (Stop all processes)" : "🛑  Выход (Остановить все процессы)", null, (s, e) => ExitApplication());
+            _contextMenu.Items.Add(_exitMenuItem);
 
             _notifyIcon = new NotifyIcon
             {
@@ -257,7 +400,11 @@ namespace OxAgent.Launcher
 
             _notifyIcon.DoubleClick += (s, e) => OpenWebUI();
 
-            _notifyIcon.ShowBalloonTip(3000, "0xAgent AI Platform", "Платформа запущена в фоновом режиме и доступна в трее.", ToolTipIcon.Info);
+            string balloonTitle = "0xAgent AI Platform";
+            string balloonMsg = isEn
+                ? "Platform running in background and available from tray."
+                : "Платформа запущена в фоновом режиме и доступна в трее.";
+            _notifyIcon.ShowBalloonTip(3000, balloonTitle, balloonMsg, ToolTipIcon.Info);
         }
 
         private void StartServices()
@@ -417,20 +564,21 @@ namespace OxAgent.Launcher
                         {
                             parent.BeginInvoke(new Action(delegate()
                             {
+                                bool isEn = GetAppLanguage() == "en";
                                 if (isServerUp && isClientUp)
                                 {
-                                    _statusMenuItem.Text = "📊  Статус: Online (HTTPS 3001, 5173)";
-                                    _notifyIcon.Text = "0xAgent AI Platform — Online (HTTPS)";
+                                    _statusMenuItem.Text = isEn ? "📊  Status: Online (HTTPS 3001, 5173)" : "📊  Статус: Online (HTTPS 3001, 5173)";
+                                    _notifyIcon.Text = isEn ? "0xAgent AI Platform — Online (HTTPS)" : "0xAgent AI Platform — Онлайн (HTTPS)";
                                 }
                                 else if (isServerUp)
                                 {
-                                    _statusMenuItem.Text = "📊  Статус: Сервер готов (:3001)";
-                                    _notifyIcon.Text = "0xAgent Server — Ready";
+                                    _statusMenuItem.Text = isEn ? "📊  Status: Server ready (:3001)" : "📊  Статус: Сервер готов (:3001)";
+                                    _notifyIcon.Text = isEn ? "0xAgent Server — Ready" : "0xAgent Сервер — Готов";
                                 }
                                 else
                                 {
-                                    _statusMenuItem.Text = "📊  Статус: Запуск сервисов...";
-                                    _notifyIcon.Text = "0xAgent — Starting...";
+                                    _statusMenuItem.Text = isEn ? "📊  Status: Starting services..." : "📊  Статус: Запуск сервисов...";
+                                    _notifyIcon.Text = isEn ? "0xAgent — Starting..." : "0xAgent — Запуск...";
                                 }
                             }));
                         }

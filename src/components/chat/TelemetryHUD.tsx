@@ -64,6 +64,12 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
                 <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
               </span>
             )}
+            {liveTelemetry.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && liveTelemetry.tokensPerSec < 8.0 && (liveTelemetry.tokenCount ?? 0) > 20 && (
+              <span className="flex items-center gap-1 text-amber-400 font-bold px-1.5 py-0.2 rounded bg-amber-500/10 border border-amber-500/30 text-[10px]" title="Зафиксировано замедление генерации (<8 t/s). Возможно переполнение VRAM.">
+                <MaterialIcon name="warning" size={11} />
+                <span>SLOW</span>
+              </span>
+            )}
             {liveTelemetry.tokenCount !== undefined && (
               <span className="flex items-center gap-1 text-[var(--theme-text)]">
                 <MaterialIcon name="memory" size={12} className="text-[var(--theme-text-muted)]" />

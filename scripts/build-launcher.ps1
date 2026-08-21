@@ -13,6 +13,13 @@ $rootDir = Get-Item $PSScriptRoot\..
 $sourceFile = Join-Path $rootDir.FullName "launcher\TrayLauncher.cs"
 $outFile = Join-Path $rootDir.FullName "0xAgent.exe"
 
+# Stop existing running 0xAgent.exe if necessary to allow overwriting
+Get-Process -Name "0xAgent" -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host "[INFO] Stopping running 0xAgent.exe (PID: $($_.Id)) to allow compilation..." -ForegroundColor Yellow
+    Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue
+}
+Start-Sleep -Milliseconds 500
+
 Write-Host "Compiling 0xAgent.exe (Windows Tray Launcher)..." -ForegroundColor Cyan
 & $cscPath /target:winexe /optimize+ /out:$outFile /r:System.dll,System.Windows.Forms.dll,System.Drawing.dll $sourceFile
 
