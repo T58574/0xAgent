@@ -123,7 +123,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
 
     if (blocks.length === 0) {
       return (
-        <div className="text-slate-200 text-[11px] font-mono whitespace-pre-wrap p-2.5 bg-slate-950/80 rounded border border-theme-border">
+        <div className="text-zinc-200 text-[11px] font-mono whitespace-pre-wrap p-2.5 bg-zinc-900/95 rounded-lg border border-zinc-800/80 selection:bg-zinc-700 selection:text-white">
           {patchText}
         </div>
       );
@@ -163,7 +163,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
 
           if (diffViewMode === 'split') {
             return (
-              <div key={idx} className="rounded-lg overflow-hidden border border-theme-border bg-slate-950/90">
+              <div key={idx} className="rounded-lg overflow-hidden border border-zinc-800/80 bg-zinc-900/95 selection:bg-zinc-700 selection:text-white">
                 <div className="grid grid-cols-2 divide-x divide-white/10 text-[11px]">
                   {/* Left Column: SEARCH (Deletions) */}
                   <div className="bg-rose-950/30 text-rose-300 p-2 overflow-x-auto">
@@ -203,7 +203,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
 
           // Unified View Mode
           return (
-            <div key={idx} className="rounded-lg overflow-hidden border border-theme-border bg-slate-950/90">
+            <div key={idx} className="rounded-lg overflow-hidden border border-zinc-800/80 bg-zinc-900/95 selection:bg-zinc-700 selection:text-white">
               {b.search && (
                 <div className="bg-rose-950/40 text-rose-300 p-2.5 border-b border-rose-500/20 whitespace-pre-wrap">
                   <div className="text-[10px] text-rose-400 font-bold uppercase tracking-wider mb-1 select-none flex items-center gap-1">
@@ -276,7 +276,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
         {/* Diff line stats (+lines -lines) or status badge */}
         <div className="flex items-center gap-2 shrink-0">
           {(diffStats.additions > 0 || diffStats.deletions > 0) && (
-            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-slate-950 border border-theme-border">
+            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-zinc-900/95 border border-zinc-800/80">
               {diffStats.additions > 0 && <span className="text-emerald-400">+{diffStats.additions}</span>}
               {diffStats.deletions > 0 && <span className="text-rose-400">-{diffStats.deletions}</span>}
             </div>
@@ -292,9 +292,9 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
       {/* Action Content Preview */}
       <div className="mt-2.5 font-mono text-xs text-theme-text">
         {tool.name === 'execute_command' && (
-          <div className="flat-input rounded-md p-2.5 bg-slate-950 border border-theme-border flex items-start gap-2 text-slate-100">
+          <div className="flat-input rounded-lg p-2.5 bg-zinc-900/95 border border-zinc-800/80 flex items-start gap-2 text-zinc-100 shadow-sm selection:bg-zinc-700 selection:text-white">
             <span className="text-emerald-400 font-bold select-none">PS &gt;</span>
-            <span className="text-slate-100 break-all font-mono">{parsedArgs.command}</span>
+            <span className="text-zinc-100 break-all font-mono selection:bg-zinc-700 selection:text-white">{parsedArgs.command}</span>
           </div>
         )}
 
@@ -307,7 +307,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
               labelClosed={t.tools.viewDetails}
             />
             {showDetails && (
-              <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-slate-950 p-3 border border-theme-border rounded-md text-slate-200">
+              <div className="text-[10px] whitespace-pre-wrap max-h-48 overflow-y-auto bg-zinc-900/95 p-3 border border-zinc-800/80 rounded-lg text-zinc-200 shadow-sm selection:bg-zinc-700 selection:text-white">
                 {parsedArgs.content}
               </div>
             )}
@@ -331,7 +331,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
             <div className="text-amber-300 font-semibold text-xs flex items-center gap-1.5">
               <span>{t.chat.askQuestionTitle}:</span>
             </div>
-            <div className="text-slate-200 text-xs font-medium bg-slate-950 p-3 rounded-md border border-theme-border">
+            <div className="text-zinc-100 text-xs font-medium bg-zinc-900/95 p-3 rounded-lg border border-zinc-800/80 shadow-sm selection:bg-zinc-700 selection:text-white">
               {parsedArgs.question}
             </div>
             {tool.status === 'pending' && (
@@ -421,7 +421,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
         {tool.name === 'run_scratch_script' && (
           <div className="space-y-1.5">
             <div className="text-theme-muted text-[11px]">Script ({parsedArgs.language})</div>
-            <div className="text-[10px] whitespace-pre-wrap max-h-36 overflow-y-auto bg-slate-950 p-2.5 border border-theme-border rounded-md text-slate-200">
+            <div className="text-[10px] whitespace-pre-wrap max-h-36 overflow-y-auto bg-zinc-900/95 p-2.5 border border-zinc-800/80 rounded-lg text-zinc-200 shadow-sm selection:bg-zinc-700 selection:text-white">
               {parsedArgs.code}
             </div>
           </div>
@@ -469,7 +469,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
           </button>
 
           {showDetails && (
-            <div className="mt-2 bg-slate-950 rounded-md p-2.5 border border-theme-border text-[11px] font-mono text-slate-200 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+            <div className="mt-2 bg-zinc-900/95 rounded-lg p-2.5 border border-zinc-800/80 text-[11px] font-mono text-zinc-200 whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed shadow-sm selection:bg-zinc-700 selection:text-white">
               {tool.output}
             </div>
           )}

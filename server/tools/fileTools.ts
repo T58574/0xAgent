@@ -287,7 +287,12 @@ ${found.content}
 export function executeListDir(workspaceDir: string | null | undefined, pathStr: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
   if (!fs.existsSync(targetPath)) {
-    throw new Error(`Directory does not exist: ${targetPath}`);
+    try {
+      fs.mkdirSync(targetPath, { recursive: true });
+      return `Directory is empty (created newly): ${targetPath}`;
+    } catch {
+      throw new Error(`Directory does not exist and cannot be created: ${targetPath}`);
+    }
   }
   const stat = fs.statSync(targetPath);
   if (!stat.isDirectory()) {

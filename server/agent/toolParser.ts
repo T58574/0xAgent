@@ -125,9 +125,24 @@ const DECLARATIVE_RULES: ToolRule[] = [
   },
   { regex: /<update_?persona_?file\b(?:\s+file=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/update_?persona_?file>/gi, handler: (m) => ({ idPrefix: 'persona', name: 'update_persona_file', args: { file: m[1] || 'SOUL.md', content: m[2] ? m[2].trim() : '' } }) },
 // 9. Exec & Interactive tools
-  { regex: /<(?:execute_command|executecommand|run_command|runcommand|exec|shell)\s+(?:command|cmd)=["']([^"']+)["']\s*\/?>/gi, handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1] } }) },
-  { regex: /<(?:execute_command|executecommand|run_command|runcommand|exec|shell)\s*>([\s\S]*?)<\/(?:execute_command|executecommand|run_command|runcommand|exec|shell)>/gi, handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1].trim() } }) },
-  { regex: /<(?:bash|powershell|shell)\s*>([\s\S]*?)<\/(?:bash|powershell|shell)>/gi, handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1].trim() } }) },
+  {
+    regex: /<(?:execute_command|executecommand|run_command|runcommand|exec|shell)\s+(?:command|cmd)=["']([^"']+)["']\s*\/?>/gi,
+    handler: (m) => ({ idPrefix: 'exec', name: 'execute_command', args: { command: m[1].replace(/^`+|`+$/g, '').trim() } }),
+  },
+  {
+    regex: /<(?:execute_command|executecommand|run_command|runcommand|exec|shell)\s*>([\s\S]*?)<\/(?:execute_command|executecommand|run_command|runcommand|exec|shell)>/gi,
+    handler: (m) => {
+      const cleanCmd = m[1].trim().replace(/^```[a-z0-9_-]*\r?\n/i, '').replace(/\r?\n```$/i, '').replace(/^`+|`+$/g, '').trim();
+      return cleanCmd ? { idPrefix: 'exec', name: 'execute_command', args: { command: cleanCmd } } : null;
+    },
+  },
+  {
+    regex: /<(?:bash|powershell|shell)\s*>([\s\S]*?)<\/(?:bash|powershell|shell)>/gi,
+    handler: (m) => {
+      const cleanCmd = m[1].trim().replace(/^```[a-z0-9_-]*\r?\n/i, '').replace(/\r?\n```$/i, '').replace(/^`+|`+$/g, '').trim();
+      return cleanCmd ? { idPrefix: 'exec', name: 'execute_command', args: { command: cleanCmd } } : null;
+    },
+  },
   { regex: /<ask_user\s+question=["']([^"']+)["'](?:\s+options=["']([^"']+)["'])?\s*\/?>/gi, handler: (m) => ({ idPrefix: 'ask', name: 'ask_user', args: { question: m[1], options: m[2] ? m[2].split(',').map((o) => o.trim()).filter(Boolean) : undefined } }) },
   {
     regex: /<ask_?user_?questions?\b([^>]*?)(?:\/>|>([\s\S]*?)<\/ask_?user_?questions?>|>)/gi,
