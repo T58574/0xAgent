@@ -49,6 +49,7 @@ interface NavbarProps {
   isServerOffline?: boolean;
   onStartServer?: () => Promise<void>;
   onModelChanged?: (newModelId: string) => void;
+  onConfigChanged?: (newConfig: AppConfig) => void;
   onOpenJarvis?: () => void;
   onNewChat?: () => void;
   onOpenMemorySkills?: () => void;
@@ -70,6 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   isServerOffline,
   onStartServer,
   onModelChanged: _onModelChanged,
+  onConfigChanged,
   onOpenJarvis: _onOpenJarvis,
   onNewChat,
   onOpenMemorySkills,
@@ -95,7 +97,9 @@ export const Navbar: React.FC<NavbarProps> = ({
     setLanguage(nextLang);
     if (config) {
       try {
-        await api.save_config({ ...config, language: nextLang });
+        const updated = { ...config, language: nextLang };
+        if (onConfigChanged) onConfigChanged(updated);
+        await api.save_config(updated);
       } catch (err) {
         console.error('Failed to save language setting:', err);
       }

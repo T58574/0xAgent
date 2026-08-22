@@ -19,7 +19,6 @@
   - `loopBreaker.ts` — Infinite tool loop detection and breaker.
   - `outputSpiller.ts` — Automatic spilling of massive tool outputs (>24 KB) to disk.
   - `codeRuntime.ts` — Sandboxed Node.js VM runtime for `<code_run>` batch operations.
-  - `subagentOrchestrator.ts` — Long-running parallel subagent management and messaging.
   - `permissionGuard.ts` — Security presets (`readonly`, `workspace-write`, `prompt`, `unrestricted`).
   - `voiceDaemonManager.ts` / `voiceMacroService.ts` — Native voice spotting and zero-token OS macros.
 - `tools/` & `tools.ts` — Tool implementations (file system, patches, search, terminal execution).
@@ -70,7 +69,7 @@
    - Massive command outputs (>24 KB) spill to `~/.0xagent/spill/*.log` with truncated context references.
 9. **Zero-Emoji UI & Design Policy**: No unicode emojis in HUDs, toasts, cards, or telemetry. Use Material Design 3 icons (`MaterialIcon`) or monospaced ASCII indicators (`[OK]`, `[ERR]`, `[>]`, `::`). Popups use persona glassmorphism (`rounded-2xl`, `backdrop-blur-2xl`).
 10. **Workspace Isolation**: Never write persona files (`SOUL.md`, `USER.md`) to the user workspace root. Use `<update_user_profile>` and `<update_persona_file>` which target `~/.0xagent/personas/`.
-11. **Robust Error Handling**: Wrap user/LLM regex in `try/catch`. Never return fake success responses on caught subagent/task errors.
+11. **Robust Error Handling**: Wrap user/LLM regex in `try/catch`. Never return fake success responses on caught task/tool errors.
 12. **Model & Agent Testing Protocol (0xAgent Bridge)**: Never test models via ad-hoc standalone CLI commands or isolated configs. Always test through the 0xAgent Bridge (`npm run bridge` or `scripts/agent-bridge.ts`), which authenticates against the live 0xAgent backend API (`POST /api/start-local-server`, `GET /api/server-health`, `/v1/chat/completions`) using the active application configuration, tracking real-time t/s, MTP draft acceptance rates, and memory telemetry.
 
 ---

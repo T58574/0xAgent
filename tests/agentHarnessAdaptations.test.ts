@@ -20,7 +20,7 @@ import { createNewSession, loadSession, deleteSession } from '../server/session'
 import { ChatMessage, AppConfig } from '../src/types';
 import { ttsService } from '../server/ttsService';
 
-describe('DeepSeek Harness Adaptations Test Suite', () => {
+describe('Agent Harness Adaptations Test Suite', () => {
   before(() => {
     ttsService.setMuted(true);
   });
@@ -85,6 +85,14 @@ describe('DeepSeek Harness Adaptations Test Suite', () => {
       // Most recent message should remain unpruned
       assert.equal(pruned[3].tool_calls![0].output, bigOutput, 'Recent tool output must not be pruned');
     });
+
+    it('should extract and preserve key error stacktraces even when middle is pruned', () => {
+      const longOutput = 'LOG_HEADER\n'.repeat(300) + 'Error: TS2345 Argument of type number is not assignable to string\n    at build (server.ts:42)' + '\nLOG_TAIL'.repeat(300);
+      const res = pruneToolResultText(longOutput, { thresholdChars: 500, headChars: 100, tailChars: 100 });
+      assert.equal(res.wasPruned, true);
+      assert.ok(res.text.includes('KEY ERROR TRACE PRESERVED'));
+      assert.ok(res.text.includes('Error: TS2345'));
+    });
   });
 
   describe('2. Repeat-Tool Loop Breaker (loopBreaker)', () => {
@@ -92,6 +100,19 @@ describe('DeepSeek Harness Adaptations Test Suite', () => {
       const arg1 = { b: 2, a: 1, nested: { y: 'two', x: 'one' } };
       const arg2 = { nested: { x: 'one', y: 'two' }, a: 1, b: 2 };
       assert.equal(canonicalizeArguments(arg1), canonicalizeArguments(arg2));
+    });
+
+    it('should detect alternating 2-step loop oscillations (A -> B -> A -> B)', () => {
+      const tracker = new LoopBreakerTracker();
+      const sessId = 'test-session-oscillate';
+
+      tracker.trackCall(sessId, 'read_file', { path: 'a.ts' });
+      tracker.trackCall(sessId, 'grep_search', { query: 'foo' });
+      tracker.trackCall(sessId, 'read_file', { path: 'a.ts' });
+      const r4 = tracker.trackCall(sessId, 'grep_search', { query: 'foo' });
+
+      assert.equal(r4.isLooping, true);
+      assert.ok(r4.advisoryReminder?.includes('осцилляция'));
     });
 
     it('should detect repeated calls and escalate to advisory reminder and halt', () => {

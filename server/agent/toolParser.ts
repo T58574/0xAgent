@@ -194,7 +194,6 @@ const DECLARATIVE_RULES: ToolRule[] = [
     },
   },
   { regex: /<run_scratch_script\s+language=["']([^"']+)["']\s*>([\s\S]*?)<\/run_scratch_script>/gi, handler: (m) => ({ idPrefix: 'scratch', name: 'run_scratch_script', args: { language: m[1], code: m[2] } }) },
-  { regex: /<spawn_subagent\s+task=["']([^"']+)["'](?:\s+role=["']([^"']+)["'])?\s*\/?>/gi, handler: (m) => ({ idPrefix: 'subagent', name: 'spawn_subagent', args: { task: m[1], role: m[2] || 'helper' } }) },
   {
     regex: /<(?:propose_pull_request|propose_staged_changes|pull_request)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:propose_pull_request|propose_staged_changes|pull_request)>|>([\s\S]*?)$)/gi,
     handler: (m) => {

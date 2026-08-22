@@ -45,6 +45,7 @@ interface FloatingCommandBarProps {
   onTriggerSlashCommand?: (command: string) => void;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
+  onConfigChanged?: (newConfig: AppConfig) => void;
 }
 
 export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
@@ -62,6 +63,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   onTriggerSlashCommand,
   config,
   onModelChanged,
+  onConfigChanged,
 }) => {
   const { t } = useI18n();
   const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash' | 'permission' | 'reasoning'>('none');
@@ -84,24 +86,48 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   inputTextRef.current = inputText;
 
   useEffect(() => {
-    if (config?.permission_preset) setPermissionPreset(config.permission_preset as PermissionPreset);
-    if (config?.reasoning_effort) setReasoningEffort(config.reasoning_effort as ReasoningEffortLevel);
+    if (config?.permission_preset !== undefined && config?.permission_preset !== null) {
+      setPermissionPreset(config.permission_preset as PermissionPreset);
+    }
+    if (config?.reasoning_effort !== undefined && config?.reasoning_effort !== null) {
+      setReasoningEffort(config.reasoning_effort as ReasoningEffortLevel);
+    }
   }, [config?.permission_preset, config?.reasoning_effort]);
 
   const handleSelectPreset = async (preset: PermissionPreset) => {
     setPermissionPreset(preset);
     setOpenMenu('none');
     try {
-      if (config) await api.save_config({ ...config, permission_preset: preset });
-    } catch {}
+      let currentCfg = config;
+      if (!currentCfg) {
+        currentCfg = await api.get_config();
+      }
+      const updated: AppConfig = { ...currentCfg, permission_preset: preset };
+      if (onConfigChanged) onConfigChanged(updated);
+      await api.save_config(updated);
+    } catch (err) {
+      console.error('Failed to save permission preset:', err);
+    }
   };
 
   const handleSelectReasoningEffort = async (effort: ReasoningEffortLevel) => {
     setReasoningEffort(effort);
     setOpenMenu('none');
     try {
-      if (config) await api.save_config({ ...config, reasoning_effort: effort, reasoning_enabled: effort !== 'off' });
-    } catch {}
+      let currentCfg = config;
+      if (!currentCfg) {
+        currentCfg = await api.get_config();
+      }
+      const updated: AppConfig = {
+        ...currentCfg,
+        reasoning_effort: effort,
+        reasoning_enabled: effort !== 'off',
+      };
+      if (onConfigChanged) onConfigChanged(updated);
+      await api.save_config(updated);
+    } catch (err) {
+      console.error('Failed to save reasoning effort:', err);
+    }
   };
 
   const {
@@ -115,7 +141,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
     selectLocalModel,
     toggleServer,
     getDisplayTitle,
-  } = useModelManager(config, onModelChanged);
+  } = useModelManager(config, onModelChanged, onConfigChanged);
 
   const activeModelLower = (activeModelId || '').toLowerCase();
   const currentLocalMeta = isLocalActive

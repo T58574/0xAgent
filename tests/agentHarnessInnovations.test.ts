@@ -7,12 +7,11 @@ import { userQuestionService } from '../server/agent/userQuestionService';
 import { executeCodeProgram } from '../server/agent/codeRuntime';
 import { evaluateToolPermission, isPathInsideWorkspace } from '../server/agent/permissionGuard';
 import { forkSession, deriveMessagesFromEvents } from '../server/agent/sessionEvents';
-import { subagentOrchestrator } from '../server/agent/subagentOrchestrator';
 import { runCompactionPipeline } from '../server/agent/compactionPipeline';
 import { AppConfig, ChatSession, SessionEvent } from '../src/types';
 import { saveSession, deleteSession } from '../server/session';
 
-describe('DeepSeek Harness Innovations Subsystem Test Suite', () => {
+describe('Agent Harness Innovations Subsystem Test Suite', () => {
   before(() => {
     process.env.NODE_ENV = 'test';
   });
@@ -176,33 +175,7 @@ describe('DeepSeek Harness Innovations Subsystem Test Suite', () => {
     });
   });
 
-  describe('5. Continuable Subagents Orchestration Subsystem', () => {
-    it('should spawn subagents, track status and allow interruption', async () => {
-      const sub = await subagentOrchestrator.spawnSubagent(
-        'parent_sess_1',
-        'Performance Benchmark Subagent',
-        'Analyze CPU bottlenecks',
-        dummyConfig
-      );
-
-      assert.ok(sub.id);
-      assert.equal(sub.role, 'Performance Benchmark Subagent');
-      assert.ok(subagentOrchestrator.getSubagent(sub.id));
-
-      const stopped = subagentOrchestrator.interruptSubagent(sub.id);
-      assert.equal(stopped, true);
-
-      const updated = subagentOrchestrator.getSubagent(sub.id);
-      assert.equal(updated?.status, 'interrupted');
-    });
-
-    it('should list subagents filtered by parent session', () => {
-      const list = subagentOrchestrator.listSubagents('parent_sess_1');
-      assert.ok(Array.isArray(list));
-    });
-  });
-
-  describe('6. 4-Tier Compaction Pipeline Subsystem', () => {
+  describe('5. 4-Tier Compaction Pipeline Subsystem', () => {
     it('should run compaction pipeline and produce valid message payloads', async () => {
       const testSession: ChatSession = {
         id: 'compaction_sess',

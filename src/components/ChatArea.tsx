@@ -42,6 +42,7 @@ interface ChatAreaProps {
   modelName?: string;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
+  onConfigChanged?: (newConfig: AppConfig) => void;
   onAcceptSpark?: (spark: JarvisSparkProposal) => void;
   personas?: PersonaMetadata[];
   activePersonaId?: string;
@@ -64,6 +65,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
   liveTelemetry,
   config,
   onModelChanged,
+  onConfigChanged,
   personas: personasProp = [],
   activePersonaId: activePersonaIdProp,
   onSelectPersona: onSelectPersonaProp,
@@ -346,6 +348,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
           onRemoveImage={handleRemoveImage}
           config={config}
           onModelChanged={onModelChanged}
+          onConfigChanged={onConfigChanged}
           activeSparks={activeSparks}
           onAcceptSpark={handleAcceptSpark}
           onDismissSpark={handleDismissSpark}
@@ -485,6 +488,7 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
               onRemoveImage={handleRemoveImage}
               config={config}
               onModelChanged={onModelChanged}
+              onConfigChanged={onConfigChanged}
             />
           </div>
         </div>

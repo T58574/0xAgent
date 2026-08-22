@@ -54,7 +54,11 @@ function getSanitizedEnv(): NodeJS.ProcessEnv {
   return env;
 }
 
-export function executeShellCommand(workspaceDir: string | null | undefined, command: string): Promise<string> {
+export function executeShellCommand(
+  workspaceDir: string | null | undefined,
+  command: string,
+  timeoutMs: number = 120000
+): Promise<string> {
   const root = workspaceDir && workspaceDir.trim().length > 0 ? workspaceDir : process.cwd();
   const normalizedRoot = path.normalize(path.resolve(root));
 
@@ -88,6 +92,8 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
       windowsHide: true,
     });
 
+    const effectiveTimeout = Math.min(600000, Math.max(5000, timeoutMs));
+
     const timeoutTimer = setTimeout(() => {
       isTimedOut = true;
       try {
@@ -99,11 +105,12 @@ export function executeShellCommand(workspaceDir: string | null | undefined, com
       } catch {}
 
       const partialOutput = (stdout + (stderr ? `\n--- STDERR ---\n${stderr}` : '')).trim();
+      const timeoutSec = Math.round(effectiveTimeout / 1000);
       resolve(
-        `[INFO] Error: Команда превысила 30-секундный лимит и была принудительно остановлена.\n` +
+        `[INFO] Error: Команда превысила ${timeoutSec}-секундный лимит и была принудительно остановлена.\n` +
         `Полученный вывод до останова:\n${partialOutput || '(Вывод отсутствует)'}\n`
       );
-    }, 30000);
+    }, effectiveTimeout);
 
     child.stdout?.on('data', (data) => { stdout += data.toString(); });
     child.stderr?.on('data', (data) => { stderr += data.toString(); });

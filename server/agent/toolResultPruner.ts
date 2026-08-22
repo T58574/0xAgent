@@ -31,9 +31,23 @@ export function pruneToolResultText(
 
   const head = text.slice(0, config.headChars);
   const tail = text.slice(originalLength - config.tailChars);
+  const middleText = text.slice(config.headChars, originalLength - config.tailChars);
   const omitted = originalLength - (config.headChars + config.tailChars);
 
-  const marker = `\n\n[... middle output pruned (${omitted.toLocaleString()} chars) ...]\n\n`;
+  // Smart Error Extraction: check if middleText contains critical error traces
+  const errorRegex = /(?:error|failed|exception|panic|TS\d{4}|SyntaxError|TypeError|ReferenceError|AssertionError)/i;
+  const errorMatch = errorRegex.exec(middleText);
+  let errorSnippet = '';
+
+  if (errorMatch) {
+    const matchIdx = errorMatch.index;
+    const errorWindow = 1024;
+    const start = Math.max(0, matchIdx - 256);
+    const end = Math.min(middleText.length, start + errorWindow);
+    errorSnippet = `\n[KEY ERROR TRACE PRESERVED]:\n${middleText.slice(start, end)}\n[...]`;
+  }
+
+  const marker = `\n\n[... middle output pruned (${omitted.toLocaleString()} chars) ...]${errorSnippet}\n\n`;
   const prunedText = `${head}${marker}${tail}`;
 
   return {

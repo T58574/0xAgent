@@ -24,7 +24,6 @@ export const READONLY_TOOLS: ReadonlySet<string> = new Set([
   'ask_user',
   'ask_user_question',
   'todo_write',
-  'list_subagents',
 ]);
 
 export const MODIFYING_TOOLS: ReadonlySet<string> = new Set([
@@ -34,9 +33,6 @@ export const MODIFYING_TOOLS: ReadonlySet<string> = new Set([
   'execute_command',
   'run_scratch_script',
   'code_run',
-  'spawn_subagent',
-  'send_subagent_message',
-  'interrupt_subagent',
 ]);
 
 /**
@@ -83,7 +79,7 @@ export function isPathInsideWorkspace(filePath: string, workspaceDir?: string | 
 }
 
 /**
- * Permission Guard adapted from DeepSeek Harness permission presets.
+ * Permission Guard and security presets enforcement.
  * Evaluates tool execution requests against the active security preset.
  */
 export function evaluateToolPermission(

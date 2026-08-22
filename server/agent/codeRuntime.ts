@@ -32,7 +32,7 @@ export const DEFAULT_RUNTIME_OPTIONS: CodeRuntimeOptions = {
 };
 
 /**
- * Sandboxed Code Mode Runtime adapted from DeepSeek Harness (@deepseek-ai/dsh-code-runtime).
+ * Sandboxed Code Mode Runtime for isolated in-memory JavaScript execution.
  * Executes an async JavaScript program with bound host `tools.*` async methods in 1 single turn.
  */
 export async function executeCodeProgram(

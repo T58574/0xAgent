@@ -378,6 +378,7 @@ export default function App() {
       modelName={config?.model_name}
       config={config}
       onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
+      onConfigChanged={(updated) => setConfig(updated)}
       onAcceptSpark={handleAcceptSpark}
       personas={personas}
       activePersonaId={activePersonaId}
@@ -408,6 +409,7 @@ export default function App() {
         isServerOffline={isServerOffline}
         onStartServer={handleStartServer}
         onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
+        onConfigChanged={(updated) => setConfig(updated)}
         onOpenJarvis={() => setActiveView('jarvis')}
         onNewChat={() => handleCreateSession('Новый диалог', 'auto')}
         onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}

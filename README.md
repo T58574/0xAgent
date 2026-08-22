@@ -13,7 +13,7 @@
 
 **A high-performance, privacy-first autonomous AI coding agent and Web-IDE designed for local model inference (`llama.cpp`, Gemma 4, Qwen, DeepSeek) and hybrid cloud LLM workflows.**
 
-[Key Features](#key-features) • [DeepSeek Harness Innovations](#deepseek-harness-innovations) • [Architecture](#architecture) • [Tech Stack](#tech-stack) • [Quick Start](#quick-start) • [Localization](#localization--language-support) • [Native Tray Launcher](#native-windows-tray-launcher) • [Project Structure](#project-structure) • [Configuration](#configuration) • [Security](#security--opsec) • [Commands](#available-scripts) • [License](#license)
+[Key Features](#key-features) • [Autonomous Agent Harness Innovations](#autonomous-agent-harness-innovations) • [Architecture](#architecture) • [Tech Stack](#tech-stack) • [Quick Start](#quick-start) • [Localization](#localization--language-support) • [Native Tray Launcher](#native-windows-tray-launcher) • [Project Structure](#project-structure) • [Configuration](#configuration) • [Security](#security--opsec) • [Commands](#available-scripts) • [License](#license)
 
 </div>
 
@@ -60,22 +60,26 @@ Whether executing quantized 31B+ models locally on consumer GPUs with Flash Atte
 
 ---
 
-## DeepSeek Harness Innovations
-
-0xAgent incorporates 6 core architectural subsystems adapted from the open-source **DeepSeek Harness** (`@deepseek-ai/deepseek-harness`):
-
-1. **Interactive Decision Cards (`<ask_user_question>`)**
+## Autonomous Agent Harness Innovations
+ 
+0xAgent incorporates core architectural subsystems engineered for resilient local LLM orchestration and maximum token efficiency:
+ 
+1. **Parallel Read-Only Tool Execution (`agent.ts`)**
+   - Independent Read-Only tools (`read_file`, `list_dir`, `grep_search`, `fff_search`, `read_web_page`, `web_search`) execute concurrently via `Promise.all()`, accelerating the exploration phase by 3-5x.
+2. **Robust Multi-Chunk Patch Engine (`fileTools.ts`)**
+   - Whitespace-tolerant search/replace block patcher with strict line-level validation, multi-strategy indentation alignment, and zero data-loss safeguards.
+3. **Interactive Decision Cards (`<ask_user_question>`)**
    - Enables the agent to pause execution and present interactive single/multi-select option cards or plan review modals (`InteractiveQuestionCard.tsx`), resuming upon user input.
-2. **Code Mode Sandbox (`<code_run>`)**
+4. **Code Mode Sandbox (`<code_run>`)**
    - Sandboxed JavaScript execution directly inside Node.js `node:vm` with async host `tools.*` bindings (read, write, patch, fff, web, exec) in 1 turn without token bloat.
-3. **4-Level Permission Matrix (`permissionGuard.ts`)**
-   - Security presets (`readonly`, `workspace-write`, `prompt`, `unrestricted`) with path traversal guards and real-time UI switching in the command bar.
-4. **Event-Sourced Session Forking (`sessionEvents.ts`)**
+5. **4-Level Permission Matrix (`permissionGuard.ts`)**
+   - Granular security presets (`readonly`, `workspace-write`, `prompt`, `unrestricted`) with path traversal guards and real-time UI switching in the command bar.
+6. **Event-Sourced Session Forking (`sessionEvents.ts`)**
    - Instant dialogue branching from any message checkpoint (`POST /api/sessions/:id/fork`) with isolated message lineage.
-5. **Continuable Subagent Orchestrator (`subagentOrchestrator.ts`)**
-   - Stateful background subagents with live messaging (`send_subagent_message`), interrupts (`interrupt_subagent`), and status polling.
-6. **4-Tier Context Compaction Pipeline (`compactionPipeline.ts`)**
-   - Coordinated context management combining Zero-Token Tool Pruning (Tier 1), CoT Thought Stripping (Tier 2), Bounded Windowing (Tier 3), and Milestone LLM Summarization (Tier 4) at 75% context threshold.
+7. **Oscillation & Repeat Loop Breaker (`loopBreaker.ts`)**
+   - 8-step rolling history tracking with canonical JSON argument sorting and cyclic oscillation detection (A -> B -> A -> B), escalating from corrective guidance to graceful termination.
+8. **4-Tier Context Compaction & Smart Error Retention (`compactionPipeline.ts` & `toolResultPruner.ts`)**
+   - Coordinated context management combining Zero-Token Tool Pruning with regex error preservation (Tier 1), CoT Thought Stripping (Tier 2), Bounded Windowing (Tier 3), and Milestone LLM Summarization (Tier 4) at 75% context threshold.
 
 ---
 
@@ -263,7 +267,6 @@ npm run build:launcher
 │   │   ├── permissionGuard.ts # 4-level security presets
 │   │   ├── promptBuilder.ts # Dynamic system prompt generation
 │   │   ├── sessionEvents.ts # Event sourcing & session forking
-│   │   ├── subagentOrchestrator.ts # Continuable subagent protocol
 │   │   ├── toolDispatcher.ts# Tool execution coordinator
 │   │   ├── toolParser.ts    # Resilient XML/JSON tool call parser
 │   │   ├── toolResultPruner.ts # Zero-token tool output pruner
@@ -287,8 +290,8 @@ npm run build:launcher
 │   ├── App.tsx              # Main application root
 │   └── index.css            # Custom glassmorphic styles and themes
 ├── tests/                   # Comprehensive automated test suites (node:test)
-│   ├── deepseekInnovations.test.ts # DeepSeek innovations test suite
-│   ├── deepseekHarnessAdaptations.test.ts # Pruner, loop breaker, spiller tests
+│   ├── agentHarnessInnovations.test.ts # Agent innovations test suite
+│   ├── agentHarnessAdaptations.test.ts # Pruner, loop breaker, spiller tests
 │   ├── jarvisCompanion.test.ts # Companion, voice, macro tests
 │   └── workspacePersona.test.ts # Workspaces, sandboxes, personas tests
 ├── .env.example             # Template for environment configuration

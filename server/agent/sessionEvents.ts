@@ -3,7 +3,7 @@ import { ChatSession, ChatMessage, SessionEvent } from '../../src/types';
 import { loadSession, saveSession } from '../session';
 
 /**
- * Event Sourcing and Session Forking module adapted from DeepSeek Harness (@deepseek-ai/dsh-session).
+ * Event Sourcing and Session Forking module.
  */
 
 /**

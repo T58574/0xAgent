@@ -13,7 +13,7 @@ export interface CompactionResult {
 }
 
 /**
- * 4-Tier Context Compaction Pipeline adapted from DeepSeek Harness (@deepseek-ai/dsh-compaction).
+ * 4-Tier Context Compaction Pipeline for token optimization and context management.
  * Tier 1: Zero-token syntactic tool-result pruning
  * Tier 2: CoT Channel thought-stripping on history
  * Tier 3: Bounded context-window fitting
@@ -47,20 +47,31 @@ export async function runCompactionPipeline(
   if (estTokens > Math.floor(contextMax * 0.75) && session.messages.length > 6) {
     try {
       const tailCount = 4;
-      const msgsToSummarize = session.messages.slice(0, Math.max(1, session.messages.length - tailCount));
-      const tailMsgs = session.messages.slice(session.messages.length - tailCount);
+      let tailStartIndex = Math.max(1, session.messages.length - tailCount);
+      // Ensure tail does not start with an orphaned tool response without its assistant tool_calls
+      while (tailStartIndex > 0 && session.messages[tailStartIndex]?.role === 'tool') {
+        tailStartIndex--;
+      }
+
+      const initialUserMsg = session.messages.find((m) => m.role === 'user');
+      const msgsToSummarize = session.messages.slice(0, tailStartIndex);
+      const tailMsgs = session.messages.slice(tailStartIndex);
 
       const summaryText = await summarizeContext(msgsToSummarize, config, broadcast || (() => {}));
 
-      session.messages = [
-        {
-          id: uuidv4(),
-          role: 'user',
-          content: `[СВОДКА ПРЕДЫДУЩЕЙ ЧАСТИ ДИАЛОГА]:\n${summaryText}`,
-          timestamp: Date.now(),
-        },
-        ...tailMsgs,
-      ];
+      const newMessages = [];
+      if (initialUserMsg && !tailMsgs.some((m) => m.id === initialUserMsg.id)) {
+        newMessages.push(initialUserMsg);
+      }
+      newMessages.push({
+        id: uuidv4(),
+        role: 'user' as const,
+        content: `[СВОДКА ПРЕДЫДУЩЕЙ ЧАСТИ ДИАЛОГА]:\n${summaryText}`,
+        timestamp: Date.now(),
+      });
+      newMessages.push(...tailMsgs);
+
+      session.messages = newMessages;
       session.updated_at = Date.now();
       await saveSession(session);
 

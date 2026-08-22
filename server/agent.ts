@@ -8,7 +8,7 @@ import { dispatchToolExecution } from './agent/toolDispatcher';
 import { parseToolCalls, detectToolOutputHallucination, stripHallucinatedToolOutput } from './agent/toolParser';
 import { loopBreaker } from './agent/loopBreaker';
 import { handleOutputSpill } from './agent/outputSpiller';
-import { evaluateToolPermission } from './agent/permissionGuard';
+import { evaluateToolPermission, READONLY_TOOLS } from './agent/permissionGuard';
 import { runCompactionPipeline } from './agent/compactionPipeline';
 import { fetchLlmResponse, readLlmStream, PRIMARY_TEXT_MODEL, DEFAULT_FALLBACK_CHAIN, GEMMA_MODEL, FAST_LITE_MODEL, NATIVE_AUDIO_MODEL } from './agent/llmClient';
 import {
@@ -256,10 +256,9 @@ export async function runAgentLoop(
       let hasNewExecutions = false;
       const toolResults: ChatMessage[] = [];
 
-      for (const tc of parsedCalls) {
+      const executeSingleTool = async (tc: (typeof parsedCalls)[0]) => {
         if (activeCancelTokens.has(sessionId)) {
-          broadcast('agent-status-changed', { sessionId, status: 'idle' });
-          return;
+          return null;
         }
 
         const perm = evaluateToolPermission(
@@ -278,12 +277,6 @@ export async function runAgentLoop(
             status: 'error',
             output,
           });
-          toolResults.push({
-            id: uuidv4(),
-            role: 'tool',
-            content: `<tool_response name="${tc.name}" id="${tc.id}">\n${output}\n</tool_response>`,
-            timestamp: Date.now(),
-          });
           if (lastMsg && lastMsg.tool_calls) {
             const t = lastMsg.tool_calls.find((x) => x.id === tc.id);
             if (t) {
@@ -291,8 +284,12 @@ export async function runAgentLoop(
               t.output = output;
             }
           }
-          hasNewExecutions = true;
-          continue;
+          return {
+            id: uuidv4(),
+            role: 'tool' as const,
+            content: `<tool_response name="${tc.name}" id="${tc.id}">\n${output}\n</tool_response>`,
+            timestamp: Date.now(),
+          };
         }
 
         let userResponseOrApproved: boolean | string = true;
@@ -371,13 +368,6 @@ export async function runAgentLoop(
           output = 'Tool execution rejected by the user.';
         }
 
-        toolResults.push({
-          id: uuidv4(),
-          role: 'tool',
-          content: `<tool_response name="${tc.name}" id="${tc.id}">\n${output}\n</tool_response>`,
-          timestamp: Date.now(),
-        });
-
         if (lastMsg && lastMsg.tool_calls) {
           const t = lastMsg.tool_calls.find((x) => x.id === tc.id);
           if (t) {
@@ -386,7 +376,68 @@ export async function runAgentLoop(
           }
         }
 
-        hasNewExecutions = true;
+        return {
+          id: uuidv4(),
+          role: 'tool' as const,
+          content: `<tool_response name="${tc.name}" id="${tc.id}">\n${output}\n</tool_response>`,
+          timestamp: Date.now(),
+        };
+      };
+
+      // Partition tool calls into parallel read-only groups and sequential mutating groups
+      const batches: { isParallel: boolean; calls: typeof parsedCalls }[] = [];
+      let currentBatchCalls: typeof parsedCalls = [];
+      let currentIsParallel = false;
+
+      for (const tc of parsedCalls) {
+        const perm = evaluateToolPermission(
+          tc.name,
+          tc.arguments,
+          sessionConfig.permission_preset || 'prompt',
+          sessionConfig.workspace_dir
+        );
+        const isParallelRead = READONLY_TOOLS.has(tc.name) && perm.allowed && !perm.requiresApproval;
+
+        if (batches.length === 0 && currentBatchCalls.length === 0) {
+          currentIsParallel = isParallelRead;
+          currentBatchCalls.push(tc);
+        } else if (currentIsParallel === isParallelRead && isParallelRead) {
+          currentBatchCalls.push(tc);
+        } else {
+          if (currentBatchCalls.length > 0) {
+            batches.push({ isParallel: currentIsParallel, calls: currentBatchCalls });
+          }
+          currentIsParallel = isParallelRead;
+          currentBatchCalls = [tc];
+        }
+      }
+      if (currentBatchCalls.length > 0) {
+        batches.push({ isParallel: currentIsParallel, calls: currentBatchCalls });
+      }
+
+      for (const batch of batches) {
+        if (activeCancelTokens.has(sessionId)) {
+          broadcast('agent-status-changed', { sessionId, status: 'idle' });
+          return;
+        }
+
+        if (batch.isParallel && batch.calls.length > 1) {
+          const results = await Promise.all(batch.calls.map((tc) => executeSingleTool(tc)));
+          for (const res of results) {
+            if (res) {
+              toolResults.push(res);
+              hasNewExecutions = true;
+            }
+          }
+        } else {
+          for (const tc of batch.calls) {
+            const res = await executeSingleTool(tc);
+            if (res) {
+              toolResults.push(res);
+              hasNewExecutions = true;
+            }
+          }
+        }
       }
 
       for (const resMsg of toolResults) {
@@ -396,24 +447,6 @@ export async function runAgentLoop(
       await saveSession(session);
 
       if (!hasNewExecutions) {
-        broadcast('agent-status-changed', { sessionId, status: 'idle' });
-        break;
-      }
-
-      // Smart turn termination: Prevent redundant re-generation turns for silent background tools
-      const SILENT_BACKGROUND_TOOLS = [
-        'update_user_profile',
-        'update_persona_file',
-        'remember_fact',
-        'save_knowledge',
-        'list_skills',
-      ];
-
-      const cleanExplanationText = strip_ai_reasoning_fluff(assistantMessage.content).trim();
-      const hasSubstantialText = cleanExplanationText.length >= 25;
-
-      const isAllSilentTools = parsedCalls.every((tc) => SILENT_BACKGROUND_TOOLS.includes(tc.name));
-      if (isAllSilentTools && hasSubstantialText) {
         broadcast('agent-status-changed', { sessionId, status: 'idle' });
         break;
       }

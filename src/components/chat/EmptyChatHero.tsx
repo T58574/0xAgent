@@ -19,6 +19,7 @@ interface EmptyChatHeroProps {
   onRemoveImage: (index: number) => void;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
+  onConfigChanged?: (newConfig: AppConfig) => void;
   activeSparks: JarvisSparkProposal[];
   onAcceptSpark: (spark: JarvisSparkProposal) => void;
   onDismissSpark: (sparkId: string) => void;
@@ -40,6 +41,7 @@ export const EmptyChatHero: React.FC<EmptyChatHeroProps> = ({
   onRemoveImage,
   config,
   onModelChanged,
+  onConfigChanged,
   activeSparks,
   onAcceptSpark,
   onDismissSpark,
@@ -98,6 +100,7 @@ export const EmptyChatHero: React.FC<EmptyChatHeroProps> = ({
             onRemoveImage={onRemoveImage}
             config={config}
             onModelChanged={onModelChanged}
+            onConfigChanged={onConfigChanged}
           />
         </div>
       </div>

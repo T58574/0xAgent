@@ -59,10 +59,11 @@ ${activePersona.user}
 
   const reasoningDirective = !isReasoningExplicitlyOff && !isGemmaModel
     ? `\n\n# INSTRUCTIONS FOR REASONING BLOCK <THINK>
-1. FREEDOM OF THOUGHT: Reason naturally, concisely, and directly in English, pseudo-code, or mixed technical language — whichever produces the highest problem-solving speed and clarity. Focus on logic, architecture, tool selection, edge cases, and verification.
-2. NO CODE/FILE DRAFTS IN THINKING: Never output full file contents, boilerplate, or long patches inside <think>. Write file modifications directly into the target tool tags (<write_file>, <patch_file>).
-3. DECISIVENESS: Avoid looping, second-guessing trivial points, or debating linguistic rules. Decide the plan and execute.
-4. TOOLS OUTSIDE THINK: Always close the thinking block with </think> BEFORE emitting tool tags. Tool XML tags must ALWAYS be placed outside <think>.`
+1. REASON CONCISELY & ACT IMMEDIATELY: Reason step-by-step about what needs to be inspected, created, or fixed. Keep thoughts compact, direct, and focused on strategy, logic, and tool selection.
+2. STRICTLY NO CODE OR DRAFTS IN THINKING: Never write actual code blocks, functions, scripts, patches, or mock file contents inside <think>. Identify the file and change conceptually in 1-2 lines, then output the real code directly inside tool tags (<write_file>, <patch_file>) or the final response.
+3. NEVER PRE-COMPOSE OR DRAFT USER RESPONSES: Do NOT draft, rehearse, or simulate the final text response inside <think>. Never formulate explanations twice. Reason about what actions to take, immediately close </think>, and produce your actual response or tool calls directly.
+4. REACTIVE THINK-ACT CYCLE: Think briefly -> execute tool or reply -> observe result -> continue iteratively. Do not simulate hypothetical multi-step dialogues or future outputs in advance.
+5. CLEAN TAG CLOSURE: Always close the thinking block with </think> BEFORE emitting any XML tool tags or final dialogue. Tool XML tags must ALWAYS be placed outside <think>.`
     : '';
 
   const languageProtocolDirective = `\n\n# CONVERSATION & LANGUAGE STANDARD:
@@ -75,13 +76,13 @@ ${activePersona.user}
   return (
     thinkTrigger +
     languageProtocolDirective +
-    personaContext +
-    unifiedToolsContext +
     toolExecutionDirective +
+    unifiedToolsContext +
     gemmaToolDirective +
     reasoningDirective +
     envContext +
     planningContext +
+    personaContext +
     memoryContext +
     workspaceMdContext
   );

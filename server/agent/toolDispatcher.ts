@@ -24,7 +24,6 @@ import { listSkills, readSkill } from '../skills';
 import { getActivePersona, appendSilentUserTrait, updatePersonaFile } from '../personas';
 import { listSessions, loadSession, saveSession } from '../session';
 import { executeCodeProgram } from './codeRuntime';
-import { subagentOrchestrator } from './subagentOrchestrator';
 import { userQuestionService } from './userQuestionService';
 import { isCoreSystemPath } from './permissionGuard';
 import { createStagedProposal, verifyStagedProposal } from './selfPatchEngine';
@@ -285,46 +284,6 @@ export async function dispatchToolExecution(
         const logStr = runRes.logs.length > 0 ? `\n\nLogs before failure:\n${runRes.logs.join('\n')}` : '';
         return `[Code Mode Execution Failed in ${runRes.executionTimeMs}ms]\nError: ${runRes.error}${logStr}`;
       }
-    }
-
-    case 'spawn_subagent': {
-      const role = tc.arguments.role || 'Assistant Sub-Agent';
-      const goal = tc.arguments.goal || 'Complete delegated task';
-      const sub = await subagentOrchestrator.spawnSubagent(sessionId || 'root', role, goal, config, broadcast);
-      return `[Субагент запущен: ID ${sub.id}]\nРоль: ${sub.role}\nЦель: ${sub.goal}\nСтатус: ${sub.status}. Вы можете проверить статус через list_subagents или отправить сообщение через send_subagent_message.`;
-    }
-
-    case 'send_subagent_message': {
-      const subId = tc.arguments.subagent_id || tc.arguments.id;
-      const msg = tc.arguments.message || tc.arguments.content || '';
-      if (!subId) return 'Error: subagent_id is required.';
-      const rep = await subagentOrchestrator.sendMessage(subId, msg, config, broadcast);
-      return `[Ответ субагента ${subId}]:\n${rep}`;
-    }
-
-    case 'interrupt_subagent': {
-      const subId = tc.arguments.subagent_id || tc.arguments.id;
-      if (!subId) return 'Error: subagent_id is required.';
-      const stopped = subagentOrchestrator.interruptSubagent(subId, broadcast);
-      return stopped ? `[OK] Субагент ${subId} успешно остановлен.` : `Ошибка: субагент ${subId} не найден.`;
-    }
-
-    case 'list_subagents': {
-      const list = subagentOrchestrator.listSubagents(sessionId);
-      return list.length > 0
-        ? JSON.stringify(
-            list.map((s) => ({
-              id: s.id,
-              role: s.role,
-              goal: s.goal,
-              status: s.status,
-              updatedAt: new Date(s.updatedAt).toLocaleTimeString(),
-              lastReport: s.lastReport ? s.lastReport.substring(0, 150) + '...' : undefined,
-            })),
-            null,
-            2
-          )
-        : 'Нет активных или завершенных субагентов для этой сессии.';
     }
 
     case 'update_user_profile': {

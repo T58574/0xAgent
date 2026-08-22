@@ -430,17 +430,6 @@ export interface CodeRunResult {
   executionTimeMs: number;
 }
 
-export interface SubagentInfo {
-  id: string;
-  parentId: string;
-  role: string;
-  goal: string;
-  status: 'idle' | 'running' | 'completed' | 'error' | 'interrupted';
-  createdAt: number;
-  updatedAt: number;
-  lastReport?: string;
-}
-
 export interface SessionEvent {
   id: string;
   type: string;

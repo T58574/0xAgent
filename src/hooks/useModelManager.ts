@@ -14,7 +14,8 @@ export interface ServerStatusData {
 
 export function useModelManager(
   config?: AppConfig | null,
-  onModelChanged?: (newModelId: string) => void
+  onModelChanged?: (newModelId: string) => void,
+  onConfigChanged?: (newConfig: AppConfig) => void
 ) {
   const { showToast } = useToast();
   const { t, formatString } = useI18n();
@@ -78,6 +79,7 @@ export function useModelManager(
       await api.save_config(updatedCfg);
 
       setModelsData((prev) => ({ ...prev, activeModelId: modelId }));
+      if (onConfigChanged) onConfigChanged(updatedCfg);
       if (onModelChanged) onModelChanged(modelId);
 
       if (serverStatus.running) {
@@ -110,6 +112,7 @@ export function useModelManager(
       };
       await api.save_config(updatedCfg);
       setModelsData((prev) => ({ ...prev, activeModelId: model.id }));
+      if (onConfigChanged) onConfigChanged(updatedCfg);
       if (onModelChanged) onModelChanged(model.id);
 
       if (!serverStatus.running || !isModelRunning(model)) {

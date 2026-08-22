@@ -201,53 +201,13 @@ new replacement lines
    - Execute JS code with tools.* in 1 turn.`,
   },
   {
-    id: 'spawn_subagent',
-    name: 'spawn_subagent',
-    description: 'Spawn background autonomous subagent.',
-    category: 'agents',
-    requiresApproval: false,
-    enabled: true,
-    xmlSpec: `19. <spawn_subagent role="..." goal="..." />
-   - Spawn subagent for isolated subtask.`,
-  },
-  {
-    id: 'send_subagent_message',
-    name: 'send_subagent_message',
-    description: 'Send message to running subagent.',
-    category: 'agents',
-    requiresApproval: false,
-    enabled: true,
-    xmlSpec: `20. <send_subagent_message subagent_id="..." message="..." />
-   - Send instruction to subagent.`,
-  },
-  {
-    id: 'interrupt_subagent',
-    name: 'interrupt_subagent',
-    description: 'Interrupt running subagent.',
-    category: 'agents',
-    requiresApproval: false,
-    enabled: true,
-    xmlSpec: `21. <interrupt_subagent subagent_id="..." />
-   - Stop subagent.`,
-  },
-  {
-    id: 'list_subagents',
-    name: 'list_subagents',
-    description: 'List subagents in current session.',
-    category: 'agents',
-    requiresApproval: false,
-    enabled: true,
-    xmlSpec: `22. <list_subagents />
-   - List subagents.`,
-  },
-  {
     id: 'save_knowledge',
     name: 'save_knowledge',
     description: 'Save article to Knowledge Vault.',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
-    xmlSpec: `23. <save_knowledge title="..." category="..." summary="...">content</save_knowledge>
+    xmlSpec: `19. <save_knowledge title="..." category="..." summary="...">content</save_knowledge>
    - Save to Knowledge Vault.`,
   },
   {

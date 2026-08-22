@@ -111,6 +111,7 @@ export function getDefaultConfig(): AppConfig {
     reasoning_enabled: true,
     reasoning_effort: 'auto',
     planning_mode: true,
+    permission_preset: 'prompt',
     temperature: 0.7,
     max_tokens: 16384,
     api_timeout_sec: 120,

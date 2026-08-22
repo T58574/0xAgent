@@ -144,13 +144,14 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
         continue;
       }
 
-      // 2. Try trimmed line comparison
+      // 2. Try trimmed line comparison (handles indentation mismatch)
       const trimSearch = searchBlockClean.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
       const currentLines = currentContentClean.split('\n');
+      const searchLines = searchBlockClean.split('\n');
       let foundIndex = -1;
 
-      for (let i = 0; i <= currentLines.length - searchBlockClean.split('\n').length; i++) {
-        const sliceTrimmed = currentLines.slice(i, i + searchBlockClean.split('\n').length).map((l) => l.trim()).filter(Boolean).join('\n');
+      for (let i = 0; i <= currentLines.length - searchLines.length; i++) {
+        const sliceTrimmed = currentLines.slice(i, i + searchLines.length).map((l) => l.trim()).filter(Boolean).join('\n');
         if (sliceTrimmed === trimSearch) {
           foundIndex = i;
           break;
@@ -158,8 +159,7 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
       }
 
       if (foundIndex !== -1) {
-        const searchLinesCount = searchBlockClean.split('\n').length;
-        currentLines.splice(foundIndex, searchLinesCount, replaceBlock);
+        currentLines.splice(foundIndex, searchLines.length, replaceBlock);
         currentContent = currentLines.join('\n');
         remaining = afterDiv.substring(endIdx + replaceMarker.length);
         appliedCount++;
@@ -170,8 +170,8 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
       const collapseSpaces = (s: string) => s.split('\n').map((l) => l.trim().replace(/\s+/g, ' ')).filter(Boolean).join('\n');
       const collapsedSearch = collapseSpaces(searchBlockClean);
       
-      for (let i = 0; i <= currentLines.length - searchBlockClean.split('\n').length; i++) {
-        const sliceCollapsed = collapseSpaces(currentLines.slice(i, i + searchBlockClean.split('\n').length).join('\n'));
+      for (let i = 0; i <= currentLines.length - searchLines.length; i++) {
+        const sliceCollapsed = collapseSpaces(currentLines.slice(i, i + searchLines.length).join('\n'));
         if (sliceCollapsed === collapsedSearch) {
           foundIndex = i;
           break;
@@ -179,37 +179,11 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
       }
 
       if (foundIndex !== -1) {
-        const searchLinesCount = searchBlockClean.split('\n').length;
-        currentLines.splice(foundIndex, searchLinesCount, replaceBlock);
+        currentLines.splice(foundIndex, searchLines.length, replaceBlock);
         currentContent = currentLines.join('\n');
         remaining = afterDiv.substring(endIdx + replaceMarker.length);
         appliedCount++;
         continue;
-      }
-
-      // 4. Try Core Lines Anchoring (ignoring loose closing brackets on edges)
-      const coreLines = searchBlockClean.split('\n').map((l) => l.trim()).filter((l) => l.length > 8 && !/^<\/(?:div|span|p|section|header|footer|aside)>$/i.test(l) && !/^[}\]);,]+$/.test(l));
-      if (coreLines.length > 0) {
-        const coreSearch = coreLines.join('\n');
-        let coreMatchIdx = -1;
-        let matchCount = 0;
-
-        for (let i = 0; i <= currentLines.length - coreLines.length; i++) {
-          const sliceCore = currentLines.slice(i, i + coreLines.length).map((l) => l.trim()).join('\n');
-          if (sliceCore === coreSearch) {
-            matchCount++;
-            coreMatchIdx = i;
-          }
-        }
-
-        // If core is unique in file, perform replace on core range
-        if (matchCount === 1 && coreMatchIdx !== -1) {
-          currentLines.splice(coreMatchIdx, coreLines.length, replaceBlock);
-          currentContent = currentLines.join('\n');
-          remaining = afterDiv.substring(endIdx + replaceMarker.length);
-          appliedCount++;
-          continue;
-        }
       }
 
       throw new Error(
@@ -223,27 +197,6 @@ export function executePatchFile(workspaceDir: string | null | undefined, pathSt
     remaining = afterDiv.substring(endIdx + replaceMarker.length);
     appliedCount++;
   }
-
-  // Clean up accidental duplicate adjacent declaration lines (e.g. repeated useState/useRef lines created by fuzzy patch)
-  const lines = currentContent.split(/\r?\n/);
-  const cleanedLines: string[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const trimmed = line.trim();
-    const prevTrimmed = i > 0 ? lines[i - 1].trim() : '';
-
-    if (
-      trimmed &&
-      trimmed.length > 12 &&
-      trimmed === prevTrimmed &&
-      (trimmed.startsWith('const ') || trimmed.startsWith('let ') || trimmed.startsWith('var ') || trimmed.startsWith('import '))
-    ) {
-      // Skip accidental duplicate declaration line created by small model patch
-      continue;
-    }
-    cleanedLines.push(line);
-  }
-  currentContent = cleanedLines.join('\n');
 
   fs.writeFileSync(targetPath, currentContent, 'utf-8');
   return `Successfully applied ${appliedCount} patch block(s) to ${targetPath}`;

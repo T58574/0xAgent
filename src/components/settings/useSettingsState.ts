@@ -175,6 +175,7 @@ export function useSettingsState(
           reasoning_enabled: reasoningEnabled,
           reasoning_effort: reasoningEffort,
           planning_mode: planningEnabled,
+          permission_preset: config.permission_preset || 'prompt',
           temperature,
           max_tokens: maxTokens,
           api_timeout_sec: apiTimeoutSec,

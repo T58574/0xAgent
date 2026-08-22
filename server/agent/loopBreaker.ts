@@ -33,6 +33,11 @@ export function canonicalizeArguments(args: any): string {
   return JSON.stringify(deepSortKeys(args));
 }
 
+interface ToolCallEntry {
+  toolName: string;
+  canonicalArgs: string;
+}
+
 export class LoopBreakerTracker {
   private sessions = new Map<
     string,
@@ -40,19 +45,37 @@ export class LoopBreakerTracker {
       lastToolName: string;
       lastCanonicalArgs: string;
       consecutiveCount: number;
+      history: ToolCallEntry[];
     }
   >();
 
   public trackCall(sessionId: string, toolName: string, args: any): LoopBreakerResult {
     const canonicalArgs = canonicalizeArguments(args);
-    const state = this.sessions.get(sessionId);
+    let state = this.sessions.get(sessionId);
+
+    if (!state) {
+      state = {
+        lastToolName: '',
+        lastCanonicalArgs: '',
+        consecutiveCount: 0,
+        history: [],
+      };
+      this.sessions.set(sessionId, state);
+    }
 
     // Ignore transparent meta-tools from loop counting
     if (toolName === 'todo_write') {
-      return { isLooping: false, count: state?.consecutiveCount || 0 };
+      return { isLooping: false, count: state.consecutiveCount };
     }
 
-    if (state && state.lastToolName === toolName && state.lastCanonicalArgs === canonicalArgs) {
+    const currentEntry: ToolCallEntry = { toolName, canonicalArgs };
+    state.history.push(currentEntry);
+    if (state.history.length > 8) {
+      state.history.shift();
+    }
+
+    // 1. Check direct consecutive repeats
+    if (state.lastToolName === toolName && state.lastCanonicalArgs === canonicalArgs) {
       state.consecutiveCount += 1;
       const count = state.consecutiveCount;
 
@@ -77,11 +100,28 @@ export class LoopBreakerTracker {
       return { isLooping: count >= 3, count };
     }
 
-    this.sessions.set(sessionId, {
-      lastToolName: toolName,
-      lastCanonicalArgs: canonicalArgs,
-      consecutiveCount: 1,
-    });
+    // 2. Check 2-step oscillation (A -> B -> A -> B)
+    if (state.history.length >= 4) {
+      const h = state.history;
+      const len = h.length;
+      const isPeriod2Oscillation =
+        h[len - 1].toolName === h[len - 3].toolName &&
+        h[len - 1].canonicalArgs === h[len - 3].canonicalArgs &&
+        h[len - 2].toolName === h[len - 4].toolName &&
+        h[len - 2].canonicalArgs === h[len - 4].canonicalArgs;
+
+      if (isPeriod2Oscillation) {
+        return {
+          isLooping: true,
+          count: 4,
+          advisoryReminder: `[СИСТЕМНОЕ ПРЕДУПРЕЖДЕНИЕ: Обнаружена циклическая осцилляция вызовов (${h[len - 2].toolName} <-> ${toolName}). Вы повторяете одни и те же действия по кругу. Прервите цикл, смените стратегию или объясните затруднение.]`,
+        };
+      }
+    }
+
+    state.lastToolName = toolName;
+    state.lastCanonicalArgs = canonicalArgs;
+    state.consecutiveCount = 1;
 
     return { isLooping: false, count: 1 };
   }
