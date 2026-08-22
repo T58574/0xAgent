@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Sliders, Shield, Volume2, Save, LayoutGrid, Globe, Key, KeyRound, LogOut, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
+import React from 'react';
+import { Sliders, Shield, Volume2, Save, LayoutGrid, Globe, Key, LogOut, Sparkles, CheckCircle2 } from 'lucide-react';
 import * as api from '../../services/api';
 import { useI18n } from '../../i18n';
 
@@ -102,7 +102,7 @@ interface GeneralTabProps {
   setProactiveCompanionEnabled?: (val: boolean) => void;
 }
 
-export const GeneralTab: React.FC<GeneralTabProps> = ({
+export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   onLanguageSelect,
   apiUrl,
   setApiUrl,
@@ -134,48 +134,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   setProactiveCompanionEnabled,
 }) => {
   const { language, setLanguage, t } = useI18n();
-
-  // Password change state
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setStatusMsg(null);
-
-    if (!currentPassword) {
-      setStatusMsg({ type: 'error', text: t.settings.general.enterCurrentPassword });
-      return;
-    }
-    if (newPassword.trim().length < 4) {
-      setStatusMsg({ type: 'error', text: t.settings.general.passwordMinLength });
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setStatusMsg({ type: 'error', text: t.settings.general.passwordMismatch });
-      return;
-    }
-
-    setIsSubmittingPassword(true);
-    try {
-      const res = await api.change_password(currentPassword, newPassword.trim());
-      if (res.success) {
-        setStatusMsg({ type: 'success', text: t.settings.general.passwordSuccess });
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } else {
-        setStatusMsg({ type: 'error', text: res.error || t.settings.general.passwordError });
-      }
-    } catch (err: any) {
-      setStatusMsg({ type: 'error', text: `${t.common.error}: ${err.message || err}` });
-    } finally {
-      setIsSubmittingPassword(false);
-    }
-  };
 
   const handleLogout = async () => {
     await api.logout();
@@ -486,92 +444,30 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
         )}
       </div>
 
-      {/* 4. Password & Session Security */}
-      <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
-        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
-            <KeyRound size={14} className="text-[var(--theme-text-muted)]" />
-            <span>{t.settings.general.securityTitle}</span>
+      {/* 4. Active Session & Logout */}
+      <div className="p-4 rounded-2xl bento-card space-y-3 border border-[var(--theme-border)]">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
+              <Shield size={14} className="text-[var(--theme-text-muted)]" />
+              <span>{t.settings.general.securityTitle}</span>
+            </div>
+            <p className="text-xs text-[var(--theme-text-muted)]">
+              {t.settings.security.logoutDesc || 'Управление сессией и паролем вынесено во вкладку Безопасность'}
+            </p>
           </div>
 
           <button
             type="button"
             onClick={handleLogout}
-            className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-xs text-[var(--theme-text-muted)] flex items-center gap-1.5 cursor-pointer transition-all font-medium"
+            className="px-3.5 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-xs text-[var(--theme-text-muted)] flex items-center gap-1.5 cursor-pointer transition-all font-medium"
             title={t.settings.security.logoutDesc}
           >
             <LogOut size={13} />
             <span>{t.settings.general.logoutBtn}</span>
           </button>
         </div>
-
-        {statusMsg && (
-          <div
-            className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
-              statusMsg.type === 'success'
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-300'
-                : 'bg-rose-500/10 border-rose-500/30 text-rose-600 dark:text-rose-300'
-            }`}
-          >
-            {statusMsg.type === 'success' ? (
-              <CheckCircle2 size={15} className="shrink-0" />
-            ) : (
-              <AlertTriangle size={15} className="shrink-0" />
-            )}
-            <span>{statusMsg.text}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleChangePassword} className="space-y-3 pt-1">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">{t.settings.general.currentPassword}</label>
-              <input
-                type="password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">{t.settings.general.newPassword}</label>
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-                required
-              />
-            </div>
-
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-[var(--theme-text-muted)]">{t.settings.general.confirmPassword}</label>
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-1">
-            <button
-              type="submit"
-              disabled={isSubmittingPassword}
-              className="px-4 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-xs transition-all hover:opacity-90 shadow-sm cursor-pointer disabled:opacity-50"
-            >
-              {isSubmittingPassword ? t.settings.saving : t.settings.general.updatePasswordBtn}
-            </button>
-          </div>
-        </form>
       </div>
     </div>
   );
-};
+});

@@ -111,7 +111,6 @@ export default function App() {
     workspaceTree,
     setWorkspaceTree,
     selectedFile,
-    has0xAgentMd,
     setHas0xAgentMd,
     splitLeftWidthPercent,
     setSplitLeftWidthPercent,
@@ -315,19 +314,6 @@ export default function App() {
     }
   };
 
-  const handleTogglePlanningMode = async () => {
-    if (!config) return;
-    const newPlanning = config.planning_mode === false ? true : false;
-    const updated = { ...config, planning_mode: newPlanning };
-    setConfig(updated);
-    try {
-      await api.save_config(updated);
-      addLog(`Planning mode switched to: ${newPlanning ? 'ENABLED' : 'DISABLED'}`);
-    } catch (err: any) {
-      console.error('Failed to save planning mode:', err);
-    }
-  };
-
   // WebSocket Event Subscriptions
   useAppWebSocket({
     currentSessionIdRef,
@@ -366,16 +352,7 @@ export default function App() {
       onCancelAgent={handleCancelAgent}
       onRollbackSession={handleRollbackSession}
       reasoningEnabled={config?.reasoning_enabled !== false}
-      groqApiKey={config?.groq_api_key}
       liveTelemetry={liveTelemetry}
-      planningMode={config?.planning_mode !== false}
-      onTogglePlanningMode={handleTogglePlanningMode}
-      isServerOffline={isServerOffline}
-      onStartServer={handleStartServer}
-      workspaceDir={activeSessionWorkspace}
-      onSelectWorkspace={handleSelectWorkspace}
-      onUpdateSessionWorkspace={handleUpdateCurrentSessionWorkspace}
-      modelName={config?.model_name}
       config={config}
       onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
       onConfigChanged={(updated) => setConfig(updated)}
@@ -395,7 +372,6 @@ export default function App() {
       
       {/* 1. TOP FLOATING SCI-FI CAPSULE NAVBAR */}
       <Navbar
-        sidebarOpen={sidebarOpen}
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         activeView={activeView}
         onChangeView={setActiveView}
@@ -404,13 +380,10 @@ export default function App() {
         workspaceDir={activeSessionWorkspace}
         onSelectWorkspace={handleSelectWorkspace}
         onUpdateSessionWorkspace={handleUpdateCurrentSessionWorkspace}
-        has0xAgentMd={has0xAgentMd}
         onToggleLogs={() => setShowLogsDrawer(!showLogsDrawer)}
         isServerOffline={isServerOffline}
         onStartServer={handleStartServer}
-        onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
         onConfigChanged={(updated) => setConfig(updated)}
-        onOpenJarvis={() => setActiveView('jarvis')}
         onNewChat={() => handleCreateSession('Новый диалог', 'auto')}
         onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
       />

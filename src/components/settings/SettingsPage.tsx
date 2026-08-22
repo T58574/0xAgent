@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User, Sparkles } from 'lucide-react';
+import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User, Sparkles, Shield } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { useI18n } from '../../i18n';
 import { GeneralTab } from './GeneralTab';
@@ -7,17 +7,18 @@ import { PersonasTab } from './PersonasTab';
 import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
 import { CustomizationsTab } from './CustomizationsTab';
+import { SecurityTab } from './SecurityTab';
 import { useSettingsState } from './useSettingsState';
 
 interface SettingsPageProps {
   config: AppConfig | null;
   onSaveConfig: (updated: AppConfig) => Promise<void>;
   onCancel: () => void;
-  initialSubtab?: 'general' | 'personas' | 'customizations' | 'themes' | 'local_server';
+  initialSubtab?: 'general' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security';
   currentSessionId?: string | null;
 }
 
-export const SettingsPage: React.FC<SettingsPageProps> = ({
+export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
   config,
   onSaveConfig,
   onCancel,
@@ -74,6 +75,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
             { id: 'personas', label: t.settings.tabs.personas, icon: User },
             { id: 'themes', label: t.settings.tabs.themes, icon: Palette },
             { id: 'local_server', label: t.settings.tabs.localServer, icon: Cpu },
+            { id: 'security', label: t.settings.tabs.security || 'Security & Auth', icon: Shield },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = s.activeSubtab === tab.id;
@@ -241,8 +243,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
               setApiUrl={s.setApiUrl}
             />
           )}
+
+          {s.activeSubtab === 'security' && <SecurityTab />}
         </div>
       </div>
     </div>
   );
-};
+});

@@ -36,6 +36,23 @@ export function reconnectWebSocket() {
   initWebSocket();
 }
 
+let reconnectAttempts = 0;
+const MAX_RECONNECT_DELAY = 15000;
+const BASE_RECONNECT_DELAY = 1000;
+
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  const backoff = Math.min(BASE_RECONNECT_DELAY * Math.pow(1.5, reconnectAttempts), MAX_RECONNECT_DELAY);
+  const jitter = Math.random() * 400;
+  const delay = backoff + jitter;
+  reconnectAttempts++;
+
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    initWebSocket();
+  }, delay);
+}
+
 export function initWebSocket() {
   if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
     return;
@@ -45,6 +62,7 @@ export function initWebSocket() {
     ws = new WebSocket(getWsUrl());
 
     ws.onopen = () => {
+      reconnectAttempts = 0;
       window.dispatchEvent(new CustomEvent('0xagent-ws-reconnected'));
     };
 
@@ -68,12 +86,7 @@ export function initWebSocket() {
         window.dispatchEvent(new CustomEvent('0xagent-unauthorized'));
         return;
       }
-      if (!reconnectTimer) {
-        reconnectTimer = setTimeout(() => {
-          reconnectTimer = null;
-          initWebSocket();
-        }, 1000);
-      }
+      scheduleReconnect();
     };
 
     ws.onerror = () => {

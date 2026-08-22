@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Save,
   Copy,
@@ -34,7 +34,7 @@ interface CodeEditorProps {
   workspaceDir?: string | null;
 }
 
-export const CodeEditor: React.FC<CodeEditorProps> = ({
+export const CodeEditor: React.FC<CodeEditorProps> = React.memo(({
   selectedFile,
   openTabs,
   onSelectTab,
@@ -55,6 +55,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const [showSearch, setShowSearch] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const gutterRef = useRef<HTMLDivElement>(null);
+
+  const lines = useMemo(() => editorContent.split('\n'), [editorContent]);
 
   // Sync content when selectedFile changes
   useEffect(() => {
@@ -211,7 +214,6 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     return parts.length > 0 ? parts : '\u00A0';
   };
 
-  const lines = editorContent.split('\n');
   const pathSegments = selectedFile ? selectedFile.path.split(/[\\/]/).filter(Boolean) : [];
   const searchMatchesCount = searchQuery.trim()
     ? (editorContent.toLowerCase().match(new RegExp(searchQuery.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length
@@ -424,6 +426,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             <div className="flex-1 w-full h-full flex overflow-hidden">
               {/* Line Numbers Gutter */}
               <div
+                ref={gutterRef}
                 className="text-right text-[var(--theme-text-muted)] font-mono select-none px-3 py-2.5 border-r border-[var(--theme-border)] bg-[var(--theme-panel)]/50 shrink-0 h-full overflow-hidden opacity-60 font-semibold"
                 style={{ fontSize: `${fontSize}px`, lineHeight: `${fontSize * 1.5}px` }}
               >
@@ -438,6 +441,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
               <textarea
                 value={editorContent}
                 onChange={(e) => setEditorContent(e.target.value)}
+                onScroll={(e) => {
+                  if (gutterRef.current) {
+                    gutterRef.current.scrollTop = e.currentTarget.scrollTop;
+                  }
+                }}
                 spellCheck={false}
                 wrap={wordWrap ? 'on' : 'off'}
                 className="flex-1 w-full h-full p-2.5 bg-transparent text-[var(--theme-text)] font-mono resize-none focus:outline-none leading-normal border-none"
@@ -499,4 +507,4 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
     </div>
   );
-};
+});

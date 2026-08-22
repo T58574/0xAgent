@@ -30,16 +30,7 @@ interface ChatAreaProps {
   onCancelAgent?: () => void;
   onRollbackSession?: (targetMessageId: string, mode: 'to_user_edit' | 'to_assistant') => Promise<string>;
   reasoningEnabled?: boolean;
-  groqApiKey?: string | null;
   liveTelemetry?: LiveTelemetry | null;
-  planningMode?: boolean;
-  onTogglePlanningMode?: () => void;
-  isServerOffline?: boolean;
-  onStartServer?: () => Promise<void>;
-  workspaceDir?: string | null;
-  onSelectWorkspace?: () => void;
-  onUpdateSessionWorkspace?: (dir: string | null) => void;
-  modelName?: string;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
   onConfigChanged?: (newConfig: AppConfig) => void;
@@ -50,9 +41,7 @@ interface ChatAreaProps {
   onOpenCustomizations?: () => void;
 }
 
-const ASCII_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
-
-export const ChatArea: React.FC<ChatAreaProps> = ({
+export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
   messages,
   currentSession,
   agentStatus,
@@ -92,33 +81,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
 
   // Jarvis Proactive Sparks
   const [activeSparks, setActiveSparks] = useState<JarvisSparkProposal[]>([]);
-
-  // ASCII thinking animation & Live thinking timer
-  const [asciiFrameIndex, setAsciiFrameIndex] = useState(0);
-  const [thinkingSeconds, setThinkingSeconds] = useState(0);
-
-  useEffect(() => {
-    if (agentStatus !== 'thinking' && agentStatus !== 'executing_tool') return;
-    const interval = setInterval(() => {
-      setAsciiFrameIndex((prev) => (prev + 1) % ASCII_FRAMES.length);
-    }, 75);
-    return () => clearInterval(interval);
-  }, [agentStatus]);
-
-  useEffect(() => {
-    let timer: any = null;
-    if (agentStatus === 'thinking' || agentStatus === 'executing_tool') {
-      const startTime = Date.now();
-      timer = setInterval(() => {
-        setThinkingSeconds((Date.now() - startTime) / 1000);
-      }, 100);
-    } else {
-      setThinkingSeconds(0);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [agentStatus]);
 
   // Load fallback personas if not passed via props
   useEffect(() => {
@@ -424,7 +386,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
                   reasoningEnabled={reasoningEnabled}
                   isLastAssistantMessage={isLastAssistantMessage}
                   agentStatus={agentStatus}
-                  thinkingSeconds={thinkingSeconds}
                   liveTelemetry={liveTelemetry}
                   onRespondToTool={onRespondToTool}
                   onRollbackSession={onRollbackSession}
@@ -438,8 +399,6 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
             <TelemetryHUD
               liveTelemetry={liveTelemetry}
               agentStatus={agentStatus}
-              thinkingSeconds={thinkingSeconds}
-              asciiFrame={ASCII_FRAMES[asciiFrameIndex]}
               showThinkingBanner={
                 agentStatus === 'thinking' &&
                 !messages.some(
@@ -495,4 +454,4 @@ export const ChatArea: React.FC<ChatAreaProps> = ({
       )}
     </div>
   );
-};
+});

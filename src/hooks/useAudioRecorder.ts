@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import * as api from '../services/api';
 
 interface UseAudioRecorderOptions {
@@ -186,6 +186,13 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       startRecording();
     }
   }, [isRecording, startRecording, stopRecording]);
+
+  // Unmount cleanup to release mic streams, close AudioContext, and cancel rAF
+  useEffect(() => {
+    return () => {
+      cleanupAudio();
+    };
+  }, [cleanupAudio]);
 
   return {
     isRecording,

@@ -26,16 +26,29 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
   const [copied, setCopied] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [spinnerFrame, setSpinnerFrame] = useState(0);
+  const [liveSeconds, setLiveSeconds] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // ASCII Spinner interval for live thinking HUD only
+  // ASCII Spinner & Live Stopwatch interval for live thinking HUD only
   useEffect(() => {
-    if (!isLive) return;
-    const interval = setInterval(() => {
+    if (!isLive) {
+      setLiveSeconds(0);
+      return;
+    }
+    const spinnerInterval = setInterval(() => {
       setSpinnerFrame((prev) => (prev + 1) % ASCII_SPINNER_FRAMES.length);
     }, 100);
-    return () => clearInterval(interval);
+    const startTime = Date.now();
+    const secInterval = setInterval(() => {
+      setLiveSeconds((Date.now() - startTime) / 1000);
+    }, 100);
+    return () => {
+      clearInterval(spinnerInterval);
+      clearInterval(secInterval);
+    };
   }, [isLive]);
+
+  const displaySeconds = isLive ? liveSeconds : thinkingSeconds;
 
   // Auto-scroll to bottom of live stream if user keeps autoScroll on
   useEffect(() => {
@@ -160,10 +173,10 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           )}
 
           {/* Live Stopwatch Timer */}
-          {(isLive || thinkingSeconds > 0) && (
+          {(isLive || displaySeconds > 0) && (
             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-bold">
               <MaterialIcon name="schedule" size={12} />
-              <span>{thinkingSeconds.toFixed(1)}s</span>
+              <span>{displaySeconds.toFixed(1)}s</span>
             </span>
           )}
 

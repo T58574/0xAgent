@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   Bot,
   Sparkles,
@@ -25,8 +25,6 @@ import { ResizableSplitter } from './ResizableSplitter';
 import { useToast } from '../context/ToastContext';
 import * as api from '../services/api';
 import { useI18n } from '../i18n';
-
-const JARVIS_WORKSPACE_PATH = 'c:\\Users\\user\\.0xagent\\workspaces\\Jarvis';
 
 interface JarvisSanctuaryProps {
   config: AppConfig | null;
@@ -62,11 +60,14 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
   personas,
   activePersonaId,
   onSelectPersona,
-  isServerOffline,
-  onStartServer,
+  isServerOffline: _isServerOffline,
+  onStartServer: _onStartServer,
 }) => {
   const { t, formatString } = useI18n();
   const { showToast } = useToast();
+
+  // Dynamic personal workspace path
+  const [jarvisWorkspacePath, setJarvisWorkspacePath] = useState<string>('');
 
   // Personal workspace state
   const [workspaceTree, setWorkspaceTree] = useState<FileNode[]>([]);
@@ -101,49 +102,68 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
     },
   ];
 
+  // Resolve dynamic Jarvis workspace path on mount
+  useEffect(() => {
+    let isMounted = true;
+    api.get_jarvis_workspace()
+      .then((res) => {
+        if (isMounted && res.workspaceDir) {
+          setJarvisWorkspacePath(res.workspaceDir);
+        }
+      })
+      .catch((err) => console.error('Failed to get jarvis workspace path:', err));
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Load Jarvis Workspace Tree
-  const loadJarvisFiles = async () => {
+  const loadJarvisFiles = useCallback(async (targetPath?: string) => {
+    const wsPath = targetPath || jarvisWorkspacePath;
+    if (!wsPath) return;
     setIsLoadingFiles(true);
     try {
-      const tree = await api.get_workspace_tree(JARVIS_WORKSPACE_PATH);
+      const tree = await api.get_workspace_tree(wsPath);
       setWorkspaceTree(tree);
     } catch (err) {
       console.error('Failed to load Jarvis workspace tree:', err);
     } finally {
       setIsLoadingFiles(false);
     }
-  };
+  }, [jarvisWorkspacePath]);
 
-  // Ensure Sanctuary session and persona are active
+  // Ensure Sanctuary session, persona and files are active once workspace path is known
   useEffect(() => {
     // 1. Activate jarvis_companion persona if not active
     if (activePersonaId !== 'jarvis_companion') {
-      const p = personas.find((item) => item.id === 'jarvis_companion');
+      const p = personas.find((item: PersonaMetadata) => item.id === 'jarvis_companion');
       if (p) {
         onSelectPersona('jarvis_companion');
       }
     }
 
+    if (!jarvisWorkspacePath) return;
+
     // 2. Load workspace files
-    loadJarvisFiles();
+    loadJarvisFiles(jarvisWorkspacePath);
 
     // 3. Find or create sanctuary session
     const isCurrentJarvisSession =
       currentSession &&
       currentSession.workspace_dir &&
-      currentSession.workspace_dir.toLowerCase() === JARVIS_WORKSPACE_PATH.toLowerCase();
+      currentSession.workspace_dir.toLowerCase() === jarvisWorkspacePath.toLowerCase();
 
     if (!isCurrentJarvisSession) {
       const existing = sessions.find(
-        (s) => s.workspace_dir && s.workspace_dir.toLowerCase() === JARVIS_WORKSPACE_PATH.toLowerCase()
+        (s: ChatSession) => s.workspace_dir && s.workspace_dir.toLowerCase() === jarvisWorkspacePath.toLowerCase()
       );
       if (existing) {
         onSelectSession(existing.id);
       } else {
-        onCreateSession('Jarvis: Personal Sanctuary', JARVIS_WORKSPACE_PATH);
+        onCreateSession('Jarvis: Personal Sanctuary', jarvisWorkspacePath);
       }
     }
-  }, []);
+  }, [jarvisWorkspacePath, activePersonaId, personas, currentSession, sessions, onSelectPersona, onSelectSession, onCreateSession, loadJarvisFiles]);
 
   const handleFileClick = async (filePath: string, fileName: string) => {
     try {
@@ -163,11 +183,12 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
 
   const handleCreateNewNote = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newNoteTitle.trim()) return;
+    if (!newNoteTitle.trim() || !jarvisWorkspacePath) return;
     try {
       const slug = newNoteTitle.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9а-яё\-]/gi, '');
       const noteFileName = `${slug || 'note'}.md`;
-      const notePath = `${JARVIS_WORKSPACE_PATH}\\notes\\${noteFileName}`;
+      const sep = jarvisWorkspacePath.includes('\\') ? '\\' : '/';
+      const notePath = `${jarvisWorkspacePath}${sep}notes${sep}${noteFileName}`;
       const initialText = `# ${newNoteTitle.trim()}\n\n*Created: ${new Date().toLocaleString()}*\n\n`;
 
       await api.write_file_raw(notePath, initialText);
@@ -207,7 +228,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onCreateSession('Jarvis: Personal Sanctuary', config?.workspace_dir || JARVIS_WORKSPACE_PATH)}
+            onClick={() => onCreateSession('Jarvis: Personal Sanctuary', jarvisWorkspacePath || config?.workspace_dir)}
             className="px-3 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm hover:opacity-90"
             title="Create new session in Jarvis workspace"
           >
@@ -233,7 +254,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
 
           <button
             type="button"
-            onClick={loadJarvisFiles}
+            onClick={() => { loadJarvisFiles(); }}
             disabled={isLoadingFiles}
             className="p-2 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-all cursor-pointer shadow-sm disabled:opacity-50"
             title={t.jarvis.refreshFiles}
@@ -416,13 +437,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
             onCancelAgent={onCancelAgent}
             onRollbackSession={onRollbackSession}
             reasoningEnabled={config?.reasoning_enabled !== false}
-            groqApiKey={config?.groq_api_key}
             liveTelemetry={liveTelemetry}
-            planningMode={config?.planning_mode !== false}
-            isServerOffline={isServerOffline}
-            onStartServer={onStartServer}
-            workspaceDir={JARVIS_WORKSPACE_PATH}
-            modelName={config?.model_name}
             config={config}
             personas={personas}
             activePersonaId="jarvis_companion"

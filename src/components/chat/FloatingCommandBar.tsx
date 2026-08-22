@@ -25,10 +25,9 @@ import {
   SlashMenuPopover,
   PermissionPopover,
   ReasoningPopover,
-  DEFAULT_SLASH_COMMANDS,
-  SlashCommandItem,
 } from './popovers';
 import { MobileMicHelpModal } from './MobileMicHelpModal';
+import { useSlashAutocomplete } from './useSlashAutocomplete';
 
 interface FloatingCommandBarProps {
   inputText: string;
@@ -48,7 +47,7 @@ interface FloatingCommandBarProps {
   onConfigChanged?: (newConfig: AppConfig) => void;
 }
 
-export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
+export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(({
   inputText,
   setInputText,
   onSubmit,
@@ -69,8 +68,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash' | 'permission' | 'reasoning'>('none');
   const [permissionPreset, setPermissionPreset] = useState<PermissionPreset>((config?.permission_preset as PermissionPreset) || 'prompt');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortLevel>((config?.reasoning_effort as ReasoningEffortLevel) || 'auto');
-  const [slashFilter, setSlashFilter] = useState('');
-  const [selectedSlashIndex, setSelectedSlashIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
   const [daemonVoiceState, setDaemonVoiceState] = useState<'idle' | 'recording' | 'processing' | 'stopped'>('idle');
   const [voicePhraseNotification, setVoicePhraseNotification] = useState<string | null>(null);
@@ -83,6 +80,27 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const inputTextRef = useRef(inputText);
+  inputTextRef.current = inputText;
+
+  const canSubmit = inputText.trim().length > 0 || attachedImages.length > 0;
+
+  const {
+    filteredSlashCommands,
+    selectedSlashIndex,
+    handleSelectSlash,
+    handleKeyDown,
+    handleFormSubmit,
+  } = useSlashAutocomplete({
+    inputText,
+    setInputText,
+    onTriggerSlashCommand,
+    textareaRef,
+    openMenu,
+    setOpenMenu,
+    onSubmit,
+    canSubmit,
+    setIsExpanded,
+  });
   inputTextRef.current = inputText;
 
   useEffect(() => {
@@ -356,72 +374,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   }, [inputText, isExpanded]);
 
   useEffect(() => {
-    if (inputText.startsWith('/')) {
-      setSlashFilter(inputText.slice(1).toLowerCase());
-      setOpenMenu('slash');
-      setSelectedSlashIndex(0);
-    } else if (openMenu === 'slash') {
-      setOpenMenu('none');
-    }
-  }, [inputText]);
-
-  useEffect(() => {
     const handleDocClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenu('none');
     };
     document.addEventListener('mousedown', handleDocClick);
     return () => document.removeEventListener('mousedown', handleDocClick);
   }, []);
-
-  const filteredSlashCommands = DEFAULT_SLASH_COMMANDS.filter(
-    (c) => c.cmd.toLowerCase().includes(slashFilter) || c.label.toLowerCase().includes(slashFilter)
-  );
-
-  const handleSelectSlash = (item: SlashCommandItem) => {
-    setInputText(`${item.cmd} `);
-    setOpenMenu('none');
-    onTriggerSlashCommand?.(item.cmd);
-    textareaRef.current?.focus();
-  };
-
-  const handleFormSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!canSubmit) return;
-    setIsExpanded(false);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = '34px';
-    }
-    onSubmit(e);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (openMenu === 'slash' && filteredSlashCommands.length > 0) {
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setSelectedSlashIndex((p) => (p + 1) % filteredSlashCommands.length);
-        return;
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setSelectedSlashIndex((p) => (p - 1 + filteredSlashCommands.length) % filteredSlashCommands.length);
-        return;
-      }
-      if (e.key === 'Enter' || e.key === 'Tab') {
-        e.preventDefault();
-        handleSelectSlash(filteredSlashCommands[selectedSlashIndex]);
-        return;
-      }
-    }
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      setOpenMenu('none');
-      return;
-    }
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleFormSubmit(e);
-    }
-  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -436,7 +394,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
   };
 
   const isBusy = agentStatus === 'thinking' || agentStatus === 'executing_tool';
-  const canSubmit = inputText.trim().length > 0 || attachedImages.length > 0;
 
   return (
     <div className="relative w-full max-w-3xl mx-auto select-none font-sans" ref={menuRef}>
@@ -620,7 +577,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
             <span className="text-[11px] hidden sm:inline font-semibold capitalize">{permissionPreset === 'workspace-write' ? 'project' : permissionPreset}</span>
           </button>
 
-          <button type="button" onClick={() => { setSlashFilter(''); setSelectedSlashIndex(0); setOpenMenu(openMenu === 'slash' ? 'none' : 'slash'); }} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'slash' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={t.chat.slashCommands}>
+          <button type="button" onClick={() => setOpenMenu(openMenu === 'slash' ? 'none' : 'slash')} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'slash' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={t.chat.slashCommands}>
             <Terminal size={13} />
             <span className="text-xs font-bold">/</span>
           </button>
@@ -630,4 +587,4 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = ({
       <MobileMicHelpModal isOpen={showMicHelpModal} onClose={() => setShowMicHelpModal(false)} />
     </div>
   );
-};
+});

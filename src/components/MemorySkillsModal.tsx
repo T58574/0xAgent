@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Brain, Sparkles, X, Plus, Trash2, Save, Search } from 'lucide-react';
 import { MemoryItem, SkillInfo } from '../types';
 import * as api from '../services/api';
@@ -28,6 +28,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
   const [skillContent, setSkillContent] = useState<string>('');
   const [isCreatingSkill, setIsCreatingSkill] = useState<boolean>(false);
   const [newSkillNameInput, setNewSkillNameInput] = useState<string>('');
+  const initialSkillContentRef = useRef<string>('');
 
   useEffect(() => {
     if (isOpen) {
@@ -47,6 +48,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
         setSelectedSkillName(skillList[0].name);
         const content = await api.get_skill_content(skillList[0].name);
         setSkillContent(content);
+        initialSkillContentRef.current = content;
       }
     } catch (err) {
       console.error('Failed to load memory or skills:', err);
@@ -76,11 +78,19 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
     }
   };
 
+  const isSkillDirty = Boolean(selectedSkillName && skillContent !== initialSkillContentRef.current);
+
   const handleSelectSkill = async (name: string) => {
+    if (name === selectedSkillName) return;
+    if (isSkillDirty) {
+      const confirmed = window.confirm(t.editor.unsavedChanges || 'Несохраненные изменения будут потеряны. Продолжить?');
+      if (!confirmed) return;
+    }
     setSelectedSkillName(name);
     try {
       const content = await api.get_skill_content(name);
       setSkillContent(content);
+      initialSkillContentRef.current = content;
     } catch (err) {
       console.error('Failed to read skill:', err);
     }
@@ -90,6 +100,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
     if (!selectedSkillName) return;
     try {
       await api.save_skill(selectedSkillName, skillContent);
+      initialSkillContentRef.current = skillContent;
       showToast(t.toasts.skillSaved, 'success');
       await loadData();
     } catch (err: any) {
@@ -120,6 +131,7 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
       if (selectedSkillName === name) {
         setSelectedSkillName('');
         setSkillContent('');
+        initialSkillContentRef.current = '';
       }
       await loadData();
       showToast(formatString(t.toasts.skillDeleted, { name }), 'success');
@@ -136,7 +148,11 @@ export const MemorySkillsModal: React.FC<MemorySkillsModalProps> = ({ isOpen, on
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 font-sans select-none animate-fadeIn">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 font-sans select-none animate-fadeIn"
+    >
       <div className="w-full max-w-4xl bento-card rounded-xl border border-[var(--theme-border)] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden text-[var(--theme-text)] bg-[var(--theme-panel)]">
         
         {/* Header Tabs */}

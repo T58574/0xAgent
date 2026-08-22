@@ -21,7 +21,7 @@ import {
   Menu,
   Plus,
 } from 'lucide-react';
-import { AppConfig, AppLanguage, ChatSession, PersonaMetadata } from '../types';
+import { AppConfig, AppLanguage, ChatSession } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useI18n } from '../i18n';
@@ -34,7 +34,6 @@ import {
 } from '../utils/helpers';
 
 interface NavbarProps {
-  sidebarOpen?: boolean;
   onToggleSidebar?: () => void;
   activeView: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge';
   onChangeView: (view: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge') => void;
@@ -43,20 +42,15 @@ interface NavbarProps {
   workspaceDir?: string | null;
   onSelectWorkspace?: () => void;
   onUpdateSessionWorkspace?: (dir: string | null) => void;
-  currentPersona?: PersonaMetadata;
-  has0xAgentMd?: boolean;
   onToggleLogs?: () => void;
   isServerOffline?: boolean;
   onStartServer?: () => Promise<void>;
-  onModelChanged?: (newModelId: string) => void;
   onConfigChanged?: (newConfig: AppConfig) => void;
-  onOpenJarvis?: () => void;
   onNewChat?: () => void;
   onOpenMemorySkills?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({
-  sidebarOpen: _sidebarOpen,
+export const Navbar: React.FC<NavbarProps> = React.memo(({
   onToggleSidebar,
   activeView,
   onChangeView,
@@ -65,14 +59,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   workspaceDir,
   onSelectWorkspace,
   onUpdateSessionWorkspace,
-  currentPersona: _currentPersona,
-  has0xAgentMd: _has0xAgentMd = false,
   onToggleLogs,
   isServerOffline,
   onStartServer,
-  onModelChanged: _onModelChanged,
   onConfigChanged,
-  onOpenJarvis: _onOpenJarvis,
   onNewChat,
   onOpenMemorySkills,
 }) => {
@@ -145,7 +135,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       navigator.clipboard.writeText(textToCopy);
       setCopiedLog(true);
       showToast(
-        isAltOrShift ? t.nav.logsCopied : t.nav.logsCopied,
+        isAltOrShift ? t.nav.exportSessionJson : t.nav.logsCopied,
         'success'
       );
       setTimeout(() => setCopiedLog(false), 2000);
@@ -515,4 +505,4 @@ export const Navbar: React.FC<NavbarProps> = ({
 
     </header>
   );
-};
+});

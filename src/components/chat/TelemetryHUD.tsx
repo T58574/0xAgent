@@ -1,13 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { LiveTelemetry } from '../../types';
 import { MaterialIcon } from '../common/MaterialIcon';
 import { useI18n } from '../../i18n';
 
+const ASCII_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
 interface TelemetryHUDProps {
   liveTelemetry?: LiveTelemetry | null;
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
-  thinkingSeconds: number;
-  asciiFrame: string;
+  thinkingSeconds?: number;
+  asciiFrame?: string;
   showThinkingBanner?: boolean;
   onOpenCustomizations?: () => void;
 }
@@ -15,12 +17,38 @@ interface TelemetryHUDProps {
 export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
   liveTelemetry,
   agentStatus,
-  thinkingSeconds,
-  asciiFrame,
+  thinkingSeconds: externalThinkingSeconds,
+  asciiFrame: externalAsciiFrame,
   showThinkingBanner = false,
   onOpenCustomizations,
 }) => {
   const { t } = useI18n();
+  const [internalFrame, setInternalFrame] = useState(0);
+  const [internalSeconds, setInternalSeconds] = useState(0);
+
+  const isGenerating = agentStatus === 'thinking' || agentStatus === 'executing_tool';
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setInternalSeconds(0);
+      return;
+    }
+    const frameInterval = setInterval(() => {
+      setInternalFrame((prev) => (prev + 1) % ASCII_FRAMES.length);
+    }, 75);
+    const startTime = Date.now();
+    const secInterval = setInterval(() => {
+      setInternalSeconds((Date.now() - startTime) / 1000);
+    }, 100);
+
+    return () => {
+      clearInterval(frameInterval);
+      clearInterval(secInterval);
+    };
+  }, [isGenerating]);
+
+  const asciiFrame = externalAsciiFrame || ASCII_FRAMES[internalFrame];
+  const thinkingSeconds = externalThinkingSeconds !== undefined ? externalThinkingSeconds : internalSeconds;
 
   return (
     <>

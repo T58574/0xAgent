@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   FolderPlus,
   Folder,
@@ -42,7 +42,7 @@ interface SidebarProps {
   onChangeView?: (view: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge') => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({
+export const Sidebar: React.FC<SidebarProps> = React.memo(({
   isOpen,
   onToggleOpen,
   sessions,
@@ -75,43 +75,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const toggleGroup = (key: string) => {
+  const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
+  }, []);
 
   // Filter sessions
-  const filteredSessions = searchFilter.trim()
-    ? sessions.filter((s) => s.title.toLowerCase().includes(searchFilter.toLowerCase()))
-    : sessions;
+  const filteredSessions = useMemo(() => {
+    return searchFilter.trim()
+      ? sessions.filter((s) => s.title.toLowerCase().includes(searchFilter.toLowerCase()))
+      : sessions;
+  }, [sessions, searchFilter]);
 
   // Separate sessions into Project Folders, Auto-Workspaces, and Standalone
-  const projectWorkspaceDirsSet = new Set<string>();
-  if (workspaceDir && !isAutoWorkspace(workspaceDir)) {
-    projectWorkspaceDirsSet.add(workspaceDir);
-  }
-  sessions.forEach((s) => {
-    if (s.workspace_dir && !isAutoWorkspace(s.workspace_dir)) {
-      projectWorkspaceDirsSet.add(s.workspace_dir);
+  const projectWorkspaceDirs = useMemo(() => {
+    const projectWorkspaceDirsSet = new Set<string>();
+    if (workspaceDir && !isAutoWorkspace(workspaceDir)) {
+      projectWorkspaceDirsSet.add(workspaceDir);
     }
-  });
-  const projectWorkspaceDirs = Array.from(projectWorkspaceDirsSet);
+    sessions.forEach((s) => {
+      if (s.workspace_dir && !isAutoWorkspace(s.workspace_dir)) {
+        projectWorkspaceDirsSet.add(s.workspace_dir);
+      }
+    });
+    return Array.from(projectWorkspaceDirsSet);
+  }, [workspaceDir, sessions]);
 
-  const autoWorkspaceSessions = filteredSessions.filter((s) => s.workspace_dir && isAutoWorkspace(s.workspace_dir));
-  const standaloneSessions = filteredSessions.filter((s) => !s.workspace_dir);
+  const autoWorkspaceSessions = useMemo(() => {
+    return filteredSessions.filter((s) => s.workspace_dir && isAutoWorkspace(s.workspace_dir));
+  }, [filteredSessions]);
 
-  const handleSelectAndCloseOnMobile = (id: string) => {
+  const standaloneSessions = useMemo(() => {
+    return filteredSessions.filter((s) => !s.workspace_dir);
+  }, [filteredSessions]);
+
+  const handleSelectAndCloseOnMobile = useCallback((id: string) => {
     onSelectSession(id);
     if (window.innerWidth < 768) {
       onToggleOpen();
     }
-  };
+  }, [onSelectSession, onToggleOpen]);
 
-  const handleCreateAndCloseOnMobile = (title?: string, wsDir?: string | null) => {
+  const handleCreateAndCloseOnMobile = useCallback((title?: string, wsDir?: string | null) => {
     onCreateSession(title, wsDir);
     if (window.innerWidth < 768) {
       onToggleOpen();
     }
-  };
+  }, [onCreateSession, onToggleOpen]);
 
   if (!isOpen) return null;
 
@@ -580,7 +589,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </aside>
     </>
   );
-};
+});
 
 // Interactive Rising ASCII Particle Flow Canvas Component
 const AsciiParticleFlow: React.FC<{ isActive: boolean }> = ({ isActive }) => {

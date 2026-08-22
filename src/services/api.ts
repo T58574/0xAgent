@@ -23,7 +23,7 @@ export { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, l
 
 const API_BASE = '/api';
 
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
   const token = getStoredToken();
   const headers = new Headers(options.headers || {});
   if (token && !headers.has('Authorization')) {
@@ -33,20 +33,36 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers.set('Content-Type', 'application/json');
   }
 
-  const res = await fetch(`${API_BASE}${endpoint}`, { ...options, headers });
-  if (!res.ok) {
-    const errText = await res.text();
-    try {
-      const parsed = JSON.parse(errText);
-      if (parsed.error) throw new Error(parsed.error);
-    } catch (e: any) {
-      if (e.message && e.message !== errText && !e.message.startsWith('Unexpected token')) throw e;
-    }
-    throw new Error(errText);
+  const { timeoutMs = 60000, signal: callerSignal, ...fetchOptions } = options;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (callerSignal) {
+    callerSignal.addEventListener('abort', () => controller.abort());
   }
 
-  const text = await res.text();
-  return text ? JSON.parse(text) : (undefined as unknown as T);
+  try {
+    const res = await fetch(`${API_BASE}${endpoint}`, {
+      ...fetchOptions,
+      headers,
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      try {
+        const parsed = JSON.parse(errText);
+        if (parsed.error) throw new Error(parsed.error);
+      } catch (e: any) {
+        if (e.message && e.message !== errText && !e.message.startsWith('Unexpected token')) throw e;
+      }
+      throw new Error(errText);
+    }
+
+    const text = await res.text();
+    return text ? JSON.parse(text) : (undefined as unknown as T);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 const get = <T>(endpoint: string) => request<T>(endpoint);
@@ -273,6 +289,7 @@ export const save_knowledge_entry = (entry: {
 export const delete_knowledge_entry = (id: string) => del<void>(`/knowledge/${encodeURIComponent(id)}`);
 
 // Jarvis & Voice
+export const get_jarvis_workspace = () => get<{ workspaceDir: string }>('/jarvis/workspace');
 export const get_jarvis_state = () => get<JarvisState>('/jarvis/status');
 export const speak_text = (
   text: string,

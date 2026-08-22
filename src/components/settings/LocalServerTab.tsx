@@ -1,13 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Cpu, Folder, AlertTriangle, Zap, Activity, RefreshCw, HardDrive, Play, Square } from 'lucide-react';
-import { GgufMetadata, HardwareInfo, LocalModelItem } from '../../types';
-import * as api from '../../services/api';
-import { useToast } from '../../context/ToastContext';
+import React, { useRef } from 'react';
+import { Cpu, Folder, Zap, Activity, RefreshCw, HardDrive, Play, Square } from 'lucide-react';
 import { useI18n } from '../../i18n';
 import { LlamaInstallerSection } from './localServer/LlamaInstallerSection';
 import { InstalledVersionsSection } from './localServer/InstalledVersionsSection';
 import { ServerPerformanceParams } from './localServer/ServerPerformanceParams';
 import { ServerLogsConsole } from './localServer/ServerLogsConsole';
+import { CrashAdviserCard } from './localServer/CrashAdviserCard';
+import { useLocalServerProcess } from './localServer/useLocalServerProcess';
 
 interface LocalServerTabProps {
   exePath: string;
@@ -85,527 +84,126 @@ interface LocalServerTabProps {
   setApiUrl: (val: string) => void;
 }
 
-export const LocalServerTab: React.FC<LocalServerTabProps> = ({
-  exePath,
-  setExePath,
-  modelPath,
-  setModelPath,
-  host,
-  setHost,
-  port,
-  setPort,
-  ctxSize,
-  setCtxSize,
-  threads,
-  setThreads,
-  gpuLayers,
-  setGpuLayers,
-  temp,
-  setTemp,
-  batchSize,
-  setBatchSize,
-  ubatchSize,
-  setUbatchSize,
-  minP,
-  setMinP,
-  topK,
-  setTopK,
-  topP,
-  setTopP,
-  predict,
-  setPredict,
-  repeatPenalty,
-  setRepeatPenalty,
-  flashAttn,
-  setFlashAttn,
-  mmap,
-  setMmap,
-  mlock,
-  setMlock,
-  embedding,
-  setEmbedding,
-  contBatching,
-  setContBatching,
-  promptCache,
-  setPromptCache,
-  parallelSlots,
-  setParallelSlots,
-  cacheReuse,
-  setCacheReuse,
-  slotSavePath,
-  setSlotSavePath,
-  customArgs,
-  setCustomArgs,
-  specDraftModel,
-  setSpecDraftModel,
-  specType,
-  setSpecType,
-  specDraftNgl,
-  setSpecDraftNgl,
-  specDraftNMax,
-  setSpecDraftNMax,
-  specDraftPMin,
-  setSpecDraftPMin,
-  jinja,
-  setJinja,
-  reasoningPreserve,
-  setReasoningPreserve,
-  reasoningFormat,
-  setReasoningFormat,
-  serverStatus,
-  setServerStatus,
-  serverLogs,
-  setServerLogs,
-  serverLogsAutoScroll,
-  setServerLogsAutoScroll,
-  setApiUrl: _setApiUrl,
-}) => {
-  void _setApiUrl;
+export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) => {
+  const {
+    exePath,
+    setExePath,
+    modelPath,
+    setModelPath,
+    host,
+    setHost,
+    port,
+    setPort,
+    ctxSize,
+    setCtxSize,
+    threads,
+    setThreads,
+    gpuLayers,
+    setGpuLayers,
+    temp,
+    setTemp,
+    batchSize,
+    setBatchSize,
+    ubatchSize,
+    setUbatchSize,
+    minP,
+    setMinP,
+    topK,
+    setTopK,
+    topP,
+    setTopP,
+    predict,
+    setPredict,
+    repeatPenalty,
+    setRepeatPenalty,
+    flashAttn,
+    setFlashAttn,
+    mmap,
+    setMmap,
+    mlock,
+    setMlock,
+    embedding,
+    setEmbedding,
+    contBatching,
+    setContBatching,
+    promptCache,
+    setPromptCache,
+    parallelSlots,
+    setParallelSlots,
+    cacheReuse,
+    setCacheReuse,
+    slotSavePath,
+    setSlotSavePath,
+    customArgs,
+    setCustomArgs,
+    specDraftModel,
+    setSpecDraftModel,
+    specType,
+    setSpecType,
+    specDraftNgl,
+    setSpecDraftNgl,
+    specDraftNMax,
+    setSpecDraftNMax,
+    specDraftPMin,
+    setSpecDraftPMin,
+    jinja,
+    setJinja,
+    reasoningPreserve,
+    setReasoningPreserve,
+    reasoningFormat,
+    setReasoningFormat,
+    serverStatus,
+    serverLogs,
+    serverLogsAutoScroll,
+    setServerLogsAutoScroll,
+  } = props;
+
   const { t, formatString } = useI18n();
-  const { showToast } = useToast();
-  const [logFilePath, setLogFilePath] = useState<string>('');
-  const [isCopiedLogs, setIsCopiedLogs] = useState(false);
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  const [isInstallingLlama, setIsInstallingLlama] = useState(false);
-  const [githubReleases, setGithubReleases] = useState<any[]>([]);
-  const [selectedTag, setSelectedTag] = useState<string>('');
-  const [selectedAssetUrl, setSelectedAssetUrl] = useState<string>('');
-  const [selectedAssetName, setSelectedAssetName] = useState<string>('');
-  const [installedVersions, setInstalledVersions] = useState<{ tag: string; exePath: string; isCurrent: boolean }[]>([]);
-  const [isLoadingReleases, setIsLoadingReleases] = useState(false);
-
-  // Auto cleanup & Download animation states
-  const [autoCleanupOld, setAutoCleanupOld] = useState(true);
-  const [justDownloadedTag, setJustDownloadedTag] = useState<string | null>(null);
-  const [isCleaningOld, setIsCleaningOld] = useState(false);
-  const [deletingTag, setDeletingTag] = useState<string | null>(null);
-
-  // Metadata, Hardware, Slots, Modal, Adviser, Scanned Models
-  const [modelMeta, setModelMeta] = useState<GgufMetadata | null>(null);
-  const [hardwareInfo, setHardwareInfo] = useState<HardwareInfo | null>(null);
-  const [healthStatus, setHealthStatus] = useState<'ok' | 'loading' | 'stopped'>('stopped');
-  const [slotMetrics, setSlotMetrics] = useState<{ totalSlots: number; activeSlots: number }>({ totalSlots: 0, activeSlots: 0 });
-  const [crashAdvice, setCrashAdvice] = useState<string | null>(null);
-  const [scannedLocalModels, setScannedLocalModels] = useState<LocalModelItem[]>([]);
-
-  const refreshScannedModels = async () => {
-    try {
-      const res = await api.get_available_models();
-      if (res && res.local) {
-        setScannedLocalModels(res.local);
-      }
-    } catch (err) {
-      console.error('Failed to scan local models:', err);
-    }
-  };
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setIsLoadingReleases(true);
-        const [releases, installed, hw, statusInfo, serverLogsInfo, availableModels] = await Promise.all([
-          api.get_llama_releases().catch(() => []),
-          api.get_installed_llama_versions().catch(() => []),
-          api.detect_hardware().catch(() => null),
-          api.get_server_status().catch(() => null),
-          api.get_server_logs().catch(() => null),
-          api.get_available_models().catch(() => null),
-        ]);
-
-        setGithubReleases(releases);
-        setInstalledVersions(installed);
-        setHardwareInfo(hw);
-        if (availableModels && availableModels.local) {
-          setScannedLocalModels(availableModels.local);
-        }
-
-        if (serverLogsInfo) {
-          if (serverLogsInfo.logs && serverLogsInfo.logs.length > 0) {
-            setServerLogs(serverLogsInfo.logs);
-          }
-          if (serverLogsInfo.logFilePath) {
-            setLogFilePath(serverLogsInfo.logFilePath);
-          }
-        }
-
-        if (statusInfo && statusInfo.running) {
-          setServerStatus('running');
-        } else if (serverLogsInfo && serverLogsInfo.running) {
-          setServerStatus('running');
-        } else {
-          setServerStatus('stopped');
-        }
-
-        if (releases.length > 0) {
-          const first = releases[0];
-          setSelectedTag(first.tag);
-          if (first.assets && first.assets.length > 0) {
-            let prefAsset = null;
-            if (hw?.recommendedAssetKeywords) {
-              for (const kw of hw.recommendedAssetKeywords) {
-                prefAsset = first.assets.find((a: any) => a.name.includes(kw));
-                if (prefAsset) break;
-              }
-            }
-            if (!prefAsset) prefAsset = first.assets[0];
-            setSelectedAssetUrl(prefAsset.download_url);
-            setSelectedAssetName(prefAsset.name);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load Llama data:', err);
-      } finally {
-        setIsLoadingReleases(false);
-      }
-    }
-    loadData();
-  }, []);
-
-  // Parse GGUF Metadata whenever modelPath changes
-  useEffect(() => {
-    if (modelPath && modelPath.trim().length > 0) {
-      api.parse_gguf(modelPath.trim())
-        .then((meta) => setModelMeta(meta))
-        .catch(() => setModelMeta(null));
-    } else {
-      setModelMeta(null);
-    }
-  }, [modelPath]);
-
-  // Health & Slots Polling Timer
-  useEffect(() => {
-    let timer: any = null;
-    if (serverStatus === 'running') {
-      timer = setInterval(async () => {
-        try {
-          const h = await api.get_server_health(host, port);
-          setHealthStatus(h.status === 'ok' || h.status === 'loading' ? h.status : 'stopped');
-          if (h.ok) {
-            const s = await api.get_server_slots(host, port);
-            setSlotMetrics({ totalSlots: s.totalSlots, activeSlots: s.activeSlots });
-          }
-        } catch {}
-      }, 2000);
-    } else {
-      setHealthStatus('stopped');
-      setSlotMetrics({ totalSlots: 0, activeSlots: 0 });
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [serverStatus, host, port]);
-
-  // Log Inspection Crash Adviser
-  useEffect(() => {
-    const logsStr = serverLogs.join('\n');
-    if (logsStr.includes('check_tensor_dims: tensor \'output.weight\'')) {
-      setCrashAdvice('Советчик: Драфт-модель имеет несовпадающий размер словаря. Для официального llama.cpp используйте совместимые драфт-модели с полным словарем (например, Qwen3.8-0.5B/1.5B) либо отключите спекулятивное декодирование.');
-    } else if (logsStr.includes('pinned memory') || logsStr.includes('CUDA error') || logsStr.includes('out of memory')) {
-      if (!mmap) {
-        setCrashAdvice('Советчик: Падение вызвано опцией --no-mmap. Включите Mmap обратно или уменьшите число GPU слоев.');
-      } else {
-        setCrashAdvice('Советчик: Падение вызвано нехваткой VRAM. Уменьшите количество GPU слоев (-ngl) или размер контекста (-c).');
-      }
-    } else {
-      setCrashAdvice(null);
-    }
-  }, [serverLogs, mmap]);
-
-  const handleTagChange = (tag: string) => {
-    setSelectedTag(tag);
-    const rel = githubReleases.find((r) => r.tag === tag);
-    if (rel && rel.assets && rel.assets.length > 0) {
-      let prefAsset = null;
-      if (hardwareInfo?.recommendedAssetKeywords) {
-        for (const kw of hardwareInfo.recommendedAssetKeywords) {
-          prefAsset = rel.assets.find((a: any) => a.name.includes(kw));
-          if (prefAsset) break;
-        }
-      }
-      if (!prefAsset) prefAsset = rel.assets[0];
-      setSelectedAssetUrl(prefAsset.download_url);
-      setSelectedAssetName(prefAsset.name);
-    }
-  };
-
-  const refreshInstalledVersions = async () => {
-    try {
-      const list = await api.get_installed_llama_versions();
-      setInstalledVersions(list);
-      return list;
-    } catch (err) {
-      console.error('Failed to refresh installed versions:', err);
-      return [];
-    }
-  };
-
-  const handleSelectExe = async () => {
-    try {
-      const file = await api.select_file_native("Executable Files (*.exe)|*.exe|All Files (*.*)|*.*");
-      if (file) setExePath(file);
-    } catch (err) {
-      console.error('Failed to select file:', err);
-    }
-  };
-
-  const handleSelectModel = async () => {
-    try {
-      const file = await api.select_file_native("GGUF Model Files (*.gguf)|*.gguf|All Files (*.*)|*.*");
-      if (file) setModelPath(file);
-    } catch (err) {
-      console.error('Failed to select GGUF model:', err);
-    }
-  };
-
-  const handleSelectDraftModel = async () => {
-    try {
-      const file = await api.select_file_native("GGUF Draft/MTP Files (*.gguf)|*.gguf|All Files (*.*)|*.*");
-      if (file) setSpecDraftModel(file);
-    } catch (err) {
-      console.error('Failed to select Draft/MTP model:', err);
-    }
-  };
-
-  const handleSelectSlotSavePath = async () => {
-    try {
-      const folder = await api.select_workspace();
-      if (folder) setSlotSavePath(folder);
-    } catch (err) {
-      console.error('Failed to select slot save folder:', err);
-    }
-  };
-
-  const handleInstallSelectedLlamaVersion = async () => {
-    if (!selectedTag) return;
-    setIsInstallingLlama(true);
-    setJustDownloadedTag(null);
-    try {
-      const res = await api.install_llama_version(selectedTag, selectedAssetUrl, selectedAssetName, autoCleanupOld);
-      setExePath(res.exePath);
-      await refreshInstalledVersions();
-      setJustDownloadedTag(selectedTag);
-      showToast(res.message || `Llama.cpp (${selectedTag}) успешно установлен!`, 'success');
-      setTimeout(() => {
-        setJustDownloadedTag((prev) => (prev === selectedTag ? null : prev));
-      }, 6000);
-    } catch (err: any) {
-      showToast(`Ошибка установки: ${err.message || err}`, 'error');
-    } finally {
-      setIsInstallingLlama(false);
-    }
-  };
-
-  const handleSelectInstalledVersion = async (vExePath: string) => {
-    try {
-      const res = await api.select_installed_llama(vExePath);
-      setExePath(res.exePath);
-      await refreshInstalledVersions();
-      showToast(res.message || 'Активная версия переключена!', 'success');
-    } catch (err: any) {
-      showToast(`Ошибка переключения: ${err.message || err}`, 'error');
-    }
-  };
-
-  const handleDeleteInstalledVersion = async (tag: string, vExePath: string) => {
-    setDeletingTag(tag);
-    try {
-      const res = await api.delete_installed_llama(tag, vExePath);
-      const updated = await refreshInstalledVersions();
-      if (exePath.toLowerCase() === vExePath.toLowerCase()) {
-        if (updated.length > 0) {
-          setExePath(updated[0].exePath);
-        } else {
-          setExePath('');
-        }
-      }
-      showToast(res.message || `Сборка ${tag} удалена!`, 'success');
-    } catch (err: any) {
-      showToast(`Ошибка удаления: ${err.message || err}`, 'error');
-    } finally {
-      setDeletingTag(null);
-    }
-  };
-
-  const handleCleanupOldVersions = async () => {
-    setIsCleaningOld(true);
-    try {
-      const res = await api.cleanup_old_llama_versions(selectedTag);
-      await refreshInstalledVersions();
-      showToast(res.message, res.removedCount > 0 ? 'success' : 'info');
-    } catch (err: any) {
-      showToast(`Ошибка очистки: ${err.message || err}`, 'error');
-    } finally {
-      setIsCleaningOld(false);
-    }
-  };
-
-  useEffect(() => {
-    const un1 = api.listen<string>('llama-server-log', (data) => {
-      setServerLogs((prev) => [...prev, data.payload]);
-    });
-
-    const un2 = api.listen<{ status: string; error?: string }>('llama-server-status', (data) => {
-      if (data.payload.status === 'running') {
-        setServerStatus('running');
-      } else if (data.payload.status === 'stopped') {
-        setServerStatus('stopped');
-        setHealthStatus('stopped');
-      }
-    });
-
-    return () => {
-      un1();
-      un2();
-    };
-  }, []);
-
-  const handleClearLogs = () => {
-    setServerLogs([]);
-  };
-
-  const handleDownloadLogs = () => {
-    const text = serverLogs.join('\n');
-    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'llama-server.log';
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleCopyLogs = () => {
-    navigator.clipboard.writeText(serverLogs.join('\n'));
-    setIsCopiedLogs(true);
-    setTimeout(() => setIsCopiedLogs(false), 2000);
-  };
-
-  const handleApplyFastPreset = () => {
-    setGpuLayers(99);
-    setThreads(0);
-    setBatchSize(2048);
-    setUbatchSize(512);
-    setFlashAttn(true);
-    setParallelSlots(1);
-    setCacheReuse(256);
-    setCtxSize(16384);
-    setCustomArgs('-ctk q8_0 -ctv q8_0');
-    showToast(t.settings.localServer.fastPresetApplied, 'success');
-  };
-
-  const handleApplyFastMtpPreset = () => {
-    setSpecType('default');
-    setSpecDraftNMax(3);
-    setSpecDraftNgl(99);
-    setSpecDraftPMin(0);
-    setJinja(true);
-    setReasoningPreserve(true);
-    setReasoningFormat('deepseek');
-    setGpuLayers(99);
-    setThreads(0);
-    setBatchSize(2048);
-    setUbatchSize(512);
-    setFlashAttn(true);
-    setTopK(20);
-    setTopP(0.95);
-    setTemp(1.0);
-    setMinP(0.05);
-    setRepeatPenalty(1.0);
-    setParallelSlots(1);
-    setCtxSize(32768);
-
-    // Auto-locate draft model if present in scanned models
-    const draftModel = scannedLocalModels.find((m) => m.isDraft || /qwen3.*draft|draft.*qwen3/i.test(m.fileName));
-    if (draftModel) {
-      setSpecDraftModel(draftModel.filePath);
-    }
-    showToast(t.settings.localServer.fastMtpPresetApplied, 'success');
-  };
-
-  const [isActionLoading, setIsActionLoading] = useState(false);
-
-  const handleStartLocalServer = async () => {
-    if (!modelPath) {
-      showToast(t.settings.localServer.selectGgufToStart, 'error');
-      return;
-    }
-    setIsActionLoading(true);
-    try {
-      const res = await api.start_local_server({
-        exePath,
-        modelPath,
-        host,
-        port,
-        ctxSize,
-        threads,
-        gpuLayers,
-        temp,
-        batchSize,
-        ubatchSize,
-        minP,
-        topK,
-        topP,
-        predict,
-        repeatPenalty,
-        flashAttn,
-        mmap,
-        mlock,
-        embedding,
-        contBatching,
-        promptCache,
-        parallelSlots,
-        cacheReuse,
-        slotSavePath,
-        customArgs,
-        specDraftModel,
-        specType,
-        specDraftNgl,
-        specDraftNMax,
-        specDraftPMin,
-        jinja,
-        reasoningPreserve,
-        reasoningFormat,
-      });
-      if (res && res.success) {
-        setServerStatus('running');
-        showToast(t.settings.localServer.serverStartedSuccess, 'success');
-      } else {
-        showToast((res && res.message) || 'Server start failed', 'error');
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Failed to start server', 'error');
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleStopLocalServer = async () => {
-    setIsActionLoading(true);
-    try {
-      await api.stop_local_server();
-      setServerStatus('stopped');
-      showToast(t.settings.localServer.serverStoppedSuccess, 'info');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to stop server', 'error');
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleRestartLocalServer = async () => {
-    setIsActionLoading(true);
-    try {
-      await api.stop_local_server();
-      await new Promise((r) => setTimeout(r, 600));
-      await handleStartLocalServer();
-    } catch (err: any) {
-      showToast(err.message || 'Failed to restart server', 'error');
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
+  const {
+    logFilePath,
+    isCopiedLogs,
+    isInstallingLlama,
+    githubReleases,
+    selectedTag,
+    selectedAssetUrl,
+    setSelectedAssetUrl,
+    setSelectedAssetName,
+    installedVersions,
+    isLoadingReleases,
+    autoCleanupOld,
+    setAutoCleanupOld,
+    justDownloadedTag,
+    isCleaningOld,
+    deletingTag,
+    modelMeta,
+    hardwareInfo,
+    healthStatus,
+    slotMetrics,
+    crashAdvice,
+    scannedLocalModels,
+    isActionLoading,
+    refreshScannedModels,
+    handleTagChange,
+    handleSelectExe,
+    handleSelectModel,
+    handleSelectDraftModel,
+    handleSelectSlotSavePath,
+    handleInstallSelectedLlamaVersion,
+    handleSelectInstalledVersion,
+    handleDeleteInstalledVersion,
+    handleCleanupOldVersions,
+    handleClearLogs,
+    handleDownloadLogs,
+    handleCopyLogs,
+    handleApplyFastPreset,
+    handleApplyFastMtpPreset,
+    handleStartLocalServer,
+    handleStopLocalServer,
+    handleRestartLocalServer,
+  } = useLocalServerProcess(props);
 
   const isSelectedVersionInstalled = installedVersions.some(
     (v) => v.tag.toLowerCase() === selectedTag.toLowerCase()
@@ -644,12 +242,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       </div>
 
       {/* Crash Advisory Alert Box */}
-      {crashAdvice && (
-        <div className="p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 text-xs flex items-start gap-2.5 animate-fadeIn">
-          <AlertTriangle size={16} className="shrink-0 mt-0.5 text-amber-500" />
-          <span className="text-[var(--theme-text)] font-medium leading-relaxed">{crashAdvice}</span>
-        </div>
-      )}
+      <CrashAdviserCard crashAdvice={crashAdvice} />
 
       {/* MAIN 2-COLUMN GRID LAYOUT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
@@ -989,4 +582,4 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = ({
       </div>
     </div>
   );
-};
+});

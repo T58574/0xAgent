@@ -1,7 +1,8 @@
 import { Router } from 'express';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { loadConfig, saveConfig } from '../config';
+import { loadConfig, saveConfig, getAppDir } from '../config';
 import {
   listSessions,
   loadSession,
@@ -31,6 +32,19 @@ import {
 } from '../agent/selfPatchEngine';
 
 export const workspaceRouter = Router();
+
+// Dynamic Jarvis workspace directory endpoint (cross-platform, user-agnostic)
+workspaceRouter.get('/jarvis/workspace', (_req, res) => {
+  try {
+    const jarvisDir = path.join(getAppDir(), 'workspaces', 'Jarvis');
+    if (!fs.existsSync(jarvisDir)) {
+      fs.mkdirSync(jarvisDir, { recursive: true });
+    }
+    res.json({ workspaceDir: jarvisDir });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // Auto workspace generator (Antigravity-like ephemeral/isolated sandbox workspaces)
 workspaceRouter.post('/workspaces/create-auto', async (_req, res) => {

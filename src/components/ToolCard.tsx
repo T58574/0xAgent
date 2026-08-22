@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { ToolCallInfo } from '../types';
 import { MaterialIcon } from './common/MaterialIcon';
 import { useI18n } from '../i18n';
@@ -70,30 +70,49 @@ function getFileTypeBadge(filePath: string): { label: string; color: string } {
   }
 }
 
-export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileInEditor }) => {
+export const ToolCard: React.FC<ToolCardProps> = React.memo(({ tool, onRespond, onOpenFileInEditor }) => {
   const { language, t } = useI18n();
   const [showDetails, setShowDetails] = useState(false);
   const [diffViewMode, setDiffViewMode] = useState<'unified' | 'split'>('unified');
   const [customAnswer, setCustomAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (submitTimerRef.current) clearTimeout(submitTimerRef.current);
+    };
+  }, []);
+
+  // Auto-reset isSubmitting when tool status changes from pending
+  useEffect(() => {
+    if (tool.status !== 'pending' && isSubmitting) {
+      setIsSubmitting(false);
+    }
+  }, [tool.status, isSubmitting]);
 
   const handleAction = (value: boolean | string) => {
     setIsSubmitting(true);
+    if (submitTimerRef.current) clearTimeout(submitTimerRef.current);
+    submitTimerRef.current = setTimeout(() => {
+      setIsSubmitting(false);
+    }, 10000);
     onRespond(tool.id, value);
   };
 
-  let parsedArgs: Record<string, any> = {};
-  try {
-    parsedArgs = JSON.parse(tool.arguments);
-  } catch (e) {
-    parsedArgs = { raw: tool.arguments };
-  }
+  const parsedArgs = useMemo<Record<string, any>>(() => {
+    try {
+      return JSON.parse(tool.arguments);
+    } catch {
+      return { raw: tool.arguments };
+    }
+  }, [tool.arguments]);
 
   const filePath = parsedArgs.path || '';
-  const fileBadge = getFileTypeBadge(filePath);
-  const diffStats = calculateDiffStats(tool.name, parsedArgs);
+  const fileBadge = useMemo(() => getFileTypeBadge(filePath), [filePath]);
+  const diffStats = useMemo(() => calculateDiffStats(tool.name, parsedArgs), [tool.name, parsedArgs]);
 
-  const getStatusInfo = () => {
+  const statusInfo = useMemo(() => {
     switch (tool.status) {
       case 'completed':
         return { label: t.tools.statusSuccess, color: 'text-emerald-400 border-emerald-500/30 bg-emerald-500/10', iconName: 'check_circle' };
@@ -108,9 +127,7 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
       default:
         return { label: tool.status.toUpperCase(), color: 'text-theme-muted border-theme-border bg-white/5', iconName: 'info' };
     }
-  };
-
-  const statusInfo = getStatusInfo();
+  }, [tool.status, t.tools]);
 
   const renderPatchDiffFormatted = (patchText: string) => {
     if (!patchText) return null;
@@ -477,4 +494,4 @@ export const ToolCard: React.FC<ToolCardProps> = ({ tool, onRespond, onOpenFileI
       )}
     </div>
   );
-};
+});

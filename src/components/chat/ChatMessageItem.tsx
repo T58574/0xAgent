@@ -23,7 +23,7 @@ interface ChatMessageItemProps {
   reasoningEnabled?: boolean;
   isLastAssistantMessage?: boolean;
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
-  thinkingSeconds: number;
+  thinkingSeconds?: number;
   liveTelemetry?: LiveTelemetry | null;
   onRespondToTool: (toolId: string, approve: boolean | string) => void;
   onRollbackSession?: (targetMessageId: string, mode: 'to_user_edit' | 'to_assistant') => Promise<string>;

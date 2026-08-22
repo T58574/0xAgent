@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -26,8 +26,14 @@ export const useToast = (): ToastContextType => {
 
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   const removeToast = useCallback((id: string) => {
+    const existingTimer = timersRef.current.get(id);
+    if (existingTimer) {
+      clearTimeout(existingTimer);
+      timersRef.current.delete(id);
+    }
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
@@ -36,17 +42,32 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setToasts((prev) => [...prev, { id, message, type, duration }]);
 
     if (duration > 0) {
-      setTimeout(() => {
+      const timer = setTimeout(() => {
+        timersRef.current.delete(id);
         removeToast(id);
       }, duration);
+      timersRef.current.set(id, timer);
     }
   }, [removeToast]);
+
+  // Clean up any remaining timers on unmount
+  useEffect(() => {
+    const activeTimers = timersRef.current;
+    return () => {
+      activeTimers.forEach((timer) => clearTimeout(timer));
+      activeTimers.clear();
+    };
+  }, []);
 
   return (
     <ToastContext.Provider value={{ showToast, removeToast }}>
       {children}
       {/* Floating Toasts Container */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3 font-mono">
+      <div
+        role="status"
+        aria-live="polite"
+        className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-3 font-mono"
+      >
         {toasts.map((toast) => {
           let badgeText = '[INFO]';
           let badgeClass = 'text-[var(--theme-text-muted)] bg-white/5 border-[var(--theme-border)]';
