@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Autonomous AI Coding Agent & Web-IDE platform powered by local llama.cpp and hybrid cloud LLMs",
   "type": "module",
+  "bin": {
+    "0xagent": "./bin/0xagent.js"
+  },
   "license": "MIT",
   "author": "T58574",
   "engines": {
