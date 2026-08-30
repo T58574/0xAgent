@@ -21,11 +21,12 @@ import {
   Menu,
   Plus,
 } from 'lucide-react';
-import { AppConfig, AppLanguage, ChatSession } from '../types';
+import { AppConfig, AppLanguage, ChatSession, LiveTelemetry } from '../types';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useI18n } from '../i18n';
 import { MaterialIcon } from './common/MaterialIcon';
+import { ContextBudgetGauge } from './chat/ContextBudgetGauge';
 import {
   getWorkspaceBaseName,
   isAutoWorkspace,
@@ -48,6 +49,7 @@ interface NavbarProps {
   onConfigChanged?: (newConfig: AppConfig) => void;
   onNewChat?: () => void;
   onOpenMemorySkills?: () => void;
+  liveTelemetry?: LiveTelemetry | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = React.memo(({
@@ -65,6 +67,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
   onConfigChanged,
   onNewChat,
   onOpenMemorySkills,
+  liveTelemetry,
 }) => {
   const { showToast } = useToast();
   const { language, setLanguage, t } = useI18n();
@@ -384,6 +387,12 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
             <span className="hidden xl:inline">{t.nav.startServer}</span>
           </button>
         )}
+
+        {/* Real-time Context Budget Gauge & Breakdown */}
+        <ContextBudgetGauge
+          liveTelemetry={liveTelemetry}
+          config={config}
+        />
 
         {/* Voice Intercom Quick Trigger */}
         {config?.tts_config?.enabled && (

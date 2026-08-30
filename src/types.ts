@@ -252,6 +252,23 @@ export interface MessageMetrics {
   vramTotalMB?: number;
   promptCacheHit?: boolean;
   modelName?: string;
+  contextBreakdown?: ContextBreakdown;
+}
+
+export interface ContextBreakdown {
+  systemTokens?: number;
+  historyTokens?: number;
+  memoryTokens?: number;
+  toolsTokens?: number;
+  freeTokens?: number;
+  compactionTier?: number; // 0 (Raw), 1 (Pruned), 2 (Summarized), 3 (Emergency)
+}
+
+export interface QuickResponseOption {
+  id?: string;
+  key?: string;
+  label: string;
+  action: string;
 }
 
 export interface LiveTelemetry {
@@ -265,6 +282,7 @@ export interface LiveTelemetry {
   vramTotalMB?: number;
   promptCacheHit?: boolean;
   modelName?: string;
+  contextBreakdown?: ContextBreakdown;
 }
 
 export interface ChatMessage {

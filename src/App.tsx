@@ -386,6 +386,7 @@ export default function App() {
         onConfigChanged={(updated) => setConfig(updated)}
         onNewChat={() => handleCreateSession('Новый диалог', 'auto')}
         onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
+        liveTelemetry={liveTelemetry}
       />
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}

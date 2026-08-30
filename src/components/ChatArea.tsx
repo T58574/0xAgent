@@ -8,7 +8,7 @@ import {
   JarvisSparkProposal,
   ChatSession,
 } from '../types';
-import { isSameDay } from '../utils/helpers';
+import { isSameDay, extractQuickResponses } from '../utils/helpers';
 import { FloatingCommandBar } from './chat/FloatingCommandBar';
 import { ChatTimelineScrubber } from './chat/ChatTimelineScrubber';
 import { JarvisSparkCard } from './chat/JarvisSparkCard';
@@ -288,6 +288,26 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
 
   const hasMessages = visibleMessages.length > 0;
 
+  const handleQuickAction = (actionText: string) => {
+    if (!actionText.trim() || agentStatus !== 'idle') return;
+    sounds.playSend();
+    onSendMessage(actionText);
+  };
+
+  const lastAssistantMessage = React.useMemo(() => {
+    for (let i = visibleMessages.length - 1; i >= 0; i--) {
+      if (visibleMessages[i].role === 'assistant') return visibleMessages[i];
+    }
+    return null;
+  }, [visibleMessages]);
+
+  const isLastMessageAssistant = visibleMessages.length > 0 && visibleMessages[visibleMessages.length - 1].role === 'assistant';
+
+  const quickResponseOptions = React.useMemo(() => {
+    if (!lastAssistantMessage?.content) return [];
+    return extractQuickResponses(lastAssistantMessage.content).options;
+  }, [lastAssistantMessage?.content]);
+
   return (
     <div
       onDragOver={handleDragOver}
@@ -452,6 +472,9 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
               config={config}
               onModelChanged={onModelChanged}
               onConfigChanged={onConfigChanged}
+              quickResponses={quickResponseOptions}
+              onSelectQuickResponse={handleQuickAction}
+              isLastMessageAssistant={isLastMessageAssistant}
             />
           </div>
         </div>

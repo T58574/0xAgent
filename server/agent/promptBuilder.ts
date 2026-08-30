@@ -72,12 +72,20 @@ ${activePersona.user}
 1. Final responses to the user, explanations, and conversational dialogue must ALWAYS be delivered in the user's language (default: Russian). Speak naturally, clearly, and concisely.
 2. Program code, file paths, terminal commands, library names, variable and type names are strictly in English.`;
 
+  const quickResponseDirective = `\n\n# QUICK RESPONSES & CONVERSATIONAL CHOICES
+When proposing choices, logical next steps, or asking for direction at the end of your response, you may optionally include a <quick_response> block with 2-4 concise options so the user can reply in 1 click:
+<quick_response>
+  <option key="1" label="Короткое название" action="Полная реплика пользователя для отправки" />
+  <option key="2" label="Другой вариант" action="Альтернативная реплика" />
+</quick_response>`;
+
   const unifiedToolsContext = getUnifiedToolsContext();
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
 
   // Cacheable Stable Prefix
   const stablePrefix =
     languageProtocolDirective +
+    quickResponseDirective +
     toolExecutionDirective +
     unifiedToolsContext +
     gemmaToolDirective +

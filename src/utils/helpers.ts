@@ -1,3 +1,5 @@
+import { QuickResponseOption } from '../types';
+
 // List of zoomer IT developer slang statuses
 export const ZOOMER_STATUSES = [
   "lowkey cooking fr fr...",
@@ -20,6 +22,72 @@ export const ZOOMER_STATUSES = [
 export function getRandomZoomerStatus(): string {
   const idx = Math.floor(Math.random() * ZOOMER_STATUSES.length);
   return ZOOMER_STATUSES[idx];
+}
+
+/**
+ * Extracts <quick_response> options from assistant content and returns cleaned text and options
+ */
+export function extractQuickResponses(content: string): { cleanText: string; options: QuickResponseOption[] } {
+  if (!content) return { cleanText: '', options: [] };
+
+  const options: QuickResponseOption[] = [];
+  const quickRegex = /<quick_responses?>([\s\S]*?)(?:<\/quick_responses?>|$)/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = quickRegex.exec(content)) !== null) {
+    const inner = match[1] || '';
+    
+    // 1. Try parsing XML <option ...> tags
+    const optionTagRegex = /<option\s+([^>]+?)(?:\/>|>([\s\S]*?)<\/option>)/gi;
+    let optMatch: RegExpExecArray | null;
+    let foundTags = false;
+
+    while ((optMatch = optionTagRegex.exec(inner)) !== null) {
+      foundTags = true;
+      const attrsStr = optMatch[1] || '';
+      const body = (optMatch[2] || '').trim();
+
+      const labelMatch = attrsStr.match(/label=["']([^"']+)["']/i);
+      const actionMatch = attrsStr.match(/action=["']([^"']+)["']/i);
+      const keyMatch = attrsStr.match(/key=["']([^"']+)["']/i);
+      const idMatch = attrsStr.match(/id=["']([^"']+)["']/i);
+
+      const label = labelMatch ? labelMatch[1] : (body || 'Option');
+      const action = actionMatch ? actionMatch[1] : (body || label);
+      const key = keyMatch ? keyMatch[1] : String(options.length + 1);
+      const id = idMatch ? idMatch[1] : `opt_${options.length + 1}`;
+
+      if (label) {
+        options.push({ id, key, label, action });
+      }
+    }
+
+    // 2. If no <option> tags, try pipe/line separated list (e.g., "Option 1 | Option 2" or "1. Option 1\n2. Option 2")
+    if (!foundTags && inner.trim()) {
+      const lines = inner.split(/[\n|]/).map(s => s.trim()).filter(Boolean);
+      lines.forEach((line) => {
+        // Strip numbering e.g. "1. ", "[1] "
+        const cleanedLine = line.replace(/^(?:\[\d+\]|\d+[\.\)\-:]|\-\s*)\s*/, '').trim();
+        if (cleanedLine) {
+          const parts = cleanedLine.split(/[:=]\s*(.+)/);
+          const label = parts[0]?.trim() || cleanedLine;
+          const action = parts[1]?.trim() || label;
+          const key = String(options.length + 1);
+          options.push({
+            id: `opt_${options.length + 1}`,
+            key,
+            label,
+            action,
+          });
+        }
+      });
+    }
+  }
+
+  return {
+    cleanText: cleanContent(content),
+    options: options.slice(0, 6), // Cap at 6 chips for clean UX
+  };
 }
 
 /**
@@ -53,8 +121,12 @@ export function cleanContent(content: string): string {
   cleaned = cleaned.replace(/<interrupt_subagent[\s\S]*?(?:<\/interrupt_subagent>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<list_subagents[\s\S]*?(?:<\/list_subagents>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   
+  // Strip complete quick_response blocks and open streaming quick_response blocks
+  cleaned = cleaned.replace(/<quick_responses?\b[\s\S]*?(?:<\/quick_responses?>|$)/gi, "");
+  cleaned = cleaned.replace(/<option\b[\s\S]*?(?:<\/option>|\/>|$)/gi, "");
+  
   // Single self-closing tags
-  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|fff_search|web_search|read_web_page|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|search_knowledge|list_knowledge|ask_user|ask_?user_?questions?|todo_?write|code_?run|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|update_?user_?profile)\s+[^>]*\/?>/gi, "");
+  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|fff_search|web_search|read_web_page|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|search_knowledge|list_knowledge|ask_user|ask_?user_?questions?|todo_?write|code_?run|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|update_?user_?profile|quick_responses?|option)\s+[^>]*\/?>/gi, "");
 
   // Block-format grep_search: <grep_search>...</grep_search>
   cleaned = cleaned.replace(/<grep_search\s*>[\s\S]*?<\/grep_search>/gi, "");
@@ -66,7 +138,7 @@ export function cleanContent(content: string): string {
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, "");
 
   // 4. Remove orphaned standalone closing tags
-  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|ask_?user_?questions?|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|tool_?call|tool-call|function_?call|function|code_run|todo_write|update_?user_?profile|update_?persona_?file|tool_response|bash|powershell|shell)\s*>/gi, "");
+  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|ask_?user_?questions?|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|tool_?call|tool-call|function_?call|function|code_run|todo_write|update_?user_?profile|update_?persona_?file|tool_response|bash|powershell|shell|quick_responses?|option)\s*>/gi, "");
 
   // 5. Remove empty code fences and excess vertical spacing
   cleaned = cleaned.replace(/```[a-z]*\s*```/gi, "");

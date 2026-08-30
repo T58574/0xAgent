@@ -15,7 +15,7 @@ import {
   Maximize2,
   Minimize2,
 } from 'lucide-react';
-import { AppConfig, PersonaMetadata, PermissionPreset, ReasoningEffortLevel } from '../../types';
+import { AppConfig, PersonaMetadata, PermissionPreset, ReasoningEffortLevel, QuickResponseOption } from '../../types';
 import { useModelManager } from '../../hooks/useModelManager';
 import { useI18n } from '../../i18n';
 import * as api from '../../services/api';
@@ -28,6 +28,7 @@ import {
 } from './popovers';
 import { MobileMicHelpModal } from './MobileMicHelpModal';
 import { useSlashAutocomplete } from './useSlashAutocomplete';
+import { QuickResponseStrip } from './QuickResponseStrip';
 
 interface FloatingCommandBarProps {
   inputText: string;
@@ -45,6 +46,9 @@ interface FloatingCommandBarProps {
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
   onConfigChanged?: (newConfig: AppConfig) => void;
+  quickResponses?: QuickResponseOption[];
+  onSelectQuickResponse?: (actionText: string) => void;
+  isLastMessageAssistant?: boolean;
 }
 
 export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(({
@@ -63,6 +67,9 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
   config,
   onModelChanged,
   onConfigChanged,
+  quickResponses = [],
+  onSelectQuickResponse,
+  isLastMessageAssistant = false,
 }) => {
   const { t } = useI18n();
   const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash' | 'permission' | 'reasoning'>('none');
@@ -479,6 +486,15 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
             </button>
           </div>
         </div>
+      )}
+
+      {onSelectQuickResponse && (
+        <QuickResponseStrip
+          options={quickResponses}
+          onSelectOption={onSelectQuickResponse}
+          agentStatus={agentStatus}
+          isLastMessageAssistant={isLastMessageAssistant}
+        />
       )}
 
       <form onSubmit={handleFormSubmit}>

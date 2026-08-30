@@ -109,6 +109,19 @@ export interface Translations {
     rejectChanges: string;
     changesApplied: string;
     changesRejected: string;
+    quickResponses: string;
+    continueAction: string;
+    elaborateAction: string;
+    contextBudget: string;
+    contextBreakdownTitle: string;
+    contextSystem: string;
+    contextHistory: string;
+    contextMemory: string;
+    contextFree: string;
+    contextCompaction: string;
+    rollbackHere: string;
+    forkSession: string;
+    editAndResend: string;
   };
 
   // Code Editor & Workspace
