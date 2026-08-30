@@ -27,6 +27,7 @@ import { voiceDaemonManager } from './agent/voiceDaemonManager';
 import { cleanupOrphanWorkspaces } from './session';
 import { reconcileInterruptedSessions } from './agent/selfPatchEngine';
 import { ensureEnvironmentHealth } from './envSanitizer';
+import { startMemoryDecayScheduler } from './agent/memoryDecayWorker';
 
 // 1. Run Self-Healing Environment diagnostics and path repair on boot
 const envHealth = ensureEnvironmentHealth();
@@ -228,4 +229,7 @@ server.listen(Number(PORT), HOST, () => {
       process.stdout.write(`[0xAgent] Reconciled ${count} interrupted sessions on boot.\n`);
     }
   }).catch(() => {});
+
+  // Start continuous memory decay & conflict hygiene scheduler
+  startMemoryDecayScheduler();
 });

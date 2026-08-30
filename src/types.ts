@@ -452,12 +452,93 @@ export interface ProposePersonaChangeResult {
   requires_approval?: boolean;
 }
 
+export interface RegressionCheckRecord {
+  id: string;
+  proposal_id: string;
+  baseline_composite: number;
+  proposed_composite: number;
+  delta: number;
+  blocked: boolean;
+  reason?: string;
+  details?: string;
+  created_at: string;
+}
+
+export interface PreApplyGuardResult {
+  ok: boolean;
+  blocked: boolean;
+  reason?: 'regression_detected' | 'protected_violation' | 'safe_to_apply';
+  baseline_score: number;
+  proposed_score: number;
+  delta: number;
+  details?: string;
+  requiresOverride?: boolean;
+  checkRecord?: RegressionCheckRecord;
+}
+
 export interface ApplyProposalResult {
   ok: boolean;
   proposal_id: string;
   new_version_id?: string;
   applied_at?: string;
   error?: string;
+  blocked?: boolean;
+  regression_check?: RegressionCheckRecord;
+}
+
+export interface MemoryDecayStats {
+  decayed_count: number;
+  archived_count: number;
+  conflicts_resolved: number;
+  duration_ms: number;
+  timestamp: string;
+}
+
+export interface EvolutionTelemetryRecord {
+  id: string;
+  event_type: 'proposal_created' | 'proposal_approved' | 'proposal_rejected' | 'proposal_applied' | 'proposal_blocked' | 'proposal_reverted' | 'memory_decay_cycle';
+  persona_id?: string;
+  project_id?: string;
+  session_id?: string;
+  proposal_id?: string;
+  proposal_risk_level?: string;
+  proposal_operation?: string;
+  regression_blocked?: boolean;
+  baseline_score?: number;
+  proposed_score?: number;
+  score_delta?: number;
+  memories_decayed?: number;
+  memories_archived?: number;
+  conflicts_resolved?: number;
+  created_at: string;
+}
+
+export interface EvolutionDashboardSummary {
+  summary: {
+    totalProposals: number;
+    appliedProposals: number;
+    blockedProposals: number;
+    revertedProposals: number;
+    applyRate: number;
+    blockRate: number;
+    revertRate: number;
+    avgScoreDelta: number;
+  };
+  trends: {
+    dailyProposals: { date: string; count: number }[];
+    dailyBlocks: { date: string; count: number }[];
+    complianceScoreOverTime: { date: string; score: number }[];
+  };
+  quality: {
+    topRiskLevels: { risk: string; count: number }[];
+    mostBlockedOperations: { operation: string; count: number }[];
+  };
+  memory: {
+    activeMemories: number;
+    archivedMemories: number;
+    avgConfidence: number;
+    recentDecayEvents: number;
+  };
 }
 
 export interface RollbackResult {

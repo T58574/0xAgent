@@ -21,6 +21,7 @@ import { loadConfig, saveConfig } from './config';
 import { getMemoryDb } from './memoryDb';
 import { getUserMemories, addOrUpdateMemory } from './memory';
 import { evaluateProposalRisk } from './personaRiskRules';
+import { evaluateProposalRegression } from './agent/regressionGuard';
 
 export type { PersonaMetadata, PersonaDetail };
 
@@ -604,10 +605,22 @@ export function rejectPersonaProposal(proposalId: string, reason?: string): Pers
   return getPersonaProposal(proposalId)!;
 }
 
-export function applyPersonaProposal(proposalId: string): ApplyProposalResult {
+export function applyPersonaProposal(proposalId: string, options: { forceOverride?: boolean } = {}): ApplyProposalResult {
   const proposal = getPersonaProposal(proposalId);
   if (!proposal) {
     return { ok: false, proposal_id: proposalId, error: 'Proposal not found' };
+  }
+
+  // 1. Pre-Apply Regression Guard Check
+  const guardResult = evaluateProposalRegression(proposal, { forceOverride: options.forceOverride });
+  if (guardResult.blocked) {
+    return {
+      ok: false,
+      blocked: true,
+      proposal_id: proposalId,
+      error: `Pre-Apply Regression Guard blocked this proposal: ${guardResult.details}`,
+      regression_check: guardResult.checkRecord,
+    };
   }
 
   const pDir = path.join(getPersonasDir(), proposal.persona_id);
@@ -657,6 +670,25 @@ export function applyPersonaProposal(proposalId: string): ApplyProposalResult {
   const now = new Date().toISOString();
   db.prepare(`UPDATE persona_change_proposals SET status = 'applied', applied_at = ? WHERE id = ?`).run(now, proposalId);
 
+  // Record Telemetry: proposal_applied
+  try {
+    db.prepare(`
+      INSERT INTO evolution_telemetry (
+        id, event_type, persona_id, proposal_id, proposal_risk_level, proposal_operation, regression_blocked, baseline_score, proposed_score, score_delta, created_at
+      ) VALUES (?, 'proposal_applied', ?, ?, ?, ?, 0, ?, ?, ?, ?)
+    `).run(
+      `tel_${uuidv4().substring(0, 8)}`,
+      proposal.persona_id,
+      proposal.id,
+      proposal.risk_level,
+      proposal.operation,
+      guardResult.baseline_score,
+      guardResult.proposed_score,
+      guardResult.delta,
+      now
+    );
+  } catch {}
+
   const latestVer = db.prepare(`SELECT id FROM persona_file_versions WHERE source_proposal_id = ? LIMIT 1`).get(proposalId) as any;
 
   return {
@@ -664,6 +696,7 @@ export function applyPersonaProposal(proposalId: string): ApplyProposalResult {
     proposal_id: proposalId,
     new_version_id: latestVer?.id,
     applied_at: now,
+    regression_check: guardResult.checkRecord,
   };
 }
 

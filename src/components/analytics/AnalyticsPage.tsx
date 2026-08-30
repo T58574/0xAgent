@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
-import { Activity, Zap, Database, CheckCircle2, RefreshCw, Layers, Search, Terminal } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { Activity, Zap, Database, CheckCircle2, RefreshCw, Layers, Search, Terminal, Shield, GitPullRequest } from 'lucide-react';
 import { MaterialIcon } from '../common/MaterialIcon';
-import { ChatSession, ChatMessage } from '../../types';
+import { ChatSession, ChatMessage, EvolutionDashboardSummary } from '../../types';
+import { get_evolution_analytics } from '../../services/api';
 import { useI18n } from '../../i18n';
 
 interface AnalyticsPageProps {
@@ -14,6 +15,18 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
   const { t, formatString } = useI18n();
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'high_speed' | 'high_context' | 'errors'>('all');
+  const [evolutionData, setEvolutionData] = useState<EvolutionDashboardSummary | null>(null);
+
+  const loadEvolution = async () => {
+    try {
+      const data = await get_evolution_analytics();
+      setEvolutionData(data);
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadEvolution();
+  }, []);
 
   const allAssistantMessages = useMemo(() => {
     const msgs: Array<{ sessionTitle: string; sessionId: string; msg: ChatMessage }> = [];
@@ -186,6 +199,66 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ sessions, serverLo
         </div>
 
       </div>
+
+      {/* EVOLUTION & SAFETY GUARD TELEMETRY */}
+      {evolutionData && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="p-4 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm">
+            <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-1.5 text-xs font-bold uppercase tracking-wider">
+              <span>Proposals Total</span>
+              <GitPullRequest size={15} className="text-primary" />
+            </div>
+            <div className="text-xl font-bold font-mono text-[var(--theme-text)]">
+              {evolutionData.summary.totalProposals}
+            </div>
+            <div className="text-[11px] text-[var(--theme-text-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>Applied: {evolutionData.summary.appliedProposals}</span>
+              <span className="text-emerald-500 font-bold">{evolutionData.summary.applyRate}% rate</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm">
+            <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-1.5 text-xs font-bold uppercase tracking-wider">
+              <span>Regression Guard</span>
+              <Shield size={15} className="text-emerald-500" />
+            </div>
+            <div className="text-xl font-bold font-mono text-[var(--theme-text)]">
+              {evolutionData.summary.blockedProposals} Blocked
+            </div>
+            <div className="text-[11px] text-[var(--theme-text-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>Block Rate: {evolutionData.summary.blockRate}%</span>
+              <span className="text-sky-400 font-bold">Protected</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm">
+            <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-1.5 text-xs font-bold uppercase tracking-wider">
+              <span>Score Delta Avg</span>
+              <Activity size={15} className="text-[var(--theme-accent)]" />
+            </div>
+            <div className="text-xl font-bold font-mono text-[var(--theme-text)]">
+              {evolutionData.summary.avgScoreDelta > 0 ? `+${evolutionData.summary.avgScoreDelta}%` : `${evolutionData.summary.avgScoreDelta}%`}
+            </div>
+            <div className="text-[11px] text-[var(--theme-text-muted)] mt-1 font-mono">
+              <span>Self-evolution quality trajectory</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm">
+            <div className="flex items-center justify-between text-[var(--theme-text-muted)] mb-1.5 text-xs font-bold uppercase tracking-wider">
+              <span>Memory Hygiene</span>
+              <Database size={15} className="text-[var(--theme-text-muted)]" />
+            </div>
+            <div className="text-xl font-bold font-mono text-[var(--theme-text)]">
+              {evolutionData.memory.activeMemories} Active
+            </div>
+            <div className="text-[11px] text-[var(--theme-text-muted)] mt-1 font-mono flex items-center justify-between">
+              <span>Archived: {evolutionData.memory.archivedMemories}</span>
+              <span>Avg Conf: {evolutionData.memory.avgConfidence}</span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TELEMETRY TABLE & FILTERS */}
       <div className="p-5 rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] space-y-4 shadow-sm">

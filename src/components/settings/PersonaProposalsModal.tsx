@@ -19,6 +19,7 @@ import {
   get_persona_history,
   rollback_persona_file,
   get_eval_benchmark,
+  trigger_memory_decay_cycle,
 } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { Modal } from '../ui/Modal';
@@ -46,6 +47,7 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
   const [proposals, setProposals] = useState<PersonaChangeProposalRecord[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<PersonaChangeProposalRecord | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [forceOverride, setForceOverride] = useState(false);
 
   // History state
   const [history, setHistory] = useState<PersonaFileVersionRecord[]>([]);
@@ -54,6 +56,7 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
   // Benchmark state
   const [benchmarkResult, setBenchmarkResult] = useState<any | null>(null);
   const [isBenchmarkRunning, setIsBenchmarkRunning] = useState(false);
+  const [isDecayRunning, setIsDecayRunning] = useState(false);
 
   const loadProposals = async () => {
     setIsLoading(true);
@@ -72,8 +75,8 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
 
   const loadHistory = async () => {
     try {
-      const fileArg = selectedFileFilter === 'ALL' ? undefined : selectedFileFilter;
-      const list = await get_persona_history(persona.id, fileArg);
+      const file = selectedFileFilter === 'ALL' ? undefined : selectedFileFilter;
+      const list = await get_persona_history(persona.id, file);
       setHistory(list);
     } catch (err) {
       console.error('Failed to load history:', err);
@@ -109,13 +112,29 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
 
   const handleApply = async (id: string) => {
     try {
-      await apply_persona_proposal(persona.id, id);
-      showToast('Изменения успешно применены к личности', 'success');
-      loadProposals();
-      loadHistory();
-      if (onPersonaUpdated) onPersonaUpdated();
+      const res = await apply_persona_proposal(persona.id, id, forceOverride);
+      if (res.blocked) {
+        showToast(res.error || 'Pre-Apply Regression Guard заблокировал применение', 'error');
+      } else {
+        showToast('Изменения успешно применены к личности', 'success');
+        loadProposals();
+        loadHistory();
+        if (onPersonaUpdated) onPersonaUpdated();
+      }
     } catch (err: any) {
       showToast(err.message || 'Failed to apply', 'error');
+    }
+  };
+
+  const handleTriggerDecay = async () => {
+    setIsDecayRunning(true);
+    try {
+      const stats = await trigger_memory_decay_cycle();
+      showToast(`Цикл гигиены выполнен: архивировано ${stats.archived_count}, разрешено конфликтов ${stats.conflicts_resolved}`, 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Ошибка запуска цикла гигиены', 'error');
+    } finally {
+      setIsDecayRunning(false);
     }
   };
 
@@ -296,15 +315,26 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
                         </>
                       )}
                       {selectedProposal.status === 'approved' && (
-                        <Button
-                          variant="accent"
-                          size="sm"
-                          onClick={() => handleApply(selectedProposal.id)}
-                          className="flex items-center gap-1"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Apply to Persona</span>
-                        </Button>
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={forceOverride}
+                              onChange={(e) => setForceOverride(e.target.checked)}
+                              className="rounded border-border"
+                            />
+                            <span>Force Override Guard</span>
+                          </label>
+                          <Button
+                            variant="accent"
+                            size="sm"
+                            onClick={() => handleApply(selectedProposal.id)}
+                            className="flex items-center gap-1"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Apply to Persona</span>
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -393,16 +423,28 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
                   Validates language directives, memory retrieval zero-budget invariants, and protected safety defense.
                 </div>
               </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={handleRunBenchmark}
-                disabled={isBenchmarkRunning}
-                className="flex items-center gap-1.5"
-              >
-                <Play className="w-4 h-4" />
-                <span>{isBenchmarkRunning ? 'Evaluating...' : 'Run Benchmark'}</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleTriggerDecay}
+                  disabled={isDecayRunning}
+                  className="flex items-center gap-1.5 text-xs"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>{isDecayRunning ? 'Cleaning...' : 'Run Memory Hygiene'}</span>
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleRunBenchmark}
+                  disabled={isBenchmarkRunning}
+                  className="flex items-center gap-1.5"
+                >
+                  <Play className="w-4 h-4" />
+                  <span>{isBenchmarkRunning ? 'Evaluating...' : 'Run Benchmark'}</span>
+                </Button>
+              </div>
             </div>
 
             {benchmarkResult && (

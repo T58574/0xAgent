@@ -19,6 +19,8 @@ import {
 import { loadSummarizerPrompt, saveSummarizerPrompt } from '../summarizer';
 import { getToolsState, saveToolsToggles, saveCustomToolsMd } from '../toolsConfig';
 import { runEvaluationHarness } from '../evalHarness';
+import { runMemoryDecayCycle } from '../agent/memoryDecayWorker';
+import { getEvolutionDashboardSummary, getRecentEvolutionTelemetry } from '../analyticsService';
 
 export function createPersonasRouter(broadcast?: (event: string, payload: any) => void) {
   const router = Router();
@@ -200,11 +202,43 @@ export function createPersonasRouter(broadcast?: (event: string, payload: any) =
 
   router.post('/personas/:id/proposals/:proposalId/apply', (req, res) => {
     try {
-      const applied = applyPersonaProposal(req.params.proposalId);
-      if (broadcast) {
+      const forceOverride = Boolean(req.body?.forceOverride);
+      const applied = applyPersonaProposal(req.params.proposalId, { forceOverride });
+      if (applied.ok && broadcast) {
         broadcast('persona-changed', { activePersonaId: req.params.id, personas: listPersonas() });
       }
       res.json(applied);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Memory Decay & Hygiene Cycle Trigger
+  router.post('/personas/decay/cycle', async (_req, res) => {
+    try {
+      const stats = await runMemoryDecayCycle();
+      res.json(stats);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Evolution Telemetry & Analytics
+  router.get('/analytics/evolution', (req, res) => {
+    try {
+      const days = parseInt(req.query.days as string, 10) || 30;
+      const summary = getEvolutionDashboardSummary(days);
+      res.json(summary);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/analytics/evolution/telemetry', (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string, 10) || 20;
+      const telemetry = getRecentEvolutionTelemetry(limit);
+      res.json(telemetry);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

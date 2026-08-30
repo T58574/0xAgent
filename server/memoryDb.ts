@@ -222,6 +222,54 @@ function initSchema(db: DatabaseSync): void {
 
     CREATE INDEX IF NOT EXISTS idx_persona_change_proposals_persona ON persona_change_proposals(persona_id, status, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_persona_change_proposals_status ON persona_change_proposals(status, created_at DESC);
+
+    -- 11. REGRESSION CHECKS (Pre-Apply Guard)
+    CREATE TABLE IF NOT EXISTS regression_checks (
+      id TEXT PRIMARY KEY,
+      proposal_id TEXT NOT NULL,
+      baseline_composite REAL NOT NULL,
+      proposed_composite REAL NOT NULL,
+      delta REAL NOT NULL,
+      blocked INTEGER NOT NULL DEFAULT 0,
+      reason TEXT,
+      details TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_regression_checks_proposal ON regression_checks(proposal_id, created_at DESC);
+
+    -- 12. EVOLUTION TELEMETRY (Continuous Observability)
+    CREATE TABLE IF NOT EXISTS evolution_telemetry (
+      id TEXT PRIMARY KEY,
+      event_type TEXT NOT NULL,
+      persona_id TEXT,
+      project_id TEXT,
+      session_id TEXT,
+      proposal_id TEXT,
+      proposal_risk_level TEXT,
+      proposal_operation TEXT,
+      regression_blocked INTEGER,
+      baseline_score REAL,
+      proposed_score REAL,
+      score_delta REAL,
+      memories_decayed INTEGER,
+      memories_archived INTEGER,
+      conflicts_resolved INTEGER,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_telemetry_event_type ON evolution_telemetry(event_type, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_telemetry_persona ON evolution_telemetry(persona_id, created_at DESC);
+
+    -- 13. MEMORY DECAY & HYGIENE LOGS
+    CREATE TABLE IF NOT EXISTS memory_decay_logs (
+      id TEXT PRIMARY KEY,
+      decayed_count INTEGER NOT NULL DEFAULT 0,
+      archived_count INTEGER NOT NULL DEFAULT 0,
+      conflicts_resolved INTEGER NOT NULL DEFAULT 0,
+      duration_ms INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // FTS5 Synchronization triggers
