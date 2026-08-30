@@ -29,35 +29,58 @@ mkdir -p "$OX_DIR" "$BIN_DIR" "$OX_DIR/models" "$OX_DIR/llama"
 
 # 1. Prerequisites Check
 echo -e "${YELLOW}[1/5] Verifying System Prerequisites...${NC}"
+
 if ! command -v git &> /dev/null; then
-    echo -e "${RED}[ERR] Git is required. Please install git and re-run installer.${NC}"
+    echo -e "${RED}[!] Git is not installed.${NC}"
+    echo -e "    - macOS: brew install git"
+    echo -e "    - Ubuntu/Debian: sudo apt update && sudo apt install -y git"
+    echo -e "    - Arch Linux: sudo pacman -S git"
     exit 1
 fi
+echo -e "${GREEN}[OK] Git is available.${NC}"
+
 if ! command -v node &> /dev/null; then
-    echo -e "${RED}[ERR] Node.js (>=20) is required. Please install Node.js and re-run installer.${NC}"
+    echo -e "${RED}[!] Node.js is not installed.${NC}"
+    echo -e "    - macOS: brew install node@22"
+    echo -e "    - Ubuntu/Debian: curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs"
+    echo -e "    - NVM: nvm install 22 && nvm use 22"
     exit 1
 fi
-echo -e "${GREEN}[OK] Git and Node.js detected.${NC}"
+
+NODE_MAJOR=$(node -v | sed 's/^v//' | cut -d. -f1)
+if [ "$NODE_MAJOR" -lt 20 ]; then
+    echo -e "${RED}[!] Detected Node.js $(node -v). 0xAgent requires Node.js >= 20.0.0.${NC}"
+    echo -e "    Please upgrade Node.js (e.g. nvm install 22 || brew upgrade node)"
+    exit 1
+fi
+echo -e "${GREEN}[OK] Node.js $(node -v) is available (>=20.0.0).${NC}"
 
 # 2. Clone or Update Codebase
 echo -e "\n${YELLOW}[2/5] Synchronizing 0xAgent Codebase...${NC}"
 if [ ! -f "$APP_DIR/package.json" ]; then
     echo -e "${CYAN}[+] Cloning repository into: $APP_DIR${NC}"
-    git clone "$REPO_URL" "$APP_DIR"
+    git clone "$REPO_URL" "$APP_DIR" || {
+        echo -e "${RED}[ERR] Failed to clone repository. Please check your internet connection.${NC}"
+        exit 1
+    }
 else
-    echo -e "${CYAN}[+] Existing installation found. Updating...${NC}"
-    cd "$APP_DIR" && git fetch origin main && git pull --rebase origin main || true
+    echo -e "${CYAN}[+] Existing installation found. Updating to latest version...${NC}"
+    cd "$APP_DIR"
+    git fetch origin main 2>/dev/null && git pull --rebase origin main 2>/dev/null || true
 fi
 
 # 3. Dependencies
 echo -e "\n${YELLOW}[3/5] Installing Dependencies (npm install)...${NC}"
 cd "$APP_DIR"
-npm install --no-audit --no-fund
+npm install --no-audit --no-fund || {
+    echo -e "${YELLOW}[!] Retrying npm install...${NC}"
+    npm install
+}
 
 # 4. Build Client & Certificates
 echo -e "\n${YELLOW}[4/5] Building Production Client & Generating SSL...${NC}"
-node ./scripts/ensure-ssl.cjs
-npm run build
+node ./scripts/ensure-ssl.cjs || true
+npm run build || true
 
 # 5. Link Global CLI Command
 echo -e "\n${YELLOW}[5/5] Linking Global '0xagent' CLI...${NC}"
@@ -70,6 +93,8 @@ if [ -n "$ZSH_VERSION" ] || [ "$SHELL" = "/bin/zsh" ]; then
     SHELL_RC="$HOME/.zshrc"
 elif [ -f "$HOME/.bashrc" ]; then
     SHELL_RC="$HOME/.bashrc"
+elif [ -f "$HOME/.profile" ]; then
+    SHELL_RC="$HOME/.profile"
 fi
 
 if [ -n "$SHELL_RC" ] && [ -f "$SHELL_RC" ]; then
