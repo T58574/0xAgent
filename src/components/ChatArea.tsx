@@ -16,6 +16,7 @@ import { PlanProgressStrip } from './chat/PlanProgressStrip';
 import { EmptyChatHero } from './chat/EmptyChatHero';
 import { TelemetryHUD } from './chat/TelemetryHUD';
 import { ChatMessageItem } from './chat/ChatMessageItem';
+import { ChatHeader } from './chat/ChatHeader';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useI18n } from '../i18n';
@@ -24,6 +25,9 @@ import { sounds } from '../services/soundEffects';
 interface ChatAreaProps {
   messages: ChatMessage[];
   currentSession?: ChatSession | null;
+  workspaceDir?: string | null;
+  onSelectWorkspace?: () => void;
+  onUpdateSessionWorkspace?: (dir: string | null) => void;
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
   onSendMessage: (text: string, images?: string[]) => void;
   onRespondToTool: (toolId: string, approve: boolean | string) => void;
@@ -44,6 +48,9 @@ interface ChatAreaProps {
 export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
   messages,
   currentSession,
+  workspaceDir,
+  onSelectWorkspace,
+  onUpdateSessionWorkspace,
   agentStatus,
   onSendMessage,
   onRespondToTool,
@@ -318,32 +325,43 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
         isDraggingOver ? 'ring-1 ring-[var(--theme-border)] ring-inset' : ''
       }`}
     >
-      {/* 1. EMPTY CHAT STATE */}
+      {/* 1. TOP CHAT HEADER: Session Title, Workspace Dropdown & Copy Log */}
+      <ChatHeader
+        currentSession={currentSession}
+        workspaceDir={workspaceDir}
+        config={config}
+        onSelectWorkspace={onSelectWorkspace}
+        onUpdateSessionWorkspace={onUpdateSessionWorkspace}
+      />
+
+      {/* 2. EMPTY CHAT STATE */}
       {!hasMessages && (
-        <EmptyChatHero
-          inputText={inputText}
-          setInputText={setInputText}
-          onSubmit={handleSubmit}
-          agentStatus={agentStatus}
-          onCancelAgent={onCancelAgent}
-          personas={personas}
-          activePersonaId={activePersonaId}
-          onSelectPersona={handleSelectPersona}
-          attachedImages={attachedImages}
-          onAttachImages={(imgs) => setAttachedImages(imgs)}
-          onRemoveImage={handleRemoveImage}
-          config={config}
-          onModelChanged={onModelChanged}
-          onConfigChanged={onConfigChanged}
-          activeSparks={activeSparks}
-          onAcceptSpark={handleAcceptSpark}
-          onDismissSpark={handleDismissSpark}
-          onSpeakPhrase={handleSpeakPhrase}
-          currentSession={currentSession}
-        />
+        <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
+          <EmptyChatHero
+            inputText={inputText}
+            setInputText={setInputText}
+            onSubmit={handleSubmit}
+            agentStatus={agentStatus}
+            onCancelAgent={onCancelAgent}
+            personas={personas}
+            activePersonaId={activePersonaId}
+            onSelectPersona={handleSelectPersona}
+            attachedImages={attachedImages}
+            onAttachImages={(imgs) => setAttachedImages(imgs)}
+            onRemoveImage={handleRemoveImage}
+            config={config}
+            onModelChanged={onModelChanged}
+            onConfigChanged={onConfigChanged}
+            activeSparks={activeSparks}
+            onAcceptSpark={handleAcceptSpark}
+            onDismissSpark={handleDismissSpark}
+            onSpeakPhrase={handleSpeakPhrase}
+            currentSession={currentSession}
+          />
+        </div>
       )}
 
-      {/* 2. ACTIVE CHAT MESSAGES STREAM */}
+      {/* 3. ACTIVE CHAT MESSAGES STREAM */}
       {hasMessages && (
         <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
           {/* Background Context Compression Banner */}

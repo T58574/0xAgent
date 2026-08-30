@@ -1,18 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   FolderPlus,
-  Folder,
   Trash2,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   FolderTree,
-  Search,
   MessageSquare,
   GitBranch,
   Plus,
   Sparkles,
-  Terminal,
   X,
   Settings as SettingsIcon,
   BarChart2,
@@ -58,7 +55,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   const { language, t } = useI18n();
   const [showFileExplorer, setShowFileExplorer] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
-  const [searchFilter, setSearchFilter] = useState('');
   const [isHoveringHistory, setIsHoveringHistory] = useState(false);
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
   const [showNewChatMenu, setShowNewChatMenu] = useState(false);
@@ -78,12 +74,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   }, []);
 
-  // Filter sessions
-  const filteredSessions = useMemo(() => {
-    return searchFilter.trim()
-      ? sessions.filter((s) => s.title.toLowerCase().includes(searchFilter.toLowerCase()))
-      : sessions;
-  }, [sessions, searchFilter]);
+  // Filtered sessions
+  const filteredSessions = sessions;
 
   // Separate sessions into Project Folders, Auto-Workspaces, and Standalone
   const projectWorkspaceDirs = useMemo(() => {
@@ -132,23 +124,24 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         aria-hidden="true"
       />
 
-      <aside className="fixed inset-y-0 left-0 z-50 w-[84vw] max-w-[310px] h-[100dvh] md:relative md:w-64 md:w-68 md:h-full md:z-20 shrink-0 font-sans text-xs select-none text-[var(--theme-text)] animate-in slide-in-from-left duration-200 md:animate-none">
+      <aside className="fixed inset-y-0 left-0 z-50 w-[84vw] max-w-[320px] h-[100dvh] md:relative md:w-72 lg:w-80 md:h-full md:z-20 shrink-0 font-sans text-xs select-none text-[var(--theme-text)] animate-in slide-in-from-left duration-200 md:animate-none">
         
         {/* Desktop Outer Edge Middle Collapse Arrow Button */}
         <button
           type="button"
           onClick={onToggleOpen}
-          className="hidden md:flex absolute -right-3.5 top-1/2 -translate-y-1/2 z-50 w-7 h-12 rounded-full bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] items-center justify-center shadow-xl transition-all cursor-pointer group hover:scale-110 opacity-100"
+          className="hidden md:flex absolute -right-3 top-1/2 -translate-y-1/2 z-50 w-6 h-11 rounded-full bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] items-center justify-center shadow-lg transition-all cursor-pointer group hover:scale-105 active:scale-95"
           style={{ backgroundColor: 'var(--theme-panel-solid)' }}
           title={t.nav.toggleSidebar}
         >
-          <ChevronLeft size={15} className="transition-transform group-hover:-translate-x-0.5" />
+          <ChevronLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
         </button>
 
-        <div className="w-full h-full bg-[var(--theme-panel)]/98 md:bg-[var(--theme-panel)]/95 border-r md:border border-[var(--theme-border)] rounded-none md:rounded-[26px] flex flex-col justify-between overflow-hidden backdrop-blur-2xl shadow-2xl md:shadow-sm">
+        {/* Unified Dark Floating Sidebar Container */}
+        <div className="w-full h-full bg-[var(--theme-panel)] border border-[var(--theme-border)] rounded-2xl sm:rounded-[26px] flex flex-col justify-between overflow-hidden shadow-sm">
           
-          {/* 1. TOP HEADER: PROMINENT NEW CHAT & QUICK SEARCH */}
-          <div className="p-3 border-b border-[var(--theme-border)] shrink-0 bg-[var(--theme-panel)] space-y-2.5">
+          {/* 1. TOP HEADER: DARK STYLISH NEW CHAT BUTTON (No search bar, no hard separator line) */}
+          <div className="p-3 shrink-0 space-y-2">
             
             {/* Mobile Header Title & Close Button */}
             <div className="flex md:hidden items-center justify-between pb-1">
@@ -170,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               </button>
             </div>
 
-            {/* Primary Action Button: New Chat with Split dropdown */}
+            {/* Primary Action Button: Dark Subtle Tactile New Chat with Split dropdown */}
             <div ref={newChatMenuRef} className="relative flex items-center gap-1.5">
               <button
                 type="button"
@@ -182,17 +175,17 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                     handleCreateAndCloseOnMobile(t.nav.newChat, 'auto');
                   }
                 }}
-                className="flex-1 py-2.5 px-3 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 font-bold text-xs flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer group"
+                className="flex-1 py-2 px-3.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition-all duration-150 cursor-pointer group active:scale-[0.98]"
                 title={t.sidebar.newChatTooltip}
               >
-                <Plus size={15} className="transition-transform group-hover:rotate-90 text-[var(--theme-accent-text)]" />
+                <Plus size={14} className="transition-transform group-hover:rotate-90 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)]" />
                 <span>{t.nav.newChat}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowNewChatMenu(!showNewChatMenu)}
-                className="p-2.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-panel)] transition-colors cursor-pointer shadow-sm"
+                className="p-2 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-all cursor-pointer shadow-xs active:scale-[0.98]"
                 title={t.nav.workspaceMenu}
               >
                 <ChevronDown size={14} className={`transition-transform duration-200 ${showNewChatMenu ? 'rotate-180' : ''}`} />
@@ -200,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
               {/* New Chat Dropdown Popover */}
               {showNewChatMenu && (
-                <div className="absolute top-full left-0 right-0 mt-2 bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 rounded-2xl space-y-1 animate-fadeIn">
+                <div className="absolute top-full left-0 right-0 mt-1.5 p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel-solid)] backdrop-blur-2xl z-50 rounded-2xl space-y-1 animate-fadeIn">
                   <button
                     type="button"
                     onClick={() => {
@@ -211,7 +204,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   >
                     <Sparkles size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-bold">{t.sidebar.autoWorkspace}</span>
+                      <span className="font-semibold">{t.sidebar.autoWorkspace}</span>
                       <span className="text-[10px] text-[var(--theme-text-muted)]">~/.0xagent/workspaces</span>
                     </div>
                   </button>
@@ -226,7 +219,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   >
                     <MessageSquare size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-bold">{t.sidebar.standalone}</span>
+                      <span className="font-semibold">{t.sidebar.standalone}</span>
                       <span className="text-[10px] text-[var(--theme-text-muted)]">{t.chat.context}</span>
                     </div>
                   </button>
@@ -241,29 +234,17 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                   >
                     <FolderPlus size={14} className="text-[var(--theme-text-muted)] shrink-0" />
                     <div className="flex flex-col">
-                      <span className="font-bold">{t.sidebar.openWorkspace}...</span>
+                      <span className="font-semibold">{t.sidebar.openWorkspace}...</span>
                       <span className="text-[10px] text-[var(--theme-text-muted)]">{t.nav.changeWorkspace}</span>
                     </div>
                   </button>
                 </div>
               )}
             </div>
-
-            {/* Search filter input */}
-            <div className="relative">
-              <input
-                type="text"
-                value={searchFilter}
-                onChange={(e) => setSearchFilter(e.target.value)}
-                placeholder={t.sidebar.searchPlaceholder}
-                className="w-full pl-8 pr-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-accent)] transition-all font-sans"
-              />
-              <Search size={13} className="absolute left-2.5 top-2.5 text-[var(--theme-text-muted)]" />
-            </div>
           </div>
 
-          {/* 2. CHATS TREE WITH VECTOR CONNECTORS */}
-          <div className="flex-1 overflow-y-auto p-2.5 space-y-3 min-h-0 scrollbar-thin">
+          {/* 2. CHATS TREE WITH VECTOR CONNECTORS & PIXEL-PERFECT ALIGNMENT */}
+          <div className="flex-1 overflow-y-auto px-3 py-1 space-y-3 min-h-0 scrollbar-thin">
             
             {/* WORKSPACE PROJECT FOLDERS */}
             {projectWorkspaceDirs.map((dir) => {
@@ -275,30 +256,29 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               const folderName = getWorkspaceBaseName(dir);
 
               return (
-                <div key={dir} className="space-y-1">
+                <div key={dir} className="space-y-1 w-full">
                   
                   {/* Folder Node Header */}
                   <div
                     onClick={() => toggleGroup(dir)}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer transition-colors text-xs font-medium ${
+                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer transition-colors text-xs font-medium w-full ${
                       isCurrentActiveWs
-                        ? 'bg-[var(--theme-accent)]/10 border border-[var(--theme-accent)]/30 text-[var(--theme-text)] font-bold'
-                        : 'bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                        ? 'bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold shadow-2xs'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       {isCollapsed ? (
                         <ChevronRight size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                       ) : (
                         <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                       )}
-                      <Folder size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                      <span className="truncate font-bold">{folderName}</span>
+                      <span className="truncate font-semibold">{folderName}</span>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0 ml-auto">
                       {isCurrentActiveWs && (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)]">
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
                           <GitBranch size={9} />
                           <span>main</span>
                         </span>
@@ -319,7 +299,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
                   {/* Sessions Branch Tree */}
                   {!isCollapsed && (
-                    <div className="relative pl-3 ml-3 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1">
+                    <div className="relative pl-3.5 ml-2.5 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1 w-[calc(100%-0.625rem)]">
                       {projSessions.length > 0 ? (
                         projSessions.map((session) => {
                           const isActive = session.id === currentSessionId;
@@ -328,30 +308,27 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                             <div
                               key={session.id}
                               onClick={() => handleSelectAndCloseOnMobile(session.id)}
-                              className={`relative group px-2.5 py-2 sm:py-1.5 rounded-xl text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                              className={`relative group w-full px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 flex items-center justify-between gap-1.5 border before:absolute before:-left-3.5 before:top-1/2 before:w-3 before:h-px before:bg-[var(--theme-border)]/70 ${
                                 isActive
-                                  ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold border-[var(--theme-accent)] shadow-sm'
+                                  ? 'session-item-active text-[var(--theme-text)] font-semibold border-[var(--theme-border)]'
                                   : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                               }`}
                             >
-                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                <MessageSquare size={12} className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0'} />
-                                <span className="truncate">{session.title}</span>
-                              </div>
+                              <span className="truncate flex-1 text-left font-medium">{session.title}</span>
 
-                              <div className="flex items-center gap-1 shrink-0">
+                              <div className="flex items-center gap-1 shrink-0 ml-auto pl-1">
                                 {relTime && (
-                                  <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-accent-text)]/80' : 'text-[var(--theme-text-muted)]'}`}>
+                                  <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-text-muted)]' : 'text-[var(--theme-text-muted)] opacity-60'}`}>
                                     {relTime}
                                   </span>
                                 )}
                                 <button
                                   type="button"
                                   onClick={(e) => onDeleteSession(session.id, e)}
-                                  className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
+                                  className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
                                   title={t.sidebar.deleteSession}
                                 >
-                                  <Trash2 size={11} />
+                                  <Trash2 size={12} />
                                 </button>
                               </div>
                             </div>
@@ -368,27 +345,26 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               );
             })}
 
-            {/* AUTO-WORKSPACE SESSIONS */}
+            {/* AUTO-WORKSPACE SESSIONS (Песочница чата) */}
             {autoWorkspaceSessions.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-1 w-full">
                 <div
                   onClick={() => toggleGroup('auto_workspaces')}
-                  className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer font-bold text-xs"
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] cursor-pointer font-semibold text-xs transition-colors w-full"
                 >
-                  <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     {collapsedGroups['auto_workspaces'] ? (
-                      <ChevronRight size={13} className="shrink-0" />
+                      <ChevronRight size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                     ) : (
-                      <ChevronDown size={13} className="shrink-0" />
+                      <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                     )}
-                    <Sparkles size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                    <span>{t.sidebar.autoWorkspace}</span>
+                    <span className="truncate">{t.sidebar.autoWorkspace}</span>
                   </div>
-                  <span className="text-[10px] font-mono opacity-60">({autoWorkspaceSessions.length})</span>
+                  <span className="text-[10px] font-mono opacity-60 ml-auto shrink-0">({autoWorkspaceSessions.length})</span>
                 </div>
 
                 {!collapsedGroups['auto_workspaces'] && (
-                  <div className="relative pl-3 ml-3 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1">
+                  <div className="relative pl-3.5 ml-2.5 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1 w-[calc(100%-0.625rem)]">
                     {autoWorkspaceSessions.map((session) => {
                       const isActive = session.id === currentSessionId;
                       const relTime = formatRelativeTime(session.updated_at);
@@ -396,30 +372,27 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                         <div
                           key={session.id}
                           onClick={() => handleSelectAndCloseOnMobile(session.id)}
-                          className={`relative group px-2.5 py-2 sm:py-1.5 rounded-xl text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                          className={`relative group w-full px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 flex items-center justify-between gap-1.5 border before:absolute before:-left-3.5 before:top-1/2 before:w-3 before:h-px before:bg-[var(--theme-border)]/70 ${
                             isActive
-                              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold border-[var(--theme-accent)] shadow-sm'
+                              ? 'session-item-active text-[var(--theme-text)] font-semibold border-[var(--theme-border)]'
                               : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                           }`}
                         >
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <Terminal size={12} className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0'} />
-                            <span className="truncate">{session.title}</span>
-                          </div>
+                          <span className="truncate flex-1 text-left font-medium">{session.title}</span>
 
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0 ml-auto pl-1">
                             {relTime && (
-                              <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-accent-text)]/80' : 'text-[var(--theme-text-muted)]'}`}>
+                              <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-text-muted)]' : 'text-[var(--theme-text-muted)] opacity-60'}`}>
                                 {relTime}
                               </span>
                             )}
                             <button
                               type="button"
                               onClick={(e) => onDeleteSession(session.id, e)}
-                              className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
+                              className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
                               title={t.sidebar.deleteSession}
                             >
-                              <Trash2 size={11} />
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         </div>
@@ -432,25 +405,24 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
 
             {/* STANDALONE GENERAL CHATS */}
             {standaloneSessions.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-1 w-full">
                 <div
                   onClick={() => toggleGroup('standalone')}
-                  className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer font-bold text-xs"
+                  className="flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] cursor-pointer font-semibold text-xs transition-colors w-full"
                 >
-                  <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
                     {collapsedGroups['standalone'] ? (
-                      <ChevronRight size={13} className="shrink-0" />
+                      <ChevronRight size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                     ) : (
-                      <ChevronDown size={13} className="shrink-0" />
+                      <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
                     )}
-                    <MessageSquare size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                    <span>{t.sidebar.standalone}</span>
+                    <span className="truncate">{t.sidebar.standalone}</span>
                   </div>
-                  <span className="text-[10px] font-mono opacity-60">({standaloneSessions.length})</span>
+                  <span className="text-[10px] font-mono opacity-60 ml-auto shrink-0">({standaloneSessions.length})</span>
                 </div>
 
                 {!collapsedGroups['standalone'] && (
-                  <div className="relative pl-3 ml-3 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1">
+                  <div className="relative pl-3.5 ml-2.5 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1 w-[calc(100%-0.625rem)]">
                     {standaloneSessions.map((session) => {
                       const isActive = session.id === currentSessionId;
                       const relTime = formatRelativeTime(session.updated_at);
@@ -458,30 +430,27 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                         <div
                           key={session.id}
                           onClick={() => handleSelectAndCloseOnMobile(session.id)}
-                          className={`relative group px-2.5 py-2 sm:py-1.5 rounded-xl text-xs cursor-pointer transition-all flex items-center justify-between gap-1.5 border before:absolute before:-left-3 before:top-1/2 before:w-2.5 before:h-px before:bg-[var(--theme-border)]/70 ${
+                          className={`relative group w-full px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 flex items-center justify-between gap-1.5 border before:absolute before:-left-3.5 before:top-1/2 before:w-3 before:h-px before:bg-[var(--theme-border)]/70 ${
                             isActive
-                              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold border-[var(--theme-accent)] shadow-sm'
+                              ? 'session-item-active text-[var(--theme-text)] font-semibold border-[var(--theme-border)]'
                               : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                           }`}
                         >
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                            <MessageSquare size={12} className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] shrink-0'} />
-                            <span className="truncate">{session.title}</span>
-                          </div>
+                          <span className="truncate flex-1 text-left font-medium">{session.title}</span>
 
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex items-center gap-1 shrink-0 ml-auto pl-1">
                             {relTime && (
-                              <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-accent-text)]/80' : 'text-[var(--theme-text-muted)]'}`}>
+                              <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-text-muted)]' : 'text-[var(--theme-text-muted)] opacity-60'}`}>
                                 {relTime}
                               </span>
                             )}
                             <button
                               type="button"
                               onClick={(e) => onDeleteSession(session.id, e)}
-                              className={`p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${isActive ? 'text-[var(--theme-accent-text)] hover:bg-black/20' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'}`}
+                              className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
                               title={t.sidebar.deleteSession}
                             >
-                              <Trash2 size={11} />
+                              <Trash2 size={12} />
                             </button>
                           </div>
                         </div>
@@ -498,7 +467,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                 <button
                   type="button"
                   onClick={() => setShowFileExplorer(!showFileExplorer)}
-                  className="w-full py-2 px-2.5 rounded-xl bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] font-bold text-[11px] flex items-center justify-between cursor-pointer shadow-sm"
+                  className="w-full py-2 px-2.5 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] font-semibold text-[11px] flex items-center justify-between cursor-pointer transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     <FolderTree size={14} className="text-[var(--theme-text-muted)]" />
@@ -545,7 +514,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
                       }}
                       className={`py-2 px-1 rounded-xl text-center flex flex-col items-center justify-center gap-1 transition-colors ${
                         isActive
-                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                          ? 'bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold shadow-xs'
                           : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                       }`}
                     >
@@ -564,7 +533,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             onClick={() => setIsTimelineOpen(true)}
             onMouseEnter={() => setIsHoveringHistory(true)}
             onMouseLeave={() => setIsHoveringHistory(false)}
-            className="w-full p-3.5 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-panel)] hover:bg-[var(--theme-border-subtle)] relative overflow-hidden group transition-all text-center cursor-pointer select-none"
+            className="w-full p-3 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-panel)] hover:bg-[var(--theme-border-subtle)] relative overflow-hidden group transition-all text-center cursor-pointer select-none"
             title={language === 'ru' ? 'Открыть хронологию всех диалогов' : 'Open session timeline'}
           >
             {/* Interactive ASCII Particle Canvas */}

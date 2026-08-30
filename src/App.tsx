@@ -346,6 +346,9 @@ export default function App() {
     <ChatArea
       messages={currentSession ? currentSession.messages : []}
       currentSession={currentSession}
+      workspaceDir={activeSessionWorkspace}
+      onSelectWorkspace={handleSelectWorkspace}
+      onUpdateSessionWorkspace={handleUpdateCurrentSessionWorkspace}
       agentStatus={agentStatus}
       onSendMessage={handleSendMessage}
       onRespondToTool={handleRespondToTool}
@@ -368,18 +371,15 @@ export default function App() {
   );
 
   return (
-    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-hidden font-sans p-0 sm:p-2.5 gap-0 sm:gap-2.5">
+    <div className="fixed inset-0 h-[100dvh] flex flex-col bg-[var(--theme-bg)] text-[var(--theme-text)] overflow-hidden font-sans p-2 sm:p-2.5 gap-2 sm:gap-2.5">
       
-      {/* 1. TOP FLOATING SCI-FI CAPSULE NAVBAR */}
+      {/* 1. TOP FLOATING FROSTED GLASS NAVBAR */}
       <Navbar
         onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         activeView={activeView}
         onChangeView={setActiveView}
         config={config}
         currentSession={currentSession}
-        workspaceDir={activeSessionWorkspace}
-        onSelectWorkspace={handleSelectWorkspace}
-        onUpdateSessionWorkspace={handleUpdateCurrentSessionWorkspace}
         isServerOffline={isServerOffline}
         onStartServer={handleStartServer}
         onNewChat={() => handleCreateSession('Новый диалог', 'auto')}
@@ -387,7 +387,7 @@ export default function App() {
       />
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}
-      <div className="flex-1 w-full min-h-0 relative flex flex-row overflow-hidden gap-0 sm:gap-2.5">
+      <div className="flex-1 w-full min-h-0 relative flex flex-row overflow-hidden gap-2 sm:gap-2.5">
         
         {/* LEFT COLLAPSIBLE / MOBILE DRAWER SIDEBAR */}
         <Sidebar
@@ -411,7 +411,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="fixed left-2 top-1/2 -translate-y-1/2 z-40 w-7 h-12 rounded-r-2xl border-r border-y border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-center shadow-lg transition-all cursor-pointer group hover:w-8"
+            className="fixed left-2 top-1/2 -translate-y-1/2 z-40 w-7 h-12 rounded-r-2xl border-r border-y border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-center shadow-lg transition-all cursor-pointer group hover:w-8 active:scale-95"
             style={{ backgroundColor: 'var(--theme-panel-solid)' }}
             title="Развернуть боковое меню"
           >
@@ -420,11 +420,11 @@ export default function App() {
         )}
 
         {/* CONTENT VIEWPORT */}
-        <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col rounded-none sm:rounded-[26px] border-0 sm:border border-[var(--theme-border)] bg-[var(--theme-panel)]/90 backdrop-blur-2xl shadow-sm">
+        <div className="flex-1 h-full min-w-0 overflow-hidden relative flex flex-col rounded-2xl sm:rounded-[26px] border border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-sm">
           <Suspense fallback={<div className="w-full h-full flex items-center justify-center text-xs font-mono text-[var(--theme-text-muted)] animate-pulse">LOADING...</div>}>
             {/* SETTINGS VIEW */}
             {activeView === 'settings' && (
-              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
+              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-2xl sm:rounded-[26px]">
                 <SettingsPage
                   config={config}
                   onSaveConfig={handleSaveConfig}
@@ -438,7 +438,7 @@ export default function App() {
 
             {/* ANALYTICS VIEW */}
             {activeView === 'analytics' && (
-              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
+              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-2xl sm:rounded-[26px]">
                 <AnalyticsPage
                   sessions={sessions}
                   serverLogs={logs}
