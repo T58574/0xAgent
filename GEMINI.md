@@ -52,6 +52,7 @@
   - `CodeEditor.tsx` — Multi-tab Monaco-style code viewer and editor.
   - `chat/` — Chat components (`ReasoningViewer.tsx`, `FloatingCommandBar.tsx`, `PlanProgressStrip.tsx`).
   - `settings/` — Settings tabs (General, LLM Server, Personas, Themes, Security, Customizations).
+  - `settings/personas/` — Modular persona & memory subcomponents (`MemoryManagerSection.tsx`, `PersonaEditorSection.tsx`, `TokenTelemetrySection.tsx`).
   - `settings/common/` — Settings molecules (`SettingsHeader.tsx`, `SettingsSection.tsx`, `SettingToggleCard.tsx`, `SettingItemRow.tsx`, `SettingStatCard.tsx`).
   - `KnowledgeVault/` — Knowledge base manager, RAG retrieval index, and vector embeddings viewer.
   - `JarvisSanctuary.tsx` / `JarvisWidget.tsx` — Voice companion floating HUD, audio visualizer, and active sparks.
@@ -91,7 +92,12 @@
    - Memory Engine v1.0 enforces dynamic token budgeting (0..400 tokens) with 0 memories for casual dialogue.
 9. **Atomic UI & Zero-Slop Design Policy**:
    - Strictly prohibit writing ad-hoc raw HTML controls (`<button>`, `<input>`, `<select>`, `<textarea>`, raw `<dialog>`) styled with haphazard utility classes (`bg-white/10`, custom borders). Always import and compose from `src/components/ui/` (`Button`, `Input`, `Select`, `Toggle`, `Badge`, `Card`, `Modal`).
-   - Settings views must strictly follow `CustomizationsTab.tsx` and `src/components/settings/common/` as the canonical layout template (`SettingsHeader` → `SettingsSection` → `Card` → `SettingItemRow`).
+   - **Canonical Settings Layout & Sub-Navigation Standard**:
+     - Settings tabs must strictly follow `PersonasTab.tsx` and `src/components/settings/common/` as the canonical standard.
+     - Top level: `SettingsHeader` (`title`, `subtitle`, `icon`, `actionSlot`).
+     - Multi-domain tabs (e.g. Memory & Personas, Tools) must use **Segmented Sub-Navigation Pills** (`px-4 py-2 rounded-xl text-xs font-semibold`, icon + label + counter badge) to isolate views and prevent infinite vertical scroll fatigue (Miller's Law / cognitive load).
+     - Entity/editor pairs must use a responsive **Master-Detail Layout** (`grid grid-cols-1 md:grid-cols-12 gap-6`, `md:col-span-5` / `md:col-span-7`) with explicit active card styling (`border-[var(--theme-accent)] bg-[var(--theme-card-bg)] ring-1 ring-[var(--theme-accent)]/30`).
+     - Large settings views must be decomposed into modular components in `src/components/settings/<domain>/` (max ~200 lines per file).
    - No blinding white buttons in dark mode; use `Button` variants (`primary`, `secondary`, `ghost`, `danger`, `accent`).
    - Zero unicode emojis in HUDs, toasts, cards, or telemetry. Use Material Design 3 icons (`MaterialIcon`) or monospaced ASCII indicators (`[OK]`, `[ERR]`, `[>]`, `::`). Popups use persona glassmorphism (`rounded-2xl`, `backdrop-blur-2xl`).
 10. **Dual Documentation Synchronization**: When updating `README.md`, always synchronously update `README.ru.md` to keep all user-facing documentation in complete parity.
