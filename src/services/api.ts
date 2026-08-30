@@ -74,6 +74,11 @@ const post = <T>(endpoint: string, body?: any) =>
     method: 'POST',
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
+const put = <T>(endpoint: string, body?: any) =>
+  request<T>(endpoint, {
+    method: 'PUT',
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
 const del = <T>(endpoint: string) => request<T>(endpoint, { method: 'DELETE' });
 
 // Auth
@@ -236,8 +241,10 @@ export const get_local_ips = () => get<{ urls: string[] }>('/get-local-ips');
 // Memories & Skills
 export const get_memories = (query?: string) =>
   get<MemoryItem[]>(query ? `/memories?query=${encodeURIComponent(query)}` : '/memories');
-export const add_memory = (key: string, value: string, category?: string) =>
-  post<MemoryItem>('/memories', { key, value, category });
+export const add_memory = (key: string, value: string, category?: string, scope?: string) =>
+  post<MemoryItem>('/memories', { key, value, category, scope });
+export const update_memory = (id: string, updates: { key?: string; value?: string; category?: string; scope?: string }) =>
+  put<MemoryItem>(`/memories/${encodeURIComponent(id)}`, updates);
 export const delete_memory = (id: string) => del<void>(`/memories/${encodeURIComponent(id)}`);
 
 export const get_skills = () => get<SkillInfo[]>('/skills');

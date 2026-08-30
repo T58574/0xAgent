@@ -9,6 +9,8 @@ import {
   History,
   Check,
   Play,
+  Sparkles,
+  Info,
 } from 'lucide-react';
 import { PersonaMetadata, PersonaChangeProposalRecord, PersonaFileVersionRecord } from '../../types';
 import {
@@ -22,6 +24,7 @@ import {
   trigger_memory_decay_cycle,
 } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { useI18n } from '../../i18n';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -41,6 +44,7 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
   onPersonaUpdated,
 }) => {
   const { showToast } = useToast();
+  const { t } = useI18n();
   const [tab, setTab] = useState<'proposals' | 'history' | 'benchmark'>('proposals');
 
   // Proposals state
@@ -93,7 +97,7 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
   const handleApprove = async (id: string) => {
     try {
       await approve_persona_proposal(persona.id, id);
-      showToast('Предложение утверждено', 'success');
+      showToast(t.settings.personas.saved || 'Предложение утверждено', 'success');
       loadProposals();
     } catch (err: any) {
       showToast(err.message || 'Failed to approve', 'error');
@@ -179,171 +183,203 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={`${persona.name} — Evolution & Proposals Studio`}
+      title={`${persona.name} — ${t.settings.personas.evolutionTitle}`}
       maxWidth="xl"
     >
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 text-[var(--theme-text)] font-sans">
+        {/* Informative Studio Intro Banner */}
+        <div className="p-3.5 rounded-2xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] flex items-start gap-3 text-xs leading-relaxed">
+          <Sparkles size={16} className="text-[var(--theme-accent)] shrink-0 mt-0.5" />
+          <div className="space-y-0.5">
+            <div className="font-bold text-[var(--theme-text)]">
+              {t.settings.personas.evolutionTitle}
+            </div>
+            <p className="text-[11.5px] text-[var(--theme-text-muted)]">
+              {t.settings.personas.evolutionIntro}
+            </p>
+          </div>
+        </div>
+
         {/* Sub-tab Navigation */}
-        <div className="flex gap-2 border-b border-border pb-2">
-          <Button
-            variant={tab === 'proposals' ? 'primary' : 'ghost'}
-            size="sm"
+        <div className="flex gap-1.5 border-b border-[var(--theme-border)] pb-2 flex-wrap">
+          <button
+            type="button"
             onClick={() => setTab('proposals')}
-            className="flex items-center gap-1.5"
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+              tab === 'proposals'
+                ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs font-bold ring-1 ring-[var(--theme-accent)]/30'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+            }`}
           >
-            <GitPullRequest className="w-4 h-4" />
-            <span>Proposals ({proposals.filter((p) => p.status === 'pending').length} pending)</span>
-          </Button>
-          <Button
-            variant={tab === 'history' ? 'primary' : 'ghost'}
-            size="sm"
+            <GitPullRequest className="w-3.5 h-3.5 text-[var(--theme-accent)]" />
+            <span>{t.settings.personas.evolutionTabProposals}</span>
+            <Badge variant="neutral" size="xs">
+              {proposals.filter((p) => p.status === 'pending').length}
+            </Badge>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setTab('history')}
-            className="flex items-center gap-1.5"
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+              tab === 'history'
+                ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs font-bold ring-1 ring-[var(--theme-accent)]/30'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+            }`}
           >
-            <History className="w-4 h-4" />
-            <span>Version History</span>
-          </Button>
-          <Button
-            variant={tab === 'benchmark' ? 'primary' : 'ghost'}
-            size="sm"
+            <History className="w-3.5 h-3.5" />
+            <span>{t.settings.personas.evolutionTabHistory}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setTab('benchmark')}
-            className="flex items-center gap-1.5"
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+              tab === 'benchmark'
+                ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs font-bold ring-1 ring-[var(--theme-accent)]/30'
+                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+            }`}
           >
-            <Activity className="w-4 h-4" />
-            <span>Evaluation Benchmark</span>
-          </Button>
+            <Activity className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{t.settings.personas.evolutionTabBenchmark}</span>
+          </button>
         </div>
 
         {/* Tab 1: Proposals */}
         {tab === 'proposals' && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[360px]">
-            {/* List */}
-            <div className="flex flex-col gap-2 overflow-y-auto max-h-[420px] pr-1">
-              {isLoading ? (
-                <div className="text-xs text-muted-foreground p-4 text-center">
-                  Loading proposals...
-                </div>
-              ) : proposals.length === 0 ? (
-                <div className="text-xs text-muted-foreground p-4 text-center">
-                  No persona evolution proposals recorded yet.
-                </div>
-              ) : (
-                proposals.map((p) => (
-                  <Card
-                    key={p.id}
-                    className={`p-2.5 cursor-pointer transition-all ${
-                      selectedProposal?.id === p.id ? 'border-primary bg-primary/5' : 'hover:border-border/80'
-                    }`}
-                    onClick={() => setSelectedProposal(p)}
-                  >
-                    <div className="flex items-center justify-between gap-1 mb-1">
-                      <span className="font-mono text-xs font-semibold">{p.target_file}</span>
-                      {getRiskBadge(p.risk_level)}
-                    </div>
-                    <div className="text-[11px] text-muted-foreground truncate mb-1">
-                      {p.operation.toUpperCase()}: {p.target_section || 'Root'}
-                    </div>
-                    <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                      <span className="font-mono">ID: {p.id.slice(0, 8)}</span>
-                      <span className={`font-semibold capitalize ${
-                        p.status === 'applied' ? 'text-green-400' :
-                        p.status === 'approved' ? 'text-blue-400' :
-                        p.status === 'rejected' ? 'text-red-400' : 'text-amber-400'
-                      }`}>
-                        {p.status}
-                      </span>
-                    </div>
+          <div className="space-y-3">
+            <p className="text-xs text-[var(--theme-text-muted)] px-1">
+              {t.settings.personas.evolutionProposalsDesc}
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-h-[340px]">
+              {/* List */}
+              <div className="flex flex-col gap-2 overflow-y-auto max-h-[400px] pr-1">
+                {isLoading ? (
+                  <div className="text-xs text-[var(--theme-text-muted)] p-4 text-center">
+                    Загрузка предложений...
+                  </div>
+                ) : proposals.length === 0 ? (
+                  <Card className="text-xs text-[var(--theme-text-muted)] p-6 text-center rounded-2xl">
+                    <Info size={16} className="mx-auto mb-1.5 text-[var(--theme-text-muted)] opacity-60" />
+                    Предложений по эволюции персоны пока нет.
                   </Card>
-                ))
-              )}
-            </div>
-
-            {/* Proposal Details & Diff */}
-            <div className="md:col-span-2 flex flex-col gap-3 border border-border rounded-xl p-3 bg-secondary/10">
-              {selectedProposal ? (
-                <>
-                  <div className="flex items-center justify-between border-b border-border pb-2">
-                    <div>
-                      <div className="font-mono text-xs font-bold text-foreground">
-                        {selectedProposal.target_file} ({selectedProposal.operation})
+                ) : (
+                  proposals.map((p) => (
+                    <Card
+                      key={p.id}
+                      variant="interactive"
+                      selected={selectedProposal?.id === p.id}
+                      className="p-3 cursor-pointer transition-all rounded-xl"
+                      onClick={() => setSelectedProposal(p)}
+                    >
+                      <div className="flex items-center justify-between gap-1 mb-1">
+                        <span className="font-mono text-xs font-semibold text-[var(--theme-text)]">{p.target_file}</span>
+                        {getRiskBadge(p.risk_level)}
                       </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        Rationale: {selectedProposal.rationale || 'Autonomous self-improvement proposal'}
+                      <div className="text-[11px] text-[var(--theme-text-muted)] truncate mb-1">
+                        {p.operation.toUpperCase()}: {p.target_section || 'Root'}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getRiskBadge(selectedProposal.risk_level)}
-                    </div>
-                  </div>
+                      <div className="flex items-center justify-between text-[10px] text-[var(--theme-text-muted)]">
+                        <span className="font-mono">ID: {p.id.slice(0, 8)}</span>
+                        <span className={`font-semibold capitalize ${
+                          p.status === 'applied' ? 'text-emerald-400' :
+                          p.status === 'approved' ? 'text-sky-400' :
+                          p.status === 'rejected' ? 'text-rose-400' : 'text-amber-400'
+                        }`}>
+                          {p.status}
+                        </span>
+                      </div>
+                    </Card>
+                  ))
+                )}
+              </div>
 
-                  {/* Patch Content Preview */}
-                  <div className="flex-1">
-                    <div className="text-[11px] font-semibold text-muted-foreground mb-1">
-                      Patch Content:
-                    </div>
-                    <pre className="p-2.5 rounded-lg bg-black/40 border border-border text-xs font-mono whitespace-pre-wrap max-h-[220px] overflow-y-auto text-emerald-300">
-                      {selectedProposal.patch_payload?.content || JSON.stringify(selectedProposal.patch_payload, null, 2)}
-                    </pre>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center justify-between pt-2 border-t border-border">
-                    <span className="text-[11px] text-muted-foreground">
-                      Source: {selectedProposal.source_type} ({new Date(selectedProposal.created_at).toLocaleTimeString()})
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {selectedProposal.status === 'pending' && (
-                        <>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleReject(selectedProposal.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span>Reject</span>
-                          </Button>
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            onClick={() => handleApprove(selectedProposal.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            <span>Approve</span>
-                          </Button>
-                        </>
-                      )}
-                      {selectedProposal.status === 'approved' && (
-                        <div className="flex items-center gap-3">
-                          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={forceOverride}
-                              onChange={(e) => setForceOverride(e.target.checked)}
-                              className="rounded border-border"
-                            />
-                            <span>Force Override Guard</span>
-                          </label>
-                          <Button
-                            variant="accent"
-                            size="sm"
-                            onClick={() => handleApply(selectedProposal.id)}
-                            className="flex items-center gap-1"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                            <span>Apply to Persona</span>
-                          </Button>
+              {/* Proposal Details & Diff */}
+              <div className="md:col-span-2 flex flex-col gap-3 border border-[var(--theme-border)] rounded-2xl p-4 bg-[var(--theme-card-bg)]">
+                {selectedProposal ? (
+                  <>
+                    <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
+                      <div>
+                        <div className="font-mono text-xs font-bold text-[var(--theme-text)]">
+                          {selectedProposal.target_file} ({selectedProposal.operation})
                         </div>
-                      )}
+                        <div className="text-[11px] text-[var(--theme-text-muted)] mt-0.5">
+                          {selectedProposal.rationale || 'Автономное предложение по улучшению личности'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {getRiskBadge(selectedProposal.risk_level)}
+                      </div>
                     </div>
+
+                    {/* Patch Content Preview */}
+                    <div className="flex-1 space-y-1">
+                      <div className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                        Содержимое патча:
+                      </div>
+                      <pre className="p-3 rounded-xl bg-[var(--theme-code-bg)] border border-[var(--theme-border)] text-xs font-mono whitespace-pre-wrap max-h-[220px] overflow-y-auto text-[var(--theme-code-text)] select-text leading-relaxed">
+                        {selectedProposal.patch_payload?.content || JSON.stringify(selectedProposal.patch_payload, null, 2)}
+                      </pre>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center justify-between pt-2.5 border-t border-[var(--theme-border)]">
+                      <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
+                        {selectedProposal.source_type} ({new Date(selectedProposal.created_at).toLocaleTimeString()})
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {selectedProposal.status === 'pending' && (
+                          <>
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              onClick={() => handleReject(selectedProposal.id)}
+                              icon={<XCircle size={13} />}
+                            >
+                              Отклонить
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => handleApprove(selectedProposal.id)}
+                              icon={<CheckCircle size={13} />}
+                            >
+                              Утвердить
+                            </Button>
+                          </>
+                        )}
+                        {selectedProposal.status === 'approved' && (
+                          <div className="flex items-center gap-3">
+                            <label className="flex items-center gap-1.5 text-[11px] text-[var(--theme-text-muted)] cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={forceOverride}
+                                onChange={(e) => setForceOverride(e.target.checked)}
+                                className="rounded border-[var(--theme-border)]"
+                              />
+                              <span>Force Override Guard</span>
+                            </label>
+                            <Button
+                              variant="accent"
+                              size="sm"
+                              onClick={() => handleApply(selectedProposal.id)}
+                              icon={<Check size={13} />}
+                            >
+                              Применить к персоне
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-xs text-[var(--theme-text-muted)] p-8 text-center space-y-1">
+                    <GitPullRequest size={20} className="opacity-40 mb-1" />
+                    <span>Выберите предложение слева для просмотра diff и утверждения</span>
                   </div>
-                </>
-              ) : (
-                <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-                  Select a proposal to inspect diff and action flow.
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -351,16 +387,16 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
         {/* Tab 2: Version History & Rollback */}
         {tab === 'history' && (
           <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                Immutable snapshots recorded whenever files are updated or proposals applied.
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <span className="text-xs text-[var(--theme-text-muted)]">
+                {t.settings.personas.evolutionHistoryDesc}
               </span>
               <div className="flex gap-1">
                 {(['ALL', 'SOUL.md', 'TOOLS.md', 'USER.md'] as const).map((f) => (
                   <Button
                     key={f}
                     variant={selectedFileFilter === f ? 'secondary' : 'ghost'}
-                    size="sm"
+                    size="xs"
                     onClick={() => setSelectedFileFilter(f)}
                     className="text-xs"
                   >
@@ -370,40 +406,39 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 max-h-[380px] overflow-y-auto">
+            <div className="flex flex-col gap-2 max-h-[380px] overflow-y-auto pr-1">
               {history.length === 0 ? (
-                <div className="text-xs text-muted-foreground p-4 text-center">
-                  No snapshot versions recorded yet.
-                </div>
+                <Card className="text-xs text-[var(--theme-text-muted)] p-6 text-center rounded-2xl">
+                  Слепки версий пока не записаны.
+                </Card>
               ) : (
                 history.map((ver) => (
-                  <Card key={ver.id} className="p-3 flex items-center justify-between gap-2">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-foreground">{ver.file}</span>
-                        <Badge variant="neutral" className="text-[10px] font-mono">
+                  <Card key={ver.id} className="p-3 flex items-center justify-between gap-3 rounded-xl">
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs font-bold text-[var(--theme-text)]">{ver.file}</span>
+                        <Badge variant="neutral" size="xs">
                           {ver.id}
                         </Badge>
-                        <span className="text-[10px] text-muted-foreground">
-                          by {ver.created_by}
+                        <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
+                          {ver.created_by}
                         </span>
                       </div>
-                      <div className="font-mono text-[10px] text-muted-foreground truncate max-w-md">
+                      <div className="font-mono text-[10px] text-[var(--theme-text-muted)] truncate">
                         SHA256: {ver.content_sha256}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-muted-foreground">
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
                         {new Date(ver.created_at).toLocaleString()}
                       </span>
                       <Button
                         variant="secondary"
-                        size="sm"
+                        size="xs"
                         onClick={() => handleRollback(ver.file, ver.id)}
-                        className="flex items-center gap-1 text-xs"
+                        icon={<RotateCcw size={12} />}
                       >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Rollback</span>
+                        Откатить
                       </Button>
                     </div>
                   </Card>
@@ -416,11 +451,11 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
         {/* Tab 3: Evaluation Benchmark */}
         {tab === 'benchmark' && (
           <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between border-b border-border pb-3">
+            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3 flex-wrap gap-2">
               <div>
-                <div className="text-sm font-semibold text-foreground">Continuous Persona & Safety Benchmark</div>
-                <div className="text-xs text-muted-foreground">
-                  Validates language directives, memory retrieval zero-budget invariants, and protected safety defense.
+                <div className="text-xs font-bold text-[var(--theme-text)]">Бенчмарк безопасности и гигиена памяти</div>
+                <div className="text-[11.5px] text-[var(--theme-text-muted)] mt-0.5">
+                  {t.settings.personas.evolutionBenchmarkDesc}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -429,55 +464,55 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
                   size="sm"
                   onClick={handleTriggerDecay}
                   disabled={isDecayRunning}
-                  className="flex items-center gap-1.5 text-xs"
+                  loading={isDecayRunning}
+                  icon={<RotateCcw size={13} />}
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>{isDecayRunning ? 'Cleaning...' : 'Run Memory Hygiene'}</span>
+                  {t.settings.personas.runHygieneBtn}
                 </Button>
                 <Button
-                  variant="primary"
+                  variant="accent"
                   size="sm"
                   onClick={handleRunBenchmark}
                   disabled={isBenchmarkRunning}
-                  className="flex items-center gap-1.5"
+                  loading={isBenchmarkRunning}
+                  icon={<Play size={13} />}
                 >
-                  <Play className="w-4 h-4" />
-                  <span>{isBenchmarkRunning ? 'Evaluating...' : 'Run Benchmark'}</span>
+                  {t.settings.personas.runBenchmarkBtn}
                 </Button>
               </div>
             </div>
 
             {benchmarkResult && (
-              <div className="flex flex-col gap-3">
-                <div className="flex items-center justify-between p-3 rounded-xl bg-secondary/20 border border-border">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-primary" />
-                    <span className="text-sm font-semibold">Overall Compliance Score:</span>
+              <div className="flex flex-col gap-3 animate-fadeIn">
+                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)]">
+                  <div className="flex items-center gap-2.5">
+                    <Shield className="w-5 h-5 text-[var(--theme-accent)]" />
+                    <span className="text-xs font-bold">Итоговый скор соответствия безопасности:</span>
                   </div>
-                  <Badge variant={benchmarkResult.overallScore >= 80 ? 'success' : 'warning'} className="text-sm font-mono px-3 py-1">
-                    {benchmarkResult.overallScore}% ({benchmarkResult.passedTasks}/{benchmarkResult.totalTasks} passed)
+                  <Badge variant={benchmarkResult.overallScore >= 80 ? 'success' : 'warning'} size="sm" className="font-mono font-bold">
+                    {benchmarkResult.overallScore}% ({benchmarkResult.passedTasks}/{benchmarkResult.totalTasks} пройдено)
                   </Badge>
                 </div>
 
-                <div className="flex flex-col gap-2 max-h-[280px] overflow-y-auto">
+                <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
                   {benchmarkResult.items?.map((item: any) => (
                     <div
                       key={item.taskId}
-                      className="p-2.5 rounded-lg border border-border bg-black/20 flex items-center justify-between gap-2"
+                      className="p-2.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] flex items-center justify-between gap-3"
                     >
-                      <div className="flex flex-col gap-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs font-semibold ${item.passed ? 'text-green-400' : 'text-red-400'}`}>
+                      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs font-bold font-mono ${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
                             {item.passed ? '[PASS]' : '[FAIL]'}
                           </span>
-                          <span className="text-xs font-medium text-foreground">{item.name}</span>
-                          <Badge variant="neutral" className="text-[10px] uppercase">
+                          <span className="text-xs font-semibold text-[var(--theme-text)]">{item.name}</span>
+                          <Badge variant="neutral" size="xs">
                             {item.category}
                           </Badge>
                         </div>
-                        <span className="text-[11px] text-muted-foreground">{item.details}</span>
+                        <span className="text-[11px] text-[var(--theme-text-muted)] line-clamp-1">{item.details}</span>
                       </div>
-                      <span className="font-mono text-xs font-bold text-muted-foreground">
+                      <span className="font-mono text-xs font-bold text-[var(--theme-text-muted)] shrink-0">
                         {Math.round(item.score * 100)}%
                       </span>
                     </div>

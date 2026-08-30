@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders, Cpu, Check, RefreshCw, ChevronLeft, User, Wrench } from 'lucide-react';
+import { Sliders, Cpu, Check, RefreshCw, ChevronLeft, Brain, Wrench } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { useI18n } from '../../i18n';
 import { Button } from '../ui/Button';
@@ -69,7 +69,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
             { id: 'general', label: t.settings.tabs.general, icon: Sliders },
             { id: 'local_server', label: t.settings.tabs.localServer, icon: Cpu },
             { id: 'tools', label: t.settings.tabs.tools, icon: Wrench },
-            { id: 'personas', label: t.settings.tabs.personas, icon: User },
+            { id: 'personas', label: t.settings.tabs.personas, icon: Brain },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = s.activeSubtab === tab.id;
@@ -86,9 +86,9 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
               >
                 <Icon
                   size={15}
-                  className={isActive ? 'text-[var(--theme-text)]' : 'text-[var(--theme-text-muted)]'}
+                  className={`shrink-0 ${isActive ? 'text-[var(--theme-text)]' : 'text-[var(--theme-text-muted)]'}`}
                 />
-                <span>{tab.label}</span>
+                <span className="truncate">{tab.label}</span>
               </button>
             );
           })}

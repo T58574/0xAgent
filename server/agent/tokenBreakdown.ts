@@ -182,18 +182,22 @@ export async function calculateContextBreakdown(
     contentPreview: workspaceMd || 'Локальный контекстный файл не загружен',
   });
 
-  // 8. Long-Term Memory (memory.json)
+  // 8. Long-Term Memory (memory.db)
   const memories = loadMemories();
+  const memoryDetails: TokenBreakdownDetailItem[] = memories.map((m) => {
+    const itemTokens = estimateMessageTokens(`- [${m.category.toUpperCase()}] ${m.key}: ${m.value}`);
+    return {
+      id: m.id,
+      name: m.key,
+      tokens: itemTokens,
+      description: `[${m.category.toUpperCase()}] ${m.value}`,
+      scope: m.scope === 'project' ? 'Workspace' : 'Global',
+      preview: m.value,
+    };
+  });
+
+  const memoryTokens = memoryDetails.reduce((sum, d) => sum + d.tokens, 0);
   const memoryMd = getSystemPromptMemoryContext();
-  const memoryTokens = estimateMessageTokens(memoryMd);
-  const memoryDetails: TokenBreakdownDetailItem[] = memories.map((m) => ({
-    id: m.id,
-    name: m.key,
-    tokens: estimateMessageTokens(`${m.key}: ${m.value}`),
-    description: `[${m.category.toUpperCase()}] ${m.value}`,
-    scope: 'Global',
-    preview: m.value,
-  }));
 
   categories.push({
     id: 'memory',
@@ -203,9 +207,9 @@ export async function calculateContextBreakdown(
     percentage: Number(((memoryTokens / totalBudget) * 100).toFixed(1)),
     shareOfUsed: 0,
     color: '#84cc16', // Lime
-    description: `База постоянных фактов и предпочтений из ~/.0xagent/memory.json`,
+    description: `База постоянных фактов и предпочтений из SQLite WAL (~/.0xagent/memory.db)`,
     scope: 'Global',
-    contentPreview: memoryMd,
+    contentPreview: memoryMd || memories.map(m => `- [${m.category.toUpperCase()}] ${m.key}: ${m.value}`).join('\n'),
     details: memoryDetails,
   });
 

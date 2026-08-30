@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { getMemoryDb } from '../memoryDb';
 import {
   loadMemories,
   addOrUpdateMemory,
@@ -34,6 +35,39 @@ memoryRouter.post('/memories', (req, res) => {
       isExplicit: is_explicit !== undefined ? is_explicit : true,
     });
     res.json(item);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+memoryRouter.put('/memories/:id', (req, res) => {
+  try {
+    const { key, value, category, domain, importance, scope } = req.body;
+    const db = getMemoryDb();
+    const now = new Date().toISOString();
+    
+    // Check if record exists
+    const existing = db.prepare(`SELECT * FROM canonical_memories WHERE id = ?`).get(req.params.id) as any;
+    if (!existing) {
+      res.status(404).json({ error: 'Memory not found' });
+      return;
+    }
+
+    const updatedKey = key !== undefined ? key.trim() : existing.key;
+    const updatedValue = value !== undefined ? value.trim() : existing.value;
+    const updatedCategory = category !== undefined ? category : existing.category;
+    const updatedDomain = domain !== undefined ? domain : existing.domain;
+    const updatedImportance = importance !== undefined ? Number(importance) : existing.importance;
+    const updatedScope = scope !== undefined ? scope : existing.scope;
+
+    db.prepare(`
+      UPDATE canonical_memories
+      SET key = ?, value = ?, category = ?, domain = ?, importance = ?, scope = ?, updated_at = ?, last_confirmed_at = ?
+      WHERE id = ?
+    `).run(updatedKey, updatedValue, updatedCategory, updatedDomain, updatedImportance, updatedScope, now, now, req.params.id);
+
+    const updated = db.prepare(`SELECT * FROM canonical_memories WHERE id = ?`).get(req.params.id) as any;
+    res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
