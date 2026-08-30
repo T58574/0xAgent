@@ -1,5 +1,7 @@
 import React from 'react';
 import { Save, FileText } from 'lucide-react';
+import { Button } from '../../ui/Button';
+import { Card } from '../../ui/Card';
 
 interface SummarizerEditorProps {
   summarizerPrompt: string;
@@ -15,35 +17,36 @@ export const SummarizerEditor: React.FC<SummarizerEditorProps> = ({
   saving,
 }) => {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <Card variant="default" className="space-y-4 font-sans text-[var(--theme-text)]">
+      <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3 gap-3">
         <div>
-          <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-            <FileText size={16} className="text-purple-400" />
+          <h3 className="text-sm font-bold text-[var(--theme-text)] flex items-center gap-2">
+            <FileText size={16} className="text-[var(--theme-text-muted)]" />
             <span>Промпт Фонового Суммаризатора Контекста</span>
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 leading-relaxed">
             Этот системный промпт используется когда диалог превышает лимит контекста и сжимается в фоновом режиме.
           </p>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={onSave}
           disabled={saving}
-          className="flat-btn px-4 py-2 rounded-xl text-xs font-bold text-emerald-400 border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 flex items-center gap-2 disabled:opacity-40 cursor-pointer"
+          loading={saving}
+          icon={<Save size={13} />}
         >
-          <Save size={14} />
-          <span>{saving ? 'Сохранение...' : 'Сохранить промпт'}</span>
-        </button>
+          {saving ? 'Сохранение...' : 'Сохранить промпт'}
+        </Button>
       </div>
 
       <textarea
         value={summarizerPrompt}
         onChange={(e) => setSummarizerPrompt(e.target.value)}
         rows={16}
-        className="w-full p-4 rounded-xl flat-input font-mono text-xs text-slate-200 focus:outline-none leading-relaxed"
+        className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none focus:border-[var(--theme-accent)] resize-y leading-relaxed"
         placeholder="Промпт для сжатия диалога..."
       />
-    </div>
+    </Card>
   );
 };

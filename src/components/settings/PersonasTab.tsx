@@ -25,6 +25,13 @@ import {
 } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { useI18n } from '../../i18n';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
+import { Toggle } from '../ui/Toggle';
+import { Modal } from '../ui/Modal';
+import { SettingsHeader, SettingsSection } from './common';
 
 export const PersonasTab: React.FC = () => {
   const { t, formatString } = useI18n();
@@ -42,7 +49,6 @@ export const PersonasTab: React.FC = () => {
   // Tools state
   const [toolsList, setToolsList] = useState<ToolDefinition[]>([]);
   const [isToolsSaving, setIsToolsSaving] = useState<boolean>(false);
-  const [_toolsSaveSuccess, setToolsSaveSuccess] = useState<boolean>(false);
 
   // Persona file state (SOUL.md & USER.md)
   const [activeFileTab, setActiveFileTab] = useState<'soul' | 'user'>('soul');
@@ -107,14 +113,17 @@ export const PersonasTab: React.FC = () => {
     loadSummarizer();
     loadToolsState();
 
-    const unsub = listen<{ activePersonaId?: string; personas: PersonaMetadata[] }>('persona-changed', (e) => {
-      if (e.payload?.personas) {
-        setPersonas(e.payload.personas);
+    const unsub = listen<{ activePersonaId?: string; personas: PersonaMetadata[] }>(
+      'persona-changed',
+      (e) => {
+        if (e.payload?.personas) {
+          setPersonas(e.payload.personas);
+        }
+        if (e.payload?.activePersonaId) {
+          setActivePersonaId(e.payload.activePersonaId);
+        }
       }
-      if (e.payload?.activePersonaId) {
-        setActivePersonaId(e.payload.activePersonaId);
-      }
-    });
+    );
 
     return () => {
       unsub();
@@ -160,8 +169,6 @@ export const PersonasTab: React.FC = () => {
     try {
       setIsToolsSaving(true);
       await save_tools_toggles(toggles);
-      setToolsSaveSuccess(true);
-      setTimeout(() => setToolsSaveSuccess(false), 2000);
     } catch (err: any) {
       console.error('Failed to save tool toggle:', err);
     } finally {
@@ -221,10 +228,14 @@ export const PersonasTab: React.FC = () => {
     if (!personaDetail) return;
     try {
       setIsSaving(true);
-      const targetFile: 'SOUL.md' | 'TOOLS.md' | 'USER.md' = activeFileTab === 'soul' ? 'SOUL.md' : 'USER.md';
+      const targetFile: 'SOUL.md' | 'TOOLS.md' | 'USER.md' =
+        activeFileTab === 'soul' ? 'SOUL.md' : 'USER.md';
       await save_persona_file(personaDetail.metadata.id, targetFile, fileContent);
       setSaveSuccess(true);
-      showToast(formatString(t.toasts.personaFileSaved, { file: `${activeFileTab.toUpperCase()}.md` }), 'success');
+      showToast(
+        formatString(t.toasts.personaFileSaved, { file: `${activeFileTab.toUpperCase()}.md` }),
+        'success'
+      );
       setTimeout(() => setSaveSuccess(false), 2000);
       loadDetail(personaDetail.metadata.id);
     } catch (err: any) {
@@ -249,196 +260,62 @@ export const PersonasTab: React.FC = () => {
   };
 
   return (
-    <div className="w-full flex flex-col gap-5 font-sans text-[var(--theme-text)]">
-      {/* Top Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-3 flex-wrap">
-        <button
-          type="button"
-          onClick={() => setSectionTab('personas')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
-            sectionTab === 'personas'
-              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
-              : 'border-[var(--theme-border)] bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-          }`}
-        >
-          <User size={14} />
-          <span>{t.settings.personas.personasTab}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSectionTab('tools')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
-            sectionTab === 'tools'
-              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
-              : 'border-[var(--theme-border)] bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-          }`}
-        >
-          <Sliders size={14} />
-          <span>{t.settings.personas.toolsTab}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setSectionTab('summarizer')}
-          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer border ${
-            sectionTab === 'summarizer'
-              ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
-              : 'border-[var(--theme-border)] bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-          }`}
-        >
-          <Sparkles size={14} />
-          <span>{t.settings.personas.summarizerTab}</span>
-        </button>
-      </div>
-
-      {/* 1. TOOLS MANAGEMENT TAB */}
-      {sectionTab === 'tools' && (
-        <div className="flex flex-col gap-4">
-          <div className="p-4 rounded-2xl bento-card flex flex-col md:flex-row md:items-center justify-between gap-3 border border-[var(--theme-border)]">
-            <div className="flex items-start gap-3">
-              <div className="p-2.5 rounded-xl bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] shrink-0">
-                <Sliders size={18} />
-              </div>
-              <div>
-                <h2 className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-2">
-                  <span>{t.settings.personas.toolsTitle}</span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] font-semibold">
-                    TOOLS.md
-                  </span>
-                </h2>
-                <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 max-w-2xl">
-                  {t.settings.personas.toolsDesc}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleBulkToggleAll(true)}
-                disabled={isToolsSaving}
-                className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] text-xs font-bold border border-[var(--theme-border)] transition-colors cursor-pointer"
-              >
-                {t.settings.personas.enableAll}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleBulkToggleAll(false)}
-                disabled={isToolsSaving}
-                className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] text-xs font-bold border border-[var(--theme-border)] transition-colors cursor-pointer"
-              >
-                {t.settings.personas.disableAll}
-              </button>
-            </div>
+    <div className="w-full space-y-6 font-sans text-[var(--theme-text)]">
+      {/* 1. Standard Top Header + Subtab Navigation */}
+      <SettingsHeader
+        title={t.settings.personas.title || 'Персоны & Инструкции'}
+        subtitle={
+          t.settings.personas.subtitle ||
+          'Конфигурация характера агента, промптов SOUL.md и системного суммаризатора'
+        }
+        icon={<User size={18} />}
+        actionSlot={
+          <div className="flex items-center gap-1.5 select-none">
+            <Button
+              variant={sectionTab === 'personas' ? 'accent' : 'secondary'}
+              size="sm"
+              onClick={() => setSectionTab('personas')}
+              icon={<User size={13} />}
+            >
+              {t.settings.personas.personasTab}
+            </Button>
+            <Button
+              variant={sectionTab === 'tools' ? 'accent' : 'secondary'}
+              size="sm"
+              onClick={() => setSectionTab('tools')}
+              icon={<Sliders size={13} />}
+            >
+              {t.settings.personas.toolsTab}
+            </Button>
+            <Button
+              variant={sectionTab === 'summarizer' ? 'accent' : 'secondary'}
+              size="sm"
+              onClick={() => setSectionTab('summarizer')}
+              icon={<Sparkles size={13} />}
+            >
+              {t.settings.personas.summarizerTab}
+            </Button>
           </div>
+        }
+      />
 
-          {/* Tools Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {toolsList.map((tool) => (
-              <div
-                key={tool.id}
-                onClick={() => handleToggleTool(tool.id)}
-                className={`p-4 rounded-2xl bento-card cursor-pointer transition-all flex flex-col justify-between gap-3 border ${
-                  tool.enabled
-                    ? 'border-[var(--theme-accent)] bg-[var(--theme-card-bg)]'
-                    : 'opacity-60 hover:opacity-90 border-[var(--theme-border)] bg-[var(--theme-card-bg)]'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-bold text-[var(--theme-text)]">&lt;{tool.name}&gt;</span>
-                      <span className="text-[9px] px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] font-mono border border-[var(--theme-border)]">
-                        {tool.requiresApproval ? t.settings.personas.requiresApproval : t.settings.personas.auto}
-                      </span>
-                    </div>
-                    <p className="text-xs text-[var(--theme-text-muted)] mt-1.5 leading-relaxed">{tool.description}</p>
-                  </div>
-
-                  <div
-                    className={`w-9 h-5 rounded-full p-0.5 flex items-center shrink-0 transition-colors border ${
-                      tool.enabled
-                        ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)] justify-end'
-                        : 'bg-[var(--theme-input-bg)] border-[var(--theme-border)] justify-start'
-                    }`}
-                  >
-                    <div
-                      className={`w-3.5 h-3.5 rounded-full transition-transform ${
-                        tool.enabled ? 'bg-[var(--theme-accent-text)]' : 'bg-[var(--theme-text-muted)]'
-                      }`}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 2. SUMMARIZER TAB */}
-      {sectionTab === 'summarizer' && (
-        <div className="flex flex-col gap-4">
-          <div className="p-4 rounded-2xl bento-card flex items-start gap-3 border border-[var(--theme-border)]">
-            <div className="p-2.5 rounded-xl bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] shrink-0">
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <h2 className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-2">
-                <span>{t.settings.personas.summarizerTitle}</span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] font-semibold">
-                  SUMMARIZER.md
-                </span>
-              </h2>
-              <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 leading-relaxed">
-                {t.settings.personas.summarizerDesc}
-              </p>
-            </div>
-          </div>
-
-          <div className="p-4 rounded-2xl bento-card flex flex-col gap-3 border border-[var(--theme-border)]">
-            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
-              <div className="flex items-center gap-2">
-                <FileText size={14} className="text-[var(--theme-text-muted)]" />
-                <span className="text-xs font-bold text-[var(--theme-text)]">{t.settings.personas.summarizerPromptTitle}</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleSaveSummarizer}
-                disabled={isSaving}
-                className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
-              >
-                {saveSuccess ? <Check size={13} /> : <Save size={13} />}
-                <span>{saveSuccess ? t.settings.personas.saved : t.settings.personas.save}</span>
-              </button>
-            </div>
-            <textarea
-              value={summarizerPrompt}
-              onChange={(e) => setSummarizerPrompt(e.target.value)}
-              rows={16}
-              className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none resize-y"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* 3. PERSONAS LIST & EDITOR TAB */}
+      {/* 2. SUBTAB: PERSONAS LIST & EDITOR */}
       {sectionTab === 'personas' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Personas List Column */}
+          {/* Left Column: Personas List */}
           <div className="lg:col-span-4 space-y-3">
             <div className="flex items-center justify-between px-1">
               <span className="text-xs font-bold text-[var(--theme-text-muted)] uppercase tracking-wider">
                 {formatString(t.settings.personas.personasCount, { count: personas.length })}
               </span>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
+                size="xs"
                 onClick={() => setIsCreateOpen(true)}
-                className="px-2.5 py-1 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors shadow-sm"
+                icon={<Plus size={13} />}
               >
-                <Plus size={13} />
-                <span>{t.settings.personas.createBtn}</span>
-              </button>
+                {t.settings.personas.createBtn}
+              </Button>
             </div>
 
             <div className="space-y-2">
@@ -446,75 +323,81 @@ export const PersonasTab: React.FC = () => {
                 const isSelected = p.id === selectedPersonaId;
                 const isActive = p.id === activePersonaId;
                 return (
-                  <div
+                  <Card
                     key={p.id}
+                    variant="interactive"
+                    selected={isSelected}
                     onClick={() => setSelectedPersonaId(p.id)}
-                    className={`p-3.5 rounded-2xl bento-card cursor-pointer transition-all flex flex-col gap-1.5 border ${
-                      isSelected
-                        ? 'border-[var(--theme-accent)] bg-[var(--theme-border-subtle)] ring-1 ring-[var(--theme-accent)]'
-                        : 'border-[var(--theme-border)] bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-                    }`}
+                    padded={false}
+                    className="p-3.5 flex flex-col gap-1.5"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <User size={14} className="text-[var(--theme-text-muted)]" />
-                        <span className="font-bold text-xs text-[var(--theme-text)]">{p.name}</span>
+                      <div className="flex items-center gap-2 truncate">
+                        <User size={14} className="text-[var(--theme-text-muted)] shrink-0" />
+                        <span className="font-bold text-xs text-[var(--theme-text)] truncate">
+                          {p.name}
+                        </span>
                       </div>
                       {isActive && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-[var(--theme-accent)] text-[var(--theme-accent-text)]">
+                        <Badge variant="accent" size="xs">
                           {t.settings.personas.activeBadge}
-                        </span>
+                        </Badge>
                       )}
                     </div>
-                    <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed">{p.description}</p>
-                  </div>
+                    <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed">
+                      {p.description}
+                    </p>
+                  </Card>
                 );
               })}
             </div>
           </div>
 
-          {/* Persona Details Column */}
+          {/* Right Column: Persona Details & Markdown Editor */}
           <div className="lg:col-span-8 space-y-3">
             {personaDetail ? (
-              <div className="p-4.5 rounded-2xl bento-card space-y-4 border border-[var(--theme-border)]">
-                <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-[var(--theme-text)]">{personaDetail.metadata.name}</h3>
-                    <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">{personaDetail.metadata.description}</p>
+              <Card variant="default" className="space-y-4">
+                <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3 gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-bold text-[var(--theme-text)] truncate">
+                      {personaDetail.metadata.name}
+                    </h3>
+                    <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 leading-relaxed">
+                      {personaDetail.metadata.description}
+                    </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     {personaDetail.metadata.id !== activePersonaId && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={() => handleActivate(personaDetail.metadata.id)}
-                        className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold cursor-pointer transition-colors shadow-sm"
                       >
                         {t.settings.personas.activateBtn}
-                      </button>
+                      </Button>
                     )}
                     {personaDetail.metadata.id !== 'default' && (
-                      <button
-                        type="button"
+                      <Button
+                        variant="danger"
+                        size="sm"
                         onClick={() => handleDelete(personaDetail.metadata.id)}
-                        className="p-1.5 rounded-xl text-rose-500 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 cursor-pointer transition-colors"
+                        icon={<Trash2 size={13} />}
                         title={t.settings.personas.deleteTooltip}
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      />
                     )}
                   </div>
                 </div>
 
-                {/* File Subtabs */}
-                <div className="flex items-center justify-between">
+                {/* Subtab Files: SOUL.md vs USER.md */}
+                <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center bg-[var(--theme-input-bg)] p-1 rounded-xl border border-[var(--theme-border)]">
                     <button
                       type="button"
                       onClick={() => setActiveFileTab('soul')}
                       className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
                         activeFileTab === 'soul'
-                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
+                          ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-sm border border-[var(--theme-border)]'
                           : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                       }`}
                     >
@@ -525,7 +408,7 @@ export const PersonasTab: React.FC = () => {
                       onClick={() => setActiveFileTab('user')}
                       className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
                         activeFileTab === 'user'
-                          ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
+                          ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-sm border border-[var(--theme-border)]'
                           : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
                       }`}
                     >
@@ -533,82 +416,167 @@ export const PersonasTab: React.FC = () => {
                     </button>
                   </div>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={handleSavePersonaFile}
                     disabled={isSaving}
-                    className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold flex items-center gap-1.5 cursor-pointer disabled:opacity-50 transition-colors shadow-sm"
+                    loading={isSaving}
+                    icon={saveSuccess ? <Check size={13} className="text-emerald-500" /> : <Save size={13} />}
                   >
-                    {saveSuccess ? <Check size={13} /> : <Save size={13} />}
-                    <span>{saveSuccess ? t.settings.personas.saved : t.settings.personas.save}</span>
-                  </button>
+                    {saveSuccess ? t.settings.personas.saved : t.settings.personas.save}
+                  </Button>
                 </div>
 
                 <textarea
                   value={fileContent}
                   onChange={(e) => setFileContent(e.target.value)}
                   rows={14}
-                  className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none resize-y"
+                  className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none focus:border-[var(--theme-accent)] resize-y leading-relaxed"
                 />
-              </div>
+              </Card>
             ) : (
-              <div className="p-8 rounded-2xl bento-card text-center text-xs text-[var(--theme-text-muted)] border border-[var(--theme-border)] font-medium">
+              <Card variant="default" className="p-8 text-center text-xs text-[var(--theme-text-muted)]">
                 {t.settings.personas.selectPersonaPrompt}
-              </div>
+              </Card>
             )}
           </div>
         </div>
       )}
 
-      {/* Modal for Creating New Persona */}
-      {isCreateOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="w-full max-w-md p-6 rounded-2xl bento-card bg-[var(--theme-panel-solid)] border border-[var(--theme-border)] shadow-xl space-y-4">
-            <h3 className="text-sm font-bold text-[var(--theme-text)]">{t.settings.personas.newPersonaTitle}</h3>
-            <form onSubmit={handleCreate} className="space-y-3.5">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-[var(--theme-text-muted)]">{t.settings.personas.personaNameLabel}</label>
-                <input
-                  type="text"
-                  value={newName}
-                  onChange={(e) => setNewName(e.target.value)}
-                  placeholder={t.settings.personas.personaNamePlaceholder}
-                  className="w-full px-3.5 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] focus:outline-none"
-                  required
-                  autoFocus
-                />
-              </div>
+      {/* 3. SUBTAB: TOOLS MANAGEMENT */}
+      {sectionTab === 'tools' && (
+        <SettingsSection
+          title={t.settings.personas.toolsTitle}
+          badge="TOOLS.md"
+          description={t.settings.personas.toolsDesc}
+          actionSlot={
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => handleBulkToggleAll(true)}
+                disabled={isToolsSaving}
+              >
+                {t.settings.personas.enableAll}
+              </Button>
+              <Button
+                variant="secondary"
+                size="xs"
+                onClick={() => handleBulkToggleAll(false)}
+                disabled={isToolsSaving}
+              >
+                {t.settings.personas.disableAll}
+              </Button>
+            </div>
+          }
+        >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {toolsList.map((tool) => (
+              <Card
+                key={tool.id}
+                variant="interactive"
+                selected={tool.enabled}
+                onClick={() => handleToggleTool(tool.id)}
+                className="flex items-start justify-between gap-3"
+              >
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-[var(--theme-text)]">
+                      &lt;{tool.name}&gt;
+                    </span>
+                    <Badge variant="neutral" size="xs">
+                      {tool.requiresApproval ? t.settings.personas.requiresApproval : t.settings.personas.auto}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed">
+                    {tool.description}
+                  </p>
+                </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-[var(--theme-text-muted)]">{t.settings.personas.personaDescLabel}</label>
-                <input
-                  type="text"
-                  value={newDesc}
-                  onChange={(e) => setNewDesc(e.target.value)}
-                  placeholder={t.settings.personas.personaDescPlaceholder}
-                  className="w-full px-3.5 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs text-[var(--theme-text)] focus:outline-none"
+                <Toggle
+                  checked={tool.enabled}
+                  onChange={() => handleToggleTool(tool.id)}
+                  size="sm"
                 />
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsCreateOpen(false)}
-                  className="px-3.5 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
-                >
-                  {t.settings.personas.cancelBtn}
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-1.5 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border border-[var(--theme-accent)] text-xs font-bold cursor-pointer transition-colors shadow-sm"
-                >
-                  {t.settings.personas.createConfirmBtn}
-                </button>
-              </div>
-            </form>
+              </Card>
+            ))}
           </div>
-        </div>
+        </SettingsSection>
       )}
+
+      {/* 4. SUBTAB: SUMMARIZER TAB */}
+      {sectionTab === 'summarizer' && (
+        <SettingsSection
+          title={t.settings.personas.summarizerTitle}
+          badge="SUMMARIZER.md"
+          description={t.settings.personas.summarizerDesc}
+        >
+          <Card variant="default" className="space-y-3">
+            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
+              <div className="flex items-center gap-2">
+                <FileText size={14} className="text-[var(--theme-text-muted)]" />
+                <span className="text-xs font-bold text-[var(--theme-text)]">
+                  {t.settings.personas.summarizerPromptTitle}
+                </span>
+              </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleSaveSummarizer}
+                disabled={isSaving}
+                loading={isSaving}
+                icon={saveSuccess ? <Check size={13} className="text-emerald-500" /> : <Save size={13} />}
+              >
+                {saveSuccess ? t.settings.personas.saved : t.settings.personas.save}
+              </Button>
+            </div>
+
+            <textarea
+              value={summarizerPrompt}
+              onChange={(e) => setSummarizerPrompt(e.target.value)}
+              rows={16}
+              className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none focus:border-[var(--theme-accent)] resize-y leading-relaxed"
+            />
+          </Card>
+        </SettingsSection>
+      )}
+
+      {/* 5. Create New Persona Modal */}
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        title={t.settings.personas.newPersonaTitle}
+        subtitle="Создайте изолированный профиль поведения и инструкций"
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setIsCreateOpen(false)}>
+              {t.settings.personas.cancelBtn}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleCreate}>
+              {t.settings.personas.createConfirmBtn}
+            </Button>
+          </>
+        }
+      >
+        <form onSubmit={handleCreate} className="space-y-3.5">
+          <Input
+            label={t.settings.personas.personaNameLabel}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={t.settings.personas.personaNamePlaceholder}
+            required
+            autoFocus
+          />
+
+          <Input
+            label={t.settings.personas.personaDescLabel}
+            value={newDesc}
+            onChange={(e) => setNewDesc(e.target.value)}
+            placeholder={t.settings.personas.personaDescPlaceholder}
+          />
+        </form>
+      </Modal>
     </div>
   );
 };

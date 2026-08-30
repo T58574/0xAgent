@@ -2,6 +2,9 @@ import React from 'react';
 import { Zap, Folder, Sparkles } from 'lucide-react';
 import { LocalModelItem, GgufMetadata } from '../../../types';
 import { useI18n } from '../../../i18n';
+import { Button } from '../../ui/Button';
+import { Toggle } from '../../ui/Toggle';
+import { Card } from '../../ui/Card';
 import {
   InfoTooltip,
   ParamNumberInput,
@@ -60,7 +63,6 @@ export interface ServerPerformanceParamsProps {
   specDraftModel: string;
   setSpecDraftModel: (val: string) => void;
   specType: string;
-  setSpecType: (val: string) => void;
   specDraftNgl: number;
   setSpecDraftNgl: (val: number) => void;
   specDraftNMax: number;
@@ -80,6 +82,7 @@ export interface ServerPerformanceParamsProps {
   onApplyFastMtpPreset?: () => void;
   modelMeta?: GgufMetadata | null;
   serverStatus?: 'stopped' | 'running' | 'checking';
+  setSpecType: (val: string) => void;
 }
 
 const CTX_PRESETS = [
@@ -141,25 +144,17 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
   setSpecDraftModel,
   specType,
   setSpecType,
-  specDraftNgl: _specDraftNgl,
   setSpecDraftNgl,
-  specDraftNMax: _specDraftNMax,
   setSpecDraftNMax,
-  specDraftPMin: _specDraftPMin,
   setSpecDraftPMin,
   jinja,
   setJinja,
   reasoningPreserve,
   setReasoningPreserve,
-  reasoningFormat: _reasoningFormat,
-  setReasoningFormat: _setReasoningFormat,
-  scannedDraftModels: _scannedDraftModels = [],
-  onSelectDraftModelFile: _onSelectDraftModelFile,
   onSelectSlotSavePath,
   onApplyFastPreset,
   onApplyFastMtpPreset,
   modelMeta,
-  serverStatus: _serverStatus,
 }) => {
   const { t, formatString } = useI18n();
   const isMtpEnabled = specType !== 'none' && specDraftModel !== 'none';
@@ -269,33 +264,37 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
   ];
 
   return (
-    <div className="p-4 rounded-2xl bento-card space-y-4 font-sans text-[var(--theme-text)]">
+    <Card variant="default" className="space-y-4">
       {/* Header & Quick Profiles */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--theme-border)] pb-3">
         <div>
-          <span className="text-xs font-bold text-[var(--theme-text)]">{t.settings.localServer.params.perfParamsTitle}</span>
-          <p className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.localServer.params.perfParamsDesc}</p>
+          <span className="text-xs font-bold text-[var(--theme-text)]">
+            {t.settings.localServer.params.perfParamsTitle}
+          </span>
+          <p className="text-[11px] text-[var(--theme-text-muted)]">
+            {t.settings.localServer.params.perfParamsDesc}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           {onApplyFastMtpPreset && (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="sm"
               onClick={onApplyFastMtpPreset}
-              className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+              icon={<Sparkles size={13} className="text-[var(--theme-text-muted)]" />}
               title={t.settings.localServer.params.presetFastMtp}
             >
-              <Sparkles size={13} className="text-[var(--theme-text-muted)]" />
-              <span>{t.settings.localServer.params.presetFastMtp}</span>
-            </button>
+              {t.settings.localServer.params.presetFastMtp}
+            </Button>
           )}
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={onApplyFastPreset}
-            className="px-3 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-xs font-semibold text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-all shadow-sm"
+            icon={<Zap size={13} className="text-[var(--theme-text-muted)]" />}
           >
-            <Zap size={13} className="text-[var(--theme-text-muted)]" />
-            <span>{t.settings.localServer.params.presetFast}</span>
-          </button>
+            {t.settings.localServer.params.presetFast}
+          </Button>
         </div>
       </div>
 
@@ -355,7 +354,11 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           value={threads}
           min={0}
           placeholder={t.settings.localServer.params.threadsAuto}
-          badge={threads === 0 ? t.settings.localServer.params.threadsAuto : formatString(t.settings.localServer.params.threadsCount, { count: threads })}
+          badge={
+            threads === 0
+              ? t.settings.localServer.params.threadsAuto
+              : formatString(t.settings.localServer.params.threadsCount, { count: threads })
+          }
           onChange={setThreads}
           tooltip={{
             title: 'CPU Threads (-t)',
@@ -509,8 +512,8 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         }}
       />
 
-      {/* 🚀 MINIMALIST SPECULATIVE ACCELERATION (MTP) SECTION */}
-      <div className="p-4 rounded-3xl bento-card space-y-3 border border-[var(--theme-border)] bg-[var(--theme-panel)]/80 shadow-md">
+      {/* MINIMALIST SPECULATIVE ACCELERATION (MTP) SECTION */}
+      <Card variant="recessed" className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2">
@@ -529,26 +532,13 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleToggleMtp}
-            className={`w-12 h-6.5 rounded-full p-1 flex items-center transition-all cursor-pointer shrink-0 shadow-inner ${
-              isMtpEnabled ? 'bg-emerald-500 shadow-sm shadow-emerald-500/30' : 'bg-zinc-300 dark:bg-zinc-700'
-            }`}
-            title={isMtpEnabled ? 'Disable MTP' : 'Enable MTP'}
-          >
-            <div
-              className={`w-4.5 h-4.5 rounded-full bg-white transition-transform shadow-md ${
-                isMtpEnabled ? 'translate-x-5.5' : 'translate-x-0'
-              }`}
-            />
-          </button>
+          <Toggle checked={isMtpEnabled} onChange={handleToggleMtp} size="md" />
         </div>
 
         {isMtpEnabled && (
           <div className="pt-2 border-t border-[var(--theme-border)] animate-fadeIn">
             {modelMeta?.supportsFastMtp ? (
-              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
                   <Zap size={14} className="animate-pulse text-emerald-500" />
                   <span>{t.settings.localServer.params.mtpNativeDraft}</span>
@@ -558,7 +548,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
                 </p>
               </div>
             ) : (
-              <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
+              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
                 <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
                   <Zap size={14} className="text-emerald-500" />
                   <span>{t.settings.localServer.params.mtpActive}</span>
@@ -570,9 +560,9 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             )}
           </div>
         )}
-      </div>
+      </Card>
 
-      {/* Extra CLI Arguments (KV Quantization Presets) */}
+      {/* Extra CLI Arguments */}
       <div className="space-y-1.5 pt-1">
         <div className="flex justify-between items-center text-xs">
           <div className="flex items-center">
@@ -586,39 +576,31 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
             />
           </div>
           <div className="flex gap-1.5">
-            <button
-              type="button"
+            <Button
+              variant={customArgs.includes('q8_0') ? 'accent' : 'secondary'}
+              size="xs"
               onClick={() => setCustomArgs('-ctk q8_0 -ctv q8_0')}
-              className={`px-2 py-0.5 rounded-lg text-[10px] font-mono cursor-pointer transition-all border ${
-                customArgs.includes('q8_0')
-                  ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] font-bold shadow-sm'
-                  : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border-[var(--theme-border)] hover:text-[var(--theme-text)]'
-              }`}
               title="8-bit KV cache quantization (saves 50% VRAM)"
             >
               Q8_0 KV
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant={customArgs.includes('q4_0') ? 'accent' : 'secondary'}
+              size="xs"
               onClick={() => setCustomArgs('-ctk q4_0 -ctv q4_0')}
-              className={`px-2 py-0.5 rounded-lg text-[10px] font-mono cursor-pointer transition-all border ${
-                customArgs.includes('q4_0')
-                  ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] font-bold shadow-sm'
-                  : 'bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border-[var(--theme-border)] hover:text-[var(--theme-text)]'
-              }`}
               title="4-bit KV cache quantization (max VRAM savings)"
             >
               Q4_0 KV
-            </button>
+            </Button>
             {customArgs && (
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="xs"
                 onClick={() => setCustomArgs('')}
-                className="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-rose-500 border border-[var(--theme-border)] cursor-pointer"
                 title={t.settings.localServer.params.clearBtn}
               >
                 [x]
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -644,6 +626,6 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           />
         ))}
       </div>
-    </div>
+    </Card>
   );
 };

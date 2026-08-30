@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
-import { Shield, KeyRound, LogOut, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Shield, KeyRound, LogOut, CheckCircle2, AlertTriangle, Lock } from 'lucide-react';
 import * as api from '../../services/api';
 import { useI18n } from '../../i18n';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Card } from '../ui/Card';
+import { Badge } from '../ui/Badge';
+import { SettingsHeader, SettingsSection } from './common';
 
 export const SecurityTab: React.FC = () => {
   const { t } = useI18n();
@@ -53,146 +58,164 @@ export const SecurityTab: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-3xl flex flex-col gap-4 font-sans text-[var(--theme-text)]">
-      
-      {/* Header Banner */}
-      <div className="flex items-center gap-3 p-4 rounded-xl bento-card">
-        <div className="w-9 h-9 rounded-lg bg-white/5 border border-[var(--theme-border)] flex items-center justify-center text-[var(--theme-text-muted)]">
-          <Shield size={18} />
-        </div>
-        <div>
-          <h3 className="text-xs font-semibold text-[var(--theme-text)]">{t.settings.security.title}</h3>
-          <p className="text-xs text-[var(--theme-text-muted)]">{t.settings.security.subtitle}</p>
-        </div>
-      </div>
+    <div className="w-full space-y-6 font-sans text-[var(--theme-text)]">
+      {/* 1. Standard Top Header */}
+      <SettingsHeader
+        title={t.settings.security.title}
+        subtitle={t.settings.security.subtitle}
+        icon={<Shield size={18} />}
+      />
 
-      {/* Security Status Badges */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-        <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
-          <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
-          <div>
-            <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.pbkdf2Title}</div>
-            <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.pbkdf2Desc}</div>
-          </div>
+      {/* 2. Security Status Badges */}
+      <SettingsSection
+        title="Статус безопасности"
+        badge="Zero-Trust Architecture"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {[
+            {
+              title: t.settings.security.pbkdf2Title,
+              desc: t.settings.security.pbkdf2Desc,
+              badge: 'PBKDF2-SHA512',
+            },
+            {
+              title: t.settings.security.bruteForceTitle,
+              desc: t.settings.security.bruteForceDesc,
+              badge: 'Active Guard',
+            },
+            {
+              title: t.settings.security.wsTitle,
+              desc: t.settings.security.wsDesc,
+              badge: 'WSS / Bearer',
+            },
+            {
+              title: t.settings.security.apiTitle,
+              desc: t.settings.security.apiDesc,
+              badge: 'Local Session',
+            },
+          ].map((item, idx) => (
+            <Card
+              key={idx}
+              variant="default"
+              padded={false}
+              className="p-4 flex items-start gap-3"
+            >
+              <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5">
+                <CheckCircle2 size={15} />
+              </div>
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <div className="flex items-center gap-2 justify-between">
+                  <span className="text-xs font-bold text-[var(--theme-text)]">{item.title}</span>
+                  <Badge variant="success" size="xs">
+                    {item.badge}
+                  </Badge>
+                </div>
+                <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                  {item.desc}
+                </p>
+              </div>
+            </Card>
+          ))}
         </div>
+      </SettingsSection>
 
-        <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
-          <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
-          <div>
-            <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.bruteForceTitle}</div>
-            <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.bruteForceDesc}</div>
-          </div>
-        </div>
+      {/* 3. Password Change Form */}
+      <SettingsSection
+        title={t.settings.security.changePasswordTitle}
+        badge="Access Credentials"
+      >
+        <Card variant="default" className="space-y-4">
+          {statusMsg && (
+            <div
+              className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                statusMsg.type === 'success'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                  : 'bg-rose-500/10 border-rose-500/30 text-rose-500 dark:text-rose-400'
+              }`}
+            >
+              {statusMsg.type === 'success' ? (
+                <CheckCircle2 size={14} className="shrink-0" />
+              ) : (
+                <AlertTriangle size={14} className="shrink-0" />
+              )}
+              <span>{statusMsg.text}</span>
+            </div>
+          )}
 
-        <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
-          <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
-          <div>
-            <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.wsTitle}</div>
-            <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.wsDesc}</div>
-          </div>
-        </div>
-
-        <div className="p-3 rounded-lg bento-card flex items-center gap-2.5">
-          <CheckCircle2 size={16} className="text-[var(--theme-text-muted)] shrink-0" />
-          <div>
-            <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.apiTitle}</div>
-            <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.apiDesc}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Password Change Form */}
-      <div className="p-4 rounded-xl bento-card flex flex-col gap-3">
-        <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-2 text-xs font-medium text-[var(--theme-text)]">
-          <KeyRound size={14} className="text-[var(--theme-text-muted)]" />
-          <span>{t.settings.security.changePasswordTitle}</span>
-        </div>
-
-        {statusMsg && (
-          <div
-            className={`p-2.5 rounded-lg border text-xs flex items-center gap-2 ${
-              statusMsg.type === 'success'
-                ? 'bg-white/10 border-[var(--theme-border)] text-[var(--theme-text)]'
-                : 'bg-white/5 border-rose-500/40 text-rose-300'
-            }`}
-          >
-            {statusMsg.type === 'success' ? (
-              <CheckCircle2 size={14} className="shrink-0" />
-            ) : (
-              <AlertTriangle size={14} className="shrink-0" />
-            )}
-            <span>{statusMsg.text}</span>
-          </div>
-        )}
-
-        <form onSubmit={handleChangePassword} className="flex flex-col gap-3">
-          <div className="space-y-1">
-            <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.settings.security.currentPasswordLabel}</label>
-            <input
+          <form onSubmit={handleChangePassword} className="space-y-4">
+            <Input
+              label={t.settings.security.currentPasswordLabel}
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none"
+              prefixIcon={<Lock size={13} />}
               required
+              mono
             />
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.settings.security.newPasswordLabel}</label>
-              <input
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+              <Input
+                label={t.settings.security.newPasswordLabel}
                 type="password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none"
+                prefixIcon={<KeyRound size={13} />}
                 required
+                mono
               />
-            </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-[var(--theme-text-muted)]">{t.settings.security.confirmPasswordLabel}</label>
-              <input
+              <Input
+                label={t.settings.security.confirmPasswordLabel}
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full px-3 py-2 rounded-lg bento-card text-xs font-mono text-[var(--theme-text)] focus:outline-none"
+                prefixIcon={<KeyRound size={13} />}
                 required
+                mono
               />
             </div>
+
+            <div className="flex justify-end pt-1">
+              <Button
+                type="submit"
+                variant="secondary"
+                size="md"
+                disabled={isSubmitting}
+                loading={isSubmitting}
+                icon={<KeyRound size={13} />}
+              >
+                {isSubmitting ? t.settings.saving : t.settings.security.updatePasswordBtn}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </SettingsSection>
+
+      {/* 4. Active Session & Logout */}
+      <SettingsSection title={t.settings.security.logoutTitle}>
+        <Card variant="default" className="flex items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <div className="text-xs font-bold text-[var(--theme-text)]">
+              {t.settings.security.logoutTitle}
+            </div>
+            <p className="text-xs text-[var(--theme-text-muted)]">
+              {t.settings.security.logoutDesc}
+            </p>
           </div>
 
-          <div className="flex justify-end pt-1">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] transition-colors cursor-pointer disabled:opacity-50"
-            >
-              {isSubmitting ? t.settings.saving : t.settings.security.updatePasswordBtn}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      {/* Logout Session */}
-      <div className="p-4 rounded-xl bento-card flex items-center justify-between">
-        <div>
-          <div className="text-xs font-medium text-[var(--theme-text)]">{t.settings.security.logoutTitle}</div>
-          <div className="text-[11px] text-[var(--theme-text-muted)]">{t.settings.security.logoutDesc}</div>
-        </div>
-
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/15 border border-[var(--theme-border)] text-xs font-medium text-[var(--theme-text)] flex items-center gap-1.5 cursor-pointer transition-colors"
-        >
-          <LogOut size={13} />
-          <span>{t.settings.security.logoutBtn}</span>
-        </button>
-      </div>
-
+          <Button
+            variant="danger"
+            size="sm"
+            onClick={handleLogout}
+            icon={<LogOut size={13} />}
+          >
+            {t.settings.security.logoutBtn}
+          </Button>
+        </Card>
+      </SettingsSection>
     </div>
   );
 };

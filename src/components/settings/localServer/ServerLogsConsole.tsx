@@ -1,6 +1,8 @@
 import React from 'react';
 import { Terminal, Check, Copy, FileText, Trash2 } from 'lucide-react';
 import { useI18n } from '../../../i18n';
+import { Button } from '../../ui/Button';
+import { Toggle } from '../../ui/Toggle';
 
 interface ServerLogsConsoleProps {
   serverLogs: string[];
@@ -43,7 +45,10 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             {logFilePath && (
-              <div className="text-[10px] text-[var(--theme-text-muted)] font-mono truncate max-w-[200px]" title={logFilePath}>
+              <div
+                className="text-[10px] text-[var(--theme-text-muted)] font-mono truncate max-w-[200px]"
+                title={logFilePath}
+              >
                 ~/.0xagent/logs
               </div>
             )}
@@ -52,45 +57,43 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
 
         {/* Console Action Controls */}
         <div className="flex items-center gap-1.5 text-xs">
-          <label className="flex items-center gap-1.5 cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none mr-1 font-medium text-[11px]">
-            <input
-              type="checkbox"
-              checked={serverLogsAutoScroll}
-              onChange={(e) => setServerLogsAutoScroll(e.target.checked)}
-              className="rounded accent-[var(--theme-accent)]"
-            />
-            <span>{t.settings.localServer.logs.autoScroll}</span>
-          </label>
+          <Toggle
+            checked={serverLogsAutoScroll}
+            onChange={(val) => setServerLogsAutoScroll(val)}
+            label={t.settings.localServer.logs.autoScroll}
+            size="sm"
+            className="mr-1"
+          />
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="xs"
             onClick={onCopyLogs}
-            className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-[var(--theme-text)] flex items-center gap-1.5 transition-all cursor-pointer text-[11px] font-medium shadow-sm"
+            icon={isCopiedLogs ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
             title="Copy logs"
           >
-            {isCopiedLogs ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-            <span>{isCopiedLogs ? t.settings.localServer.logs.copied : t.settings.localServer.logs.copy}</span>
-          </button>
+            {isCopiedLogs ? t.settings.localServer.logs.copied : t.settings.localServer.logs.copy}
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="xs"
             onClick={onDownloadLogs}
-            className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-panel)] text-[var(--theme-text)] flex items-center gap-1.5 transition-all cursor-pointer text-[11px] font-medium shadow-sm"
+            icon={<FileText size={12} />}
             title="Download log file"
           >
-            <FileText size={12} />
-            <span>{t.settings.localServer.logs.file}</span>
-          </button>
+            {t.settings.localServer.logs.file}
+          </Button>
 
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="xs"
             onClick={onClearLogs}
-            className="px-2.5 py-1.5 rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-[var(--theme-text-muted)] cursor-pointer transition-all text-[11px] font-medium flex items-center gap-1"
+            icon={<Trash2 size={12} />}
             title="Clear console logs"
           >
-            <Trash2 size={12} />
-            <span>{t.settings.localServer.logs.clear}</span>
-          </button>
+            {t.settings.localServer.logs.clear}
+          </Button>
         </div>
       </div>
 
@@ -101,11 +104,18 @@ export const ServerLogsConsole: React.FC<ServerLogsConsoleProps> = ({
       >
         {serverLogs.length > 0 ? (
           serverLogs.map((log, index) => {
-            const isError = log.includes('[ERROR]') || log.includes('error') || log.includes('FAILED') || log.includes('exiting due to');
+            const isError =
+              log.includes('[ERROR]') ||
+              log.includes('error') ||
+              log.includes('FAILED') ||
+              log.includes('exiting due to');
             const isWarning = log.includes('[WARNING]') || log.includes('[WATCHDOG]');
             const isDiagnostic = log.includes('[FASTMTP') || log.includes('[CMD]');
-            const isSuccess = log.includes('HTTP server listening') || log.includes('model loaded') || log.includes('all slots are idle');
-            
+            const isSuccess =
+              log.includes('HTTP server listening') ||
+              log.includes('model loaded') ||
+              log.includes('all slots are idle');
+
             return (
               <div
                 key={index}

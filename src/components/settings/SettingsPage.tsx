@@ -2,6 +2,7 @@ import React from 'react';
 import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User, Sparkles, Shield, Wrench } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { useI18n } from '../../i18n';
+import { Button } from '../ui/Button';
 import { GeneralTab } from './GeneralTab';
 import { ToolsTab } from './ToolsTab';
 import { PersonasTab } from './PersonasTab';
@@ -34,14 +35,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
       {/* Settings Top Header Bar */}
       <div className="px-4 py-3 border-b border-[var(--theme-border)] bg-[var(--theme-panel)] flex items-center justify-between shrink-0 select-none">
         <div className="flex items-center gap-3">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
+            size="xs"
             onClick={onCancel}
-            className="p-1.5 rounded-lg bento-card text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
+            icon={<ChevronLeft size={15} />}
             title={t.settings.backToChat}
-          >
-            <ChevronLeft size={16} />
-          </button>
+            className="p-1.5"
+          />
           <img
             src="/0xAgent-icon.jpg"
             alt="0xAgent Logo"
@@ -51,7 +52,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
         </div>
 
         {/* Auto-save Indicator */}
-        <div className="flex items-center gap-2 text-xs font-mono text-[var(--theme-text-muted)] bento-card px-3 py-1 rounded-lg">
+        <div className="flex items-center gap-2 text-xs font-mono text-[var(--theme-text-muted)] bg-[var(--theme-card-bg)] border border-[var(--theme-border)] px-3 py-1 rounded-xl shadow-xs">
           {s.saveStatus === 'saving' ? (
             <>
               <RefreshCw size={12} className="animate-spin text-[var(--theme-text-muted)]" />
@@ -59,7 +60,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
             </>
           ) : (
             <>
-              <Check size={12} className="text-[var(--theme-text)]" />
+              <Check size={12} className="text-emerald-500" />
               <span>{t.settings.saved}</span>
             </>
           )}
@@ -86,13 +87,16 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
                 key={tab.id}
                 type="button"
                 onClick={() => s.setActiveSubtab(tab.id as any)}
-                className={`w-auto md:w-full shrink-0 whitespace-nowrap px-3.5 py-2 md:py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer text-left border ${
+                className={`w-auto md:w-full shrink-0 whitespace-nowrap px-3.5 py-2 md:py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer text-left border ${
                   isActive
-                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
+                    ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs ring-1 ring-[var(--theme-accent)]/30 font-bold'
                     : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                 }`}
               >
-                <Icon size={15} className={isActive ? 'text-[var(--theme-accent-text)]' : 'text-[var(--theme-text-muted)]'} />
+                <Icon
+                  size={15}
+                  className={isActive ? 'text-[var(--theme-text)]' : 'text-[var(--theme-text-muted)]'}
+                />
                 <span>{tab.label}</span>
               </button>
             );

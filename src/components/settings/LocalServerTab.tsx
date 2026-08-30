@@ -1,6 +1,12 @@
 import React, { useRef } from 'react';
-import { Cpu, Folder, Zap, Activity, RefreshCw, HardDrive, Play, Square } from 'lucide-react';
+import { Cpu, Folder, Zap, Activity, RefreshCw, Play, Square } from 'lucide-react';
 import { useI18n } from '../../i18n';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
+import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
+import { SettingsHeader } from './common';
 import { LlamaInstallerSection } from './localServer/LlamaInstallerSection';
 import { InstalledVersionsSection } from './localServer/InstalledVersionsSection';
 import { ServerPerformanceParams } from './localServer/ServerPerformanceParams';
@@ -210,70 +216,79 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
   );
 
   const mainLocalModels = scannedLocalModels.filter((m) => !m.isDraft && !m.isMmproj);
-  const draftLocalModels = scannedLocalModels.filter((m) => m.isDraft || /fastmtp|mtp|draft/i.test(m.fileName));
+  const draftLocalModels = scannedLocalModels.filter(
+    (m) => m.isDraft || /fastmtp|mtp|draft/i.test(m.fileName)
+  );
 
   return (
-    <div className="space-y-4 font-sans text-[var(--theme-text)] max-w-full">
-      {/* Top Header & Live Health Metric */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[var(--theme-border)] pb-3">
-        <div>
-          <h3 className="text-sm font-semibold text-[var(--theme-text)] flex items-center gap-2">
-            <Cpu size={16} className="text-[var(--theme-accent)]" />
-            <span>{t.settings.localServer.title}</span>
-          </h3>
-          <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-            {t.settings.localServer.subtitle}
-          </p>
-        </div>
+    <div className="w-full space-y-6 font-sans text-[var(--theme-text)]">
+      {/* 1. Standard Top Header + Live Health Telemetry */}
+      <SettingsHeader
+        title={t.settings.localServer.title}
+        subtitle={t.settings.localServer.subtitle}
+        icon={<Cpu size={18} />}
+        actionSlot={
+          serverStatus === 'running' ? (
+            <div className="flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] shadow-xs select-none">
+              <Activity size={13} className="text-emerald-500 animate-pulse" />
+              <span className="text-[var(--theme-text)] font-semibold">
+                {healthStatus === 'loading'
+                  ? t.settings.localServer.loadingToGpu
+                  : healthStatus === 'ok'
+                  ? formatString(t.settings.localServer.onlineSlots, {
+                      active: slotMetrics.activeSlots,
+                      total: slotMetrics.totalSlots || 1,
+                    })
+                  : t.settings.localServer.initializing}
+              </span>
+            </div>
+          ) : undefined
+        }
+      />
 
-        {/* Live Health Metrics Badge */}
-        {serverStatus === 'running' && (
-          <div className="flex items-center gap-2 text-xs font-mono bento-card px-3 py-1.5 rounded-lg select-none">
-            <Activity size={13} className="text-emerald-500 animate-pulse" />
-            <span className="text-[var(--theme-text)] font-medium">
-              {healthStatus === 'loading'
-                ? t.settings.localServer.loadingToGpu
-                : healthStatus === 'ok'
-                ? formatString(t.settings.localServer.onlineSlots, { active: slotMetrics.activeSlots, total: slotMetrics.totalSlots || 1 })
-                : t.settings.localServer.initializing}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Crash Advisory Alert Box */}
+      {/* 2. Crash Advisory Alert Box */}
       <CrashAdviserCard crashAdvice={crashAdvice} />
 
-      {/* MAIN 2-COLUMN GRID LAYOUT */}
+      {/* 3. MAIN 2-COLUMN GRID LAYOUT */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        
         {/* LEFT COLUMN: Server Settings & Controls */}
         <div className="lg:col-span-7 space-y-4">
-          
           {/* Hardware GPU & Server Control Hero Banner */}
-          <div className="p-4.5 rounded-3xl bento-card flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[var(--theme-border)] bg-[var(--theme-panel)]/80 shadow-md">
-            <div className="flex items-center gap-3.5">
-              <div className="p-3 rounded-2xl bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-accent)]">
+          <Card
+            variant="default"
+            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md"
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="p-3 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-accent)] shrink-0">
                 <Zap size={20} />
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 font-bold text-xs text-[var(--theme-text)]">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2 font-bold text-xs text-[var(--theme-text)] flex-wrap">
                   <span>GPU:</span>
-                  <span className="font-mono text-[var(--theme-text)]">
+                  <span className="font-mono text-[var(--theme-text)] truncate">
                     {hardwareInfo?.gpuName || t.settings.localServer.gpuNameAuto}
                   </span>
-                  <span className="px-2 py-0.5 rounded-md bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)] font-mono text-[10px] font-semibold">
+                  <Badge variant="neutral" size="xs">
                     {t.settings.localServer.fullGpuOffload}
-                  </span>
+                  </Badge>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] font-mono text-[var(--theme-text-muted)]">
                   <span className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${serverStatus === 'running' ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'}`} />
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        serverStatus === 'running'
+                          ? 'bg-emerald-500 animate-pulse'
+                          : 'bg-zinc-400'
+                      }`}
+                    />
                     {serverStatus === 'running'
                       ? healthStatus === 'loading'
                         ? t.settings.localServer.loadingToGpu
                         : healthStatus === 'ok'
-                        ? formatString(t.settings.localServer.onlineSlots, { active: slotMetrics.activeSlots, total: slotMetrics.totalSlots || 1 })
+                        ? formatString(t.settings.localServer.onlineSlots, {
+                            active: slotMetrics.activeSlots,
+                            total: slotMetrics.totalSlots || 1,
+                          })
                         : t.settings.localServer.initializing
                       : t.settings.localServer.serverStopped}
                   </span>
@@ -281,46 +296,47 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
               </div>
             </div>
 
-            {/* Prominent Large Server Control Button */}
-            <div className="flex items-center gap-2.5 shrink-0">
+            {/* Server Action Controls */}
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
               {serverStatus === 'running' ? (
                 <>
-                  <button
-                    type="button"
+                  <Button
+                    variant="secondary"
+                    size="md"
                     disabled={isActionLoading}
+                    loading={isActionLoading}
                     onClick={handleRestartLocalServer}
-                    className="px-4 py-2.5 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-bold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                    title={t.settings.localServer.restartBtn}
+                    icon={<RefreshCw size={14} />}
                   >
-                    <RefreshCw size={15} className={isActionLoading ? 'animate-spin' : ''} />
-                    <span>{t.settings.localServer.restartBtn}</span>
-                  </button>
+                    {t.settings.localServer.restartBtn}
+                  </Button>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="danger"
+                    size="md"
                     disabled={isActionLoading}
                     onClick={handleStopLocalServer}
-                    className="px-4.5 py-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-xs font-bold text-rose-600 dark:text-rose-400 hover:bg-rose-500/20 flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
-                    title={t.settings.localServer.stopBtn}
+                    icon={<Square size={13} className="fill-current" />}
                   >
-                    <Square size={15} className="fill-current" />
-                    <span>{t.settings.localServer.stopBtn}</span>
-                  </button>
+                    {t.settings.localServer.stopBtn}
+                  </Button>
                 </>
               ) : (
-                <button
-                  type="button"
+                <Button
+                  variant="primary"
+                  size="md"
                   disabled={isActionLoading || !modelPath}
+                  loading={isActionLoading}
                   onClick={handleStartLocalServer}
-                  className="px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center gap-2.5 transition-all cursor-pointer shadow-lg shadow-emerald-600/25 hover:shadow-emerald-600/40 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                  icon={<Play size={14} className="fill-current" />}
                   title={modelPath ? t.settings.localServer.startBtn : t.settings.localServer.selectGgufToStart}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white border-transparent shadow-sm"
                 >
-                  <Play size={16} className={isActionLoading ? 'animate-spin fill-current' : 'fill-current'} />
-                  <span>{isActionLoading ? t.settings.localServer.startingBtn : t.settings.localServer.startBtn}</span>
-                </button>
+                  {isActionLoading ? t.settings.localServer.startingBtn : t.settings.localServer.startBtn}
+                </Button>
               )}
             </div>
-          </div>
+          </Card>
 
           {/* GitHub Releases Llama.cpp Installer Section */}
           <div className="space-y-3">
@@ -353,61 +369,33 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
           </div>
 
           {/* Executable Path & Model Selector Card */}
-          <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-[var(--theme-text)] flex items-center justify-between">
-                <span>{t.settings.localServer.exePath}</span>
-                <button
-                  type="button"
+          <Card variant="default" className="space-y-4">
+            <Input
+              label={t.settings.localServer.exePath}
+              value={exePath}
+              onChange={(e) => setExePath(e.target.value)}
+              placeholder="~/.0xagent/llama/llama-server.exe"
+              mono
+              actionSlot={
+                <Button
+                  variant="ghost"
+                  size="xs"
                   onClick={handleSelectExe}
-                  className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
+                  icon={<Folder size={12} />}
                 >
-                  <Folder size={12} />
-                  <span>{t.settings.localServer.browse}</span>
-                </button>
-              </label>
-              <input
-                type="text"
-                value={exePath}
-                onChange={(e) => setExePath(e.target.value)}
-                placeholder="~/.0xagent/llama/llama-server.exe"
-                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-              />
-            </div>
+                  {t.settings.localServer.browse}
+                </Button>
+              }
+            />
 
-            <div className="space-y-1.5 pt-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5">
-                  <HardDrive size={14} className="text-[var(--theme-text-muted)]" />
-                  <span>{t.settings.localServer.modelPath}</span>
-                </label>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={refreshScannedModels}
-                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
-                    title="Rescan models"
-                  >
-                    <RefreshCw size={11} />
-                    <span>{t.settings.localServer.rescanModels}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSelectModel}
-                    className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
-                    title="Select model file"
-                  >
-                    <Folder size={12} />
-                    <span>{t.settings.localServer.browse}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Local GGUF Scanned Dropdown */}
-              <select
+            <div className="space-y-2">
+              <Select
+                label={t.settings.localServer.modelPath}
                 value={
                   mainLocalModels.find(
-                    (m) => m.filePath.toLowerCase() === modelPath.toLowerCase() || m.fileName.toLowerCase() === modelPath.toLowerCase()
+                    (m) =>
+                      m.filePath.toLowerCase() === modelPath.toLowerCase() ||
+                      m.fileName.toLowerCase() === modelPath.toLowerCase()
                   )?.filePath || (modelPath ? 'custom' : '')
                 }
                 onChange={(e) => {
@@ -416,57 +404,106 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
                     setModelPath(val);
                   }
                 }}
-                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none cursor-pointer transition-colors"
+                mono
+                actionSlot={
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={refreshScannedModels}
+                      icon={<RefreshCw size={11} />}
+                      title="Rescan models"
+                    >
+                      {t.settings.localServer.rescanModels}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={handleSelectModel}
+                      icon={<Folder size={12} />}
+                      title="Select model file"
+                    >
+                      {t.settings.localServer.browse}
+                    </Button>
+                  </div>
+                }
               >
-                <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">{t.settings.localServer.selectModelPlaceholder}</option>
+                <option value="" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
+                  {t.settings.localServer.selectModelPlaceholder}
+                </option>
                 {mainLocalModels.map((m) => (
-                  <option key={m.id || m.filePath} value={m.filePath} className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
+                  <option
+                    key={m.id || m.filePath}
+                    value={m.filePath}
+                    className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]"
+                  >
                     {m.title || m.fileName} ({m.quantization} • {m.sizeGB})
                   </option>
                 ))}
-                {modelPath && !mainLocalModels.some((m) => m.filePath.toLowerCase() === modelPath.toLowerCase()) && (
-                  <option value="custom" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">{formatString(t.settings.localServer.customPath, { path: modelPath })}</option>
-                )}
-              </select>
+                {modelPath &&
+                  !mainLocalModels.some(
+                    (m) => m.filePath.toLowerCase() === modelPath.toLowerCase()
+                  ) && (
+                    <option
+                      value="custom"
+                      className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]"
+                    >
+                      {formatString(t.settings.localServer.customPath, { path: modelPath })}
+                    </option>
+                  )}
+              </Select>
 
               {/* Full Absolute Path Details Input */}
-              <input
-                type="text"
+              <Input
                 value={modelPath}
                 onChange={(e) => setModelPath(e.target.value)}
                 placeholder="~/.0xagent/models/model.gguf"
-                className="w-full px-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[11px] font-mono text-[var(--theme-text-muted)] focus:text-[var(--theme-text)] focus:outline-none transition-colors"
+                mono
               />
             </div>
 
             {/* GGUF Model Metadata Card with Reasoning Specs */}
             {modelMeta && (
-              <div className="p-4 rounded-2xl bento-card border border-[var(--theme-border)] text-xs space-y-2.5 font-mono shadow-sm">
+              <Card variant="recessed" className="space-y-2.5 font-mono text-xs">
                 <div className="flex items-center justify-between text-[var(--theme-text)] font-bold border-b border-[var(--theme-border)] pb-2">
                   <div className="flex items-center gap-2 truncate">
-                    <span className="truncate">{modelMeta.cleanTitle || modelMeta.modelName || modelMeta.architecture}</span>
-                    <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-semibold">
-                      {modelMeta.quantization}
+                    <span className="truncate">
+                      {modelMeta.cleanTitle || modelMeta.modelName || modelMeta.architecture}
                     </span>
+                    <Badge variant="neutral" size="xs">
+                      {modelMeta.quantization}
+                    </Badge>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] text-[10px] shrink-0 font-medium">
+                  <Badge variant="neutral" size="xs">
                     {modelMeta.fileSizeFormatted}
-                  </span>
+                  </Badge>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
                     <span>{t.settings.localServer.modelMeta.family}</span>
-                    <span className="text-[var(--theme-text)] font-bold uppercase">{modelMeta.family || 'GGUF'}</span>
+                    <span className="text-[var(--theme-text)] font-bold uppercase">
+                      {modelMeta.family || 'GGUF'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
                     <span>{t.settings.localServer.modelMeta.trainContext}</span>
-                    <span className="text-[var(--theme-text)] font-bold">{modelMeta.contextLength.toLocaleString()} tok</span>
+                    <span className="text-[var(--theme-text)] font-bold">
+                      {modelMeta.contextLength.toLocaleString()} tok
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
                     <span>{t.settings.localServer.modelMeta.reasoningSpec}</span>
-                    <span className={modelMeta.supportsReasoning ? 'text-sky-600 dark:text-sky-400 font-bold' : 'text-[var(--theme-text-muted)]'}>
-                      {modelMeta.supportsReasoning ? t.settings.localServer.modelMeta.supported : t.settings.localServer.modelMeta.instructDirect}
+                    <span
+                      className={
+                        modelMeta.supportsReasoning
+                          ? 'text-sky-500 font-bold'
+                          : 'text-[var(--theme-text-muted)]'
+                      }
+                    >
+                      {modelMeta.supportsReasoning
+                        ? t.settings.localServer.modelMeta.supported
+                        : t.settings.localServer.modelMeta.instructDirect}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
@@ -479,15 +516,17 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
 
                 {modelMeta.supportsFastMtp && (
                   <div className="flex items-center justify-between text-[11px] border-t border-[var(--theme-border)] pt-2 mt-1">
-                    <span className="text-sky-600 dark:text-sky-300 font-semibold">{t.settings.localServer.modelMeta.fastMtpSupport}</span>
-                    <span className="px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-600 dark:text-sky-300 border border-sky-500/30 text-[10px] font-bold">
-                      {t.settings.localServer.modelMeta.fastMtpBadge}
+                    <span className="text-sky-500 font-semibold">
+                      {t.settings.localServer.modelMeta.fastMtpSupport}
                     </span>
+                    <Badge variant="info" size="xs">
+                      {t.settings.localServer.modelMeta.fastMtpBadge}
+                    </Badge>
                   </div>
                 )}
-              </div>
+              </Card>
             )}
-          </div>
+          </Card>
 
           {/* Performance Parameters Component */}
           <ServerPerformanceParams
@@ -578,7 +617,6 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
             logsEndRef={logsEndRef}
           />
         </div>
-
       </div>
     </div>
   );

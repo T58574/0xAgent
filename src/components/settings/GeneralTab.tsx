@@ -1,74 +1,24 @@
 import React from 'react';
-import { Sliders, Shield, Volume2, Save, LayoutGrid, Globe, Key, LogOut, Sparkles, CheckCircle2 } from 'lucide-react';
+import {
+  Sliders,
+  Shield,
+  Volume2,
+  Save,
+  LayoutGrid,
+  Globe,
+  Key,
+  LogOut,
+  Sparkles,
+  CheckCircle2,
+} from 'lucide-react';
 import * as api from '../../services/api';
 import { useI18n } from '../../i18n';
-
-interface SettingToggleCardProps {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  active: boolean;
-  onToggle: () => void;
-  statusOnText: string;
-  statusOffText: string;
-}
-
-const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
-  icon,
-  title,
-  desc,
-  active,
-  onToggle,
-  statusOnText,
-  statusOffText,
-}) => (
-  <div
-    onClick={onToggle}
-    className={`p-4 rounded-2xl bento-card flex items-center justify-between cursor-pointer transition-all border ${
-      active
-        ? 'border-[var(--theme-accent)] bg-[var(--theme-card-bg)] shadow-sm'
-        : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:border-[var(--theme-text-muted)]'
-    }`}
-  >
-    <div className="flex items-center gap-3.5 min-w-0 pr-2">
-      <div
-        className={`p-2.5 rounded-xl shrink-0 transition-colors ${
-          active
-            ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] shadow-sm'
-            : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)]'
-        }`}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-bold text-[var(--theme-text)] truncate">{title}</span>
-          <span
-            className={`text-[9px] font-mono px-2 py-0.5 rounded-full transition-colors ${
-              active
-                ? 'bg-[var(--theme-accent)]/15 text-[var(--theme-text)] font-bold border border-[var(--theme-accent)]/30'
-                : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]'
-            }`}
-          >
-            {active ? statusOnText : statusOffText}
-          </span>
-        </div>
-        <div className="text-[11px] text-[var(--theme-text-muted)] leading-tight mt-1">{desc}</div>
-      </div>
-    </div>
-    <div
-      className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors shrink-0 ${
-        active ? 'bg-[var(--theme-accent)]' : 'bg-zinc-300 dark:bg-zinc-700'
-      }`}
-    >
-      <div
-        className={`w-4 h-4 rounded-full transition-transform ${
-          active ? 'translate-x-4 bg-[var(--theme-accent-text)] shadow-sm' : 'translate-x-0 bg-white'
-        }`}
-      />
-    </div>
-  </div>
-);
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
+import { Select } from '../ui/Select';
+import { Toggle } from '../ui/Toggle';
+import { Card } from '../ui/Card';
+import { SettingsHeader, SettingsSection, SettingToggleCard } from './common';
 
 interface GeneralTabProps {
   onLanguageSelect?: (lang: 'en' | 'ru') => void;
@@ -134,145 +84,135 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   setProactiveCompanionEnabled,
 }) => {
   const { language, setLanguage, t } = useI18n();
+  const [testingVoice, setTestingVoice] = React.useState(false);
 
   const handleLogout = async () => {
     await api.logout();
     window.location.reload();
   };
 
+  const handleTestVoice = async () => {
+    setTestingVoice(true);
+    try {
+      await api.speak_text('Jarvis systems fully operational, sir.', {
+        voice: ttsVoice,
+        rate: ttsRate,
+        playOnSpeaker: ttsPlayOnSpeaker,
+        category: 'greeting',
+      });
+    } catch (err) {
+      console.error('Voice test failed:', err);
+    } finally {
+      setTestingVoice(false);
+    }
+  };
+
   return (
-    <div className="space-y-4 font-sans text-[var(--theme-text)] max-w-4xl pb-6">
-      <div>
-        <h3 className="text-sm font-bold text-[var(--theme-text)] flex items-center gap-2">
-          <Sliders size={15} className="text-[var(--theme-text-muted)]" />
-          <span>{t.settings.general.title}</span>
-        </h3>
-        <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-          {t.settings.general.subtitle}
-        </p>
-      </div>
+    <div className="w-full space-y-6 font-sans text-[var(--theme-text)]">
+      {/* 1. Standard Top Header */}
+      <SettingsHeader
+        title={t.settings.general.title}
+        subtitle={t.settings.general.subtitle}
+        icon={<Sliders size={18} />}
+      />
 
-      {/* 0. Interface Language Selector */}
-      <div className="p-4 rounded-2xl bento-card space-y-3 border border-[var(--theme-border)]">
-        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
-            <Globe size={14} className="text-[var(--theme-text-muted)]" />
-            <span>{t.settings.general.languageTitle}</span>
+      {/* 2. UI Language Selector */}
+      <SettingsSection
+        title={t.settings.general.languageTitle}
+        badge="UI Language"
+        description={t.settings.general.languageDesc}
+      >
+        <Card variant="default" className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setLanguage('en');
+                onLanguageSelect?.('en');
+              }}
+              className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all cursor-pointer select-none ${
+                language === 'en'
+                  ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm ring-1 ring-[var(--theme-accent)]/30'
+                  : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="font-mono font-bold text-xs px-2 py-0.5 rounded-lg bg-[var(--theme-card-bg)] border border-[var(--theme-border)]">
+                  [EN]
+                </span>
+                <span>{t.settings.general.langEn}</span>
+              </div>
+              {language === 'en' && <CheckCircle2 size={16} className="text-[var(--theme-accent)]" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setLanguage('ru');
+                onLanguageSelect?.('ru');
+              }}
+              className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all cursor-pointer select-none ${
+                language === 'ru'
+                  ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm ring-1 ring-[var(--theme-accent)]/30'
+                  : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="font-mono font-bold text-xs px-2 py-0.5 rounded-lg bg-[var(--theme-card-bg)] border border-[var(--theme-border)]">
+                  [RU]
+                </span>
+                <span>{t.settings.general.langRu}</span>
+              </div>
+              {language === 'ru' && <CheckCircle2 size={16} className="text-[var(--theme-accent)]" />}
+            </button>
           </div>
-          <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
-            :: UI Language
-          </span>
-        </div>
-        <p className="text-xs text-[var(--theme-text-muted)]">
-          {t.settings.general.languageDesc}
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              setLanguage('en');
-              onLanguageSelect?.('en');
-            }}
-            className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
-              language === 'en'
-                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm'
-                : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-[var(--theme-border-subtle)] border border-[var(--theme-border)]">[EN]</span>
-              <span>{t.settings.general.langEn}</span>
-            </div>
-            {language === 'en' && <CheckCircle2 size={16} className="text-[var(--theme-accent)]" />}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setLanguage('ru');
-              onLanguageSelect?.('ru');
-            }}
-            className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all cursor-pointer ${
-              language === 'ru'
-                ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm'
-                : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
-            }`}
-          >
-            <div className="flex items-center gap-2.5">
-              <span className="font-mono font-bold text-xs px-2 py-0.5 rounded bg-[var(--theme-border-subtle)] border border-[var(--theme-border)]">[RU]</span>
-              <span>{t.settings.general.langRu}</span>
-            </div>
-            {language === 'ru' && <CheckCircle2 size={16} className="text-[var(--theme-accent)]" />}
-          </button>
-        </div>
-      </div>
+        </Card>
+      </SettingsSection>
 
-      {/* 1. Connection Card */}
-      <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
-        <div className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5 border-b border-[var(--theme-border)] pb-2.5">
-          <Globe size={14} className="text-[var(--theme-text-muted)]" />
-          <span>{t.settings.general.connectionTitle}</span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* API Endpoint URL */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
-              <Globe size={12} />
-              <span>{t.settings.general.apiUrl}</span>
-            </label>
-            <input
-              type="text"
+      {/* 3. Connection & API Keys */}
+      <SettingsSection
+        title={t.settings.general.connectionTitle}
+        badge="Cloud & Local Endpoints"
+      >
+        <Card variant="default">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
+            <Input
+              label={t.settings.general.apiUrl}
               value={apiUrl}
               onChange={(e) => setApiUrl(e.target.value)}
               placeholder="http://127.0.0.1:11434/v1"
-              className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
+              prefixIcon={<Globe size={13} />}
+              mono
             />
-          </div>
 
-          {/* Google AI Studio (Gemini) API Key */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
-              <Key size={12} />
-              <span>{t.settings.general.geminiApiKey}</span>
-            </label>
-            <input
+            <Input
+              label={t.settings.general.geminiApiKey}
               type="password"
               value={geminiApiKey}
               onChange={(e) => setGeminiApiKey && setGeminiApiKey(e.target.value)}
               placeholder="AIzaSy..."
-              className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
+              prefixIcon={<Key size={13} />}
+              mono
             />
-          </div>
 
-          {/* Groq API Key */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-[var(--theme-text-muted)] flex items-center gap-1">
-              <Key size={12} />
-              <span>{t.settings.general.groqApiKey}</span>
-            </label>
-            <input
+            <Input
+              label={t.settings.general.groqApiKey}
               type="password"
               value={groqApiKey}
               onChange={(e) => setGroqApiKey(e.target.value)}
               placeholder="gsk_..."
-              className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
+              prefixIcon={<Key size={13} />}
+              mono
             />
           </div>
-        </div>
-      </div>
+        </Card>
+      </SettingsSection>
 
-      {/* 2. UI & Behavior Toggles */}
-      <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
-        <div className="text-xs font-bold text-[var(--theme-text)] flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
-          <div className="flex items-center gap-1.5">
-            <Sliders size={14} className="text-[var(--theme-text-muted)]" />
-            <span>{t.settings.general.behaviorTitle}</span>
-          </div>
-          <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
-            :: Preferences
-          </span>
-        </div>
-
+      {/* 4. UI & Behavior Toggles */}
+      <SettingsSection
+        title={t.settings.general.behaviorTitle}
+        badge="Preferences"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <SettingToggleCard
             icon={<Shield size={16} />}
@@ -314,139 +254,109 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
             statusOffText={t.settings.general.statusOff}
           />
         </div>
-      </div>
+      </SettingsSection>
 
-      {/* 3. Jarvis Voice Intercom & Proactive Companion */}
-      <div className="p-4 rounded-2xl bento-card space-y-4 border border-[var(--theme-border)]">
-        <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
-          <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
-            <Volume2 size={14} className="text-[var(--theme-text-muted)]" />
-            <span>{t.settings.general.jarvisVoiceTitle}</span>
+      {/* 5. Jarvis Voice Intercom & Proactive Companion */}
+      <SettingsSection
+        title={t.settings.general.jarvisVoiceTitle}
+        badge="Push-Driven Engine"
+      >
+        <Card variant="default" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <SettingToggleCard
+              icon={<Volume2 size={16} />}
+              title={t.settings.general.edgeTtsTitle}
+              desc={t.settings.general.edgeTtsDesc}
+              active={Boolean(ttsVoiceEnabled)}
+              onToggle={() => setTtsVoiceEnabled && setTtsVoiceEnabled(!ttsVoiceEnabled)}
+              statusOnText={t.settings.general.statusOn}
+              statusOffText={t.settings.general.statusOff}
+            />
+
+            <SettingToggleCard
+              icon={<Sparkles size={16} />}
+              title={t.settings.general.sparksTitle}
+              desc={t.settings.general.sparksDesc}
+              active={Boolean(proactiveCompanionEnabled)}
+              onToggle={() =>
+                setProactiveCompanionEnabled && setProactiveCompanionEnabled(!proactiveCompanionEnabled)
+              }
+              statusOnText={t.settings.general.statusOn}
+              statusOffText={t.settings.general.statusOff}
+            />
           </div>
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
-            :: Push-Driven Engine
-          </span>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <SettingToggleCard
-            icon={<Volume2 size={16} />}
-            title={t.settings.general.edgeTtsTitle}
-            desc={t.settings.general.edgeTtsDesc}
-            active={Boolean(ttsVoiceEnabled)}
-            onToggle={() => setTtsVoiceEnabled && setTtsVoiceEnabled(!ttsVoiceEnabled)}
-            statusOnText={t.settings.general.statusOn}
-            statusOffText={t.settings.general.statusOff}
-          />
-
-          <SettingToggleCard
-            icon={<Sparkles size={16} />}
-            title={t.settings.general.sparksTitle}
-            desc={t.settings.general.sparksDesc}
-            active={Boolean(proactiveCompanionEnabled)}
-            onToggle={() => setProactiveCompanionEnabled && setProactiveCompanionEnabled(!proactiveCompanionEnabled)}
-            statusOnText={t.settings.general.statusOn}
-            statusOffText={t.settings.general.statusOff}
-          />
-        </div>
-
-        {/* Voice Parameters */}
-        {ttsVoiceEnabled && (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-[var(--theme-border)]">
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] block font-mono">
-                  {t.settings.general.voiceLabel}
-                </label>
-                <select
+          {/* Voice Parameters */}
+          {ttsVoiceEnabled && (
+            <div className="space-y-4 pt-2 border-t border-[var(--theme-border)]">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 items-end">
+                <Select
+                  label={t.settings.general.voiceLabel}
                   value={ttsVoice}
                   onChange={(e) => setTtsVoice && setTtsVoice(e.target.value)}
-                  className="w-full text-xs px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] cursor-pointer transition-colors"
-                >
-                  <option value="ru-RU-SvetlanaNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Svetlana (RU, Female)</option>
-                  <option value="ru-RU-DmitryNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Dmitry (RU, Male)</option>
-                  <option value="en-US-GuyNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Guy (EN, Male)</option>
-                  <option value="en-US-JennyNeural" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Jenny (EN, Female)</option>
-                </select>
-              </div>
+                  options={[
+                    { value: 'ru-RU-SvetlanaNeural', label: 'Svetlana', sublabel: 'RU, Female' },
+                    { value: 'ru-RU-DmitryNeural', label: 'Dmitry', sublabel: 'RU, Male' },
+                    { value: 'en-US-GuyNeural', label: 'Guy', sublabel: 'EN, Male' },
+                    { value: 'en-US-JennyNeural', label: 'Jenny', sublabel: 'EN, Female' },
+                  ]}
+                />
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-semibold text-[var(--theme-text-muted)] block font-mono">
-                  {t.settings.general.voiceRateLabel}
-                </label>
-                <select
+                <Select
+                  label={t.settings.general.voiceRateLabel}
                   value={ttsRate}
                   onChange={(e) => setTtsRate && setTtsRate(e.target.value)}
-                  className="w-full text-xs px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] focus:outline-none focus:border-[var(--theme-accent)] cursor-pointer transition-colors"
+                  options={[
+                    { value: '+0%', label: 'Standard (+0%)' },
+                    { value: '+15%', label: 'Fast (+15%)' },
+                    { value: '+20%', label: 'Optimal (+20%)' },
+                    { value: '+30%', label: 'Ultra (+30%)' },
+                  ]}
+                />
+
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={handleTestVoice}
+                  loading={testingVoice}
+                  icon={<Volume2 size={14} />}
+                  className="w-full"
                 >
-                  <option value="+0%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Standard (+0%)</option>
-                  <option value="+15%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Fast (+15%)</option>
-                  <option value="+20%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Optimal (+20%)</option>
-                  <option value="+30%" className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">Ultra (+30%)</option>
-                </select>
+                  {t.settings.general.testVoiceBtn}
+                </Button>
               </div>
 
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      await api.speak_text('Jarvis systems fully operational, sir.', {
-                        voice: ttsVoice,
-                        rate: ttsRate,
-                        playOnSpeaker: ttsPlayOnSpeaker,
-                        category: 'greeting',
-                      });
-                    } catch (err: any) {
-                      console.error('Voice test failed:', err);
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-xs transition-all hover:opacity-90 shadow-sm cursor-pointer"
-                >
-                  <Volume2 size={14} />
-                  <span>{t.settings.general.testVoiceBtn}</span>
-                </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--theme-border)]">
+                <Toggle
+                  checked={Boolean(ttsPlayOnSpeaker)}
+                  onChange={(val) => setTtsPlayOnSpeaker && setTtsPlayOnSpeaker(val)}
+                  label={t.settings.general.playSpeakerLabel}
+                  size="sm"
+                />
+
+                <Toggle
+                  checked={Boolean(ttsPlayInBrowser)}
+                  onChange={(val) => setTtsPlayInBrowser && setTtsPlayInBrowser(val)}
+                  label={t.settings.general.playBrowserLabel}
+                  size="sm"
+                />
+
+                <Toggle
+                  checked={Boolean(wakeWordEnabled)}
+                  onChange={(val) => setWakeWordEnabled && setWakeWordEnabled(val)}
+                  label={t.settings.general.wakeWordLabel}
+                  size="sm"
+                  className="sm:col-span-2"
+                />
               </div>
             </div>
+          )}
+        </Card>
+      </SettingsSection>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--theme-border)]">
-              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none font-medium">
-                <input
-                  type="checkbox"
-                  checked={ttsPlayOnSpeaker}
-                  onChange={(e) => setTtsPlayOnSpeaker && setTtsPlayOnSpeaker(e.target.checked)}
-                  className="rounded accent-[var(--theme-accent)] cursor-pointer"
-                />
-                <span>{t.settings.general.playSpeakerLabel}</span>
-              </label>
-
-              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] select-none font-medium">
-                <input
-                  type="checkbox"
-                  checked={ttsPlayInBrowser}
-                  onChange={(e) => setTtsPlayInBrowser && setTtsPlayInBrowser(e.target.checked)}
-                  className="rounded accent-[var(--theme-accent)] cursor-pointer"
-                />
-                <span>{t.settings.general.playBrowserLabel}</span>
-              </label>
-
-              <label className="flex items-center gap-2.5 cursor-pointer text-xs text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] sm:col-span-2 select-none font-medium">
-                <input
-                  type="checkbox"
-                  checked={wakeWordEnabled}
-                  onChange={(e) => setWakeWordEnabled && setWakeWordEnabled(e.target.checked)}
-                  className="rounded accent-[var(--theme-accent)] cursor-pointer"
-                />
-                <span>{t.settings.general.wakeWordLabel}</span>
-              </label>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* 4. Active Session & Logout */}
-      <div className="p-4 rounded-2xl bento-card space-y-3 border border-[var(--theme-border)]">
-        <div className="flex items-center justify-between">
+      {/* 6. Active Session & Logout */}
+      <SettingsSection title={t.settings.general.securityTitle}>
+        <Card variant="default" className="flex items-center justify-between gap-4">
           <div className="space-y-0.5">
             <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
               <Shield size={14} className="text-[var(--theme-text-muted)]" />
@@ -457,17 +367,16 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
             </p>
           </div>
 
-          <button
-            type="button"
+          <Button
+            variant="danger"
+            size="sm"
             onClick={handleLogout}
-            className="px-3.5 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-xs text-[var(--theme-text-muted)] flex items-center gap-1.5 cursor-pointer transition-all font-medium"
-            title={t.settings.security.logoutDesc}
+            icon={<LogOut size={13} />}
           >
-            <LogOut size={13} />
-            <span>{t.settings.general.logoutBtn}</span>
-          </button>
-        </div>
-      </div>
+            {t.settings.general.logoutBtn}
+          </Button>
+        </Card>
+      </SettingsSection>
     </div>
   );
 });

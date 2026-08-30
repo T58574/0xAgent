@@ -19,13 +19,20 @@ import {
 import { ContextBreakdownReport, AppConfig } from '../../types';
 import * as api from '../../services/api';
 import { useI18n } from '../../i18n';
+import { Button } from '../ui/Button';
+import { Badge } from '../ui/Badge';
+import { Card } from '../ui/Card';
+import { SettingsHeader, SettingsSection, SettingStatCard } from './common';
 
 interface CustomizationsTabProps {
   config: AppConfig | null;
   currentSessionId?: string | null;
 }
 
-export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, currentSessionId }) => {
+export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({
+  config,
+  currentSessionId,
+}) => {
   const { t, formatString } = useI18n();
   const [report, setReport] = useState<ContextBreakdownReport | null>(null);
   const [loading, setLoading] = useState(true);
@@ -94,15 +101,44 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
   };
 
   const translateCategoryName = (name: string, catKey: string) => {
-    if (catKey === 'tools' || name.toLowerCase().includes('tools')) return t.settings.customizations.catTools;
-    if (catKey === 'persona' || name.toLowerCase().includes('soul')) return t.settings.customizations.catPersona;
-    if (catKey === 'user_profile' || name.toLowerCase().includes('user')) return t.settings.customizations.catUser;
-    if (catKey === 'environment' || name.toLowerCase().includes('environment') || name.toLowerCase().includes('окружение')) return t.settings.customizations.catEnv;
-    if (catKey === 'planning' || name.toLowerCase().includes('planning')) return t.settings.customizations.catPlanning;
-    if (catKey === 'workspace_rules' || name.toLowerCase().includes('rules') || name.toLowerCase().includes('правила')) return t.settings.customizations.catRules;
-    if (catKey === 'memory' || name.toLowerCase().includes('memory') || name.toLowerCase().includes('память')) return t.settings.customizations.catMemory;
-    if (catKey === 'history' || name.toLowerCase().includes('history') || name.toLowerCase().includes('история')) return t.settings.customizations.catHistory;
-    if (catKey === 'skills' || name.toLowerCase().includes('skills') || name.toLowerCase().includes('скиллы')) return t.settings.customizations.catSkills;
+    if (catKey === 'tools' || name.toLowerCase().includes('tools'))
+      return t.settings.customizations.catTools;
+    if (catKey === 'persona' || name.toLowerCase().includes('soul'))
+      return t.settings.customizations.catPersona;
+    if (catKey === 'user_profile' || name.toLowerCase().includes('user'))
+      return t.settings.customizations.catUser;
+    if (
+      catKey === 'environment' ||
+      name.toLowerCase().includes('environment') ||
+      name.toLowerCase().includes('окружение')
+    )
+      return t.settings.customizations.catEnv;
+    if (catKey === 'planning' || name.toLowerCase().includes('planning'))
+      return t.settings.customizations.catPlanning;
+    if (
+      catKey === 'workspace_rules' ||
+      name.toLowerCase().includes('rules') ||
+      name.toLowerCase().includes('правила')
+    )
+      return t.settings.customizations.catRules;
+    if (
+      catKey === 'memory' ||
+      name.toLowerCase().includes('memory') ||
+      name.toLowerCase().includes('память')
+    )
+      return t.settings.customizations.catMemory;
+    if (
+      catKey === 'history' ||
+      name.toLowerCase().includes('history') ||
+      name.toLowerCase().includes('история')
+    )
+      return t.settings.customizations.catHistory;
+    if (
+      catKey === 'skills' ||
+      name.toLowerCase().includes('skills') ||
+      name.toLowerCase().includes('скиллы')
+    )
+      return t.settings.customizations.catSkills;
     return name;
   };
 
@@ -115,66 +151,60 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
   };
 
   return (
-    <div className="w-full h-full overflow-y-auto p-4 md:p-6 space-y-6 select-text font-sans">
+    <div className="w-full space-y-6 select-text font-sans text-[var(--theme-text)]">
       {/* Top Title & Refresh */}
-      <div className="flex items-center justify-between pb-3 border-b border-[var(--theme-border)]">
-        <div>
-          <h1 className="text-base md:text-lg font-bold text-[var(--theme-text)]">
-            {t.settings.customizations.title}
-          </h1>
-          <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-            {t.settings.customizations.subtitle}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={fetchBreakdown}
-          disabled={loading}
-          className="px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] text-xs font-bold transition-colors cursor-pointer flex items-center gap-2 shadow-sm"
-          title={t.settings.customizations.refreshBtn}
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-          <span>{t.settings.customizations.refreshBtn}</span>
-        </button>
-      </div>
+      <SettingsHeader
+        title={t.settings.customizations.title}
+        subtitle={t.settings.customizations.subtitle}
+        icon={<Sparkles size={18} />}
+        actionSlot={
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={fetchBreakdown}
+            disabled={loading}
+            loading={loading}
+            icon={loading ? <RefreshCw size={13} /> : <RefreshCw size={13} />}
+          >
+            {t.settings.customizations.refreshBtn}
+          </Button>
+        }
+      />
 
       {/* Main Token Usage Infographic Card */}
-      <div className="space-y-3">
-        <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--theme-text-muted)]">
-          {t.settings.customizations.budgetTitle}
-        </h2>
-
+      <SettingsSection title={t.settings.customizations.budgetTitle}>
         {report ? (
-          <div className="p-5 rounded-2xl bento-card space-y-4 border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm">
+          <Card variant="default" className="space-y-4">
             <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed">
               {t.settings.customizations.budgetDesc}
             </p>
 
             {/* Availability Percentage & Quick Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-              <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">{t.settings.customizations.available}</span>
-                <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
-                  {report.availablePercentage}%
-                </span>
-                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">{t.settings.customizations.limitContext}</span>
-              </div>
+              <SettingStatCard
+                label={t.settings.customizations.available}
+                value={`${report.availablePercentage}%`}
+                sublabel={t.settings.customizations.limitContext}
+              />
 
-              <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">{t.settings.customizations.usedTokens}</span>
-                <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
-                  {report.totalUsed.toLocaleString()} <span className="text-xs font-normal text-[var(--theme-text-muted)]">/ {report.totalBudget.toLocaleString()}</span>
-                </span>
-                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">{t.settings.customizations.systemInst}</span>
-              </div>
+              <SettingStatCard
+                label={t.settings.customizations.usedTokens}
+                value={
+                  <>
+                    {report.totalUsed.toLocaleString()}{' '}
+                    <span className="text-xs font-normal text-[var(--theme-text-muted)]">
+                      / {report.totalBudget.toLocaleString()}
+                    </span>
+                  </>
+                }
+                sublabel={t.settings.customizations.systemInst}
+              />
 
-              <div className="p-3 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)]">{t.settings.customizations.categoriesCount}</span>
-                <span className="text-lg font-bold text-[var(--theme-text)] font-mono">
-                  {report.categories.length}
-                </span>
-                <span className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">{t.settings.customizations.activeDirectives}</span>
-              </div>
+              <SettingStatCard
+                label={t.settings.customizations.categoriesCount}
+                value={report.categories.length}
+                sublabel={t.settings.customizations.activeDirectives}
+              />
             </div>
 
             {/* Segmented Color Progress Bar */}
@@ -208,7 +238,9 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                       className="w-2 h-2 rounded-full shrink-0"
                       style={{ backgroundColor: cat.color }}
                     />
-                    <span className="font-semibold">{translateCategoryName(cat.name, cat.category).split(' ')[0]}</span>
+                    <span className="font-semibold">
+                      {translateCategoryName(cat.name, cat.category).split(' ')[0]}
+                    </span>
                     <span className="text-[10px] font-mono text-[var(--theme-text-muted)] font-bold">
                       {cat.tokens.toLocaleString()} tok
                     </span>
@@ -221,26 +253,33 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                 onClick={() => setShowBreakdowns(!showBreakdowns)}
                 className="text-xs font-bold text-[var(--theme-text)] hover:underline transition-colors cursor-pointer flex items-center gap-1 shrink-0 ml-auto"
               >
-                <span>{showBreakdowns ? t.settings.customizations.collapseCategories : formatString(t.settings.customizations.showAllCategories, { count: report.categories.length })}</span>
-                <ChevronDown size={14} className={`transition-transform duration-200 ${showBreakdowns ? 'rotate-180' : ''}`} />
+                <span>
+                  {showBreakdowns
+                    ? t.settings.customizations.collapseCategories
+                    : formatString(t.settings.customizations.showAllCategories, {
+                        count: report.categories.length,
+                      })}
+                </span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-200 ${
+                    showBreakdowns ? 'rotate-180' : ''
+                  }`}
+                />
               </button>
             </div>
-          </div>
+          </Card>
         ) : (
-          <div className="p-8 rounded-2xl bento-card text-center text-xs text-[var(--theme-text-muted)] flex items-center justify-center gap-2 border border-[var(--theme-border)]">
+          <Card variant="default" className="p-8 text-center text-xs text-[var(--theme-text-muted)] flex items-center justify-center gap-2">
             <RefreshCw size={14} className="animate-spin" />
             <span>{t.common.loading}</span>
-          </div>
+          </Card>
         )}
-      </div>
+      </SettingsSection>
 
       {/* Detailed Accordion Breakdown Sections */}
       {showBreakdowns && report && (
-        <div className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--theme-text-muted)]">
-            {t.settings.customizations.structureTitle}
-          </h2>
-
+        <SettingsSection title={t.settings.customizations.structureTitle}>
           <div className="space-y-2.5">
             {report.categories.map((cat) => {
               const isExpanded = !!expandedCategories[cat.id];
@@ -249,7 +288,10 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
               const scopeName = translateScope(cat.scope);
 
               return (
-                <div key={cat.id} className="rounded-2xl bento-card border border-[var(--theme-border)] overflow-hidden transition-all shadow-sm">
+                <div
+                  key={cat.id}
+                  className="rounded-2xl bento-card border border-[var(--theme-border)] overflow-hidden transition-all shadow-sm"
+                >
                   {/* Accordion Header */}
                   <div
                     onClick={() => toggleCategory(cat.id)}
@@ -257,7 +299,11 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                   >
                     <div className="flex items-center gap-2.5">
                       {hasDetails || cat.contentPreview ? (
-                        isExpanded ? <ChevronDown size={15} className="text-[var(--theme-text-muted)]" /> : <ChevronRight size={15} className="text-[var(--theme-text-muted)]" />
+                        isExpanded ? (
+                          <ChevronDown size={15} className="text-[var(--theme-text-muted)]" />
+                        ) : (
+                          <ChevronRight size={15} className="text-[var(--theme-text-muted)]" />
+                        )
                       ) : (
                         <div className="w-3.5" />
                       )}
@@ -266,15 +312,16 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                         {titleName}
                       </span>
                       {scopeName && (
-                        <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)] font-bold">
+                        <Badge variant="neutral" size="xs">
                           {scopeName}
-                        </span>
+                        </Badge>
                       )}
                     </div>
 
                     <div className="flex items-center gap-3">
                       <span className="text-xs font-mono text-[var(--theme-text-muted)] font-semibold">
-                        {cat.tokens.toLocaleString()} tok <span className="text-[10px] opacity-70">({cat.percentage}%)</span>
+                        {cat.tokens.toLocaleString()} tok{' '}
+                        <span className="text-[10px] opacity-70">({cat.percentage}%)</span>
                       </span>
                       <div
                         className="w-2.5 h-2.5 rounded-full"
@@ -292,7 +339,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                         </p>
                       )}
 
-                      {/* Detailed Items List (e.g. Skills, Tools) */}
+                      {/* Detailed Items List */}
                       {hasDetails && (
                         <div className="space-y-2 pt-1">
                           {cat.details!.map((detail) => (
@@ -300,20 +347,25 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                               key={detail.id}
                               className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm"
                             >
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2">
+                              <div className="space-y-1 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-xs font-bold text-[var(--theme-text)] font-mono">
                                     {detail.name}
                                   </span>
                                   {detail.scope && (
-                                    <span className="text-[9px] font-mono px-2 py-0.5 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)] font-bold">
+                                    <Badge variant="neutral" size="xs">
                                       {translateScope(detail.scope)}
-                                    </span>
+                                    </Badge>
                                   )}
                                   {detail.enabled !== undefined && (
-                                    <span className={`text-[9px] font-mono px-2 py-0.5 rounded-md font-bold ${detail.enabled ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30'}`}>
-                                      {detail.enabled ? t.settings.customizations.activeBadge : t.settings.customizations.inactiveBadge}
-                                    </span>
+                                    <Badge
+                                      variant={detail.enabled ? 'success' : 'danger'}
+                                      size="xs"
+                                    >
+                                      {detail.enabled
+                                        ? t.settings.customizations.activeBadge
+                                        : t.settings.customizations.inactiveBadge}
+                                    </Badge>
                                   )}
                                 </div>
                                 {detail.description && (
@@ -328,14 +380,19 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                                   {detail.tokens.toLocaleString()} tok
                                 </span>
                                 {detail.preview && (
-                                  <button
-                                    type="button"
+                                  <Button
+                                    variant="ghost"
+                                    size="xs"
                                     onClick={() => handleCopy(detail.id, detail.preview!)}
-                                    className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer border border-[var(--theme-border)]"
+                                    icon={
+                                      copiedId === detail.id ? (
+                                        <Check size={12} className="text-emerald-500" />
+                                      ) : (
+                                        <Copy size={12} />
+                                      )
+                                    }
                                     title={t.settings.customizations.copyTooltip}
-                                  >
-                                    {copiedId === detail.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
-                                  </button>
+                                  />
                                 )}
                               </div>
                             </div>
@@ -353,7 +410,11 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
                               onClick={() => handleCopy(cat.id, cat.contentPreview!)}
                               className="flex items-center gap-1 hover:text-[var(--theme-text)] cursor-pointer"
                             >
-                              {copiedId === cat.id ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                              {copiedId === cat.id ? (
+                                <Check size={11} className="text-emerald-500" />
+                              ) : (
+                                <Copy size={11} />
+                              )}
                               <span>{t.common.copy}</span>
                             </button>
                           </div>
@@ -368,7 +429,7 @@ export const CustomizationsTab: React.FC<CustomizationsTabProps> = ({ config, cu
               );
             })}
           </div>
-        </div>
+        </SettingsSection>
       )}
     </div>
   );

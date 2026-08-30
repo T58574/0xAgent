@@ -1,6 +1,11 @@
 import React from 'react';
 import { Download, RefreshCw } from 'lucide-react';
 import { useI18n } from '../../../i18n';
+import { Button } from '../../ui/Button';
+import { Select } from '../../ui/Select';
+import { Toggle } from '../../ui/Toggle';
+import { Badge } from '../../ui/Badge';
+import { Card } from '../../ui/Card';
 
 interface LlamaInstallerSectionProps {
   githubReleases: any[];
@@ -35,7 +40,7 @@ export const LlamaInstallerSection: React.FC<LlamaInstallerSectionProps> = ({
   const currentRel = githubReleases.find((r) => r.tag === selectedTag);
 
   return (
-    <div className="p-4 rounded-2xl bento-card space-y-3.5 border border-[var(--theme-border)]">
+    <Card variant="default" className="space-y-4">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b border-[var(--theme-border)] pb-2.5">
         <div>
           <div className="text-xs font-bold text-[var(--theme-text)] flex items-center gap-1.5">
@@ -55,86 +60,72 @@ export const LlamaInstallerSection: React.FC<LlamaInstallerSectionProps> = ({
       </div>
 
       {/* Release Tag Dropdown & Asset Selection */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
-            {t.settings.localServer.installer.releaseTagLabel}
-          </label>
-          <select
-            value={selectedTag}
-            onChange={(e) => onTagChange(e.target.value)}
-            disabled={githubReleases.length === 0 || isInstallingLlama}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none cursor-pointer transition-colors"
-          >
-            {githubReleases.map((rel) => (
-              <option key={rel.tag} value={rel.tag} className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
-                {rel.name} ({rel.tag})
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+        <Select
+          label={t.settings.localServer.installer.releaseTagLabel}
+          value={selectedTag}
+          onChange={(e) => onTagChange(e.target.value)}
+          disabled={githubReleases.length === 0 || isInstallingLlama}
+          mono
+          options={githubReleases.map((rel) => ({
+            value: rel.tag,
+            label: rel.name || rel.tag,
+            sublabel: rel.tag,
+          }))}
+        />
 
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
-            {t.settings.localServer.installer.assetLabel}
-          </label>
-          <select
-            value={selectedAssetUrl}
-            onChange={(e) => {
-              const url = e.target.value;
-              const asset = currentRel?.assets.find((a: any) => a.download_url === url);
-              onAssetUrlChange(url, asset ? asset.name : '');
-            }}
-            disabled={!currentRel || isInstallingLlama}
-            className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none cursor-pointer transition-colors"
-          >
-            {currentRel?.assets.map((asset: any) => (
-              <option key={asset.download_url} value={asset.download_url} className="bg-[var(--theme-panel-solid)] text-[var(--theme-text)]">
-                {asset.name} ({asset.size})
-              </option>
-            ))}
-          </select>
-        </div>
+        <Select
+          label={t.settings.localServer.installer.assetLabel}
+          value={selectedAssetUrl}
+          onChange={(e) => {
+            const url = e.target.value;
+            const asset = currentRel?.assets.find((a: any) => a.download_url === url);
+            onAssetUrlChange(url, asset ? asset.name : '');
+          }}
+          disabled={!currentRel || isInstallingLlama}
+          mono
+          options={
+            currentRel?.assets?.map((asset: any) => ({
+              value: asset.download_url,
+              label: asset.name,
+              sublabel: asset.size,
+            })) || []
+          }
+        />
       </div>
 
-      {/* Auto Cleanup Old Versions Checkbox & Download Action */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2">
-        <label className="flex items-center gap-2 text-xs text-[var(--theme-text-muted)] cursor-pointer select-none font-medium">
-          <input
-            type="checkbox"
-            checked={autoCleanupOld}
-            onChange={(e) => setAutoCleanupOld(e.target.checked)}
-            className="rounded accent-[var(--theme-accent)]"
-          />
-          <span>{t.settings.localServer.installer.autoCleanupLabel}</span>
-        </label>
+      {/* Auto Cleanup Old Versions & Download Action */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-[var(--theme-border)]">
+        <Toggle
+          checked={autoCleanupOld}
+          onChange={(val) => setAutoCleanupOld(val)}
+          label={t.settings.localServer.installer.autoCleanupLabel}
+          size="sm"
+        />
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
           {justDownloadedTag === selectedTag && (
-            <span className="px-2.5 py-1 rounded-lg bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-border)] text-[10px] font-mono font-semibold">
+            <Badge variant="success" size="xs">
               {t.settings.localServer.installer.installedBadge}
-            </span>
+            </Badge>
           )}
-          <button
-            type="button"
+
+          <Button
+            variant="secondary"
+            size="md"
             onClick={onInstall}
             disabled={!selectedAssetUrl || isInstallingLlama}
-            className="px-4 py-2 rounded-xl bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 font-semibold text-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer transition-all shadow-sm"
+            loading={isInstallingLlama}
+            icon={isInstallingLlama ? <RefreshCw size={13} /> : <Download size={13} />}
           >
-            {isInstallingLlama ? (
-              <>
-                <RefreshCw size={13} className="animate-spin" />
-                <span>{t.settings.localServer.installer.installingStatus}</span>
-              </>
-            ) : (
-              <>
-                <Download size={13} />
-                <span>{isSelectedVersionInstalled ? t.settings.localServer.installer.reinstallBtn : t.settings.localServer.installer.downloadInstallBtn}</span>
-              </>
-            )}
-          </button>
+            {isInstallingLlama
+              ? t.settings.localServer.installer.installingStatus
+              : isSelectedVersionInstalled
+              ? t.settings.localServer.installer.reinstallBtn
+              : t.settings.localServer.installer.downloadInstallBtn}
+          </Button>
         </div>
       </div>
-    </div>
+    </Card>
   );
 };
