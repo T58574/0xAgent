@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Brain, Plus, GitPullRequest, Database, Sparkles, Activity } from 'lucide-react';
+import { Brain, Plus, GitPullRequest, Database, Sparkles, Activity, Terminal, Layers } from 'lucide-react';
 import {
   PersonaMetadata,
   PersonaDetail,
@@ -17,6 +17,7 @@ import { PersonaProposalsModal } from './PersonaProposalsModal';
 import { MemoryManagerSection } from './personas/MemoryManagerSection';
 import { PersonaEditorSection } from './personas/PersonaEditorSection';
 import { TokenTelemetrySection } from './personas/TokenTelemetrySection';
+import { SystemPromptsModal } from './personas/SystemPromptsModal';
 
 interface PersonasTabProps {
   currentSessionId?: string | null;
@@ -40,15 +41,15 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
   const [activePersonaId, setActivePersonaId] = useState<string>('default');
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('default');
   const [personaDetail, setPersonaDetail] = useState<PersonaDetail | null>(null);
-  const [activeFile, setActiveFile] = useState<'soul' | 'user' | 'summarizer'>('soul');
+  const [activeFile, setActiveFile] = useState<'soul' | 'user'>('soul');
   const [fileContent, setFileContent] = useState<string>('');
-  const [summarizerPrompt, setSummarizerPrompt] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // 3. Modals State
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProposalsOpen, setIsProposalsOpen] = useState(false);
+  const [isSystemPromptsOpen, setIsSystemPromptsOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
 
@@ -73,12 +74,17 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
     try {
       const list = await api.get_personas();
       setPersonas(list);
-      const active = list.find((p) => p.is_active) || list[0];
-      if (active) {
+      if (list.length > 0) {
+        const active = list.find((p) => p.is_active) || list[0];
         setActivePersonaId(active.id);
         if (!selectedPersonaId || !list.some((p) => p.id === selectedPersonaId)) {
           setSelectedPersonaId(active.id);
         }
+      } else {
+        setActivePersonaId('');
+        setSelectedPersonaId('');
+        setPersonaDetail(null);
+        setFileContent('');
       }
     } catch (err) {
       console.error('Failed to fetch personas:', err);
@@ -86,6 +92,11 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
   };
 
   const loadDetail = async (id: string) => {
+    if (!id) {
+      setPersonaDetail(null);
+      setFileContent('');
+      return;
+    }
     try {
       const detail = await api.get_persona_detail(id);
       setPersonaDetail(detail);
@@ -95,18 +106,6 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
       }
     } catch (err) {
       console.error('Failed to load persona detail:', err);
-    }
-  };
-
-  const loadSummarizer = async () => {
-    try {
-      const text = await api.get_summarizer_prompt();
-      setSummarizerPrompt(text);
-      if (activeFile === 'summarizer') {
-        setFileContent(text);
-      }
-    } catch (err) {
-      console.error('Failed to load summarizer prompt:', err);
     }
   };
 
@@ -125,7 +124,6 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
   useEffect(() => {
     loadMemories();
     loadPersonas();
-    loadSummarizer();
     fetchTokenBreakdown();
 
     const unsub = api.listen<{ activePersonaId?: string; personas: PersonaMetadata[] }>(
@@ -144,6 +142,9 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
   useEffect(() => {
     if (selectedPersonaId) {
       loadDetail(selectedPersonaId);
+    } else {
+      setPersonaDetail(null);
+      setFileContent('');
     }
   }, [selectedPersonaId]);
 
@@ -152,10 +153,8 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
       setFileContent(personaDetail.soul);
     } else if (activeFile === 'user' && personaDetail) {
       setFileContent(personaDetail.user);
-    } else if (activeFile === 'summarizer') {
-      setFileContent(summarizerPrompt);
     }
-  }, [activeFile, personaDetail, summarizerPrompt]);
+  }, [activeFile, personaDetail]);
 
   // Memory Handlers
   const handleAddMemory = async (key: string, value: string, category: string, scope: 'user' | 'project') => {
@@ -221,23 +220,17 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
   };
 
   const handleSaveActiveFile = async () => {
+    if (!personaDetail) return;
     try {
       setIsSaving(true);
-      if (activeFile === 'summarizer') {
-        await api.save_summarizer_prompt(fileContent);
-        setSummarizerPrompt(fileContent);
-        setSaveSuccess(true);
-        showToast(formatString(t.toasts.personaFileSaved, { file: 'SUMMARIZER.md' }), 'success');
-      } else if (personaDetail) {
-        const targetFile: 'SOUL.md' | 'USER.md' = activeFile === 'soul' ? 'SOUL.md' : 'USER.md';
-        await api.save_persona_file(personaDetail.metadata.id, targetFile, fileContent);
-        setSaveSuccess(true);
-        showToast(
-          formatString(t.toasts.personaFileSaved, { file: `${activeFile.toUpperCase()}.md` }),
-          'success'
-        );
-        loadDetail(personaDetail.metadata.id);
-      }
+      const targetFile: 'SOUL.md' | 'USER.md' = activeFile === 'soul' ? 'SOUL.md' : 'USER.md';
+      await api.save_persona_file(personaDetail.metadata.id, targetFile, fileContent);
+      setSaveSuccess(true);
+      showToast(
+        formatString(t.toasts.personaFileSaved, { file: `${activeFile.toUpperCase()}.md` }),
+        'success'
+      );
+      loadDetail(personaDetail.metadata.id);
       setTimeout(() => setSaveSuccess(false), 2000);
       fetchTokenBreakdown();
     } catch (err: any) {
@@ -248,12 +241,23 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
   };
 
   const handleDeletePersona = async (id: string) => {
-    if (id === 'default') return;
     try {
       await api.delete_persona(id);
-      await loadPersonas();
-      if (selectedPersonaId === id) setSelectedPersonaId('default');
+      const list = await api.get_personas();
+      setPersonas(list);
+      if (list.length > 0) {
+        const next = list.find((p) => p.is_active) || list[0];
+        setSelectedPersonaId(next.id);
+        setActivePersonaId(next.id);
+        await loadDetail(next.id);
+      } else {
+        setSelectedPersonaId('');
+        setActivePersonaId('');
+        setPersonaDetail(null);
+        setFileContent('');
+      }
       showToast(t.toasts.personaDeleted, 'info');
+      fetchTokenBreakdown();
     } catch (err: any) {
       showToast(err.message || t.common.error, 'error');
     }
@@ -345,22 +349,57 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
 
       {/* Active Subtab Content */}
       {activeSubtab === 'personas' && (
-        <PersonaEditorSection
-          personas={personas}
-          activePersonaId={activePersonaId}
-          selectedPersonaId={selectedPersonaId}
-          personaDetail={personaDetail}
-          activeFile={activeFile}
-          fileContent={fileContent}
-          isSaving={isSaving}
-          saveSuccess={saveSuccess}
-          onSelectPersona={setSelectedPersonaId}
-          onActivatePersona={handleActivatePersona}
-          onDeletePersona={handleDeletePersona}
-          onChangeActiveFile={setActiveFile}
-          onChangeFileContent={setFileContent}
-          onSaveActiveFile={handleSaveActiveFile}
-        />
+        <div className="space-y-6">
+          <PersonaEditorSection
+            personas={personas}
+            activePersonaId={activePersonaId}
+            selectedPersonaId={selectedPersonaId}
+            personaDetail={personaDetail}
+            activeFile={activeFile}
+            fileContent={fileContent}
+            isSaving={isSaving}
+            saveSuccess={saveSuccess}
+            onSelectPersona={setSelectedPersonaId}
+            onActivatePersona={handleActivatePersona}
+            onDeletePersona={handleDeletePersona}
+            onChangeActiveFile={setActiveFile}
+            onChangeFileContent={setFileContent}
+            onSaveActiveFile={handleSaveActiveFile}
+            onCreatePersonaClick={() => setIsCreateOpen(true)}
+          />
+
+          {/* Bottom Interface: System Prompts Inspector Trigger */}
+          <div className="p-4 rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)]/60 backdrop-blur-xs flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-[var(--theme-accent)]/10 text-[var(--theme-accent)] flex items-center justify-center shrink-0">
+                <Terminal size={15} />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[var(--theme-text)]">
+                    {t.settings.personas.systemPromptsTitle || 'Системные промпты проекта'}
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
+                    SUMMARIZER, TOOLS, DIRECTIVES
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--theme-text-muted)]">
+                  {t.settings.personas.systemPromptsFooterDesc || 'Просмотр и настройка встроенных инструкций ядра и сжатия контекста'}
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setIsSystemPromptsOpen(true)}
+              icon={<Layers size={13} />}
+              className="text-xs shrink-0"
+            >
+              {t.settings.personas.viewSystemPromptsBtn || 'Открыть промпты проекта'}
+            </Button>
+          </div>
+        </div>
       )}
 
       {activeSubtab === 'memory' && (
@@ -430,6 +469,12 @@ export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) =>
           }}
         />
       )}
+
+      {/* Modal: Project System Prompts Inspector */}
+      <SystemPromptsModal
+        isOpen={isSystemPromptsOpen}
+        onClose={() => setIsSystemPromptsOpen(false)}
+      />
     </div>
   );
 };

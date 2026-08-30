@@ -518,6 +518,14 @@ export interface Translations {
       catProjectConv: string;
       catProfile: string;
       noMemoriesFound: string;
+      systemPromptsTitle: string;
+      systemPromptsSubtitle: string;
+      systemPromptsFooterDesc: string;
+      viewSystemPromptsBtn: string;
+      noPersonasTitle: string;
+      noPersonasDesc: string;
+      copyPrompt: string;
+      promptCopied: string;
       evolutionTitle: string;
       evolutionIntro: string;
       evolutionTabProposals: string;

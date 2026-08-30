@@ -15,6 +15,7 @@ import {
   applyPersonaProposal,
   listPersonaFileVersions,
   rollbackPersonaFile,
+  getProjectSystemPrompts,
 } from '../personas';
 import { loadSummarizerPrompt, saveSummarizerPrompt } from '../summarizer';
 import { getToolsState, saveToolsToggles, saveCustomToolsMd } from '../toolsConfig';
@@ -267,6 +268,15 @@ export function createPersonasRouter(broadcast?: (event: string, payload: any) =
         broadcast('persona-changed', { activePersonaId: req.params.id, personas: listPersonas() });
       }
       res.json(rollback);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/system-prompts', (_req, res) => {
+    try {
+      const prompts = getProjectSystemPrompts();
+      res.json(prompts);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

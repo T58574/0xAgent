@@ -19,6 +19,7 @@ import {
   SearchEngineInfo,
   WebSearchProvider,
   ApprovalResult,
+  SystemPromptItem,
 } from '../types';
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
@@ -285,6 +286,8 @@ export const get_evolution_analytics = (days?: number) =>
   get<any>(days ? `/analytics/evolution?days=${days}` : '/analytics/evolution');
 export const get_evolution_telemetry = (limit?: number) =>
   get<any[]>(limit ? `/analytics/evolution/telemetry?limit=${limit}` : '/analytics/evolution/telemetry');
+
+export const get_system_prompts = () => get<SystemPromptItem[]>('/system-prompts');
 
 export async function get_summarizer_prompt(): Promise<string> {
   const data = await get<{ content: string }>('/summarizer-prompt');

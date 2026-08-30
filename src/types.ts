@@ -116,6 +116,15 @@ export interface SearchEngineInfo {
   isAvailable: boolean;
 }
 
+export interface SystemPromptItem {
+  id: string;
+  name: string;
+  title: string;
+  description: string;
+  content: string;
+  editable?: boolean;
+}
+
 export interface AppConfig {
   api_url: string;
   model_name: string;
