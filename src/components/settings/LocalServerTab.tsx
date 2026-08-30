@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Cpu, Folder, Zap, Activity, RefreshCw, Play, Square } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Cpu, Folder, Zap, Activity, RefreshCw, Play, Square, Sliders, Terminal, Box } from 'lucide-react';
 import { useI18n } from '../../i18n';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -90,6 +90,8 @@ interface LocalServerTabProps {
   setApiUrl: (val: string) => void;
 }
 
+type LocalServerSubtab = 'config' | 'params' | 'logs';
+
 export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) => {
   const {
     exePath,
@@ -165,13 +167,23 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
   } = props;
 
   const { t, formatString } = useI18n();
+
+  // Active Subtab
+  const [activeSubtab, setActiveSubtab] = useState<LocalServerSubtab>('config');
+
   const logsContainerRef = useRef<HTMLDivElement>(null);
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const {
+    hardwareInfo,
+    scannedLocalModels,
+    modelMeta,
+    healthStatus,
+    slotMetrics,
+    isActionLoading,
+    crashAdvice,
     logFilePath,
     isCopiedLogs,
-    isInstallingLlama,
     githubReleases,
     selectedTag,
     selectedAssetUrl,
@@ -179,24 +191,18 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
     setSelectedAssetName,
     installedVersions,
     isLoadingReleases,
+    isInstallingLlama,
     autoCleanupOld,
     setAutoCleanupOld,
-    justDownloadedTag,
     isCleaningOld,
     deletingTag,
-    modelMeta,
-    hardwareInfo,
-    healthStatus,
-    slotMetrics,
-    crashAdvice,
-    scannedLocalModels,
-    isActionLoading,
+    justDownloadedTag,
     refreshScannedModels,
-    handleTagChange,
-    handleSelectExe,
     handleSelectModel,
     handleSelectDraftModel,
+    handleSelectExe,
     handleSelectSlotSavePath,
+    handleTagChange,
     handleInstallSelectedLlamaVersion,
     handleSelectInstalledVersion,
     handleDeleteInstalledVersion,
@@ -221,7 +227,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
   );
 
   return (
-    <div className="w-full space-y-6 font-sans text-[var(--theme-text)]">
+    <div className="w-full space-y-6 pb-10 font-sans text-[var(--theme-text)]">
       {/* 1. Standard Top Header + Live Health Telemetry */}
       <SettingsHeader
         title={t.settings.localServer.title}
@@ -246,21 +252,75 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
         }
       />
 
-      {/* 2. Crash Advisory Alert Box */}
+      {/* 2. Sub-Navigation Tabs Bar (Segmented Pills) */}
+      <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveSubtab('config')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+            activeSubtab === 'config'
+              ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs ring-1 ring-[var(--theme-accent)]/30 font-bold'
+              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+          }`}
+        >
+          <Box size={14} className={activeSubtab === 'config' ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text-muted)]'} />
+          <span>{t.settings.localServer.subtabConfig}</span>
+          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
+            {serverStatus === 'running' ? 'Active' : 'Offline'}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubtab('params')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+            activeSubtab === 'params'
+              ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs ring-1 ring-[var(--theme-accent)]/30 font-bold'
+              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+          }`}
+        >
+          <Sliders size={14} className={activeSubtab === 'params' ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text-muted)]'} />
+          <span>{t.settings.localServer.subtabParams}</span>
+          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
+            {ctxSize.toLocaleString()} tok
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubtab('logs')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+            activeSubtab === 'logs'
+              ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs ring-1 ring-[var(--theme-accent)]/30 font-bold'
+              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+          }`}
+        >
+          <Terminal size={14} className={activeSubtab === 'logs' ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text-muted)]'} />
+          <span>{t.settings.localServer.subtabLogs}</span>
+          {serverLogs.length > 0 && (
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
+              {serverLogs.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Crash Advisory Alert Box */}
       <CrashAdviserCard crashAdvice={crashAdvice} />
 
-      {/* 3. MAIN 2-COLUMN GRID LAYOUT */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* LEFT COLUMN: Server Settings & Controls */}
-        <div className="lg:col-span-7 space-y-4">
+      {/* ===================================================================== */}
+      {/* SUBTAB 1: MODEL & SERVER CONFIGURATION                                */}
+      {/* ===================================================================== */}
+      {activeSubtab === 'config' && (
+        <div className="space-y-6">
           {/* Hardware GPU & Server Control Hero Banner */}
           <Card
             variant="default"
-            className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-md"
+            className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm rounded-2xl"
           >
-            <div className="flex items-center gap-3.5 min-w-0">
-              <div className="p-3 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-accent)] shrink-0">
-                <Zap size={20} />
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="p-3.5 rounded-2xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-accent)] shrink-0">
+                <Zap size={22} />
               </div>
               <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2 font-bold text-xs text-[var(--theme-text)] flex-wrap">
@@ -338,56 +398,8 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
             </div>
           </Card>
 
-          {/* GitHub Releases Llama.cpp Installer Section */}
-          <div className="space-y-3">
-            <LlamaInstallerSection
-              githubReleases={githubReleases}
-              selectedTag={selectedTag}
-              onTagChange={handleTagChange}
-              selectedAssetUrl={selectedAssetUrl}
-              onAssetUrlChange={(url, name) => {
-                setSelectedAssetUrl(url);
-                if (name) setSelectedAssetName(name);
-              }}
-              isLoadingReleases={isLoadingReleases}
-              isInstallingLlama={isInstallingLlama}
-              autoCleanupOld={autoCleanupOld}
-              setAutoCleanupOld={setAutoCleanupOld}
-              justDownloadedTag={justDownloadedTag}
-              isSelectedVersionInstalled={isSelectedVersionInstalled}
-              onInstall={handleInstallSelectedLlamaVersion}
-            />
-
-            <InstalledVersionsSection
-              installedVersions={installedVersions}
-              isCleaningOld={isCleaningOld}
-              deletingTag={deletingTag}
-              onSelectVersion={handleSelectInstalledVersion}
-              onDeleteVersion={handleDeleteInstalledVersion}
-              onCleanupOld={handleCleanupOldVersions}
-            />
-          </div>
-
-          {/* Executable Path & Model Selector Card */}
-          <Card variant="default" className="space-y-4">
-            <Input
-              label={t.settings.localServer.exePath}
-              value={exePath}
-              onChange={(e) => setExePath(e.target.value)}
-              placeholder="~/.0xagent/llama/llama-server.exe"
-              mono
-              actionSlot={
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={handleSelectExe}
-                  icon={<Folder size={12} />}
-                >
-                  {t.settings.localServer.browse}
-                </Button>
-              }
-            />
-
+          {/* Model Selection & Metadata Card */}
+          <Card variant="default" className="p-6 space-y-5 rounded-2xl">
             <div className="space-y-2">
               <Select
                 label={t.settings.localServer.modelPath}
@@ -464,8 +476,8 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
 
             {/* GGUF Model Metadata Card with Reasoning Specs */}
             {modelMeta && (
-              <Card variant="recessed" className="space-y-2.5 font-mono text-xs">
-                <div className="flex items-center justify-between text-[var(--theme-text)] font-bold border-b border-[var(--theme-border)] pb-2">
+              <Card variant="recessed" className="p-4 space-y-3 font-mono text-xs rounded-2xl border border-[var(--theme-border)]">
+                <div className="flex items-center justify-between text-[var(--theme-text)] font-bold border-b border-[var(--theme-border)] pb-2.5">
                   <div className="flex items-center gap-2 truncate">
                     <span className="truncate">
                       {modelMeta.cleanTitle || modelMeta.modelName || modelMeta.architecture}
@@ -479,7 +491,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-[11px]">
+                <div className="grid grid-cols-2 gap-3 text-[11.5px]">
                   <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
                     <span>{t.settings.localServer.modelMeta.family}</span>
                     <span className="text-[var(--theme-text)] font-bold uppercase">
@@ -515,7 +527,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
                 </div>
 
                 {modelMeta.supportsFastMtp && (
-                  <div className="flex items-center justify-between text-[11px] border-t border-[var(--theme-border)] pt-2 mt-1">
+                  <div className="flex items-center justify-between text-[11px] border-t border-[var(--theme-border)] pt-2.5 mt-1">
                     <span className="text-sky-500 font-semibold">
                       {t.settings.localServer.modelMeta.fastMtpSupport}
                     </span>
@@ -528,7 +540,63 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
             )}
           </Card>
 
-          {/* Performance Parameters Component */}
+          {/* GitHub Releases Llama.cpp Installer Section */}
+          <div className="space-y-4">
+            <LlamaInstallerSection
+              githubReleases={githubReleases}
+              selectedTag={selectedTag}
+              onTagChange={handleTagChange}
+              selectedAssetUrl={selectedAssetUrl}
+              onAssetUrlChange={(url, name) => {
+                setSelectedAssetUrl(url);
+                if (name) setSelectedAssetName(name);
+              }}
+              isLoadingReleases={isLoadingReleases}
+              isInstallingLlama={isInstallingLlama}
+              autoCleanupOld={autoCleanupOld}
+              setAutoCleanupOld={setAutoCleanupOld}
+              justDownloadedTag={justDownloadedTag}
+              isSelectedVersionInstalled={isSelectedVersionInstalled}
+              onInstall={handleInstallSelectedLlamaVersion}
+            />
+
+            <InstalledVersionsSection
+              installedVersions={installedVersions}
+              isCleaningOld={isCleaningOld}
+              deletingTag={deletingTag}
+              onSelectVersion={handleSelectInstalledVersion}
+              onDeleteVersion={handleDeleteInstalledVersion}
+              onCleanupOld={handleCleanupOldVersions}
+            />
+
+            <Card variant="default" className="p-5 rounded-2xl">
+              <Input
+                label={t.settings.localServer.exePath}
+                value={exePath}
+                onChange={(e) => setExePath(e.target.value)}
+                placeholder="~/.0xagent/llama/llama-server.exe"
+                mono
+                actionSlot={
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    onClick={handleSelectExe}
+                    icon={<Folder size={12} />}
+                  >
+                    {t.settings.localServer.browse}
+                  </Button>
+                }
+              />
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================== */}
+      {/* SUBTAB 2: LLAMA.CPP PARAMETERS & TUNING                               */}
+      {/* ===================================================================== */}
+      {activeSubtab === 'params' && (
+        <div className="space-y-6">
           <ServerPerformanceParams
             host={host}
             setHost={setHost}
@@ -601,9 +669,13 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
             serverStatus={serverStatus}
           />
         </div>
+      )}
 
-        {/* RIGHT COLUMN: Terminal Logs Console */}
-        <div className="lg:col-span-5">
+      {/* ===================================================================== */}
+      {/* SUBTAB 3: LOGS & CONSOLE TERMINAL                                     */}
+      {/* ===================================================================== */}
+      {activeSubtab === 'logs' && (
+        <div className="space-y-6">
           <ServerLogsConsole
             serverLogs={serverLogs}
             logFilePath={logFilePath}
@@ -617,7 +689,7 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
             logsEndRef={logsEndRef}
           />
         </div>
-      </div>
+      )}
     </div>
   );
 });

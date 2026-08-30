@@ -203,6 +203,9 @@ export const en: Translations = {
     toolsTab: {
       title: 'Agent Tools & Web Search',
       subtitle: 'Configure search engines, Firecrawl/SearXNG integrations, and manage enabled agent tool capabilities',
+      subtabSearch: 'Web Search & Providers',
+      subtabRegistry: 'Tools Registry',
+      subtabTester: 'Search Tester & Diagnostics',
       searchEngineTitle: 'Web Search & Crawling Engine',
       searchEngineDesc: 'Select active web search service. In Auto mode, a smart fallback cascade is used (Firecrawl -> SearXNG -> DuckDuckGo -> Wikipedia).',
       activeEngine: 'Active Search Engine',
@@ -248,6 +251,9 @@ export const en: Translations = {
     general: {
       title: 'General Parameters & Appearance',
       subtitle: 'Theme styles, language, API connection settings, voice intercom, and security',
+      subtabInterface: 'Theme & Interface',
+      subtabVoice: 'Voice & Companion',
+      subtabSecurity: 'Security & Network',
       themeTitle: 'Theme & Appearance',
       themeDesc: 'Choose your preferred visual aesthetic for 0xAgent',
       themeGraphite: 'Graphite',
@@ -323,8 +329,11 @@ export const en: Translations = {
       chooseDir: 'Browse Folder',
     },
     localServer: {
-      title: 'llama.cpp Inference Server & Logs',
-      subtitle: 'Supervise local llama-server.exe process, configure hardware offload, and inspect real-time logs',
+      title: 'Local Llama.cpp Server & GGUF Models',
+      subtitle: 'GPU-accelerated inference with quantized models, VRAM offloading, KV-cache tuning, and speculative decoding',
+      subtabConfig: 'Model & Server',
+      subtabParams: 'Llama.cpp Parameters',
+      subtabLogs: 'Logs & Console',
       gpuNameAuto: 'Auto-detected GPU',
       fullGpuOffload: 'Full GPU Offload (-ngl 999)',
       loadingToGpu: 'Loading into GPU...',

@@ -203,6 +203,9 @@ export const ru: Translations = {
     toolsTab: {
       title: 'Инструменты агента и Веб-поиск',
       subtitle: 'Настройка поисковых движков, интеграции с Firecrawl, SearXNG и управление активными инструментами агента',
+      subtabSearch: 'Веб-поиск & Провайдеры',
+      subtabRegistry: 'Реестр инструментов',
+      subtabTester: 'Тестер поиска & Диагностика',
       searchEngineTitle: 'Движок веб-поиска и парсинга',
       searchEngineDesc: 'Выберите активный поисковый сервис. В режиме Auto задействуется умный каскад (Firecrawl -> SearXNG -> DuckDuckGo -> Wikipedia).',
       activeEngine: 'Активный движок поиска',
@@ -248,6 +251,9 @@ export const ru: Translations = {
     general: {
       title: 'Основные параметры и Внешний вид',
       subtitle: 'Конфигурация тем оформления, языка, API подключения, голосового интеркома и безопасности',
+      subtabInterface: 'Оформление & Интерфейс',
+      subtabVoice: 'Голос & Джарвис',
+      subtabSecurity: 'Безопасность & LAN',
       themeTitle: 'Тема оформления',
       themeDesc: 'Выберите визуальный стиль интерфейса 0xAgent',
       themeGraphite: 'Graphite',
@@ -323,8 +329,11 @@ export const ru: Translations = {
       chooseDir: 'Выбрать папку',
     },
     localServer: {
-      title: 'Параметры и Логи ИИ-Сервера Llama.cpp',
-      subtitle: 'Настройка локального ИИ-движка llama-server.exe, выбор релизов и просмотр реальных логов работы.',
+      title: 'Локальный Llama.cpp Сервер & GGUF Модели',
+      subtitle: 'Аппаратный запуск квантованных моделей на вашей видеокарте, тюнинг VRAM-слоев, KV-кэша и спекулятивного декодирования',
+      subtabConfig: 'Модель & Сервер',
+      subtabParams: 'Параметры Llama.cpp',
+      subtabLogs: 'Логи & Терминал',
       gpuNameAuto: 'Автоопределение GPU',
       fullGpuOffload: 'Full GPU Offload (-ngl 999)',
       loadingToGpu: 'Загрузка в GPU...',

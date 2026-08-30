@@ -207,6 +207,9 @@ export interface Translations {
     toolsTab: {
       title: string;
       subtitle: string;
+      subtabSearch: string;
+      subtabRegistry: string;
+      subtabTester: string;
       searchEngineTitle: string;
       searchEngineDesc: string;
       activeEngine: string;
@@ -252,6 +255,9 @@ export interface Translations {
     general: {
       title: string;
       subtitle: string;
+      subtabInterface: string;
+      subtabVoice: string;
+      subtabSecurity: string;
       languageTitle: string;
       languageDesc: string;
       langEn: string;
@@ -329,6 +335,9 @@ export interface Translations {
     localServer: {
       title: string;
       subtitle: string;
+      subtabConfig: string;
+      subtabParams: string;
+      subtabLogs: string;
       gpuNameAuto: string;
       fullGpuOffload: string;
       loadingToGpu: string;
