@@ -1,72 +1,124 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   User,
-  Sparkles,
   Plus,
   Trash2,
-  FileText,
   Save,
-  Sliders,
   Check,
   GitPullRequest,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight,
+  Copy,
+  Sparkles,
+  Wrench,
+  Layers,
+  FileText,
+  Terminal,
+  Shield,
+  BookOpen,
+  Brain,
+  MessageSquare,
+  HardDrive,
 } from 'lucide-react';
-import { PersonaMetadata, PersonaDetail, ToolDefinition } from '../../types';
-import { PersonaProposalsModal } from './PersonaProposalsModal';
 import {
-  get_personas,
-  get_persona_detail,
-  activate_persona,
-  create_persona,
-  save_persona_file,
-  delete_persona,
-  get_summarizer_prompt,
-  save_summarizer_prompt,
-  get_tools_state,
-  save_tools_toggles,
-  listen,
-} from '../../services/api';
+  PersonaMetadata,
+  PersonaDetail,
+  ContextBreakdownReport,
+} from '../../types';
+import { PersonaProposalsModal } from './PersonaProposalsModal';
+import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { useI18n } from '../../i18n';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Badge } from '../ui/Badge';
 import { Card } from '../ui/Card';
-import { Toggle } from '../ui/Toggle';
 import { Modal } from '../ui/Modal';
-import { SettingsHeader, SettingsSection } from './common';
+import { SettingsHeader, SettingsSection, SettingStatCard } from './common';
 
-export const PersonasTab: React.FC = () => {
+interface PersonasTabProps {
+  currentSessionId?: string | null;
+}
+
+export const PersonasTab: React.FC<PersonasTabProps> = ({ currentSessionId }) => {
   const { t, formatString } = useI18n();
   const { showToast } = useToast();
+
   const [personas, setPersonas] = useState<PersonaMetadata[]>([]);
   const [activePersonaId, setActivePersonaId] = useState<string>('default');
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>('default');
   const [personaDetail, setPersonaDetail] = useState<PersonaDetail | null>(null);
 
-  const [sectionTab, setSectionTab] = useState<'personas' | 'tools' | 'summarizer'>('personas');
-
-  // Summarizer state
-  const [summarizerPrompt, setSummarizerPrompt] = useState<string>('');
-
-  // Tools state
-  const [toolsList, setToolsList] = useState<ToolDefinition[]>([]);
-  const [isToolsSaving, setIsToolsSaving] = useState<boolean>(false);
-
-  // Persona file state (SOUL.md & USER.md)
-  const [activeFileTab, setActiveFileTab] = useState<'soul' | 'user'>('soul');
+  // File editor state: 3 files (soul, user, summarizer)
+  const [activeFile, setActiveFile] = useState<'soul' | 'user' | 'summarizer'>('soul');
   const [fileContent, setFileContent] = useState<string>('');
+  const [summarizerPrompt, setSummarizerPrompt] = useState<string>('');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
 
-  // New Persona Modal
+  // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isProposalsOpen, setIsProposalsOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
 
+  // Context Token Breakdown state
+  const [tokenReport, setTokenReport] = useState<ContextBreakdownReport | null>(null);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(false);
+  const [copiedTokenCat, setCopiedTokenCat] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+
+  const toggleCategory = (id: string) => {
+    setExpandedCategories((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const hasAnyExpanded = Object.values(expandedCategories).some(Boolean);
+
+  const toggleAllCategories = () => {
+    if (!tokenReport) return;
+    if (hasAnyExpanded) {
+      setExpandedCategories({});
+    } else {
+      const all: Record<string, boolean> = {};
+      tokenReport.categories.forEach((c) => {
+        all[c.id] = true;
+      });
+      setExpandedCategories(all);
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'skills':
+        return <Sparkles size={14} className="text-cyan-500 shrink-0" />;
+      case 'tools':
+        return <Wrench size={14} className="text-sky-500 shrink-0" />;
+      case 'persona':
+        return <Layers size={14} className="text-purple-500 shrink-0" />;
+      case 'user_profile':
+        return <FileText size={14} className="text-pink-500 shrink-0" />;
+      case 'environment':
+        return <Terminal size={14} className="text-emerald-500 shrink-0" />;
+      case 'planning':
+        return <Shield size={14} className="text-amber-500 shrink-0" />;
+      case 'workspace_rules':
+        return <BookOpen size={14} className="text-indigo-500 shrink-0" />;
+      case 'memory':
+        return <Brain size={14} className="text-lime-500 shrink-0" />;
+      case 'chat_history':
+        return <MessageSquare size={14} className="text-zinc-400 shrink-0" />;
+      default:
+        return <HardDrive size={14} className="text-[var(--theme-text-muted)] shrink-0" />;
+    }
+  };
+
   const loadPersonas = async () => {
     try {
-      const list = await get_personas();
+      const list = await api.get_personas();
       setPersonas(list);
       const active = list.find((p) => p.is_active) || list[0];
       if (active) {
@@ -82,11 +134,11 @@ export const PersonasTab: React.FC = () => {
 
   const loadDetail = async (id: string) => {
     try {
-      const detail = await get_persona_detail(id);
+      const detail = await api.get_persona_detail(id);
       setPersonaDetail(detail);
       if (detail) {
-        if (activeFileTab === 'soul') setFileContent(detail.soul);
-        else if (activeFileTab === 'user') setFileContent(detail.user);
+        if (activeFile === 'soul') setFileContent(detail.soul);
+        else if (activeFile === 'user') setFileContent(detail.user);
       }
     } catch (err) {
       console.error('Failed to load persona detail:', err);
@@ -95,28 +147,34 @@ export const PersonasTab: React.FC = () => {
 
   const loadSummarizer = async () => {
     try {
-      const text = await get_summarizer_prompt();
+      const text = await api.get_summarizer_prompt();
       setSummarizerPrompt(text);
+      if (activeFile === 'summarizer') {
+        setFileContent(text);
+      }
     } catch (err) {
       console.error('Failed to load summarizer prompt:', err);
     }
   };
 
-  const loadToolsState = async () => {
+  const fetchTokenBreakdown = useCallback(async () => {
+    setIsLoadingTokens(true);
     try {
-      const state = await get_tools_state();
-      setToolsList(state.tools);
+      const data = await api.get_context_breakdown(currentSessionId);
+      setTokenReport(data);
     } catch (err) {
-      console.error('Failed to load tools state:', err);
+      console.error('Failed to load token breakdown:', err);
+    } finally {
+      setIsLoadingTokens(false);
     }
-  };
+  }, [currentSessionId]);
 
   useEffect(() => {
     loadPersonas();
     loadSummarizer();
-    loadToolsState();
+    fetchTokenBreakdown();
 
-    const unsub = listen<{ activePersonaId?: string; personas: PersonaMetadata[] }>(
+    const unsub = api.listen<{ activePersonaId?: string; personas: PersonaMetadata[] }>(
       'persona-changed',
       (e) => {
         if (e.payload?.personas) {
@@ -140,71 +198,22 @@ export const PersonasTab: React.FC = () => {
   }, [selectedPersonaId]);
 
   useEffect(() => {
-    if (personaDetail) {
-      if (activeFileTab === 'soul') setFileContent(personaDetail.soul);
-      else if (activeFileTab === 'user') setFileContent(personaDetail.user);
+    if (activeFile === 'soul' && personaDetail) {
+      setFileContent(personaDetail.soul);
+    } else if (activeFile === 'user' && personaDetail) {
+      setFileContent(personaDetail.user);
+    } else if (activeFile === 'summarizer') {
+      setFileContent(summarizerPrompt);
     }
-  }, [activeFileTab, personaDetail]);
-
-  const handleSaveSummarizer = async () => {
-    try {
-      setIsSaving(true);
-      await save_summarizer_prompt(summarizerPrompt);
-      setSaveSuccess(true);
-      showToast(formatString(t.toasts.personaFileSaved, { file: 'SUMMARIZER.md' }), 'success');
-      setTimeout(() => setSaveSuccess(false), 2000);
-    } catch (err: any) {
-      showToast(err.message || t.common.error, 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleToggleTool = async (toolId: string) => {
-    const updated = toolsList.map((t) => (t.id === toolId ? { ...t, enabled: !t.enabled } : t));
-    setToolsList(updated);
-
-    const toggles: Record<string, boolean> = {};
-    for (const t of updated) {
-      toggles[t.id] = t.enabled;
-    }
-
-    try {
-      setIsToolsSaving(true);
-      await save_tools_toggles(toggles);
-    } catch (err: any) {
-      console.error('Failed to save tool toggle:', err);
-    } finally {
-      setIsToolsSaving(false);
-    }
-  };
-
-  const handleBulkToggleAll = async (enabled: boolean) => {
-    const updated = toolsList.map((t) => ({ ...t, enabled }));
-    setToolsList(updated);
-
-    const toggles: Record<string, boolean> = {};
-    for (const tool of updated) {
-      toggles[tool.id] = enabled;
-    }
-
-    try {
-      setIsToolsSaving(true);
-      await save_tools_toggles(toggles);
-      showToast(enabled ? t.settings.personas.enableAll : t.settings.personas.disableAll, 'info');
-    } catch (err: any) {
-      showToast(err.message || 'Failed to update tools', 'error');
-    } finally {
-      setIsToolsSaving(false);
-    }
-  };
+  }, [activeFile, personaDetail, summarizerPrompt]);
 
   const handleActivate = async (id: string) => {
     try {
-      await activate_persona(id);
+      await api.activate_persona(id);
       setActivePersonaId(id);
       const p = personas.find((item) => item.id === id);
       showToast(formatString(t.toasts.personaActivated, { name: p?.name || id }), 'success');
+      fetchTokenBreakdown();
     } catch (err: any) {
       showToast(err.message || t.common.error, 'error');
     }
@@ -215,7 +224,7 @@ export const PersonasTab: React.FC = () => {
     if (!newName.trim()) return;
 
     try {
-      const created = await create_persona(newName.trim(), newDesc.trim());
+      const created = await api.create_persona(newName.trim(), newDesc.trim());
       setIsCreateOpen(false);
       setNewName('');
       setNewDesc('');
@@ -227,20 +236,26 @@ export const PersonasTab: React.FC = () => {
     }
   };
 
-  const handleSavePersonaFile = async () => {
-    if (!personaDetail) return;
+  const handleSaveActiveFile = async () => {
     try {
       setIsSaving(true);
-      const targetFile: 'SOUL.md' | 'TOOLS.md' | 'USER.md' =
-        activeFileTab === 'soul' ? 'SOUL.md' : 'USER.md';
-      await save_persona_file(personaDetail.metadata.id, targetFile, fileContent);
-      setSaveSuccess(true);
-      showToast(
-        formatString(t.toasts.personaFileSaved, { file: `${activeFileTab.toUpperCase()}.md` }),
-        'success'
-      );
+      if (activeFile === 'summarizer') {
+        await api.save_summarizer_prompt(fileContent);
+        setSummarizerPrompt(fileContent);
+        setSaveSuccess(true);
+        showToast(formatString(t.toasts.personaFileSaved, { file: 'SUMMARIZER.md' }), 'success');
+      } else if (personaDetail) {
+        const targetFile: 'SOUL.md' | 'USER.md' = activeFile === 'soul' ? 'SOUL.md' : 'USER.md';
+        await api.save_persona_file(personaDetail.metadata.id, targetFile, fileContent);
+        setSaveSuccess(true);
+        showToast(
+          formatString(t.toasts.personaFileSaved, { file: `${activeFile.toUpperCase()}.md` }),
+          'success'
+        );
+        loadDetail(personaDetail.metadata.id);
+      }
       setTimeout(() => setSaveSuccess(false), 2000);
-      loadDetail(personaDetail.metadata.id);
+      fetchTokenBreakdown();
     } catch (err: any) {
       showToast(err.message || t.common.error, 'error');
     } finally {
@@ -251,7 +266,7 @@ export const PersonasTab: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (id === 'default') return;
     try {
-      await delete_persona(id);
+      await api.delete_persona(id);
       await loadPersonas();
       if (selectedPersonaId === id) {
         setSelectedPersonaId('default');
@@ -262,303 +277,467 @@ export const PersonasTab: React.FC = () => {
     }
   };
 
+  const handleCopyCategory = (name: string, content: string) => {
+    navigator.clipboard.writeText(content);
+    setCopiedTokenCat(name);
+    setTimeout(() => setCopiedTokenCat(null), 2000);
+  };
+
   return (
     <div className="w-full space-y-6 font-sans text-[var(--theme-text)]">
-      {/* 1. Standard Top Header + Subtab Navigation */}
+      {/* 1. Standard Top Header */}
       <SettingsHeader
-        title={t.settings.personas.title || 'Персоны & Инструкции'}
-        subtitle={
-          t.settings.personas.subtitle ||
-          'Конфигурация характера агента, промптов SOUL.md и системного суммаризатора'
-        }
+        title={t.settings.personas.title}
+        subtitle={t.settings.personas.subtitle}
         icon={<User size={18} />}
         actionSlot={
-          <div className="flex items-center gap-1.5 select-none">
-            <Button
-              variant={sectionTab === 'personas' ? 'accent' : 'secondary'}
-              size="sm"
-              onClick={() => setSectionTab('personas')}
-              icon={<User size={13} />}
-            >
-              {t.settings.personas.personasTab}
-            </Button>
-            <Button
-              variant={sectionTab === 'tools' ? 'accent' : 'secondary'}
-              size="sm"
-              onClick={() => setSectionTab('tools')}
-              icon={<Sliders size={13} />}
-            >
-              {t.settings.personas.toolsTab}
-            </Button>
-            <Button
-              variant={sectionTab === 'summarizer' ? 'accent' : 'secondary'}
-              size="sm"
-              onClick={() => setSectionTab('summarizer')}
-              icon={<Sparkles size={13} />}
-            >
-              {t.settings.personas.summarizerTab}
-            </Button>
-          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsCreateOpen(true)}
+            icon={<Plus size={13} />}
+          >
+            {t.settings.personas.createBtn}
+          </Button>
         }
       />
 
-      {/* 2. SUBTAB: PERSONAS LIST & EDITOR */}
-      {sectionTab === 'personas' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Left Column: Personas List */}
-          <div className="lg:col-span-4 space-y-3">
-            <div className="flex items-center justify-between px-1">
-              <span className="text-xs font-bold text-[var(--theme-text-muted)] uppercase tracking-wider">
-                {formatString(t.settings.personas.personasCount, { count: personas.length })}
-              </span>
-              <Button
-                variant="secondary"
-                size="xs"
-                onClick={() => setIsCreateOpen(true)}
-                icon={<Plus size={13} />}
-              >
-                {t.settings.personas.createBtn}
-              </Button>
-            </div>
-
-            <div className="space-y-2">
-              {personas.map((p) => {
-                const isSelected = p.id === selectedPersonaId;
-                const isActive = p.id === activePersonaId;
-                return (
-                  <Card
-                    key={p.id}
-                    variant="interactive"
-                    selected={isSelected}
-                    onClick={() => setSelectedPersonaId(p.id)}
-                    padded={false}
-                    className="p-3.5 flex flex-col gap-1.5"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 truncate">
-                        <User size={14} className="text-[var(--theme-text-muted)] shrink-0" />
-                        <span className="font-bold text-xs text-[var(--theme-text)] truncate">
-                          {p.name}
-                        </span>
-                      </div>
-                      {isActive && (
-                        <Badge variant="accent" size="xs">
-                          {t.settings.personas.activeBadge}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed">
-                      {p.description}
-                    </p>
-                  </Card>
-                );
-              })}
-            </div>
+      {/* 2. Main Persona Workspace (2-Column Grid) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        {/* Left Column: Personas Profiles List */}
+        <div className="lg:col-span-4 space-y-3">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-bold text-[var(--theme-text-muted)] uppercase tracking-wider">
+              {formatString(t.settings.personas.personasCount, { count: personas.length })}
+            </span>
           </div>
 
-          {/* Right Column: Persona Details & Markdown Editor */}
-          <div className="lg:col-span-8 space-y-3">
-            {personaDetail ? (
-              <Card variant="default" className="space-y-4">
-                <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3 gap-3">
-                  <div className="min-w-0">
+          <div className="space-y-2">
+            {personas.map((p) => {
+              const isSelected = p.id === selectedPersonaId;
+              const isActive = p.id === activePersonaId;
+              return (
+                <Card
+                  key={p.id}
+                  variant="interactive"
+                  selected={isSelected}
+                  onClick={() => setSelectedPersonaId(p.id)}
+                  padded={false}
+                  className="p-3.5 flex flex-col gap-1.5 rounded-2xl"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 truncate">
+                      <User size={14} className="text-[var(--theme-text-muted)] shrink-0" />
+                      <span className="font-bold text-xs text-[var(--theme-text)] truncate">
+                        {p.name}
+                      </span>
+                    </div>
+                    {isActive && (
+                      <Badge variant="accent" size="xs">
+                        {t.settings.personas.activeBadge}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed">
+                    {p.description}
+                  </p>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Right Column: Active Persona File Editor (SOUL.md / USER.md / SUMMARIZER.md) */}
+        <div className="lg:col-span-8 space-y-3">
+          {personaDetail ? (
+            <Card variant="default" className="space-y-4 rounded-2xl">
+              {/* Persona Metadata Header */}
+              <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3 gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
                     <h3 className="text-sm font-bold text-[var(--theme-text)] truncate">
                       {personaDetail.metadata.name}
                     </h3>
-                    <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 leading-relaxed">
-                      {personaDetail.metadata.description}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => setIsProposalsOpen(true)}
-                      icon={<GitPullRequest size={13} />}
-                    >
-                      Evolution Studio
-                    </Button>
-                    {personaDetail.metadata.id !== activePersonaId && (
+                    {personaDetail.metadata.id === activePersonaId ? (
+                      <Badge variant="accent" size="xs">
+                        {t.settings.personas.activeBadge}
+                      </Badge>
+                    ) : (
                       <Button
-                        variant="secondary"
-                        size="sm"
+                        variant="ghost"
+                        size="xs"
                         onClick={() => handleActivate(personaDetail.metadata.id)}
+                        className="text-[10px] text-[var(--theme-accent)]"
                       >
                         {t.settings.personas.activateBtn}
                       </Button>
                     )}
-                    {personaDetail.metadata.id !== 'default' && (
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => handleDelete(personaDetail.metadata.id)}
-                        icon={<Trash2 size={13} />}
-                        title={t.settings.personas.deleteTooltip}
-                      />
-                    )}
                   </div>
-                </div>
-
-                {/* Subtab Files: SOUL.md vs USER.md */}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center bg-[var(--theme-input-bg)] p-1 rounded-xl border border-[var(--theme-border)]">
-                    <button
-                      type="button"
-                      onClick={() => setActiveFileTab('soul')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                        activeFileTab === 'soul'
-                          ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-sm border border-[var(--theme-border)]'
-                          : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
-                      }`}
-                    >
-                      SOUL.md
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveFileTab('user')}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold cursor-pointer transition-all ${
-                        activeFileTab === 'user'
-                          ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-sm border border-[var(--theme-border)]'
-                          : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
-                      }`}
-                    >
-                      USER.md
-                    </button>
-                  </div>
-
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleSavePersonaFile}
-                    disabled={isSaving}
-                    loading={isSaving}
-                    icon={saveSuccess ? <Check size={13} className="text-emerald-500" /> : <Save size={13} />}
-                  >
-                    {saveSuccess ? t.settings.personas.saved : t.settings.personas.save}
-                  </Button>
-                </div>
-
-                <textarea
-                  value={fileContent}
-                  onChange={(e) => setFileContent(e.target.value)}
-                  rows={14}
-                  className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none focus:border-[var(--theme-accent)] resize-y leading-relaxed"
-                />
-              </Card>
-            ) : (
-              <Card variant="default" className="p-8 text-center text-xs text-[var(--theme-text-muted)]">
-                {t.settings.personas.selectPersonaPrompt}
-              </Card>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 3. SUBTAB: TOOLS MANAGEMENT */}
-      {sectionTab === 'tools' && (
-        <SettingsSection
-          title={t.settings.personas.toolsTitle}
-          badge="TOOLS.md"
-          description={t.settings.personas.toolsDesc}
-          actionSlot={
-            <div className="flex items-center gap-1.5">
-              <Button
-                variant="secondary"
-                size="xs"
-                onClick={() => handleBulkToggleAll(true)}
-                disabled={isToolsSaving}
-              >
-                {t.settings.personas.enableAll}
-              </Button>
-              <Button
-                variant="secondary"
-                size="xs"
-                onClick={() => handleBulkToggleAll(false)}
-                disabled={isToolsSaving}
-              >
-                {t.settings.personas.disableAll}
-              </Button>
-            </div>
-          }
-        >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {toolsList.map((tool) => (
-              <Card
-                key={tool.id}
-                variant="interactive"
-                selected={tool.enabled}
-                onClick={() => handleToggleTool(tool.id)}
-                className="flex items-start justify-between gap-3"
-              >
-                <div className="space-y-1 min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs font-bold text-[var(--theme-text)]">
-                      &lt;{tool.name}&gt;
-                    </span>
-                    <Badge variant="neutral" size="xs">
-                      {tool.requiresApproval ? t.settings.personas.requiresApproval : t.settings.personas.auto}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed">
-                    {tool.description}
+                  <p className="text-xs text-[var(--theme-text-muted)] mt-0.5 leading-relaxed">
+                    {personaDetail.metadata.description}
                   </p>
                 </div>
 
-                <Toggle
-                  checked={tool.enabled}
-                  onChange={() => handleToggleTool(tool.id)}
-                  size="sm"
-                />
-              </Card>
-            ))}
-          </div>
-        </SettingsSection>
-      )}
-
-      {/* 4. SUBTAB: SUMMARIZER TAB */}
-      {sectionTab === 'summarizer' && (
-        <SettingsSection
-          title={t.settings.personas.summarizerTitle}
-          badge="SUMMARIZER.md"
-          description={t.settings.personas.summarizerDesc}
-        >
-          <Card variant="default" className="space-y-3">
-            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2.5">
-              <div className="flex items-center gap-2">
-                <FileText size={14} className="text-[var(--theme-text-muted)]" />
-                <span className="text-xs font-bold text-[var(--theme-text)]">
-                  {t.settings.personas.summarizerPromptTitle}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setIsProposalsOpen(true)}
+                    icon={<GitPullRequest size={13} />}
+                  >
+                    {t.settings.personas.evolutionStudioBtn}
+                  </Button>
+                  {personaDetail.metadata.id !== 'default' && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleDelete(personaDetail.metadata.id)}
+                      icon={<Trash2 size={13} />}
+                      title={t.settings.personas.deleteTooltip}
+                    />
+                  )}
+                </div>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleSaveSummarizer}
-                disabled={isSaving}
-                loading={isSaving}
-                icon={saveSuccess ? <Check size={13} className="text-emerald-500" /> : <Save size={13} />}
-              >
-                {saveSuccess ? t.settings.personas.saved : t.settings.personas.save}
-              </Button>
+
+              {/* 3-Position File Switcher + Save Action */}
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center bg-[var(--theme-input-bg)] p-1 rounded-xl border border-[var(--theme-border)]">
+                  <button
+                    type="button"
+                    onClick={() => setActiveFile('soul')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                      activeFile === 'soul'
+                        ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-xs border border-[var(--theme-border)]'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                    }`}
+                  >
+                    {t.settings.personas.fileTabSoul}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFile('user')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                      activeFile === 'user'
+                        ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-xs border border-[var(--theme-border)]'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                    }`}
+                  >
+                    {t.settings.personas.fileTabUser}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFile('summarizer')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold cursor-pointer transition-all ${
+                      activeFile === 'summarizer'
+                        ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] shadow-xs border border-[var(--theme-border)]'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                    }`}
+                  >
+                    {t.settings.personas.fileTabSummarizer}
+                  </button>
+                </div>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSaveActiveFile}
+                  disabled={isSaving}
+                  loading={isSaving}
+                  icon={saveSuccess ? <Check size={13} className="text-emerald-500" /> : <Save size={13} />}
+                >
+                  {saveSuccess ? t.settings.personas.saved : t.settings.personas.save}
+                </Button>
+              </div>
+
+              {/* Code / Markdown Textarea */}
+              <textarea
+                value={fileContent}
+                onChange={(e) => setFileContent(e.target.value)}
+                rows={13}
+                className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none focus:border-[var(--theme-accent)] resize-y leading-relaxed"
+                placeholder={
+                  activeFile === 'soul'
+                    ? 'Personality & behavior rules for the assistant...'
+                    : activeFile === 'user'
+                    ? 'User profile facts and context directives...'
+                    : 'Context compaction summarizer prompt...'
+                }
+              />
+            </Card>
+          ) : (
+            <Card variant="default" className="p-8 text-center text-xs text-[var(--theme-text-muted)] rounded-2xl">
+              {t.settings.personas.selectPersonaPrompt}
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* 3. Integrated Context & Token Budget Inspector */}
+      {tokenReport && (
+        <SettingsSection
+          title={t.settings.personas.contextBreakdownTitle}
+          description={t.settings.personas.contextBreakdownDesc}
+          badge="Token Telemetry"
+          actionSlot={
+            <Button
+              variant="secondary"
+              size="xs"
+              onClick={fetchTokenBreakdown}
+              loading={isLoadingTokens}
+              icon={<RefreshCw size={12} />}
+            >
+              {t.common.refresh}
+            </Button>
+          }
+        >
+          <Card variant="default" className="space-y-4 rounded-2xl">
+            {/* Quick Stats Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <SettingStatCard
+                label={t.settings.customizations.available}
+                value={`${tokenReport.availablePercentage}%`}
+                sublabel={t.settings.customizations.limitContext}
+              />
+
+              <SettingStatCard
+                label={t.settings.customizations.usedTokens}
+                value={
+                  <>
+                    {tokenReport.totalUsed.toLocaleString()}{' '}
+                    <span className="text-xs font-normal text-[var(--theme-text-muted)]">
+                      / {tokenReport.totalBudget.toLocaleString()}
+                    </span>
+                  </>
+                }
+                sublabel={t.settings.customizations.systemInst}
+              />
+
+              <SettingStatCard
+                label={t.settings.customizations.categoriesCount}
+                value={tokenReport.categories.length}
+                sublabel={t.settings.customizations.activeDirectives}
+              />
             </div>
 
-            <textarea
-              value={summarizerPrompt}
-              onChange={(e) => setSummarizerPrompt(e.target.value)}
-              rows={16}
-              className="w-full p-3.5 rounded-xl bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] border border-[var(--theme-border)] font-mono text-xs focus:outline-none focus:border-[var(--theme-accent)] resize-y leading-relaxed"
-            />
+            {/* Segmented Color Progress Bar */}
+            <div className="w-full h-2.5 rounded-full bg-[var(--theme-input-bg)] overflow-hidden flex items-center p-0.5 border border-[var(--theme-border)]">
+              {tokenReport.categories.map((cat) => {
+                const widthPercent = Math.max(0.6, (cat.tokens / tokenReport.totalBudget) * 100);
+                return (
+                  <div
+                    key={cat.id}
+                    style={{
+                      width: `${widthPercent}%`,
+                      backgroundColor: cat.color,
+                    }}
+                    className="h-full first:rounded-l-full last:rounded-r-full transition-all duration-300 cursor-pointer hover:brightness-125"
+                    onClick={() => toggleCategory(cat.id)}
+                    title={`${cat.name}: ${cat.tokens.toLocaleString()} tok (${cat.percentage}%)`}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Category Badges Grid + Toggle All Button */}
+            <div className="space-y-3 pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {tokenReport.categories.map((cat) => {
+                    const isExpanded = Boolean(expandedCategories[cat.id]);
+                    return (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => toggleCategory(cat.id)}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs cursor-pointer transition-all select-none ${
+                          isExpanded
+                            ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/15 text-[var(--theme-text)] font-bold'
+                            : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)]'
+                        }`}
+                        title="Click to view directive breakdown"
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full shrink-0"
+                          style={{ backgroundColor: cat.color }}
+                        />
+                        <span>{cat.name}</span>
+                        <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
+                          {cat.tokens.toLocaleString()} tok
+                        </span>
+                        {isExpanded ? (
+                          <ChevronDown size={11} className="text-[var(--theme-accent)] ml-0.5" />
+                        ) : (
+                          <ChevronRight size={11} className="text-[var(--theme-text-muted)] ml-0.5" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={toggleAllCategories}
+                  className="text-xs font-semibold text-[var(--theme-accent)] hover:underline flex items-center gap-1 cursor-pointer select-none ml-auto shrink-0"
+                >
+                  <span>
+                    {hasAnyExpanded
+                      ? t.settings.customizations.collapseCategories
+                      : formatString(t.settings.customizations.showAllCategories, {
+                          count: tokenReport.categories.length,
+                        })}
+                  </span>
+                  <ChevronDown
+                    size={13}
+                    className={`transition-transform duration-200 ${hasAnyExpanded ? 'rotate-180' : ''}`}
+                  />
+                </button>
+              </div>
+
+              {/* Detailed Breakdown Accordion Items */}
+              {tokenReport.categories.some((c) => expandedCategories[c.id]) && (
+                <div className="space-y-2 pt-2 border-t border-[var(--theme-border)]">
+                  {tokenReport.categories
+                    .filter((c) => expandedCategories[c.id])
+                    .map((cat) => {
+                      const hasDetails = cat.details && cat.details.length > 0;
+                      return (
+                        <div
+                          key={cat.id}
+                          className="rounded-xl border border-[var(--theme-border)] bg-[var(--theme-input-bg)] p-3.5 space-y-2.5 animate-fadeIn"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {getCategoryIcon(cat.category)}
+                              <span className="text-xs font-bold text-[var(--theme-text)] truncate">
+                                {cat.name}
+                              </span>
+                              {cat.scope && (
+                                <Badge variant="neutral" size="xs">
+                                  {cat.scope}
+                                </Badge>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="text-xs font-mono font-semibold text-[var(--theme-text)]">
+                                {cat.tokens.toLocaleString()} tok
+                              </span>
+                              <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
+                                ({cat.percentage}%)
+                              </span>
+                            </div>
+                          </div>
+
+                          {cat.description && (
+                            <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                              {cat.description}
+                            </p>
+                          )}
+
+                          {/* Detail Items List */}
+                          {hasDetails && (
+                            <div className="space-y-1.5 pt-1">
+                              {cat.details!.map((detail) => (
+                                <div
+                                  key={detail.id}
+                                  className="p-2.5 rounded-lg bg-[var(--theme-card-bg)] border border-[var(--theme-border)] flex items-center justify-between gap-3"
+                                >
+                                  <div className="min-w-0 space-y-0.5 flex-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-xs font-semibold font-mono text-[var(--theme-text)]">
+                                        {detail.name}
+                                      </span>
+                                      {detail.scope && (
+                                        <Badge variant="neutral" size="xs">
+                                          {detail.scope}
+                                        </Badge>
+                                      )}
+                                      {detail.enabled !== undefined && (
+                                        <Badge
+                                          variant={detail.enabled ? 'success' : 'neutral'}
+                                          size="xs"
+                                        >
+                                          {detail.enabled ? 'Active' : 'Off'}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    {detail.description && (
+                                      <p className="text-[10px] text-[var(--theme-text-muted)] line-clamp-1">
+                                        {detail.description}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 shrink-0">
+                                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)]">
+                                      {detail.tokens.toLocaleString()} tok
+                                    </span>
+                                    {detail.preview && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleCopyCategory(detail.id, detail.preview!)}
+                                        className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
+                                        title={t.common.copy}
+                                      >
+                                        {copiedTokenCat === detail.id ? (
+                                          <Check size={12} className="text-emerald-500" />
+                                        ) : (
+                                          <Copy size={12} />
+                                        )}
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Raw Content Preview if available and no structured details */}
+                          {!hasDetails && cat.contentPreview && (
+                            <div className="space-y-1.5 pt-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--theme-text-muted)]">
+                                  {t.settings.customizations.contentPreview}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyCategory(cat.id, cat.contentPreview!)}
+                                  className="text-[10px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer"
+                                >
+                                  {copiedTokenCat === cat.id ? (
+                                    <>
+                                      <Check size={11} className="text-emerald-500" />
+                                      <span className="text-emerald-500">{t.common.copied}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy size={11} />
+                                      <span>{t.common.copy}</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                              <pre className="p-2.5 rounded-lg bg-[var(--theme-code-bg)] text-[var(--theme-code-text)] text-[11px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto border border-[var(--theme-border)] select-text leading-relaxed">
+                                {cat.contentPreview}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
           </Card>
         </SettingsSection>
       )}
 
-      {/* 5. Create New Persona Modal */}
+      {/* 4. Create New Persona Modal */}
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         title={t.settings.personas.newPersonaTitle}
-        subtitle="Создайте изолированный профиль поведения и инструкций"
+        subtitle={t.settings.personas.newPersonaSubtitle}
         footer={
           <>
             <Button variant="ghost" size="sm" onClick={() => setIsCreateOpen(false)}>
@@ -589,7 +768,7 @@ export const PersonasTab: React.FC = () => {
         </form>
       </Modal>
 
-      {/* 6. Evolution & Proposals Studio Modal */}
+      {/* 5. Evolution & Proposals Studio Modal */}
       {personaDetail && (
         <PersonaProposalsModal
           isOpen={isProposalsOpen}
@@ -601,3 +780,4 @@ export const PersonasTab: React.FC = () => {
     </div>
   );
 };
+

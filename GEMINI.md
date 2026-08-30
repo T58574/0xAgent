@@ -26,7 +26,7 @@
   - `loopBreaker.ts` — Infinite tool loop & cyclic oscillation breaker.
   - `outputSpiller.ts` — Automatic spilling of massive tool outputs (>24 KB) to disk.
   - `codeRuntime.ts` — Sandboxed Node.js VM runtime for `<code_run>` batch operations.
-  - `permissionGuard.ts` — Security presets (`readonly`, `workspace-write`, `prompt`, `unrestricted`).
+  - `permissionGuard.ts` — Security presets (`prompt` - Partial Automation, `unrestricted` - Full Automation).
   - `voiceDaemonManager.ts` / `voiceMacroService.ts` — Native voice spotting and zero-token OS macros.
 - `memory.ts` — Memory Engine v1.0 (CRUD, Write Policy, deterministic router, token budget allocator).
 - `memoryDb.ts` — Native `node:sqlite` connection manager, WAL mode, tables and FTS5 triggers.

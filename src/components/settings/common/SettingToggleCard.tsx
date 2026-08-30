@@ -21,8 +21,6 @@ export const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
   desc,
   active,
   onToggle,
-  statusOnText,
-  statusOffText,
   badge,
   disabled = false,
   className = '',
@@ -30,38 +28,27 @@ export const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
   return (
     <div
       onClick={() => !disabled && onToggle()}
-      className={`p-4 rounded-2xl bento-card flex items-center justify-between cursor-pointer transition-all border select-none ${
+      className={`p-3.5 rounded-xl flex items-center justify-between cursor-pointer transition-all border select-none ${
         disabled ? 'opacity-50 pointer-events-none' : ''
       } ${
         active
-          ? 'border-[var(--theme-accent)]/50 bg-[var(--theme-card-bg)] shadow-sm ring-1 ring-[var(--theme-accent)]/20'
-          : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:border-[var(--theme-text-muted)]'
+          ? 'border-[var(--theme-border)] bg-[var(--theme-card-bg)]'
+          : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] opacity-80 hover:opacity-100 hover:border-[var(--theme-text-muted)]'
       } ${className}`}
     >
-      <div className="flex items-center gap-3.5 min-w-0 pr-3">
+      <div className="flex items-center gap-3 min-w-0 pr-3">
         {icon && (
-          <div
-            className={`p-2.5 rounded-xl shrink-0 transition-colors border ${
-              active
-                ? 'bg-[var(--theme-accent)]/15 border-[var(--theme-accent)]/30 text-[var(--theme-text)]'
-                : 'bg-[var(--theme-card-bg)] border-[var(--theme-border)] text-[var(--theme-text-muted)]'
-            }`}
-          >
+          <div className="text-[var(--theme-text-muted)] shrink-0">
             {icon}
           </div>
         )}
 
         <div className="min-w-0 space-y-0.5">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-bold text-[var(--theme-text)] truncate">{title}</span>
+            <span className="text-xs font-semibold text-[var(--theme-text)] truncate">{title}</span>
             {badge && (
               <Badge variant="neutral" size="xs">
                 {badge}
-              </Badge>
-            )}
-            {(statusOnText || statusOffText) && (
-              <Badge variant={active ? 'accent' : 'neutral'} size="xs">
-                {active ? statusOnText : statusOffText}
               </Badge>
             )}
           </div>
@@ -71,7 +58,8 @@ export const SettingToggleCard: React.FC<SettingToggleCardProps> = ({
         </div>
       </div>
 
-      <Toggle checked={active} onChange={onToggle} disabled={disabled} size="md" />
+      <Toggle checked={active} onChange={onToggle} disabled={disabled} size="sm" />
     </div>
   );
 };
+

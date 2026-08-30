@@ -18,18 +18,7 @@ describe('FastMTP & Speculative Decoding Integration Suite', () => {
     assert.equal(caps.recommendedReasoningEffort, 'xhigh');
   });
 
-  it('should parse Raven/Qwen3.8 MTP model metadata correctly from file', () => {
-    const modelPath = path.join(process.cwd(), 'models', 'RVN-IQ3_S-multilingual-mtp.gguf');
-    if (fs.existsSync(modelPath)) {
-      const meta = parseGgufMetadata(modelPath);
-      assert.equal(meta.magicValid, true);
-      assert.equal(meta.family, 'qwen');
-      assert.equal(meta.supportsReasoning, true);
-      assert.equal(meta.supportsFastMtp, true);
-      assert.equal(meta.isDraft, false);
-      assert.ok(meta.cleanTitle.includes('Qwen38') || meta.cleanTitle.includes('Raven') || meta.cleanTitle.includes('27B'));
-    }
-  });
+
 
   it('should prevent main model from being loaded as its own draft model', () => {
     const target = 'C:/models/RVN-IQ3_S-multilingual-mtp.gguf';

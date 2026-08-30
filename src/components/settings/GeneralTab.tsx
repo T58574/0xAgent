@@ -1,22 +1,15 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Sliders,
-  Shield,
-  Volume2,
-  Save,
-  LayoutGrid,
   Globe,
-  Key,
+  KeyRound,
   LogOut,
-  Sparkles,
-  CheckCircle2,
-  Wifi,
   Copy,
   Check,
-  Brain,
   ExternalLink,
-  RefreshCw,
+  Volume2,
 } from 'lucide-react';
+import { AppTheme } from '../../types';
 import * as api from '../../services/api';
 import { useI18n } from '../../i18n';
 import { Button } from '../ui/Button';
@@ -24,11 +17,13 @@ import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
 import { Toggle } from '../ui/Toggle';
 import { Card } from '../ui/Card';
-import { SettingsHeader, SettingsSection, SettingToggleCard } from './common';
+import { SettingsHeader, SettingsSection } from './common';
 
 interface GeneralTabProps {
   onLanguageSelect?: (lang: 'en' | 'ru') => void;
   onOpenMemorySkills?: () => void;
+  activeTheme?: string;
+  onSelectTheme?: (theme: AppTheme) => void;
   apiUrl: string;
   setApiUrl: (val: string) => void;
   groqApiKey: string;
@@ -62,12 +57,8 @@ interface GeneralTabProps {
 export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   onLanguageSelect,
   onOpenMemorySkills,
-  apiUrl,
-  setApiUrl,
-  groqApiKey,
-  setGroqApiKey,
-  geminiApiKey = '',
-  setGeminiApiKey,
+  activeTheme = 'graphite',
+  onSelectTheme,
   reasoningEnabled,
   setReasoningEnabled,
   autoSaveHistory,
@@ -91,45 +82,52 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   proactiveCompanionEnabled = true,
   setProactiveCompanionEnabled,
 }) => {
-  const { language, setLanguage, t } = useI18n();
-  const [testingVoice, setTestingVoice] = React.useState(false);
+  const { t, language, setLanguage } = useI18n();
 
-  // LAN Sharing state
-  const [lanUrls, setLanUrls] = React.useState<string[]>([]);
-  const [lanLoading, setLanLoading] = React.useState(false);
-  const [copiedUrl, setCopiedUrl] = React.useState<string | null>(null);
+  // Network State
+  const [lanIp, setLanIp] = useState<string | null>(null);
+  const [copiedLan, setCopiedLan] = useState(false);
 
-  const fetchLanInfo = React.useCallback(async () => {
-    setLanLoading(true);
+  // Voice test state
+  const [testingVoice, setTestingVoice] = useState(false);
+
+  // Security & Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordStatus, setPasswordStatus] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const fetchLanInfo = useCallback(async () => {
     try {
-      const info = await api.get_lan_info();
-      setLanUrls(info.urls || []);
-    } catch (err) {
-      console.error('Failed to load LAN info:', err);
-    } finally {
-      setLanLoading(false);
+      const data = await api.get_lan_info();
+      if (data?.urls?.[0]) {
+        const url = new URL(data.urls[0]);
+        setLanIp(url.hostname);
+      }
+    } catch {
+      // ignore
     }
   }, []);
 
-  React.useEffect(() => {
+  useEffect(() => {
     fetchLanInfo();
   }, [fetchLanInfo]);
 
-  const handleCopyUrl = (url: string) => {
+  const handleCopyLan = () => {
+    if (!lanIp) return;
+    const url = `https://${lanIp}:3001`;
     navigator.clipboard.writeText(url);
-    setCopiedUrl(url);
-    setTimeout(() => setCopiedUrl(null), 2000);
-  };
-
-  const handleLogout = async () => {
-    await api.logout();
-    window.location.reload();
+    setCopiedLan(true);
+    setTimeout(() => setCopiedLan(false), 2000);
   };
 
   const handleTestVoice = async () => {
+    if (testingVoice) return;
     setTestingVoice(true);
     try {
-      await api.speak_text('Jarvis systems fully operational, sir.', {
+      const testPhrase = language === 'ru' ? t.settings.general.voiceTestPhrase : 'Jarvis systems fully operational, sir.';
+      await api.speak_text(testPhrase, {
         voice: ttsVoice,
         rate: ttsRate,
         playOnSpeaker: ttsPlayOnSpeaker,
@@ -142,374 +140,480 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
     }
   };
 
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordStatus(null);
+    if (newPassword.trim().length < 4) {
+      setPasswordStatus({ type: 'error', text: t.settings.general.passwordMinLength });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordStatus({ type: 'error', text: t.settings.general.passwordMismatch });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await api.change_password(currentPassword, newPassword.trim());
+      if (res.success) {
+        setPasswordStatus({ type: 'success', text: t.settings.general.passwordSuccess });
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setPasswordStatus({ type: 'error', text: res.error || t.settings.general.passwordError });
+      }
+    } catch (err: any) {
+      setPasswordStatus({ type: 'error', text: `${t.common.error}: ${err.message || err}` });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const currentThemeId = activeTheme === 'light' ? 'light' : 'graphite';
+
   return (
     <div className="w-full space-y-6 font-sans text-[var(--theme-text)]">
-      {/* 1. Standard Top Header */}
+      {/* 1. Header */}
       <SettingsHeader
         title={t.settings.general.title}
         subtitle={t.settings.general.subtitle}
         icon={<Sliders size={18} />}
       />
 
-      {/* 2. UI Language Selector */}
+      {/* 2. Theme & Language (Unified 2-Column Section) */}
       <SettingsSection
-        title={t.settings.general.languageTitle}
-        badge="UI Language"
-        description={t.settings.general.languageDesc}
+        title={t.settings.general.themeTitle}
+        description={t.settings.general.themeDesc}
       >
-        <Card variant="default" className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setLanguage('en');
-                onLanguageSelect?.('en');
-              }}
-              className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all cursor-pointer select-none ${
-                language === 'en'
-                  ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm ring-1 ring-[var(--theme-accent)]/30'
-                  : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="font-mono font-bold text-xs px-2 py-0.5 rounded-lg bg-[var(--theme-card-bg)] border border-[var(--theme-border)]">
-                  [EN]
-                </span>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Theme Switcher */}
+          <Card variant="default" className="p-3.5 space-y-2">
+            <span className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider block">
+              {t.settings.general.themeTitle}
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => onSelectTheme?.('graphite')}
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none ${
+                  currentThemeId === 'graphite'
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)]'
+                    : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-[#09090b] border border-white/30" />
+                <span>{t.settings.themes.graphiteName}</span>
+                {currentThemeId === 'graphite' && <Check size={13} className="text-[var(--theme-accent)]" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onSelectTheme?.('light')}
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none ${
+                  currentThemeId === 'light'
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)]'
+                    : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                }`}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-[#f8fafc] border border-black/30" />
+                <span>{t.settings.themes.lightName}</span>
+                {currentThemeId === 'light' && <Check size={13} className="text-[var(--theme-accent)]" />}
+              </button>
+            </div>
+          </Card>
+
+          {/* Language Switcher */}
+          <Card variant="default" className="p-3.5 space-y-2">
+            <span className="text-xs font-semibold text-[var(--theme-text-muted)] uppercase tracking-wider block">
+              {t.settings.general.languageTitle}
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setLanguage('en');
+                  onLanguageSelect?.('en');
+                }}
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none ${
+                  language === 'en'
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)]'
+                    : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                }`}
+              >
+                <Globe size={13} />
                 <span>{t.settings.general.langEn}</span>
-              </div>
-              {language === 'en' && <CheckCircle2 size={16} className="text-[var(--theme-accent)]" />}
-            </button>
+                {language === 'en' && <Check size={13} className="text-[var(--theme-accent)]" />}
+              </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                setLanguage('ru');
-                onLanguageSelect?.('ru');
-              }}
-              className={`p-3.5 rounded-xl border text-xs font-semibold flex items-center justify-between transition-all cursor-pointer select-none ${
-                language === 'ru'
-                  ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm ring-1 ring-[var(--theme-accent)]/30'
-                  : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-              }`}
-            >
-              <div className="flex items-center gap-2.5">
-                <span className="font-mono font-bold text-xs px-2 py-0.5 rounded-lg bg-[var(--theme-card-bg)] border border-[var(--theme-border)]">
-                  [RU]
-                </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setLanguage('ru');
+                  onLanguageSelect?.('ru');
+                }}
+                className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer select-none ${
+                  language === 'ru'
+                    ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)]'
+                    : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                }`}
+              >
+                <Globe size={13} />
                 <span>{t.settings.general.langRu}</span>
-              </div>
-              {language === 'ru' && <CheckCircle2 size={16} className="text-[var(--theme-accent)]" />}
-            </button>
-          </div>
-        </Card>
+                {language === 'ru' && <Check size={13} className="text-[var(--theme-accent)]" />}
+              </button>
+            </div>
+          </Card>
+        </div>
       </SettingsSection>
 
-      {/* 3. LAN & Local Network Sharing */}
+      {/* 3. Behavior & Preferences (Clean Grouped List) */}
       <SettingsSection
-        title={t.nav.lanTitle}
-        badge="LAN & Wi-Fi"
-        description={t.nav.lanDesc}
+        title={t.settings.general.behaviorTitle}
+        description={t.settings.general.subtitle}
       >
-        <Card variant="default" className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Wifi size={16} className="text-[var(--theme-accent)]" />
-              <span className="text-xs font-semibold text-[var(--theme-text)]">
-                {t.nav.lanShare}
-              </span>
+        <Card variant="default" className="p-0 overflow-hidden divide-y divide-[var(--theme-border)]">
+          {/* Row 1: Reasoning */}
+          <div className="flex items-center justify-between p-3.5 sm:px-4">
+            <div className="space-y-0.5 min-w-0 pr-4">
+              <div className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.settings.general.reasoningTitle}
+              </div>
+              <div className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                {t.settings.general.reasoningDesc}
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={fetchLanInfo}
-              className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
-              title="Refresh network interfaces"
-            >
-              <RefreshCw size={13} className={lanLoading ? 'animate-spin' : ''} />
-            </button>
+            <Toggle
+              checked={reasoningEnabled}
+              onChange={() => setReasoningEnabled(!reasoningEnabled)}
+              size="sm"
+            />
           </div>
 
-          {lanLoading ? (
-            <div className="flex items-center justify-center gap-2 py-3 text-xs text-[var(--theme-text-muted)]">
-              <RefreshCw size={13} className="animate-spin" />
-              <span>{t.common.loading}...</span>
+          {/* Row 2: AutoSave */}
+          <div className="flex items-center justify-between p-3.5 sm:px-4">
+            <div className="space-y-0.5 min-w-0 pr-4">
+              <div className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.settings.general.autoSaveTitle}
+              </div>
+              <div className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                {t.settings.general.autoSaveDesc}
+              </div>
             </div>
-          ) : lanUrls.length === 0 ? (
-            <div className="text-xs text-[var(--theme-text-muted)] py-2 text-center">
-              {t.nav.lanEmpty}
+            <Toggle
+              checked={autoSaveHistory}
+              onChange={() => setAutoSaveHistory(!autoSaveHistory)}
+              size="sm"
+            />
+          </div>
+
+          {/* Row 3: Sound */}
+          <div className="flex items-center justify-between p-3.5 sm:px-4">
+            <div className="space-y-0.5 min-w-0 pr-4">
+              <div className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.settings.general.soundTitle}
+              </div>
+              <div className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                {t.settings.general.soundDesc}
+              </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {lanUrls.map((url, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)] transition-colors"
-                >
-                  <span className="font-mono text-xs text-[var(--theme-text)] truncate select-all font-semibold mr-2">
-                    {url}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleCopyUrl(url)}
-                    className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0"
-                    title={t.nav.lanCopy}
-                  >
-                    {copiedUrl === url ? (
-                      <Check size={13} className="text-emerald-500" />
-                    ) : (
-                      <Copy size={13} />
-                    )}
-                  </button>
-                </div>
-              ))}
+            <Toggle
+              checked={soundNotifications}
+              onChange={() => setSoundNotifications(!soundNotifications)}
+              size="sm"
+            />
+          </div>
+
+          {/* Row 4: Compact View */}
+          <div className="flex items-center justify-between p-3.5 sm:px-4">
+            <div className="space-y-0.5 min-w-0 pr-4">
+              <div className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.settings.general.compactTitle}
+              </div>
+              <div className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                {t.settings.general.compactDesc}
+              </div>
             </div>
-          )}
+            <Toggle
+              checked={compactChat}
+              onChange={() => setCompactChat(!compactChat)}
+              size="sm"
+            />
+          </div>
         </Card>
       </SettingsSection>
 
-      {/* 4. Memory Engine & Skills Hub */}
+      {/* 4. Jarvis Voice & Sparks Intercom */}
+      <SettingsSection
+        title={t.settings.general.jarvisVoiceTitle}
+      >
+        <Card variant="default" className="p-0 overflow-hidden divide-y divide-[var(--theme-border)]">
+          {/* Row 1: Edge-TTS Voice Intercom */}
+          <div className="p-3.5 sm:px-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5 min-w-0 pr-4">
+                <div className="text-xs font-semibold text-[var(--theme-text)]">
+                  {t.settings.general.edgeTtsTitle}
+                </div>
+                <div className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                  {t.settings.general.edgeTtsDesc}
+                </div>
+              </div>
+              <Toggle
+                checked={Boolean(ttsVoiceEnabled)}
+                onChange={() => setTtsVoiceEnabled && setTtsVoiceEnabled(!ttsVoiceEnabled)}
+                size="sm"
+              />
+            </div>
+
+            {ttsVoiceEnabled && (
+              <div className="space-y-3 pt-2.5 border-t border-[var(--theme-border)]">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                  <Select
+                    label={t.settings.general.voiceLabel}
+                    value={ttsVoice}
+                    onChange={(e) => setTtsVoice && setTtsVoice(e.target.value)}
+                    options={[
+                      { value: 'ru-RU-SvetlanaNeural', label: 'Svetlana', sublabel: 'RU, Female' },
+                      { value: 'ru-RU-DmitryNeural', label: 'Dmitry', sublabel: 'RU, Male' },
+                      { value: 'en-US-GuyNeural', label: 'Guy', sublabel: 'EN, Male' },
+                      { value: 'en-US-JennyNeural', label: 'Jenny', sublabel: 'EN, Female' },
+                    ]}
+                  />
+
+                  <Select
+                    label={t.settings.general.voiceRateLabel}
+                    value={ttsRate}
+                    onChange={(e) => setTtsRate && setTtsRate(e.target.value)}
+                    options={[
+                      { value: '+0%', label: 'Standard (+0%)' },
+                      { value: '+15%', label: 'Fast (+15%)' },
+                      { value: '+20%', label: 'Optimal (+20%)' },
+                      { value: '+30%', label: 'Ultra (+30%)' },
+                    ]}
+                  />
+
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={handleTestVoice}
+                    loading={testingVoice}
+                    icon={<Volume2 size={14} />}
+                    className="w-full"
+                  >
+                    {t.settings.general.testVoiceBtn}
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <Toggle
+                    checked={Boolean(ttsPlayOnSpeaker)}
+                    onChange={(val) => setTtsPlayOnSpeaker && setTtsPlayOnSpeaker(val)}
+                    label={t.settings.general.playSpeakerLabel}
+                    size="sm"
+                  />
+
+                  <Toggle
+                    checked={Boolean(ttsPlayInBrowser)}
+                    onChange={(val) => setTtsPlayInBrowser && setTtsPlayInBrowser(val)}
+                    label={t.settings.general.playBrowserLabel}
+                    size="sm"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Row 2: Sparks Autonomous Companion */}
+          <div className="flex items-center justify-between p-3.5 sm:px-4">
+            <div className="space-y-0.5 min-w-0 pr-4">
+              <div className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.settings.general.sparksTitle}
+              </div>
+              <div className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                {t.settings.general.sparksDesc}
+              </div>
+            </div>
+            <Toggle
+              checked={Boolean(proactiveCompanionEnabled)}
+              onChange={() =>
+                setProactiveCompanionEnabled && setProactiveCompanionEnabled(!proactiveCompanionEnabled)
+              }
+              size="sm"
+            />
+          </div>
+
+          {/* Row 3: Wake-Word Detection */}
+          <div className="flex items-center justify-between p-3.5 sm:px-4">
+            <div className="space-y-0.5 min-w-0 pr-4">
+              <div className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.settings.general.wakeWordLabel}
+              </div>
+              <div className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                Бесконтактная активация интеркома голосом без нажатия клавиш
+              </div>
+            </div>
+            <Toggle
+              checked={Boolean(wakeWordEnabled)}
+              onChange={(val) => setWakeWordEnabled && setWakeWordEnabled(val)}
+              size="sm"
+            />
+          </div>
+        </Card>
+      </SettingsSection>
+
+      {/* 5. Memory Hub & Skills (Clean Single Card) */}
       {onOpenMemorySkills && (
         <SettingsSection
           title={t.nav.memorySkills}
-          badge="Memory Engine v1.0"
-          description="Долговременная память фактов пользователя, кастомные навыки AGY Skills и правила поведения."
         >
-          <Card variant="default">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-[var(--theme-accent)]/10 text-[var(--theme-accent)] border border-[var(--theme-accent)]/20">
-                  <Brain size={20} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-[var(--theme-text)]">
-                    {t.nav.memorySkills} & AGY Skills
-                  </h4>
-                  <p className="text-[11px] text-[var(--theme-text-muted)]">
-                    Просмотр и редактирование воспоминаний, правил SOUL/USER и дерева навыков.
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={onOpenMemorySkills}
-                icon={<ExternalLink size={13} />}
-                className="shrink-0"
-              >
-                Открыть хаб навыков
-              </Button>
+          <Card variant="default" className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="space-y-0.5 min-w-0 pr-3">
+              <h4 className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.nav.memorySkills} & AGY Skills
+              </h4>
+              <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                {t.settings.general.memorySkillsDesc}
+              </p>
             </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={onOpenMemorySkills}
+              icon={<ExternalLink size={13} />}
+              className="shrink-0"
+            >
+              {t.settings.general.openSkillsHubBtn}
+            </Button>
           </Card>
         </SettingsSection>
       )}
 
-      {/* 5. Connection & API Keys */}
+      {/* 6. LAN & Wi-Fi Network Sharing */}
       <SettingsSection
-        title={t.settings.general.connectionTitle}
-        badge="Cloud & Local Endpoints"
+        title={t.nav.lanTitle}
       >
-        <Card variant="default">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-            <Input
-              label={t.settings.general.apiUrl}
-              value={apiUrl}
-              onChange={(e) => setApiUrl(e.target.value)}
-              placeholder="http://127.0.0.1:11434/v1"
-              prefixIcon={<Globe size={13} />}
-              mono
-            />
-
-            <Input
-              label={t.settings.general.geminiApiKey}
-              type="password"
-              value={geminiApiKey}
-              onChange={(e) => setGeminiApiKey && setGeminiApiKey(e.target.value)}
-              placeholder="AIzaSy..."
-              prefixIcon={<Key size={13} />}
-              mono
-            />
-
-            <Input
-              label={t.settings.general.groqApiKey}
-              type="password"
-              value={groqApiKey}
-              onChange={(e) => setGroqApiKey(e.target.value)}
-              placeholder="gsk_..."
-              prefixIcon={<Key size={13} />}
-              mono
-            />
-          </div>
-        </Card>
-      </SettingsSection>
-
-      {/* 4. UI & Behavior Toggles */}
-      <SettingsSection
-        title={t.settings.general.behaviorTitle}
-        badge="Preferences"
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <SettingToggleCard
-            icon={<Shield size={16} />}
-            title={t.settings.general.reasoningTitle}
-            desc={t.settings.general.reasoningDesc}
-            active={reasoningEnabled}
-            onToggle={() => setReasoningEnabled(!reasoningEnabled)}
-            statusOnText={t.settings.general.statusOn}
-            statusOffText={t.settings.general.statusOff}
-          />
-
-          <SettingToggleCard
-            icon={<Save size={16} />}
-            title={t.settings.general.autoSaveTitle}
-            desc={t.settings.general.autoSaveDesc}
-            active={autoSaveHistory}
-            onToggle={() => setAutoSaveHistory(!autoSaveHistory)}
-            statusOnText={t.settings.general.statusOn}
-            statusOffText={t.settings.general.statusOff}
-          />
-
-          <SettingToggleCard
-            icon={<Volume2 size={16} />}
-            title={t.settings.general.soundTitle}
-            desc={t.settings.general.soundDesc}
-            active={soundNotifications}
-            onToggle={() => setSoundNotifications(!soundNotifications)}
-            statusOnText={t.settings.general.statusOn}
-            statusOffText={t.settings.general.statusOff}
-          />
-
-          <SettingToggleCard
-            icon={<LayoutGrid size={16} />}
-            title={t.settings.general.compactTitle}
-            desc={t.settings.general.compactDesc}
-            active={compactChat}
-            onToggle={() => setCompactChat(!compactChat)}
-            statusOnText={t.settings.general.statusOn}
-            statusOffText={t.settings.general.statusOff}
-          />
-        </div>
-      </SettingsSection>
-
-      {/* 5. Jarvis Voice Intercom & Proactive Companion */}
-      <SettingsSection
-        title={t.settings.general.jarvisVoiceTitle}
-        badge="Push-Driven Engine"
-      >
-        <Card variant="default" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <SettingToggleCard
-              icon={<Volume2 size={16} />}
-              title={t.settings.general.edgeTtsTitle}
-              desc={t.settings.general.edgeTtsDesc}
-              active={Boolean(ttsVoiceEnabled)}
-              onToggle={() => setTtsVoiceEnabled && setTtsVoiceEnabled(!ttsVoiceEnabled)}
-              statusOnText={t.settings.general.statusOn}
-              statusOffText={t.settings.general.statusOff}
-            />
-
-            <SettingToggleCard
-              icon={<Sparkles size={16} />}
-              title={t.settings.general.sparksTitle}
-              desc={t.settings.general.sparksDesc}
-              active={Boolean(proactiveCompanionEnabled)}
-              onToggle={() =>
-                setProactiveCompanionEnabled && setProactiveCompanionEnabled(!proactiveCompanionEnabled)
-              }
-              statusOnText={t.settings.general.statusOn}
-              statusOffText={t.settings.general.statusOff}
-            />
+        <Card variant="default" className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="space-y-0.5 min-w-0 pr-3">
+            <div className="text-xs font-semibold text-[var(--theme-text)]">
+              {t.settings.general.lanSharingTitle}
+            </div>
+            <div className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+              {t.settings.general.lanSharingDesc}
+            </div>
           </div>
 
-          {/* Voice Parameters */}
-          {ttsVoiceEnabled && (
-            <div className="space-y-4 pt-2 border-t border-[var(--theme-border)]">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 items-end">
-                <Select
-                  label={t.settings.general.voiceLabel}
-                  value={ttsVoice}
-                  onChange={(e) => setTtsVoice && setTtsVoice(e.target.value)}
-                  options={[
-                    { value: 'ru-RU-SvetlanaNeural', label: 'Svetlana', sublabel: 'RU, Female' },
-                    { value: 'ru-RU-DmitryNeural', label: 'Dmitry', sublabel: 'RU, Male' },
-                    { value: 'en-US-GuyNeural', label: 'Guy', sublabel: 'EN, Male' },
-                    { value: 'en-US-JennyNeural', label: 'Jenny', sublabel: 'EN, Female' },
-                  ]}
-                />
-
-                <Select
-                  label={t.settings.general.voiceRateLabel}
-                  value={ttsRate}
-                  onChange={(e) => setTtsRate && setTtsRate(e.target.value)}
-                  options={[
-                    { value: '+0%', label: 'Standard (+0%)' },
-                    { value: '+15%', label: 'Fast (+15%)' },
-                    { value: '+20%', label: 'Optimal (+20%)' },
-                    { value: '+30%', label: 'Ultra (+30%)' },
-                  ]}
-                />
-
+          <div className="flex items-center gap-2 shrink-0">
+            {lanIp ? (
+              <>
+                <div className="px-3 py-1 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] font-mono text-xs font-semibold text-[var(--theme-text)] select-all">
+                  https://{lanIp}:3001
+                </div>
                 <Button
                   variant="secondary"
-                  size="md"
-                  onClick={handleTestVoice}
-                  loading={testingVoice}
-                  icon={<Volume2 size={14} />}
-                  className="w-full"
+                  size="sm"
+                  onClick={handleCopyLan}
+                  icon={copiedLan ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
                 >
-                  {t.settings.general.testVoiceBtn}
+                  {copiedLan ? t.settings.general.lanCopied : t.common.copy}
                 </Button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-[var(--theme-border)]">
-                <Toggle
-                  checked={Boolean(ttsPlayOnSpeaker)}
-                  onChange={(val) => setTtsPlayOnSpeaker && setTtsPlayOnSpeaker(val)}
-                  label={t.settings.general.playSpeakerLabel}
-                  size="sm"
-                />
-
-                <Toggle
-                  checked={Boolean(ttsPlayInBrowser)}
-                  onChange={(val) => setTtsPlayInBrowser && setTtsPlayInBrowser(val)}
-                  label={t.settings.general.playBrowserLabel}
-                  size="sm"
-                />
-
-                <Toggle
-                  checked={Boolean(wakeWordEnabled)}
-                  onChange={(val) => setWakeWordEnabled && setWakeWordEnabled(val)}
-                  label={t.settings.general.wakeWordLabel}
-                  size="sm"
-                  className="sm:col-span-2"
-                />
-              </div>
-            </div>
-          )}
+                <a
+                  href={`https://${lanIp}:3001`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-semibold text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors"
+                >
+                  <span>{t.settings.general.lanOpen}</span>
+                  <ExternalLink size={12} />
+                </a>
+              </>
+            ) : (
+              <span className="text-xs text-[var(--theme-text-muted)] font-mono">127.0.0.1:3001</span>
+            )}
+          </div>
         </Card>
       </SettingsSection>
 
-      {/* 6. Active Session & Logout */}
-      <SettingsSection title={t.settings.general.securityTitle}>
-        <Card variant="default" className="flex items-center justify-between gap-4">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2 text-xs font-bold text-[var(--theme-text)]">
-              <Shield size={14} className="text-[var(--theme-text-muted)]" />
-              <span>{t.settings.general.securityTitle}</span>
-            </div>
-            <p className="text-xs text-[var(--theme-text-muted)]">
-              {t.settings.security.logoutDesc || 'Управление сессией и паролем вынесено во вкладку Безопасность'}
-            </p>
-          </div>
+      {/* 7. Master Password & Session Security */}
+      <SettingsSection
+        title={t.settings.general.masterPasswordTitle}
+      >
+        <Card variant="default" className="p-4 space-y-4">
+          <form onSubmit={handleChangePassword} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Input
+                label={t.settings.general.currentPassword}
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
 
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={handleLogout}
-            icon={<LogOut size={13} />}
-          >
-            {t.settings.general.logoutBtn}
-          </Button>
+              <Input
+                label={t.settings.general.newPassword}
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+
+              <Input
+                label={t.settings.general.confirmPassword}
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {passwordStatus && (
+              <div
+                className={`p-2.5 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
+                  passwordStatus.type === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-500'
+                }`}
+              >
+                {passwordStatus.type === 'success' ? <Check size={14} /> : <KeyRound size={14} />}
+                <span>{passwordStatus.text}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-1">
+              <Button
+                type="submit"
+                variant="secondary"
+                size="sm"
+                loading={isChangingPassword}
+                disabled={isChangingPassword || !currentPassword || !newPassword}
+              >
+                {t.settings.general.updatePasswordBtn}
+              </Button>
+
+              <Button
+                variant="danger"
+                size="sm"
+                type="button"
+                onClick={async () => {
+                  try {
+                    await api.logout();
+                    window.location.reload();
+                  } catch (e) {
+                    console.error('Logout error:', e);
+                  }
+                }}
+                icon={<LogOut size={13} />}
+              >
+                {t.settings.general.logoutLabel}
+              </Button>
+            </div>
+          </form>
         </Card>
       </SettingsSection>
     </div>
   );
 });
+

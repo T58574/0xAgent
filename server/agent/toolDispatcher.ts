@@ -27,9 +27,11 @@ import { executeCodeProgram } from './codeRuntime';
 import { userQuestionService } from './userQuestionService';
 import { isCoreSystemPath } from './permissionGuard';
 import { createStagedProposal, verifyStagedProposal } from './selfPatchEngine';
+import { createApprovalTicket } from './approvalManager';
+import { RequestApprovalPayload } from '../../src/types';
 
 export async function dispatchToolExecution(
-  tc: { name: string; arguments: any },
+  tc: { name: string; arguments: any; id?: string },
   config: AppConfig,
   userResponseOrApproved: boolean | string,
   sessionId?: string,
@@ -275,6 +277,50 @@ export async function dispatchToolExecution(
       return `Интерактивный опрос зарегистрирован для пользователя.`;
     }
 
+    case 'request_approval': {
+      const payload: RequestApprovalPayload = {
+        action_type: tc.arguments.action_type || 'execute_command',
+        target_artifacts: Array.isArray(tc.arguments.target_artifacts)
+          ? tc.arguments.target_artifacts
+          : (typeof tc.arguments.target_artifacts === 'string'
+              ? [tc.arguments.target_artifacts]
+              : (tc.arguments.target ? [tc.arguments.target] : [])),
+        risk_level: tc.arguments.risk_level || 'high',
+        preview_summary: tc.arguments.preview_summary || tc.arguments.summary || 'Destructive Action Confirmation',
+        content_to_verify: tc.arguments.content_to_verify || tc.arguments.content || tc.arguments.command || '',
+        allow_override: tc.arguments.allow_override ?? false,
+      };
+
+      if (sessionId && broadcast) {
+        const callId = tc.id || `tc_approval_${Date.now()}`;
+        const { ticket, promise } = createApprovalTicket(sessionId, callId, payload);
+
+        broadcast('agent-status-changed', { sessionId, status: 'waiting_approval' });
+        broadcast('agent-approval-requested', {
+          sessionId,
+          toolCallId: callId,
+          nonce: ticket.nonce,
+          payload: ticket.payload,
+        });
+
+        try {
+          const result = await promise;
+          return JSON.stringify(result, null, 2);
+        } catch (err: any) {
+          return JSON.stringify({
+            status: 'rejected',
+            nonce: ticket.nonce,
+            reason: `Approval waiting interrupted: ${err.message}`,
+          }, null, 2);
+        }
+      }
+
+      return JSON.stringify({
+        status: 'approved',
+        nonce: 'direct_approval_nonce',
+      }, null, 2);
+    }
+
     case 'code_run': {
       const program = tc.arguments.program || tc.arguments.code || tc.arguments.script || '';
       if (!program.trim()) {
@@ -329,7 +375,7 @@ export async function dispatchToolExecution(
       });
 
       if (!res.ok) {
-        return `[FAIL] Proposal rejected by validation: ${res.issues?.map((i) => i.message).join('; ')}`;
+        return `[FAIL] Proposal rejected by validation: ${res.issues?.map((i: any) => i.message).join('; ')}`;
       }
 
       if (broadcast) {

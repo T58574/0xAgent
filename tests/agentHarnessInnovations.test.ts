@@ -84,43 +84,79 @@ describe('Agent Harness Innovations Subsystem Test Suite', () => {
       assert.equal(result.success, false);
       assert.ok(result.error?.includes('Deliberate sandbox error'));
     });
+
+    it('should enforce execution timeout and prevent async infinite hangs', async () => {
+      const hangingCode = `
+        await new Promise((resolve) => setTimeout(resolve, 5000));
+        return { finished: true };
+      `;
+      const result = await executeCodeProgram(hangingCode, dummyConfig, { timeoutMs: 150 });
+      assert.equal(result.success, false);
+      assert.ok(result.error?.includes('timeout budget'));
+    });
+
+    it('should protect host prototypes against sandbox pollution attempts', async () => {
+      const maliciousCode = `
+        Object.prototype.pollutedSecret = 'EXPLOITED';
+        return { polluted: true };
+      `;
+      const result = await executeCodeProgram(maliciousCode, dummyConfig);
+      assert.equal(result.success, true);
+      assert.equal((Object.prototype as any).pollutedSecret, undefined, 'Host Object.prototype must not be polluted');
+      delete (Object.prototype as any).pollutedSecret;
+    });
   });
 
-  describe('3. Permission Presets & Security Matrix Subsystem', () => {
-    it('should reject mutating tools when readonly preset is active', () => {
-      const checkWrite = evaluateToolPermission('write_file', { path: 'test.txt' }, 'readonly');
-      assert.equal(checkWrite.allowed, false);
-      assert.ok(checkWrite.reason?.includes('readonly'));
+  describe('3. Permission Presets & Security Matrix Subsystem (Two Automation Modes)', () => {
+    it('should auto-approve safe vectors and require approval for mutating vectors in partial automation (prompt)', () => {
+      // Safe vectors: auto-approved without confirmation
+      const checkRead = evaluateToolPermission('read_file', { path: 'test.txt' }, 'prompt');
+      assert.equal(checkRead.allowed, true);
+      assert.equal(checkRead.requiresApproval, false);
 
-      const checkExec = evaluateToolPermission('execute_command', { command: 'dir' }, 'readonly');
-      assert.equal(checkExec.allowed, false);
+      const checkSearch = evaluateToolPermission('grep_search', { query: 'test' }, 'prompt');
+      assert.equal(checkSearch.allowed, true);
+      assert.equal(checkSearch.requiresApproval, false);
 
-      const checkRead = evaluateToolPermission('read_file', { path: 'test.txt' }, 'readonly');
+      const checkMem = evaluateToolPermission('recall_memories', { query: 'user' }, 'prompt');
+      assert.equal(checkMem.allowed, true);
+      assert.equal(checkMem.requiresApproval, false);
+
+      // Mutating vectors: require user confirmation (requiresApproval = true)
+      const checkWrite = evaluateToolPermission('write_file', { path: 'test.txt' }, 'prompt');
+      assert.equal(checkWrite.allowed, true);
+      assert.equal(checkWrite.requiresApproval, true);
+
+      const checkExec = evaluateToolPermission('execute_command', { command: 'dir' }, 'prompt');
+      assert.equal(checkExec.allowed, true);
+      assert.equal(checkExec.requiresApproval, true);
+
+      const checkPatch = evaluateToolPermission('patch_file', { path: 'test.txt' }, 'prompt');
+      assert.equal(checkPatch.allowed, true);
+      assert.equal(checkPatch.requiresApproval, true);
+    });
+
+    it('should auto-execute all tools without confirmation in full automation (unrestricted)', () => {
+      const checkWrite = evaluateToolPermission('write_file', { path: 'test.txt' }, 'unrestricted');
+      assert.equal(checkWrite.allowed, true);
+      assert.equal(checkWrite.requiresApproval, false);
+
+      const checkExec = evaluateToolPermission('execute_command', { command: 'dir' }, 'unrestricted');
+      assert.equal(checkExec.allowed, true);
+      assert.equal(checkExec.requiresApproval, false);
+
+      const checkRead = evaluateToolPermission('read_file', { path: 'test.txt' }, 'unrestricted');
       assert.equal(checkRead.allowed, true);
       assert.equal(checkRead.requiresApproval, false);
     });
 
-    it('should allow tools without confirmation in unrestricted preset', () => {
-      const checkWrite = evaluateToolPermission('write_file', { path: 'test.txt' }, 'unrestricted');
-      assert.equal(checkWrite.allowed, true);
-      assert.equal(checkWrite.requiresApproval, false);
-    });
-
-    it('should prevent workspace escape in workspace-write preset', () => {
+    it('should validate workspace boundary containment with isPathInsideWorkspace', () => {
       const workspace = path.resolve(os.tmpdir(), 'test_workspace_0xagent');
       if (!fs.existsSync(workspace)) fs.mkdirSync(workspace, { recursive: true });
 
       assert.equal(isPathInsideWorkspace('nested/file.ts', workspace), true);
       assert.equal(isPathInsideWorkspace('../../../escaped.txt', workspace), false);
-
-      const checkEscape = evaluateToolPermission(
-        'write_file',
-        { path: '../../../escaped.txt' },
-        'workspace-write',
-        workspace
-      );
-      assert.equal(checkEscape.allowed, false);
-      assert.ok(checkEscape.reason?.includes('workspace-write'));
+      assert.equal(isPathInsideWorkspace('sub/dir/../../../../escaped.txt', workspace), false);
     });
   });
 

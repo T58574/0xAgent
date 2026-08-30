@@ -23,6 +23,7 @@ export const READONLY_TOOLS: ReadonlySet<string> = new Set([
   'search_sessions',
   'ask_user',
   'ask_user_question',
+  'request_approval',
   'todo_write',
 ]);
 
@@ -81,48 +82,28 @@ export function isPathInsideWorkspace(filePath: string, workspaceDir?: string | 
 /**
  * Permission Guard and security presets enforcement.
  * Evaluates tool execution requests against the active security preset.
+ * 
+ * 1. 'prompt' (Частичная автоматизация / Partial Automation):
+ *    - Auto-approves safe vectors: reading, search, memory, skills, questions, todo.
+ *    - Requires user approval for modifying/destructive vectors: file writes, patches, shell commands, code execution.
+ * 
+ * 2. 'unrestricted' (Полная автоматизация / Full Automation):
+ *    - Fully autonomous: auto-executes all tools under the background guard protection (core system paths protected by Staged Proposals).
  */
 export function evaluateToolPermission(
   toolName: string,
-  args: any,
+  _args: any,
   preset: PermissionPreset = 'prompt',
-  workspaceDir?: string | null
+  _workspaceDir?: string | null
 ): PermissionCheckResult {
   const isModifying = MODIFYING_TOOLS.has(toolName);
 
-  // 1. Read-Only Preset: Completely reject mutating and shell tools
-  if (preset === 'readonly') {
-    if (isModifying) {
-      return {
-        allowed: false,
-        requiresApproval: false,
-        reason: `[SECURITY REJECTED]: Инструмент '${toolName}' заблокирован. Активен режим безопасности 'readonly' (Только чтение).`,
-      };
-    }
-    return { allowed: true, requiresApproval: false };
-  }
-
-  // 2. Workspace-Write Preset: Allow mutations only strictly inside workspace
-  if (preset === 'workspace-write') {
-    const targetPath = args?.path || args?.file || args?.filePath;
-    if (targetPath && typeof targetPath === 'string' && workspaceDir) {
-      if (!isPathInsideWorkspace(targetPath, workspaceDir)) {
-        return {
-          allowed: false,
-          requiresApproval: false,
-          reason: `[SECURITY REJECTED]: Доступ к пути '${targetPath}' за пределами рабочей области проекта запрещен политикой 'workspace-write'.`,
-        };
-      }
-    }
-    return { allowed: true, requiresApproval: false };
-  }
-
-  // 3. Unrestricted Preset: Execute without confirmation prompts
+  // 1. Full Automation Preset ('unrestricted'): execute all tools autonomously under guard protection
   if (preset === 'unrestricted') {
     return { allowed: true, requiresApproval: false };
   }
 
-  // 4. Default: Prompt Preset (ask for user approval on modifying tools)
+  // 2. Partial Automation Preset ('prompt'): safe tools auto-approved; mutating tools require Tier-2 approval
   return {
     allowed: true,
     requiresApproval: isModifying,

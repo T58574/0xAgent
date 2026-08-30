@@ -70,7 +70,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
   onSelectQuickResponse,
   isLastMessageAssistant = false,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [openMenu, setOpenMenu] = useState<'none' | 'persona' | 'model' | 'slash' | 'permission' | 'reasoning'>('none');
   const [permissionPreset, setPermissionPreset] = useState<PermissionPreset>((config?.permission_preset as PermissionPreset) || 'prompt');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortLevel>((config?.reasoning_effort as ReasoningEffortLevel) || 'auto');
@@ -587,9 +587,9 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
             <span className="text-[11px] uppercase font-mono tracking-wider font-bold">{reasoningEffort.toUpperCase()}</span>
           </button>
 
-          <button type="button" onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'permission' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.permission}: ${permissionPreset}`} aria-label={`${t.chat.permission}: ${permissionPreset}`}>
+          <button type="button" onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'permission' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.permission}: ${permissionPreset === 'unrestricted' ? (language === 'ru' ? 'Полная автоматизация' : 'Full Automation') : (language === 'ru' ? 'Частичная автоматизация' : 'Partial Automation')}`} aria-label={`${t.chat.permission}: ${permissionPreset}`}>
             <Shield size={13} />
-            <span className="text-[11px] hidden sm:inline font-semibold capitalize">{permissionPreset === 'workspace-write' ? 'project' : permissionPreset}</span>
+            <span className="text-[11px] hidden sm:inline font-semibold">{permissionPreset === 'unrestricted' ? (language === 'ru' ? 'Полная' : 'Full') : (language === 'ru' ? 'Частичная' : 'Partial')}</span>
           </button>
 
           <button type="button" onClick={() => setOpenMenu(openMenu === 'slash' ? 'none' : 'slash')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'slash' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={t.chat.slashCommands} aria-label={t.chat.slashCommands}>

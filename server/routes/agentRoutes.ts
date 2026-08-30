@@ -8,6 +8,7 @@ import {
   respondToToolConfirmation,
 } from '../agent';
 import { userQuestionService } from '../agent/userQuestionService';
+import { resolveApprovalTicket } from '../agent/approvalManager';
 
 type BroadcastFn = (event: string, payload: any) => void;
 
@@ -55,6 +56,16 @@ export function createAgentRouter(broadcast: BroadcastFn): Router {
     const { sessionId, toolCallId, approve } = req.body;
     const ok = respondToToolConfirmation(sessionId, toolCallId, approve);
     res.json({ success: ok });
+  });
+
+  router.post('/respond-to-approval', (req, res) => {
+    const { ticketOrNonce, approve, overrideText, currentContent } = req.body;
+    if (!ticketOrNonce) {
+      res.status(400).json({ error: 'ticketOrNonce is required' });
+      return;
+    }
+    const result = resolveApprovalTicket(ticketOrNonce, Boolean(approve), overrideText, currentContent);
+    res.json(result);
   });
 
   router.post('/answer-question', (req, res) => {

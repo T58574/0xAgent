@@ -180,6 +180,23 @@ describe('0xAgent Memory Engine v1.0 Test Suite', () => {
     const resultsGpu = searchEpisodesFts('Radeon VRAM');
     assert.equal(resultsGpu.length, 1);
     assert.equal(resultsGpu[0].title, 'Настройка Vulkan драйверов');
+
+    // Robustness against malformed FTS5 syntax, unbalanced quotes and operators
+    const adversarialQueries = [
+      '"""',
+      'AND OR NOT NEAR',
+      'foo* OR (bar AND',
+      'SELECT * FROM canonical_memories; --',
+      '   ',
+      '%%%$$$###@@@!!!',
+    ];
+
+    for (const q of adversarialQueries) {
+      assert.doesNotThrow(() => {
+        const res = searchEpisodesFts(q);
+        assert.ok(Array.isArray(res), `Query '${q}' must return array without crashing SQLite FTS5`);
+      });
+    }
   });
 
   test('6. Persona-Scoped Relationship Isolation', () => {

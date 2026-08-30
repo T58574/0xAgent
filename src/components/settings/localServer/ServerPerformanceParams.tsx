@@ -263,25 +263,29 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
     },
   ];
 
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
+
   return (
-    <Card variant="default" className="space-y-4">
-      {/* Header & Quick Profiles */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--theme-border)] pb-3">
+    <Card variant="default" className="space-y-4 rounded-2xl">
+      {/* Title & Quick Presets Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[var(--theme-border)] pb-3">
         <div>
-          <span className="text-xs font-bold text-[var(--theme-text)]">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--theme-text)]">
             {t.settings.localServer.params.perfParamsTitle}
-          </span>
-          <p className="text-[11px] text-[var(--theme-text-muted)]">
+          </h3>
+          <p className="text-[11px] text-[var(--theme-text-muted)] mt-0.5">
             {t.settings.localServer.params.perfParamsDesc}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {onApplyFastMtpPreset && (
+
+        {/* Action Presets */}
+        <div className="flex items-center gap-2 shrink-0">
+          {modelMeta?.supportsFastMtp && (
             <Button
               variant="secondary"
-              size="sm"
+              size="xs"
               onClick={onApplyFastMtpPreset}
-              icon={<Sparkles size={13} className="text-[var(--theme-text-muted)]" />}
+              icon={<Sparkles size={12} className="text-[var(--theme-text-muted)]" />}
               title={t.settings.localServer.params.presetFastMtp}
             >
               {t.settings.localServer.params.presetFastMtp}
@@ -289,39 +293,16 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
           )}
           <Button
             variant="secondary"
-            size="sm"
+            size="xs"
             onClick={onApplyFastPreset}
-            icon={<Zap size={13} className="text-[var(--theme-text-muted)]" />}
+            icon={<Zap size={12} className="text-[var(--theme-text-muted)]" />}
           >
             {t.settings.localServer.params.presetFast}
           </Button>
         </div>
       </div>
 
-      {/* Host & Port */}
-      <div className="grid grid-cols-2 gap-3">
-        <ParamTextInput
-          label={t.settings.localServer.params.hostLabel}
-          value={host}
-          onChange={setHost}
-          tooltip={{
-            title: 'Host',
-            text: '127.0.0.1 (local only) or 0.0.0.0 (LAN access).',
-            benefit: 'Local isolation or LAN network distribution',
-          }}
-        />
-        <ParamNumberInput
-          label={t.settings.localServer.params.portLabel}
-          value={port}
-          onChange={setPort}
-          tooltip={{
-            title: 'Port',
-            text: 'Server API port (default 11434).',
-          }}
-        />
-      </div>
-
-      {/* Context Size -c with quick presets */}
+      {/* CORE PARAMETER 1: Context Window Size (-c) with quick presets */}
       <ParamSlider
         label={t.settings.localServer.params.ctxSizeLabel}
         value={ctxSize}
@@ -337,7 +318,7 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         }}
       />
 
-      {/* GPU Layers & CPU Threads */}
+      {/* CORE PARAMETER 2: GPU Layers & CPU Threads */}
       <div className="grid grid-cols-2 gap-3 pt-1">
         <ParamNumberInput
           label={t.settings.localServer.params.gpuLayersLabel}
@@ -367,264 +348,316 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
         />
       </div>
 
-      {/* Batch & Micro-Batch */}
-      <div className="grid grid-cols-2 gap-3 pt-1">
-        <ParamNumberInput
-          label={t.settings.localServer.params.batchSizeLabel}
-          value={batchSize}
-          onChange={setBatchSize}
-          tooltip={{
-            title: 'Batch Size (-b)',
-            text: 'Prompt processing token batch size.',
-          }}
-        />
-        <ParamNumberInput
-          label={t.settings.localServer.params.ubatchSizeLabel}
-          value={ubatchSize}
-          onChange={setUbatchSize}
-          tooltip={{
-            title: 'Micro-Batch (-ub)',
-            text: 'Internal compute sub-batch in VRAM.',
-          }}
-        />
-      </div>
-
-      {/* Temperature & Predict */}
-      <div className="grid grid-cols-2 gap-3 pt-1">
-        <ParamNumberInput
-          label={t.settings.localServer.params.tempLabel}
-          value={temp}
-          min={0}
-          max={2}
-          step={0.05}
-          badge={temp.toFixed(2)}
-          onChange={setTemp}
-          tooltip={{
-            title: 'Temperature',
-            text: 'Sampling randomness. 0.2-0.7 recommended for coding.',
-          }}
-        />
-        <ParamNumberInput
-          label={t.settings.localServer.params.predictLabel}
-          value={predict}
-          placeholder={t.settings.localServer.params.predictUnlimited}
-          onChange={setPredict}
-          tooltip={{
-            title: 'Max Output Tokens (-n)',
-            text: 'Maximum generation length per response.',
-          }}
-        />
-      </div>
-
-      {/* Sampling Parameters: Min-P, Top-K, Top-P, Repeat Penalty */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-        <ParamNumberInput
-          label={t.settings.localServer.params.minPLabel}
-          value={minP}
-          min={0}
-          max={1}
-          step={0.01}
-          onChange={setMinP}
-          tooltip={{
-            title: 'Min-P Sampling',
-            text: 'Trims low-probability tokens relative to top token.',
-          }}
-        />
-        <ParamNumberInput
-          label={t.settings.localServer.params.topKLabel}
-          value={topK}
-          onChange={setTopK}
-          tooltip={{
-            title: 'Top-K Sampling',
-            text: 'Restricts candidate pool to top K tokens.',
-          }}
-        />
-        <ParamNumberInput
-          label={t.settings.localServer.params.topPLabel}
-          value={topP}
-          min={0}
-          max={1}
-          step={0.01}
-          onChange={setTopP}
-          tooltip={{
-            title: 'Top-P (Nucleus Sampling)',
-            text: 'Cumulative probability threshold for token candidate set.',
-          }}
-        />
-        <ParamNumberInput
-          label={t.settings.localServer.params.repeatPenaltyLabel}
-          value={repeatPenalty}
-          min={1}
-          max={2}
-          step={0.05}
-          onChange={setRepeatPenalty}
-          tooltip={{
-            title: 'Repeat Penalty',
-            text: 'Penalizes repeated tokens. 1.0 recommended for syntax-precise code.',
-          }}
-        />
-      </div>
-
-      {/* Parallel Slots & Cache Reuse */}
-      <div className="grid grid-cols-2 gap-3 pt-1">
-        <ParamNumberInput
-          label={t.settings.localServer.params.slotsLabel}
-          value={parallelSlots}
-          min={1}
-          max={8}
-          onChange={setParallelSlots}
-          tooltip={{
-            title: 'Parallel Slots (-np)',
-            text: 'Concurrent dialogue slots. Single slot (1) saves VRAM.',
-            benefit: '1 slot saves up to 70% VRAM',
-          }}
-        />
-        <ParamNumberInput
-          label={t.settings.localServer.params.cacheReuseLabel}
-          value={cacheReuse}
-          onChange={setCacheReuse}
-          tooltip={{
-            title: 'Cache Reuse (KV Chunk)',
-            text: 'Minimum chunk size for KV prompt cache reuse.',
-          }}
-        />
-      </div>
-
-      {/* Slot Save Path */}
-      <ParamTextInput
-        label={t.settings.localServer.params.slotSavePathLabel}
-        value={slotSavePath}
-        onChange={setSlotSavePath}
-        placeholder="~/.0xagent/slots or C:\path\to\slots"
-        actionButton={
-          <button
-            type="button"
-            onClick={onSelectSlotSavePath}
-            className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
-          >
-            <Folder size={12} />
-            <span>{t.common.browse}</span>
-          </button>
-        }
-        tooltip={{
-          title: 'Slot State Directory',
-          text: 'Directory where server state and KV cache are saved across sessions.',
-        }}
-      />
-
-      {/* MINIMALIST SPECULATIVE ACCELERATION (MTP) SECTION */}
-      <Card variant="recessed" className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="space-y-0.5">
-            <div className="flex items-center gap-2">
-              <Sparkles size={16} className="text-[var(--theme-accent)]" />
-              <span className="text-xs font-bold text-[var(--theme-text)]">
-                {t.settings.localServer.params.mtpTitle}
-              </span>
-              <InfoTooltip
-                title="Hardware MTP"
-                text="Multi-Token Prediction accelerates token generation in 1 GPU step."
-                benefit="Hardware multi-token prediction"
-              />
+      {/* ADVANCED ENGINE TUNING (ACCORDION) */}
+      <div className="pt-2 border-t border-[var(--theme-border)]">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs font-bold text-[var(--theme-text)]">
+              {t.settings.localServer.params.advancedTitle}
             </div>
             <p className="text-[11px] text-[var(--theme-text-muted)]">
-              {t.settings.localServer.params.mtpDesc}
+              {t.settings.localServer.params.advancedDesc}
             </p>
           </div>
 
-          <Toggle checked={isMtpEnabled} onChange={handleToggleMtp} size="md" />
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="text-[11px] font-semibold text-[var(--theme-accent)]"
+          >
+            {showAdvanced
+              ? t.settings.localServer.params.hideAdvanced
+              : t.settings.localServer.params.showAdvanced}
+          </Button>
         </div>
 
-        {isMtpEnabled && (
-          <div className="pt-2 border-t border-[var(--theme-border)] animate-fadeIn">
-            {modelMeta?.supportsFastMtp ? (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
-                  <Zap size={14} className="animate-pulse text-emerald-500" />
-                  <span>{t.settings.localServer.params.mtpNativeDraft}</span>
+        {showAdvanced && (
+          <div className="space-y-3.5 pt-3.5 mt-2 border-t border-[var(--theme-border)]/60">
+            {/* Host & Port */}
+            <div className="grid grid-cols-2 gap-3">
+              <ParamTextInput
+                label={t.settings.localServer.params.hostLabel}
+                value={host}
+                onChange={setHost}
+                tooltip={{
+                  title: 'Host',
+                  text: '127.0.0.1 (local only) or 0.0.0.0 (LAN access).',
+                  benefit: 'Local isolation or LAN network distribution',
+                }}
+              />
+              <ParamNumberInput
+                label={t.settings.localServer.params.portLabel}
+                value={port}
+                onChange={setPort}
+                tooltip={{
+                  title: 'Port',
+                  text: 'Server API port (default 11434).',
+                }}
+              />
+            </div>
+
+            {/* Batch & Micro-Batch */}
+            <div className="grid grid-cols-2 gap-3">
+              <ParamNumberInput
+                label={t.settings.localServer.params.batchSizeLabel}
+                value={batchSize}
+                onChange={setBatchSize}
+                tooltip={{
+                  title: 'Batch Size (-b)',
+                  text: 'Prompt processing token batch size.',
+                }}
+              />
+              <ParamNumberInput
+                label={t.settings.localServer.params.ubatchSizeLabel}
+                value={ubatchSize}
+                onChange={setUbatchSize}
+                tooltip={{
+                  title: 'Micro-Batch (-ub)',
+                  text: 'Internal compute sub-batch in VRAM.',
+                }}
+              />
+            </div>
+
+            {/* Temperature & Predict */}
+            <div className="grid grid-cols-2 gap-3">
+              <ParamNumberInput
+                label={t.settings.localServer.params.tempLabel}
+                value={temp}
+                min={0}
+                max={2}
+                step={0.05}
+                badge={temp.toFixed(2)}
+                onChange={setTemp}
+                tooltip={{
+                  title: 'Temperature',
+                  text: 'Sampling randomness. 0.2-0.7 recommended for coding.',
+                }}
+              />
+              <ParamNumberInput
+                label={t.settings.localServer.params.predictLabel}
+                value={predict}
+                placeholder={t.settings.localServer.params.predictUnlimited}
+                onChange={setPredict}
+                tooltip={{
+                  title: 'Max Output Tokens (-n)',
+                  text: 'Maximum generation length per response.',
+                }}
+              />
+            </div>
+
+            {/* Sampling Parameters: Min-P, Top-K, Top-P, Repeat Penalty */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <ParamNumberInput
+                label={t.settings.localServer.params.minPLabel}
+                value={minP}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={setMinP}
+                tooltip={{
+                  title: 'Min-P Sampling',
+                  text: 'Trims low-probability tokens relative to top token.',
+                }}
+              />
+              <ParamNumberInput
+                label={t.settings.localServer.params.topKLabel}
+                value={topK}
+                onChange={setTopK}
+                tooltip={{
+                  title: 'Top-K Sampling',
+                  text: 'Restricts candidate pool to top K tokens.',
+                }}
+              />
+              <ParamNumberInput
+                label={t.settings.localServer.params.topPLabel}
+                value={topP}
+                min={0}
+                max={1}
+                step={0.01}
+                onChange={setTopP}
+                tooltip={{
+                  title: 'Top-P (Nucleus Sampling)',
+                  text: 'Cumulative probability threshold for token candidate set.',
+                }}
+              />
+              <ParamNumberInput
+                label={t.settings.localServer.params.repeatPenaltyLabel}
+                value={repeatPenalty}
+                min={1}
+                max={2}
+                step={0.05}
+                onChange={setRepeatPenalty}
+                tooltip={{
+                  title: 'Repeat Penalty',
+                  text: 'Penalizes repeated tokens. 1.0 recommended for syntax-precise code.',
+                }}
+              />
+            </div>
+
+            {/* Parallel Slots & Cache Reuse */}
+            <div className="grid grid-cols-2 gap-3">
+              <ParamNumberInput
+                label={t.settings.localServer.params.slotsLabel}
+                value={parallelSlots}
+                min={1}
+                max={8}
+                onChange={setParallelSlots}
+                tooltip={{
+                  title: 'Parallel Slots (-np)',
+                  text: 'Concurrent dialogue slots. Single slot (1) saves VRAM.',
+                  benefit: '1 slot saves up to 70% VRAM',
+                }}
+              />
+              <ParamNumberInput
+                label={t.settings.localServer.params.cacheReuseLabel}
+                value={cacheReuse}
+                onChange={setCacheReuse}
+                tooltip={{
+                  title: 'Cache Reuse (KV Chunk)',
+                  text: 'Minimum chunk size for KV prompt cache reuse.',
+                }}
+              />
+            </div>
+
+            {/* Slot Save Path */}
+            <ParamTextInput
+              label={t.settings.localServer.params.slotSavePathLabel}
+              value={slotSavePath}
+              onChange={setSlotSavePath}
+              placeholder="~/.0xagent/slots or C:\path\to\slots"
+              actionButton={
+                <button
+                  type="button"
+                  onClick={onSelectSlotSavePath}
+                  className="text-[11px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] flex items-center gap-1 cursor-pointer font-medium"
+                >
+                  <Folder size={12} />
+                  <span>{t.common.browse}</span>
+                </button>
+              }
+              tooltip={{
+                title: 'Slot State Directory',
+                text: 'Directory where server state and KV cache are saved across sessions.',
+              }}
+            />
+
+            {/* MTP Section */}
+            <Card variant="recessed" className="space-y-3 rounded-xl">
+              <div className="flex items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={15} className="text-[var(--theme-accent)]" />
+                    <span className="text-xs font-bold text-[var(--theme-text)]">
+                      {t.settings.localServer.params.mtpTitle}
+                    </span>
+                    <InfoTooltip
+                      title="Hardware MTP"
+                      text="Multi-Token Prediction accelerates token generation in 1 GPU step."
+                      benefit="Hardware multi-token prediction"
+                    />
+                  </div>
+                  <p className="text-[11px] text-[var(--theme-text-muted)]">
+                    {t.settings.localServer.params.mtpDesc}
+                  </p>
                 </div>
-                <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                  {t.settings.localServer.params.mtpNativeDraftDesc}
-                </p>
+
+                <Toggle checked={isMtpEnabled} onChange={handleToggleMtp} size="sm" />
               </div>
-            ) : (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
-                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
-                  <Zap size={14} className="text-emerald-500" />
-                  <span>{t.settings.localServer.params.mtpActive}</span>
+
+              {isMtpEnabled && (
+                <div className="pt-2 border-t border-[var(--theme-border)]">
+                  {modelMeta?.supportsFastMtp ? (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
+                        <Zap size={14} className="animate-pulse text-emerald-500" />
+                        <span>{t.settings.localServer.params.mtpNativeDraft}</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                        {t.settings.localServer.params.mtpNativeDraftDesc}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
+                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
+                        <Zap size={14} className="text-emerald-500" />
+                        <span>{t.settings.localServer.params.mtpActive}</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
+                        {t.settings.localServer.params.mtpActiveDesc}
+                      </p>
+                    </div>
+                  )}
                 </div>
-                <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                  {t.settings.localServer.params.mtpActiveDesc}
-                </p>
+              )}
+            </Card>
+
+            {/* Extra CLI Arguments */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex justify-between items-center text-xs">
+                <div className="flex items-center">
+                  <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
+                    {t.settings.localServer.params.customArgsLabel}
+                  </label>
+                  <InfoTooltip
+                    title="CLI Custom Args"
+                    text="Direct CLI arguments for llama-server.exe. e.g. -ctk q8_0 -ctv q8_0 saves 50% VRAM."
+                    benefit="KV quantization doubles context capacity"
+                  />
+                </div>
+                <div className="flex gap-1.5">
+                  <Button
+                    variant={customArgs.includes('q8_0') ? 'accent' : 'secondary'}
+                    size="xs"
+                    onClick={() => setCustomArgs('-ctk q8_0 -ctv q8_0')}
+                    title="8-bit KV cache quantization (saves 50% VRAM)"
+                  >
+                    Q8_0 KV
+                  </Button>
+                  <Button
+                    variant={customArgs.includes('q4_0') ? 'accent' : 'secondary'}
+                    size="xs"
+                    onClick={() => setCustomArgs('-ctk q4_0 -ctv q4_0')}
+                    title="4-bit KV cache quantization (max VRAM savings)"
+                  >
+                    Q4_0 KV
+                  </Button>
+                  {customArgs && (
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      onClick={() => setCustomArgs('')}
+                      title={t.settings.localServer.params.clearBtn}
+                    >
+                      [x]
+                    </Button>
+                  )}
+                </div>
               </div>
-            )}
+              <input
+                type="text"
+                value={customArgs}
+                onChange={(e) => setCustomArgs(e.target.value)}
+                placeholder="-ctk q8_0 -ctv q8_0"
+                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
+              />
+            </div>
+
+            {/* Switches Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-[var(--theme-border)]">
+              {toggleItems.map((item, i) => (
+                <ParamToggleCard
+                  key={i}
+                  label={item.label}
+                  sub={item.sub}
+                  value={item.value}
+                  onToggle={item.toggle}
+                  tooltip={item.tooltip}
+                />
+              ))}
+            </div>
           </div>
         )}
-      </Card>
-
-      {/* Extra CLI Arguments */}
-      <div className="space-y-1.5 pt-1">
-        <div className="flex justify-between items-center text-xs">
-          <div className="flex items-center">
-            <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
-              {t.settings.localServer.params.customArgsLabel}
-            </label>
-            <InfoTooltip
-              title="CLI Custom Args"
-              text="Direct CLI arguments for llama-server.exe. e.g. -ctk q8_0 -ctv q8_0 saves 50% VRAM."
-              benefit="KV quantization doubles context capacity"
-            />
-          </div>
-          <div className="flex gap-1.5">
-            <Button
-              variant={customArgs.includes('q8_0') ? 'accent' : 'secondary'}
-              size="xs"
-              onClick={() => setCustomArgs('-ctk q8_0 -ctv q8_0')}
-              title="8-bit KV cache quantization (saves 50% VRAM)"
-            >
-              Q8_0 KV
-            </Button>
-            <Button
-              variant={customArgs.includes('q4_0') ? 'accent' : 'secondary'}
-              size="xs"
-              onClick={() => setCustomArgs('-ctk q4_0 -ctv q4_0')}
-              title="4-bit KV cache quantization (max VRAM savings)"
-            >
-              Q4_0 KV
-            </Button>
-            {customArgs && (
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setCustomArgs('')}
-                title={t.settings.localServer.params.clearBtn}
-              >
-                [x]
-              </Button>
-            )}
-          </div>
-        </div>
-        <input
-          type="text"
-          value={customArgs}
-          onChange={(e) => setCustomArgs(e.target.value)}
-          placeholder="-ctk q8_0 -ctv q8_0"
-          className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-        />
-      </div>
-
-      {/* Switches Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-[var(--theme-border)]">
-        {toggleItems.map((item, i) => (
-          <ParamToggleCard
-            key={i}
-            label={item.label}
-            sub={item.sub}
-            value={item.value}
-            onToggle={item.toggle}
-            tooltip={item.tooltip}
-          />
-        ))}
       </div>
     </Card>
   );

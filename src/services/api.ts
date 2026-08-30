@@ -18,6 +18,7 @@ import {
   StagedProposal,
   SearchEngineInfo,
   WebSearchProvider,
+  ApprovalResult,
 } from '../types';
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
@@ -175,6 +176,8 @@ export const send_message = (sessionId: string) => post<void>('/send-message', {
 export const cancel_agent = (sessionId: string) => post<void>('/cancel-agent', { sessionId });
 export const respond_to_tool = (sessionId: string, toolCallId: string, approve: boolean | string) =>
   post<void>('/respond-to-tool', { sessionId, toolCallId, approve });
+export const respond_to_approval = (ticketOrNonce: string, approve: boolean, overrideText?: string, currentContent?: string) =>
+  post<ApprovalResult>('/respond-to-approval', { ticketOrNonce, approve, overrideText, currentContent });
 export const answer_user_question = (toolCallId: string, answers: any[]) =>
   post<void>('/answer-question', { toolCallId, answers });
 export async function transcribe_audio(audioBase64: string, apiKey?: string, mimeType?: string): Promise<string> {

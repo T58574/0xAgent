@@ -151,7 +151,7 @@ export interface AppConfig {
   tool_toggles?: Record<string, boolean> | null;
 }
 
-export type PermissionPreset = 'readonly' | 'workspace-write' | 'prompt' | 'unrestricted';
+export type PermissionPreset = 'prompt' | 'unrestricted';
 
 export interface TtsConfig {
   enabled: boolean;
@@ -264,11 +264,53 @@ export interface ContextBreakdown {
   compactionTier?: number; // 0 (Raw), 1 (Pruned), 2 (Summarized), 3 (Emergency)
 }
 
+export type QuickReplyActionType = 'send_prompt' | 'insert_prompt' | 'open_diff' | 'explain';
+
+export interface QuickReplyItem {
+  id: string;
+  label: string;
+  prompt: string;
+  action_type?: QuickReplyActionType;
+  key?: string;
+}
+
 export interface QuickResponseOption {
   id?: string;
   key?: string;
   label: string;
   action: string;
+  prompt?: string;
+  action_type?: QuickReplyActionType;
+}
+
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+
+export type DestructiveActionType =
+  | 'patch_file'
+  | 'write_file'
+  | 'delete_file'
+  | 'execute_command'
+  | 'run_shell_command'
+  | 'git_push'
+  | 'install_dependency'
+  | string;
+
+export interface RequestApprovalPayload {
+  action_type: DestructiveActionType;
+  target_artifacts: string[];
+  risk_level: RiskLevel;
+  preview_summary: string;
+  content_to_verify?: string;
+  content_hash?: string;
+  nonce?: string;
+  allow_override?: boolean;
+}
+
+export interface ApprovalResult {
+  status: 'approved' | 'rejected' | 'expired';
+  nonce: string;
+  override_text?: string;
+  reason?: string;
 }
 
 export interface LiveTelemetry {
@@ -372,7 +414,6 @@ export type MemoryCategory = 'profile' | 'preference' | 'interest' | 'fact' | 'u
 export type MemoryStatus = 'active' | 'candidate' | 'superseded' | 'invalidated' | 'conflict' | 'archived' | 'rejected';
 export type MemoryDomain = string;
 
-export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'applied' | 'reverted' | 'expired';
 export type ProposalOperation = 'append' | 'prepend' | 'replace_section' | 'insert_after' | 'insert_before' | 'delete_section' | 'set_metadata';
 export type ProposalSourceType = 'agent' | 'user' | 'reflection' | 'migration' | 'system';

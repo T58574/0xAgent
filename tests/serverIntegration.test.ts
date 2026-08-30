@@ -4,7 +4,8 @@ import https from 'node:https';
 import http from 'node:http';
 import { WebSocket } from 'ws';
 import express from 'express';
-import { getOrCreateSslCertificates } from '../server/sslHelper';
+import fs from 'node:fs';
+import { getOrCreateSslCertificates, getLocalLanIps } from '../server/sslHelper';
 import { authRouter } from '../server/routes/authRoutes';
 import { WebSocketServer } from 'ws';
 
@@ -88,5 +89,18 @@ describe('Server & WebSocket HTTPS Integration Test Suite', () => {
 
     assert.strictEqual(received.event, 'connected');
     assert.strictEqual(received.payload?.status, 'ready');
+  });
+
+  it('should validate generated X.509 SSL certificates and local LAN IPs', () => {
+    const ips = getLocalLanIps();
+    assert.ok(Array.isArray(ips));
+    assert.ok(ips.includes('127.0.0.1'));
+
+    assert.ok(sslCerts.key, 'SSL private key must be defined');
+    assert.ok(sslCerts.cert, 'SSL certificate must be defined');
+    assert.ok(sslCerts.cert.includes('BEGIN CERTIFICATE'));
+    assert.ok(sslCerts.key.includes('BEGIN RSA PRIVATE KEY') || sslCerts.key.includes('BEGIN PRIVATE KEY'));
+    assert.ok(fs.existsSync(sslCerts.certPath), 'Certificate file must exist on disk');
+    assert.ok(fs.existsSync(sslCerts.keyPath), 'Private key file must exist on disk');
   });
 });

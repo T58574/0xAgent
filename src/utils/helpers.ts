@@ -24,20 +24,70 @@ export function getRandomZoomerStatus(): string {
   return ZOOMER_STATUSES[idx];
 }
 
+function sanitizeOptionLabel(raw: string): string {
+  if (!raw) return 'Option';
+  // Strip markdown formatting, HTML tags, backticks, brackets
+  let cleaned = raw
+    .replace(/<[^>]+>/g, '')
+    .replace(/[`*_~#\[\]\(\)]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // If multiple sentences or lines, take the first one
+  const firstSentence = cleaned.split(/[.!?\n]/)[0]?.trim() || cleaned;
+  if (firstSentence.length > 28) {
+    return firstSentence.substring(0, 25).trim() + '...';
+  }
+  return firstSentence || 'Option';
+}
+
 /**
- * Extracts <quick_response> options from assistant content and returns cleaned text and options
+ * Extracts <quick_replies> / <quick_response> options from assistant content and returns cleaned text and options.
+ * Complies with suggestions specification: max 4 items, label <= 28 chars, non-blocking prompt dispatch.
  */
 export function extractQuickResponses(content: string): { cleanText: string; options: QuickResponseOption[] } {
   if (!content) return { cleanText: '', options: [] };
 
   const options: QuickResponseOption[] = [];
+
+  // 1. Try parsing JSON array format inside <quick_replies>...</quick_replies>
+  const quickRepliesRegex = /<quick_replies\b[^>]*>([\s\S]*?)(?:<\/quick_replies>|$)/gi;
+  let qrMatch: RegExpExecArray | null;
+  while ((qrMatch = quickRepliesRegex.exec(content)) !== null) {
+    const inner = (qrMatch[1] || '').trim();
+    if (inner) {
+      try {
+        const parsed = JSON.parse(inner);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((item: any, idx: number) => {
+            const rawLabel = String(item.label || item.title || item.name || 'Option');
+            const label = sanitizeOptionLabel(rawLabel);
+            const prompt = String(item.prompt || item.action || label).trim();
+            if (label && options.length < 4) {
+              options.push({
+                id: item.id || `qr_${idx + 1}`,
+                key: String(options.length + 1),
+                label,
+                action: prompt,
+                prompt,
+                action_type: item.action_type || 'send_prompt',
+              });
+            }
+          });
+        }
+      } catch {
+        // Fallback to line splitting if JSON is partial/malformed during streaming
+      }
+    }
+  }
+
+  // 2. Try parsing XML <quick_response><option ... /></quick_response> tags
   const quickRegex = /<quick_responses?>([\s\S]*?)(?:<\/quick_responses?>|$)/gi;
   let match: RegExpExecArray | null;
 
   while ((match = quickRegex.exec(content)) !== null) {
     const inner = match[1] || '';
-    
-    // 1. Try parsing XML <option ...> tags
+
+    // 2a. Try parsing XML <option ...> tags
     const optionTagRegex = /<option\s+([^>]+?)(?:\/>|>([\s\S]*?)<\/option>)/gi;
     let optMatch: RegExpExecArray | null;
     let foundTags = false;
@@ -49,35 +99,39 @@ export function extractQuickResponses(content: string): { cleanText: string; opt
 
       const labelMatch = attrsStr.match(/label=["']([^"']+)["']/i);
       const actionMatch = attrsStr.match(/action=["']([^"']+)["']/i);
+      const promptMatch = attrsStr.match(/prompt=["']([^"']+)["']/i);
       const keyMatch = attrsStr.match(/key=["']([^"']+)["']/i);
       const idMatch = attrsStr.match(/id=["']([^"']+)["']/i);
 
-      const label = labelMatch ? labelMatch[1] : (body || 'Option');
-      const action = actionMatch ? actionMatch[1] : (body || label);
+      const rawLabel = labelMatch ? labelMatch[1] : (body || 'Option');
+      const label = sanitizeOptionLabel(rawLabel);
+      const prompt = (promptMatch ? promptMatch[1] : (actionMatch ? actionMatch[1] : (body || label))).trim();
+      const action = prompt;
       const key = keyMatch ? keyMatch[1] : String(options.length + 1);
       const id = idMatch ? idMatch[1] : `opt_${options.length + 1}`;
 
-      if (label) {
-        options.push({ id, key, label, action });
+      if (label && options.length < 4) {
+        options.push({ id, key, label, action, prompt });
       }
     }
 
-    // 2. If no <option> tags, try pipe/line separated list (e.g., "Option 1 | Option 2" or "1. Option 1\n2. Option 2")
-    if (!foundTags && inner.trim()) {
+    // 2b. If no <option> tags, try pipe/line separated list
+    if (!foundTags && inner.trim() && !inner.trim().startsWith('[')) {
       const lines = inner.split(/[\n|]/).map(s => s.trim()).filter(Boolean);
       lines.forEach((line) => {
-        // Strip numbering e.g. "1. ", "[1] "
         const cleanedLine = line.replace(/^(?:\[\d+\]|\d+[\.\)\-:]|\-\s*)\s*/, '').trim();
-        if (cleanedLine) {
+        if (cleanedLine && options.length < 4) {
           const parts = cleanedLine.split(/[:=]\s*(.+)/);
-          const label = parts[0]?.trim() || cleanedLine;
-          const action = parts[1]?.trim() || label;
+          const rawLabel = parts[0]?.trim() || cleanedLine;
+          const label = sanitizeOptionLabel(rawLabel);
+          const prompt = (parts[1]?.trim() || label).trim();
           const key = String(options.length + 1);
           options.push({
             id: `opt_${options.length + 1}`,
             key,
             label,
-            action,
+            action: prompt,
+            prompt,
           });
         }
       });
@@ -86,7 +140,7 @@ export function extractQuickResponses(content: string): { cleanText: string; opt
 
   return {
     cleanText: cleanContent(content),
-    options: options.slice(0, 6), // Cap at 6 chips for clean UX
+    options: options.slice(0, 4), // Cap at max 4 items
   };
 }
 
@@ -99,7 +153,7 @@ export function cleanContent(content: string): string {
   let cleaned = content;
 
   // 1. Strip markdown code block wrappers containing tool tags
-  cleaned = cleaned.replace(/```(?:xml|bash|powershell|js|ts|python)?\s*<(?:write_file|patch_file|read_file|execute_command|run_scratch_script|update_?user_?profile|update_?persona_?file)[\s\S]*?```/gi, "");
+  cleaned = cleaned.replace(/```(?:xml|bash|powershell|js|ts|python)?\s*<(?:write_file|patch_file|read_file|execute_command|run_scratch_script|update_?user_?profile|update_?persona_?file|request_approval)[\s\S]*?```/gi, "");
 
   // 2. Strip closed & unclosed tool tags for all tools
   cleaned = cleaned.replace(/<(?:tool_?call|tool-call|function_?call)[\s\S]*?(?:<\/(?:tool_?call|tool-call|function_?call)>|(?=<[a-z_]+|$))/gi, "");
@@ -114,6 +168,7 @@ export function cleanContent(content: string): string {
   cleaned = cleaned.replace(/<update_?user_?profile[\s\S]*?(?:<\/update_?user_?profile>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<ask_?user_?questions?[\s\S]*?(?:<\/ask_?user_?questions?>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<ask_user[\s\S]*?(?:<\/ask_user>|\/>|>|(?=<[a-z_]+|$))/gi, "");
+  cleaned = cleaned.replace(/<request_approval[\s\S]*?(?:<\/request_approval>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<todo_?write[\s\S]*?(?:<\/todo_?write>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<code_?run[\s\S]*?(?:<\/code_?run>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<spawn_subagent[\s\S]*?(?:<\/spawn_subagent>|\/>|>|(?=<[a-z_]+|$))/gi, "");
@@ -121,12 +176,13 @@ export function cleanContent(content: string): string {
   cleaned = cleaned.replace(/<interrupt_subagent[\s\S]*?(?:<\/interrupt_subagent>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   cleaned = cleaned.replace(/<list_subagents[\s\S]*?(?:<\/list_subagents>|\/>|>|(?=<[a-z_]+|$))/gi, "");
   
-  // Strip complete quick_response blocks and open streaming quick_response blocks
+  // Strip complete quick_replies and quick_response blocks
+  cleaned = cleaned.replace(/<quick_replies\b[\s\S]*?(?:<\/quick_replies>|$)/gi, "");
   cleaned = cleaned.replace(/<quick_responses?\b[\s\S]*?(?:<\/quick_responses?>|$)/gi, "");
   cleaned = cleaned.replace(/<option\b[\s\S]*?(?:<\/option>|\/>|$)/gi, "");
   
   // Single self-closing tags
-  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|fff_search|web_search|read_web_page|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|search_knowledge|list_knowledge|ask_user|ask_?user_?questions?|todo_?write|code_?run|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|update_?user_?profile|quick_responses?|option)\s+[^>]*\/?>/gi, "");
+  cleaned = cleaned.replace(/<(?:read_file|create_directory|get_file_info|list_dir|grep_search|fff_search|web_search|read_web_page|remember_fact|recall_memories|list_skills|execute_skill|search_sessions|search_knowledge|list_knowledge|ask_user|ask_?user_?questions?|request_approval|todo_?write|code_?run|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|update_?user_?profile|quick_replies|quick_responses?|option)\s+[^>]*\/?>/gi, "");
 
   // Block-format grep_search: <grep_search>...</grep_search>
   cleaned = cleaned.replace(/<grep_search\s*>[\s\S]*?<\/grep_search>/gi, "");
@@ -138,7 +194,7 @@ export function cleanContent(content: string): string {
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, "");
 
   // 4. Remove orphaned standalone closing tags
-  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|ask_?user_?questions?|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|tool_?call|tool-call|function_?call|function|code_run|todo_write|update_?user_?profile|update_?persona_?file|tool_response|bash|powershell|shell|quick_responses?|option)\s*>/gi, "");
+  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|ask_?user_?questions?|request_approval|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|tool_?call|tool-call|function_?call|function|code_run|todo_write|update_?user_?profile|update_?persona_?file|tool_response|bash|powershell|shell|quick_replies|quick_responses?|option)\s*>/gi, "");
 
   // 5. Remove empty code fences and excess vertical spacing
   cleaned = cleaned.replace(/```[a-z]*\s*```/gi, "");

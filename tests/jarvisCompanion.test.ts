@@ -160,10 +160,12 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
       assert.equal(spark.status, 'pending');
     });
 
-    it('should record user activity timestamp', () => {
-      assert.doesNotThrow(() => {
-        proactiveCompanion.recordUserActivity();
-      });
+    it('should record user activity timestamp and update internal state', async () => {
+      const beforeTs = proactiveCompanion.getLastActivityTimestamp();
+      await new Promise((r) => setTimeout(r, 5));
+      proactiveCompanion.recordUserActivity();
+      const afterTs = proactiveCompanion.getLastActivityTimestamp();
+      assert.ok(afterTs >= beforeTs, 'Activity timestamp must be updated');
     });
 
     it('should intercept server error logs and create an error_incident spark', async () => {

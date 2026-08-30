@@ -174,7 +174,7 @@ async function cmdStatus() {
 
   console.log(`  Backend Server (:3001) : ${isServerUp ? `${c.green}[ONLINE]${c.reset}` : `${c.red}[OFFLINE]${c.reset}`}`);
   console.log(`  Active Language        : ${c.cyan}${cfg.language || 'ru'}${c.reset}`);
-  console.log(`  Security Preset        : ${c.cyan}${cfg.permissionPreset || 'workspace-write'}${c.reset}`);
+  console.log(`  Security Preset        : ${c.cyan}${cfg.permissionPreset || 'prompt'}${c.reset}`);
   console.log(`  LLM Provider           : ${c.cyan}${cfg.defaultProvider || 'local'}${c.reset}`);
   console.log(`  Model                  : ${c.cyan}${cfg.selectedModel || 'None / Not Selected'}${c.reset}`);
   console.log(`  Config Location        : ${c.gray}${CONFIG_PATH}${c.reset}`);
@@ -241,7 +241,7 @@ async function cmdConfig() {
 
   console.log(`${c.bold}0xAgent Interactive Configuration Manager${c.reset}\n`);
   console.log(`  1. Set Interface Language [current: ${cfg.language || 'ru'}]`);
-  console.log(`  2. Set Security Permission Preset [current: ${cfg.permissionPreset || 'workspace-write'}]`);
+  console.log(`  2. Set Security Permission Preset [current: ${cfg.permissionPreset || 'prompt'}]`);
   console.log(`  3. Set Google AI Studio (Gemini) API Key [current: ${cfg.geminiApiKey ? '***' + cfg.geminiApiKey.slice(-4) : 'none'}]`);
   console.log(`  4. Set Groq API Key [current: ${cfg.groqApiKey ? '***' + cfg.groqApiKey.slice(-4) : 'none'}]`);
   console.log(`  5. Open Models Folder in File Explorer`);
@@ -264,9 +264,9 @@ async function cmdConfig() {
       break;
     }
     case '2': {
-      console.log(`Available presets: readonly, workspace-write, prompt, unrestricted`);
-      const preset = await promptQuestion(`${c.yellow}Enter preset: ${c.reset}`);
-      if (['readonly', 'workspace-write', 'prompt', 'unrestricted'].includes(preset)) {
+      console.log(`Available presets: prompt (Partial Automation), unrestricted (Full Automation)`);
+      const preset = await promptQuestion(`${c.yellow}Enter preset ('prompt' or 'unrestricted'): ${c.reset}`);
+      if (['prompt', 'unrestricted'].includes(preset)) {
         cfg.permissionPreset = preset;
         saveConfig(cfg);
         console.log(`${c.green}[OK] Security preset updated to ${preset}.${c.reset}`);

@@ -69,7 +69,7 @@ describe('Quick Responses & Action Parsing Subsystem', () => {
     assert.equal(cleaned, 'Генерирую ответ...');
   });
 
-  it('should cap quick responses at 6 items for clean UI rendering', () => {
+  it('should cap quick responses at 4 items for clean UI rendering', () => {
     const manyOptions = `Выбери шаг:
 <quick_response>
   <option label="1" action="a1" />
@@ -83,6 +83,6 @@ describe('Quick Responses & Action Parsing Subsystem', () => {
 </quick_response>`;
 
     const { options } = extractQuickResponses(manyOptions);
-    assert.equal(options.length, 6);
+    assert.equal(options.length, 4);
   });
 });

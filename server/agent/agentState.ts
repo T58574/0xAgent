@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { saveSession, loadSession, setActiveStreamGetter } from '../session';
+import { cancelPendingApprovalsForSession } from './approvalManager';
 
 export interface PendingConfirmation {
   sessionId: string;
@@ -98,6 +99,9 @@ export function respondToToolConfirmation(sessionId: string, toolCallId: string,
 
 export async function cancelAgentSession(sessionId: string): Promise<void> {
   activeCancelTokens.add(sessionId);
+
+  // Cancel any active legacy confirmations and L2 approvals
+  cancelPendingApprovalsForSession(sessionId, 'Session cancelled by user');
 
   for (const [key, pending] of activeConfirmations.entries()) {
     if (pending.sessionId === sessionId) {

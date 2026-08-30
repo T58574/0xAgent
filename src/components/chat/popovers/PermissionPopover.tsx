@@ -18,24 +18,18 @@ export const PermissionPopover: React.FC<PermissionPopoverProps> = ({
 
   const presets = [
     {
-      id: 'readonly',
-      title: language === 'ru' ? 'Только чтение' : 'Read-Only',
-      desc: language === 'ru' ? 'Запрещены любые изменения файлов и запуск команд' : 'Disallow file modifications and command execution',
-    },
-    {
-      id: 'workspace-write',
-      title: language === 'ru' ? 'Песочница проекта' : 'Workspace Sandbox',
-      desc: language === 'ru' ? 'Разрешено менять файлы только внутри проекта' : 'Allow modifications only within workspace boundary',
-    },
-    {
       id: 'prompt',
-      title: language === 'ru' ? 'Подтверждение' : 'Prompt on Mutation',
-      desc: language === 'ru' ? 'Запрашивать одобрение на опасные и модифицирующие действия' : 'Ask for approval before executing modifying actions',
+      title: language === 'ru' ? 'Частичная автоматизация' : 'Partial Automation',
+      desc: language === 'ru'
+        ? 'Авто-одобрение чтения, поиска и памяти. Запись и команды требуют подтверждения.'
+        : 'Auto-run read, search, and memory. Writes and shell commands require approval.',
     },
     {
       id: 'unrestricted',
-      title: language === 'ru' ? 'Полная автономия' : 'Unrestricted',
-      desc: language === 'ru' ? 'Автоматическое выполнение всех действий' : 'Fully autonomous execution without prompts',
+      title: language === 'ru' ? 'Полная автоматизация' : 'Full Automation',
+      desc: language === 'ru'
+        ? 'Автономное выполнение всех действий, включая запись и терминал, под фоновой защитой.'
+        : 'Autonomous execution of all actions including writes and shell commands under guard protection.',
     },
   ] as const;
 

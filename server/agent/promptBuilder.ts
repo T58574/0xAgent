@@ -72,12 +72,31 @@ ${activePersona.user}
 1. Final responses to the user, explanations, and conversational dialogue must ALWAYS be delivered in the user's language (default: Russian). Speak naturally, clearly, and concisely.
 2. Program code, file paths, terminal commands, library names, variable and type names are strictly in English.`;
 
-  const quickResponseDirective = `\n\n# QUICK RESPONSES & CONVERSATIONAL CHOICES
-When proposing choices, logical next steps, or asking for direction at the end of your response, you may optionally include a <quick_response> block with 2-4 concise options so the user can reply in 1 click:
-<quick_response>
-  <option key="1" label="Короткое название" action="Полная реплика пользователя для отправки" />
-  <option key="2" label="Другой вариант" action="Альтернативная реплика" />
-</quick_response>`;
+  const twoTierProtocolDirective = `\n\n# TWO-TIER APPROVAL & INTERACTION PROTOCOL:
+You operate under a strict Two-Tier Approval Protocol:
+
+## Tier 1: Quick Replies (Non-blocking Intent Suggestions)
+When proposing choices or next steps, you may append a <quick_replies> block with 2 to 4 concise suggestion chips (label <= 25 chars, max 4 items):
+<quick_replies>
+[
+  { "id": "1", "label": "Применить патч", "prompt": "Примени предложенный патч к файлу src/auth.ts", "action_type": "send_prompt" },
+  { "id": "2", "label": "Показать diff", "prompt": "Покажи полный diff изменений", "action_type": "open_diff" },
+  { "id": "3", "label": "Объяснить логику", "prompt": "Подробно объясни архитектурное решение", "action_type": "explain" }
+]
+</quick_replies>
+XML format is also supported: <quick_response><option key="1" label="Короткий текст" action="Реплика" /></quick_response>
+* Invariant: Maximum 4 options. Never output long lists. Keep 'label' strictly concise (2-4 words, <= 25 chars, no sentences, no markdown). Put the full command/question in 'prompt' or 'action'. Clicking a chip only sends the specified prompt to the chat.
+
+## Tier 2: Approval Gate (Blocking Destructive Actions)
+Before performing destructive modifications (e.g. patch_file, write_file, delete_file, execute_command, git_push), when in 'prompt' permission mode or when high risk, you MUST call the <request_approval> tool to halt execution and request explicit user confirmation:
+<request_approval action_type="patch_file" risk_level="high" preview_summary="Обновление логики авторизации в auth.ts" target_artifacts="[\"src/auth.ts\"]">
+<<<<<<< SEARCH
+old code
+=======
+new code
+>>>>>>> REPLACE
+</request_approval>
+The runtime validates cryptographic nonces and hashes before execution.`;
 
   const unifiedToolsContext = getUnifiedToolsContext();
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
@@ -85,7 +104,7 @@ When proposing choices, logical next steps, or asking for direction at the end o
   // Cacheable Stable Prefix
   const stablePrefix =
     languageProtocolDirective +
-    quickResponseDirective +
+    twoTierProtocolDirective +
     toolExecutionDirective +
     unifiedToolsContext +
     gemmaToolDirective +
@@ -105,15 +124,18 @@ When proposing choices, logical next steps, or asking for direction at the end o
 export function formatMessageContent(m: ChatMessage, isHistoryAssistant: boolean = false): string | any[] {
   let content = m.content || '';
 
-  // Tier-2 CoT Compaction:
-  // In multi-turn conversations, historical assistant outputs must NOT retain large thinking blocks.
-  // Stripping past reasoning prevents context bloat, reduces KV cache memory consumption,
+  // Tier-2 CoT & Quick Replies Compaction:
+  // In multi-turn conversations, historical assistant outputs must NOT retain large thinking blocks or transient quick reply chips.
+  // Stripping past reasoning & quick replies prevents context bloat, reduces KV cache memory consumption,
   // and eliminates repetition traps on follow-up turns ("продолжи").
   if (isHistoryAssistant) {
     content = content
       .replace(/<(?:think|thought|thought_process|system_thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?(?:<\/(?:think|thought|thought_process|system_thought|thinking|\|thought\||\|end_thought\|)>|$)/gi, '')
       .replace(/<\|?channel\|?>?(?:thought|reasoning)[\s\S]*?(?:<\|?(?:\/channel|channel\|?)>|$)/gi, '')
       .replace(/\[(?:think|thinking|thought|thought_process)\][\s\S]*?(?:\[\/(?:think|thinking|thought|thought_process)\]|$)/gi, '')
+      .replace(/<quick_replies\b[\s\S]*?(?:<\/quick_replies>|$)/gi, '')
+      .replace(/<quick_responses?\b[\s\S]*?(?:<\/quick_responses?>|$)/gi, '')
+      .replace(/<option\b[\s\S]*?(?:<\/option>|\/>|$)/gi, '')
       .trim();
 
     // If this assistant message executed tools, ensure XML tool tags remain in content

@@ -6,7 +6,22 @@ export function useSettingsState(
   onSaveConfig: (updated: AppConfig) => Promise<void>,
   initialSubtab?: 'general' | 'tools' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security'
 ) {
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'tools' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security'>(initialSubtab || 'general');
+  const normalizeSubtab = (sub?: string): 'general' | 'tools' | 'personas' | 'local_server' => {
+    if (sub === 'tools') return 'tools';
+    if (sub === 'personas' || sub === 'customizations') return 'personas';
+    if (sub === 'local_server') return 'local_server';
+    return 'general';
+  };
+
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'tools' | 'personas' | 'local_server'>(
+    normalizeSubtab(initialSubtab)
+  );
+
+  useEffect(() => {
+    if (initialSubtab) {
+      setActiveSubtab(normalizeSubtab(initialSubtab));
+    }
+  }, [initialSubtab]);
 
   // General state
   const [language, setLanguage] = useState<'en' | 'ru'>((config?.language as 'en' | 'ru') || 'en');

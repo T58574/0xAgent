@@ -72,6 +72,8 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
   const [savingToggles, setSavingToggles] = useState(false);
   const [toolsSuccessMsg, setToolsSuccessMsg] = useState<string | null>(null);
 
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+
   useEffect(() => {
     fetchSearchEngines();
     fetchTools();
@@ -153,7 +155,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
     setSavingToggles(true);
     try {
       await api.save_tools_toggles(toggles);
-      setToolsSuccessMsg('Пресет инструментов успешно применён');
+      setToolsSuccessMsg(t.settings.toolsTab.presetAppliedSuccess);
       setTimeout(() => setToolsSuccessMsg(null), 2500);
     } catch (err) {
       console.error('Failed to apply tools preset:', err);
@@ -256,34 +258,34 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
         badge={webSearchProvider === 'auto' ? 'Auto Cascade' : webSearchProvider.toUpperCase()}
         description={t.settings.toolsTab.searchEngineDesc}
       >
-        <Card variant="default" className="space-y-4">
+        <Card variant="default" className="space-y-4 rounded-2xl">
           {/* Search Engine Cards Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {[
               {
                 id: 'auto',
                 name: 'Auto Cascade',
-                desc: 'Firecrawl → SearXNG → DuckDuckGo → Wikipedia',
+                desc: t.settings.toolsTab.engineDescAuto,
               },
               {
                 id: 'firecrawl',
                 name: 'Firecrawl',
-                desc: 'Чистый Markdown и глубокий скрейпинг страниц',
+                desc: t.settings.toolsTab.engineDescFirecrawl,
               },
               {
                 id: 'searxng',
                 name: 'SearXNG',
-                desc: 'Локальный приватный мета-поисковик (Docker / URL)',
+                desc: t.settings.toolsTab.engineDescSearxng,
               },
               {
                 id: 'duckduckgo',
                 name: 'DuckDuckGo',
-                desc: 'Бесплатный поиск без ключа и регистрации',
+                desc: t.settings.toolsTab.engineDescDuckDuckGo,
               },
               {
                 id: 'wikipedia',
                 name: 'Wikipedia',
-                desc: 'Энциклопедические факты через OpenSearch API',
+                desc: t.settings.toolsTab.engineDescWikipedia,
               },
             ].map((eng) => {
               const isSelected = webSearchProvider === eng.id;
@@ -294,8 +296,8 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
                   onClick={() => setWebSearchProvider(eng.id as WebSearchProvider)}
                   className={`p-3.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer select-none ${
                     isSelected
-                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm ring-1 ring-[var(--theme-accent)]/30'
-                      : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:bg-[var(--theme-border-subtle)] hover:border-[var(--theme-text-muted)]'
+                      ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] font-semibold'
+                      : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:bg-[var(--theme-border-subtle)]'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1.5 w-full">
@@ -322,8 +324,8 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
                     onClick={() => setWebSearchProvider(eng.id as WebSearchProvider)}
                     className={`p-3.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer select-none ${
                       isSelected
-                        ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] shadow-sm ring-1 ring-[var(--theme-accent)]/30'
-                        : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:bg-[var(--theme-border-subtle)] hover:border-[var(--theme-text-muted)]'
+                        ? 'border-[var(--theme-accent)] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] font-semibold'
+                        : 'border-[var(--theme-border)] bg-[var(--theme-input-bg)] hover:bg-[var(--theme-border-subtle)]'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-1.5 w-full">
@@ -359,7 +361,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
                   rel="noreferrer"
                   className="text-[10px] text-[var(--theme-text)] hover:underline flex items-center gap-1 font-normal opacity-80 hover:opacity-100"
                 >
-                  <span>Получить 1000 бесплатных кредитов</span>
+                  <span>{t.settings.toolsTab.firecrawlFreeCredits}</span>
                   <ExternalLink size={10} />
                 </a>
               }
@@ -384,15 +386,17 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
             </div>
           </div>
 
-          {/* Interactive Live Search Diagnostic Sandbox */}
-          <div className="p-4 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] space-y-3">
+          {/* Collapsible Search Diagnostic Sandbox */}
+          <div className="pt-2 border-t border-[var(--theme-border)]">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity size={14} className="text-[var(--theme-text)]" />
-                <span className="text-xs font-bold text-[var(--theme-text)]">
-                  {t.settings.toolsTab.testSearchTitle}
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowDiagnostics(!showDiagnostics)}
+                className="flex items-center gap-2 text-xs font-semibold text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer py-1"
+              >
+                <Activity size={14} className="text-[var(--theme-text-muted)]" />
+                <span>{t.settings.toolsTab.showDiagnostics}</span>
+              </button>
               {testResult && (
                 <div className="flex items-center gap-2 text-[10px] font-mono">
                   <Badge variant="success" size="xs">
@@ -405,85 +409,89 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
               )}
             </div>
 
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  value={testQuery}
-                  onChange={(e) => setTestQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleTestSearch()}
-                  placeholder={t.settings.toolsTab.testSearchPlaceholder}
-                />
-              </div>
-              <Button
-                variant="secondary"
-                size="md"
-                onClick={handleTestSearch}
-                disabled={isTesting || !testQuery.trim()}
-                loading={isTesting}
-                icon={isTesting ? <RotateCcw size={13} /> : <Play size={13} />}
-              >
-                {isTesting ? t.settings.toolsTab.testing : t.settings.toolsTab.testSearchBtn}
-              </Button>
-            </div>
+            {showDiagnostics && (
+              <div className="p-3.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] space-y-3 mt-2">
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Input
+                      value={testQuery}
+                      onChange={(e) => setTestQuery(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleTestSearch()}
+                      placeholder={t.settings.toolsTab.testSearchPlaceholder}
+                    />
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    onClick={handleTestSearch}
+                    disabled={isTesting || !testQuery.trim()}
+                    loading={isTesting}
+                    icon={isTesting ? <RotateCcw size={13} /> : <Play size={13} />}
+                  >
+                    {isTesting ? t.settings.toolsTab.testing : t.settings.toolsTab.testSearchBtn}
+                  </Button>
+                </div>
 
-            {/* Test Results Output */}
-            {testResult && (
-              <div className="space-y-2 pt-2 border-t border-[var(--theme-border)]">
-                {testResult.cascadeTrail && testResult.cascadeTrail.length > 1 && (
-                  <div className="flex items-center gap-1.5 text-[10px] text-[var(--theme-text-muted)] font-mono flex-wrap">
-                    <span>{t.settings.toolsTab.cascadeTrail}:</span>
-                    {testResult.cascadeTrail.map((hop, idx) => (
-                      <React.Fragment key={idx}>
-                        <Badge variant="neutral" size="xs">
-                          {hop}
-                        </Badge>
-                        {idx < (testResult.cascadeTrail?.length || 0) - 1 && (
-                          <ArrowRight size={10} className="text-[var(--theme-text-muted)]" />
-                        )}
-                      </React.Fragment>
+                {/* Test Results Output */}
+                {testResult && (
+                  <div className="space-y-2 pt-2 border-t border-[var(--theme-border)]">
+                    {testResult.cascadeTrail && testResult.cascadeTrail.length > 1 && (
+                      <div className="flex items-center gap-1.5 text-[10px] text-[var(--theme-text-muted)] font-mono flex-wrap">
+                        <span>{t.settings.toolsTab.cascadeTrail}:</span>
+                        {testResult.cascadeTrail.map((hop, idx) => (
+                          <React.Fragment key={idx}>
+                            <Badge variant="neutral" size="xs">
+                              {hop}
+                            </Badge>
+                            {idx < (testResult.cascadeTrail?.length || 0) - 1 && (
+                              <ArrowRight size={10} className="text-[var(--theme-text-muted)]" />
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    )}
+
+                    {testResult.error && (
+                      <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 text-xs flex items-start gap-2">
+                        <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                        <span>{testResult.error}</span>
+                      </div>
+                    )}
+
+                    {testResult.results.length === 0 && !testResult.error && (
+                      <div className="text-xs text-[var(--theme-text-muted)] italic">
+                        {t.settings.toolsTab.noResults}
+                      </div>
+                    )}
+
+                    {testResult.results.slice(0, 3).map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] space-y-1"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-semibold text-[var(--theme-text)] hover:underline flex items-center gap-1 truncate"
+                          >
+                            <span className="truncate">{item.title}</span>
+                            <ExternalLink size={11} className="shrink-0 text-[var(--theme-text-muted)]" />
+                          </a>
+                          {item.engine && (
+                            <Badge variant="neutral" size="xs">
+                              {item.engine}
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed">
+                          {item.snippet}
+                        </p>
+                      </div>
                     ))}
                   </div>
                 )}
-
-                {testResult.error && (
-                  <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-500 dark:text-rose-400 text-xs flex items-start gap-2">
-                    <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                    <span>{testResult.error}</span>
-                  </div>
-                )}
-
-                {testResult.results.length === 0 && !testResult.error && (
-                  <div className="text-xs text-[var(--theme-text-muted)] italic">
-                    {t.settings.toolsTab.noResults}
-                  </div>
-                )}
-
-                {testResult.results.slice(0, 3).map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] space-y-1"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs font-semibold text-[var(--theme-text)] hover:underline flex items-center gap-1 truncate"
-                      >
-                        <span className="truncate">{item.title}</span>
-                        <ExternalLink size={11} className="shrink-0 text-[var(--theme-text-muted)]" />
-                      </a>
-                      {item.engine && (
-                        <Badge variant="neutral" size="xs">
-                          {item.engine}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-[var(--theme-text-muted)] line-clamp-2 leading-relaxed">
-                      {item.snippet}
-                    </p>
-                  </div>
-                ))}
               </div>
             )}
           </div>
@@ -495,10 +503,10 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
         title={t.settings.toolsTab.toolsManagementTitle}
         description={t.settings.toolsTab.toolsManagementDesc}
         actionSlot={
-          <div className="flex items-center gap-2 select-none">
+          <div className="flex items-center gap-1.5 select-none">
             {savingToggles && (
-              <span className="text-[10px] font-mono text-[var(--theme-text-muted)] animate-pulse">
-                (сохранение...)
+              <span className="text-[10px] font-mono text-[var(--theme-text-muted)] animate-pulse mr-1">
+                ({t.settings.saving})
               </span>
             )}
             <Button
@@ -525,7 +533,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
           </div>
         }
       >
-        <Card variant="default" className="space-y-4">
+        <Card variant="default" className="space-y-4 rounded-2xl">
           {toolsSuccessMsg && (
             <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs flex items-center gap-2">
               <Check size={14} />
@@ -536,7 +544,7 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
           {loadingTools ? (
             <div className="py-8 flex items-center justify-center gap-2 text-xs text-[var(--theme-text-muted)]">
               <RotateCcw size={14} className="animate-spin" />
-              <span>Загрузка реестра инструментов...</span>
+              <span>{t.settings.toolsTab.loadingRegistry}</span>
             </div>
           ) : (
             <div className="space-y-4">

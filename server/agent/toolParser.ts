@@ -30,6 +30,7 @@ const TOOL_NAME_MAP: Record<string, string> = {
   update_persona_file: 'update_persona_file', updatepersonafile: 'update_persona_file', persona_file: 'update_persona_file',
   propose_persona_change: 'propose_persona_change', proposepersonachange: 'propose_persona_change', persona_change: 'propose_persona_change',
   propose_pull_request: 'propose_pull_request', pull_request: 'propose_pull_request', propose_staged_changes: 'propose_pull_request',
+  request_approval: 'request_approval', requestapproval: 'request_approval', ask_approval: 'request_approval',
 };
 
 function tryParseJson(text: string): any {
@@ -221,6 +222,40 @@ const DECLARATIVE_RULES: ToolRule[] = [
         idPrefix: 'pr',
         name: 'propose_pull_request',
         args: { title, description, changes, rawBody: bodyStr },
+      };
+    },
+  },
+  {
+    regex: /<(?:request_approval|requestapproval|ask_approval)\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:request_approval|requestapproval|ask_approval)>|>([\s\S]*?)$)/gi,
+    handler: (m) => {
+      const attrStr = m[1] || '';
+      const bodyStr = (m[2] || m[3] || '').trim();
+      let parsedArgs: any = bodyStr ? tryParseJson(bodyStr) : null;
+      if (!parsedArgs) {
+        const actionMatch = /action_type=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr);
+        const riskMatch = /risk_level=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr);
+        const summaryMatch = /preview_summary=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr) || /summary=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr);
+        const artifactsMatch = /target_artifacts=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr) || /targets=(?:'([^']*)'|"([^"]*)")/i.exec(attrStr);
+
+        let targets: string[] = [];
+        if (artifactsMatch) {
+          const rawVal = artifactsMatch[1] ?? artifactsMatch[2] ?? '';
+          const p = tryParseJson(rawVal);
+          targets = Array.isArray(p) ? p : rawVal.split(',').map((s) => s.trim()).filter(Boolean);
+        }
+
+        parsedArgs = {
+          action_type: actionMatch ? (actionMatch[1] ?? actionMatch[2]) : 'execute_command',
+          risk_level: riskMatch ? (riskMatch[1] ?? riskMatch[2]) : 'high',
+          preview_summary: summaryMatch ? (summaryMatch[1] ?? summaryMatch[2]) : 'Action Approval Required',
+          target_artifacts: targets,
+          content_to_verify: bodyStr,
+        };
+      }
+      return {
+        idPrefix: 'appr',
+        name: 'request_approval',
+        args: parsedArgs,
       };
     },
   },

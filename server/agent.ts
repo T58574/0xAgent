@@ -11,6 +11,7 @@ import { handleOutputSpill } from './agent/outputSpiller';
 import { evaluateToolPermission, READONLY_TOOLS } from './agent/permissionGuard';
 import { runCompactionPipeline } from './agent/compactionPipeline';
 import { memoryWorker } from './agent/memoryWorker';
+import { cancelPendingApprovalsForSession } from './agent/approvalManager';
 import { fetchLlmResponse, readLlmStream, PRIMARY_TEXT_MODEL, DEFAULT_FALLBACK_CHAIN, GEMMA_MODEL, FAST_LITE_MODEL, NATIVE_AUDIO_MODEL } from './agent/llmClient';
 import {
   PendingConfirmation,
@@ -51,6 +52,7 @@ export async function runAgentLoop(
   try {
     const session = await loadSession(sessionId);
     activeCancelTokens.delete(sessionId);
+    cancelPendingApprovalsForSession(sessionId, 'Interrupted by new user message');
 
     const sessionWorkspace = session.workspace_dir !== undefined ? session.workspace_dir : config.workspace_dir;
     const sessionConfig: AppConfig = {

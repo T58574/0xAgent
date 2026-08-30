@@ -10,13 +10,13 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 
 const variantStyles: Record<CardVariant, string> = {
   default:
-    'rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] shadow-sm',
+    'rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)]',
   recessed:
-    'rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] shadow-xs',
+    'rounded-xl border border-[var(--theme-border)] bg-[var(--theme-input-bg)]',
   interactive:
-    'rounded-2xl bento-card border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] hover:border-[var(--theme-text-muted)] cursor-pointer transition-all shadow-sm select-none',
+    'rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] hover:border-[var(--theme-text-muted)] cursor-pointer transition-all select-none',
   solid:
-    'rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel-solid)] shadow-md',
+    'rounded-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]',
 };
 
 export const Card = React.forwardRef<HTMLDivElement, CardProps>(

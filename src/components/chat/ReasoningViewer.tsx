@@ -97,28 +97,28 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
   };
 
   return (
-    <div className="relative inline-block font-sans text-xs select-none">
+    <div className="relative inline-flex items-center font-sans text-xs select-none">
       {/* 1. BACKGROUND-LESS COMPACT BUTTON AT BOTTOM-LEFT */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`px-2 py-0.5 rounded-lg text-[11px] font-mono transition-all flex items-center gap-1.5 cursor-pointer border ${
+        className={`px-2 py-1 rounded-lg text-[11px] font-mono transition-all inline-flex items-center gap-1.5 cursor-pointer border ${
           isOpen
             ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs'
             : 'bg-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent'
         }`}
         title={t.chat.reasoningTitle}
       >
-        <Brain size={12} className={isLive ? 'text-[var(--theme-accent)] animate-pulse' : 'text-[var(--theme-text-muted)]'} />
+        <Brain size={12} className={`shrink-0 ${isLive ? 'text-[var(--theme-accent)] animate-pulse' : 'text-[var(--theme-text-muted)]'}`} />
         
         {isLive ? (
-          <span className="flex items-center gap-1 text-[var(--theme-text)] font-semibold">
+          <span className="inline-flex items-center gap-1 text-[var(--theme-text)] font-semibold leading-none">
             <span>{ASCII_SPINNER_FRAMES[spinnerFrame]}</span>
             <span>{t.chat.reasoning}</span>
             <span className="opacity-70 font-mono">({displaySeconds.toFixed(1)}s)</span>
           </span>
         ) : (
-          <span className="flex items-center gap-1">
+          <span className="inline-flex items-center gap-1 leading-none">
             <span className="font-semibold text-[var(--theme-text)]">{t.chat.reasoning}</span>
             <span className="text-[10px] text-[var(--theme-text-muted)] opacity-80">
               · {estimatedTokens > 0 ? `${estimatedTokens} tok · ` : ''}{wordCount} {language === 'ru' ? 'слов' : 'words'}{displaySeconds > 0 ? ` · ${displaySeconds.toFixed(1)}s` : ''}
@@ -126,7 +126,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
           </span>
         )}
 
-        <ChevronRight size={11} className={`transition-transform duration-150 opacity-60 ${isOpen ? 'rotate-90' : ''}`} />
+        <ChevronRight size={11} className={`shrink-0 transition-transform duration-150 opacity-60 ${isOpen ? 'rotate-90' : ''}`} />
       </button>
 
       {/* 2. INDEPENDENT SIDE FLYOUT PANEL */}

@@ -96,6 +96,10 @@ export class ProactiveCompanion {
     this.lastActivityTimestamp = Date.now();
   }
 
+  public getLastActivityTimestamp(): number {
+    return this.lastActivityTimestamp;
+  }
+
   public resetErrorIncidentThrottle(): void {
     this.lastErrorIncidentTime = 0;
   }

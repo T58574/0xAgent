@@ -1,15 +1,12 @@
 import React from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User, Sparkles, Shield, Wrench } from 'lucide-react';
+import { Sliders, Cpu, Check, RefreshCw, ChevronLeft, User, Wrench } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { useI18n } from '../../i18n';
 import { Button } from '../ui/Button';
 import { GeneralTab } from './GeneralTab';
 import { ToolsTab } from './ToolsTab';
 import { PersonasTab } from './PersonasTab';
-import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
-import { CustomizationsTab } from './CustomizationsTab';
-import { SecurityTab } from './SecurityTab';
 import { useSettingsState } from './useSettingsState';
 
 interface SettingsPageProps {
@@ -45,11 +42,6 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
             title={t.settings.backToChat}
             className="p-1.5"
           />
-          <img
-            src="/0xAgent-icon.jpg"
-            alt="0xAgent Logo"
-            className="w-5 h-5 rounded-md object-cover border border-[var(--theme-border)] shrink-0"
-          />
           <h2 className="text-xs font-semibold text-[var(--theme-text)] uppercase tracking-wider">{t.settings.title}</h2>
         </div>
 
@@ -71,16 +63,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
 
       {/* Main Settings Layout (Sidebar Navigation + Right Content Panel) */}
       <div className="flex-1 w-full flex flex-col md:flex-row overflow-hidden">
-        {/* Left Vertical Navigation Menu */}
+        {/* Left Vertical Navigation Menu (4 Canonical Tabs) */}
         <div className="w-full md:w-60 bg-[var(--theme-panel)] border-r border-[var(--theme-border)] p-3 shrink-0 flex flex-row md:flex-col gap-1.5 select-none overflow-x-auto scrollbar-none">
           {[
             { id: 'general', label: t.settings.tabs.general, icon: Sliders },
-            { id: 'tools', label: t.settings.tabs.tools, icon: Wrench },
-            { id: 'customizations', label: t.settings.tabs.customizations, icon: Sparkles },
-            { id: 'personas', label: t.settings.tabs.personas, icon: User },
-            { id: 'themes', label: t.settings.tabs.themes, icon: Palette },
             { id: 'local_server', label: t.settings.tabs.localServer, icon: Cpu },
-            { id: 'security', label: t.settings.tabs.security || 'Security & Auth', icon: Shield },
+            { id: 'tools', label: t.settings.tabs.tools, icon: Wrench },
+            { id: 'personas', label: t.settings.tabs.personas, icon: User },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = s.activeSubtab === tab.id;
@@ -103,25 +92,14 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
               </button>
             );
           })}
-
-          {/* 0xAgent System Badge */}
-          <div className="hidden md:flex mt-auto pt-4 border-t border-[var(--theme-border)] items-center gap-2.5 px-2">
-            <img
-              src="/0xAgent-icon.jpg"
-              alt="0xAgent"
-              className="w-7 h-7 rounded-lg object-cover border border-[var(--theme-border)] shadow-xs shrink-0"
-            />
-            <div className="min-w-0">
-              <div className="text-[11px] font-bold text-[var(--theme-text)] tracking-wider">0xAGENT</div>
-              <div className="text-[9px] font-mono text-[var(--theme-text-muted)]">v0.1.0 (local)</div>
-            </div>
-          </div>
         </div>
 
         {/* Right Scrollable Content Panel */}
         <div className="flex-1 h-full overflow-y-auto p-4 md:p-8 pb-28 scrollbar-none">
           {s.activeSubtab === 'general' && (
             <GeneralTab
+              activeTheme={s.activeTheme}
+              onSelectTheme={s.handleSelectTheme}
               onLanguageSelect={(lang) => {
                 s.setLanguage(lang);
               }}
@@ -157,43 +135,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
             />
           )}
 
-          {s.activeSubtab === 'tools' && (
-            <ToolsTab
-              webSearchProvider={s.webSearchProvider}
-              setWebSearchProvider={s.setWebSearchProvider}
-              firecrawlApiKey={s.firecrawlApiKey}
-              setFirecrawlApiKey={s.setFirecrawlApiKey}
-              firecrawlApiUrl={s.firecrawlApiUrl}
-              setFirecrawlApiUrl={s.setFirecrawlApiUrl}
-              searxngUrl={s.searxngUrl}
-              setSearxngUrl={s.setSearxngUrl}
-            />
-          )}
-
-          {s.activeSubtab === 'customizations' && (
-            <CustomizationsTab
-              config={config}
-              currentSessionId={currentSessionId}
-            />
-          )}
-
-          {s.activeSubtab === 'personas' && (
-            <PersonasTab />
-          )}
-
-          {s.activeSubtab === 'themes' && (
-            <ThemesTab
-              activeTheme={s.activeTheme}
-              onSelectTheme={s.handleSelectTheme}
-            />
-          )}
-
           {s.activeSubtab === 'local_server' && (
             <LocalServerTab
               exePath={s.exePath}
-              setExePath={s.setExePath}
-              modelPath={s.modelPath}
               setModelPath={s.setModelPath}
+              modelPath={s.modelPath}
+              setExePath={s.setExePath}
               host={s.host}
               setHost={s.setHost}
               port={s.port}
@@ -266,9 +213,25 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
             />
           )}
 
-          {s.activeSubtab === 'security' && <SecurityTab />}
+          {s.activeSubtab === 'tools' && (
+            <ToolsTab
+              webSearchProvider={s.webSearchProvider}
+              setWebSearchProvider={s.setWebSearchProvider}
+              firecrawlApiKey={s.firecrawlApiKey}
+              setFirecrawlApiKey={s.setFirecrawlApiKey}
+              firecrawlApiUrl={s.firecrawlApiUrl}
+              setFirecrawlApiUrl={s.setFirecrawlApiUrl}
+              searxngUrl={s.searxngUrl}
+              setSearxngUrl={s.setSearxngUrl}
+            />
+          )}
+
+          {s.activeSubtab === 'personas' && (
+            <PersonasTab currentSessionId={currentSessionId} />
+          )}
         </div>
       </div>
     </div>
   );
 });
+

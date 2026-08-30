@@ -12,6 +12,7 @@ import { NotionMarkdown } from '../NotionMarkdown';
 import { ReasoningViewer } from './ReasoningViewer';
 import { InteractiveQuestionCard } from './InteractiveQuestionCard';
 import { StagedProposalCard } from './StagedProposalCard';
+import { ApprovalGateCard } from './ApprovalGateCard';
 import { sounds } from '../../services/soundEffects';
 import * as api from '../../services/api';
 import { useI18n } from '../../i18n';
@@ -222,9 +223,9 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
               )}
 
               {/* Bottom Metadata & Action Strip */}
-              <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--theme-border)]/40 mt-1">
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--theme-border)]/40 mt-2.5">
                 {/* LEFT: Background-less Reasoning Button */}
-                <div className="flex items-center">
+                <div className="flex items-center min-h-[22px]">
                   {reasoningEnabled && (hasThinking || isActivelyGenerating) && (
                     <ReasoningViewer
                       thinking={thinking}
@@ -238,8 +239,8 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                 </div>
 
                 {/* RIGHT: Timestamp & Actions */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-[var(--theme-text-muted)] opacity-80 font-sans select-none">
+                <div className="flex items-center gap-2 min-h-[22px]">
+                  <span className="text-[10px] text-[var(--theme-text-muted)] opacity-80 font-sans select-none leading-none">
                     {formatTime(msg.timestamp)}
                   </span>
 
@@ -326,6 +327,16 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                               showToast(err.message || t.common.error, 'error');
                             }
                           }}
+                        />
+                      );
+                    }
+
+                    if (tool.name === 'request_approval') {
+                      return (
+                        <ApprovalGateCard
+                          key={tool.id}
+                          tool={tool}
+                          showToast={showToast}
                         />
                       );
                     }
