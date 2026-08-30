@@ -702,14 +702,21 @@ export const ToolsTab: React.FC<ToolsTabProps> = ({
                         {/* Toggle Switch */}
                         <button
                           type="button"
+                          role="switch"
+                          aria-checked={tool.enabled}
+                          aria-label={`Toggle ${tool.name}`}
                           onClick={() => handleToggleTool(tool.id, !tool.enabled)}
-                          className={`w-10 h-5 rounded-full p-0.5 transition-colors cursor-pointer shrink-0 mt-0.5 ${
-                            tool.enabled ? 'bg-[var(--theme-accent)]' : 'bg-zinc-700'
+                          className={`w-9 h-5 rounded-full p-0.5 flex items-center transition-colors cursor-pointer shrink-0 mt-0.5 border ${
+                            tool.enabled
+                              ? 'bg-[var(--theme-accent)] border-[var(--theme-accent)]'
+                              : 'bg-zinc-800 border-[var(--theme-border)]'
                           }`}
                         >
                           <div
-                            className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                              tool.enabled ? 'translate-x-5' : 'translate-x-0'
+                            className={`w-4 h-4 rounded-full transition-transform shadow-xs ${
+                              tool.enabled
+                                ? 'translate-x-4 bg-[var(--theme-accent-text)]'
+                                : 'translate-x-0 bg-zinc-400'
                             }`}
                           />
                         </button>
