@@ -16,6 +16,8 @@ import {
   JarvisState,
   ContextBreakdownReport,
   StagedProposal,
+  SearchEngineInfo,
+  WebSearchProvider,
 } from '../types';
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
@@ -264,6 +266,25 @@ export const save_summarizer_prompt = (content: string) => post<void>('/summariz
 export const get_tools_state = () => get<ToolsState>('/tools');
 export const save_tools_toggles = (toggles: Record<string, boolean>) => post<ToolsState>('/tools/toggles', { toggles });
 export const save_tools_md = (content: string) => post<ToolsState>('/tools/md', { content });
+
+// Web Search Engines & Testing
+export const get_search_engines = () =>
+  get<{ engines: SearchEngineInfo[]; activeProvider: WebSearchProvider }>('/search-engines');
+
+export const test_web_search = (params: {
+  query: string;
+  provider?: WebSearchProvider;
+  firecrawl_api_key?: string | null;
+  firecrawl_api_url?: string | null;
+  searxng_url?: string | null;
+}) =>
+  post<{
+    results: Array<{ title: string; url: string; snippet: string; engine?: string }>;
+    engineUsed: string;
+    latencyMs: number;
+    error?: string;
+    cascadeTrail?: string[];
+  }>('/web-search/test', params);
 
 // Knowledge Base
 export async function get_knowledge_entries(options?: KnowledgeQueryOptions): Promise<KnowledgeEntry[]> {

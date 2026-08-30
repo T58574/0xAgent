@@ -33,33 +33,17 @@ export class SearxngService {
    * 3. DuckDuckGo Instant Answer API
    * 4. Wikipedia OpenSearch API (for encyclopedic / fact queries)
    */
-  public async search(query: string, limit = 5): Promise<SearchResultItem[]> {
+  public async search(query: string, limit = 5, customSearxngUrl?: string | null): Promise<SearchResultItem[]> {
     if (!query || !query.trim()) return [];
 
     const cleanQuery = query.trim();
 
     // 1. Try local SearXNG instance
     try {
-      const url = `${this.searxngUrl}/search?q=${encodeURIComponent(cleanQuery)}&format=json`;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = (await response.json()) as any;
-        if (Array.isArray(data.results) && data.results.length > 0) {
-          return data.results.slice(0, limit).map((r: any) => ({
-            title: decodeHtmlEntities(r.title || 'Untitled'),
-            url: r.url || '',
-            snippet: decodeHtmlEntities(r.content || r.snippet || ''),
-            engine: r.engine || 'searxng',
-          }));
-        }
-      }
+      const results = await this.searchSearxng(cleanQuery, limit, customSearxngUrl);
+      if (results.length > 0) return results;
     } catch {
-      // SearXNG not running locally, proceed to fallbacks
+      // SearXNG not running, proceed to fallbacks
     }
 
     // 2. DuckDuckGo HTML Search
@@ -96,9 +80,40 @@ export class SearxngService {
   }
 
   /**
+   * Search using SearXNG instance
+   */
+  public async searchSearxng(query: string, limit = 5, customUrl?: string | null): Promise<SearchResultItem[]> {
+    const baseUrl = (customUrl && customUrl.trim() ? customUrl.trim() : this.searxngUrl).replace(/\/+$/, '');
+    const url = `${baseUrl}/search?q=${encodeURIComponent(query.trim())}&format=json`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = (await response.json()) as any;
+        if (Array.isArray(data.results) && data.results.length > 0) {
+          return data.results.slice(0, limit).map((r: any) => ({
+            title: decodeHtmlEntities(r.title || 'Untitled'),
+            url: r.url || '',
+            snippet: decodeHtmlEntities(r.content || r.snippet || ''),
+            engine: r.engine || 'searxng',
+          }));
+        }
+      }
+    } catch (err) {
+      clearTimeout(timeoutId);
+      throw err;
+    }
+    return [];
+  }
+
+  /**
    * Scrape DuckDuckGo HTML search results
    */
-  private async searchDuckDuckGoHtml(query: string, limit: number): Promise<SearchResultItem[]> {
+  public async searchDuckDuckGoHtml(query: string, limit = 5): Promise<SearchResultItem[]> {
     const ddgUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -163,7 +178,7 @@ export class SearxngService {
   /**
    * DuckDuckGo Instant Answer API
    */
-  private async searchDuckDuckGoInstant(query: string, limit: number): Promise<SearchResultItem[]> {
+  public async searchDuckDuckGoInstant(query: string, limit: number): Promise<SearchResultItem[]> {
     const apiUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&no_redirect=1`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -202,7 +217,7 @@ export class SearxngService {
   /**
    * Wikipedia OpenSearch API
    */
-  private async searchWikipedia(query: string, limit: number): Promise<SearchResultItem[]> {
+  public async searchWikipedia(query: string, limit: number): Promise<SearchResultItem[]> {
     const lang = /[а-яА-ЯёЁ]/.test(query) ? 'ru' : 'en';
     const url = `https://${lang}.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(query)}&limit=${limit}&namespace=0&format=json`;
     const controller = new AbortController();

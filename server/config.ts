@@ -137,6 +137,11 @@ export function getDefaultConfig(): AppConfig {
       wake_word_enabled: false,
     },
     proactive_companion_enabled: true,
+    web_search_provider: 'auto',
+    firecrawl_api_key: null,
+    firecrawl_api_url: 'https://api.firecrawl.dev',
+    searxng_url: 'http://localhost:8080',
+    tool_toggles: null,
   };
 }
 

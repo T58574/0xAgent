@@ -1,0 +1,104 @@
+import test from 'node:test';
+import assert from 'node:assert';
+import { searchEngineRegistry, registerSearchEngineProvider, SearchEngineProvider } from '../server/searchEngineRegistry';
+import { executeWebSearch } from '../server/tools/webTools';
+import { getToolsState, saveToolsToggles, generateToolsMdContent } from '../server/toolsConfig';
+import { AppConfig } from '../src/types';
+
+test('Web Search Multi-Engine & Tools Architecture Test Suite', async (t) => {
+  const baseMockConfig: AppConfig = {
+    api_url: 'http://127.0.0.1:11434/v1',
+    model_name: 'gemini-3.6-flash',
+    system_prompt: '',
+    web_search_provider: 'auto',
+    firecrawl_api_key: null,
+    firecrawl_api_url: 'https://api.firecrawl.dev',
+    searxng_url: 'http://localhost:8080',
+  };
+
+  await t.test('1. Search Engine Registry Initialization & Available Providers', async () => {
+    const list = await searchEngineRegistry.getEngineInfoList(baseMockConfig);
+    const ids = list.map((e) => e.id);
+
+    assert.ok(ids.includes('auto'), 'Should include auto cascade');
+    assert.ok(ids.includes('firecrawl'), 'Should include firecrawl provider');
+    assert.ok(ids.includes('searxng'), 'Should include searxng provider');
+    assert.ok(ids.includes('duckduckgo'), 'Should include duckduckgo provider');
+    assert.ok(ids.includes('wikipedia'), 'Should include wikipedia provider');
+  });
+
+  await t.test('2. Dynamic Custom Search Engine Registration', async () => {
+    const mockCustomEngine: SearchEngineProvider = {
+      id: 'custom_arxiv',
+      name: 'arXiv Research Index',
+      description: 'Scientific research papers index',
+      requiresKey: false,
+      isConfigured: () => true,
+      isAvailable: async () => true,
+      search: async (query, limit) => [
+        {
+          title: `Paper on ${query}`,
+          url: 'https://arxiv.org/abs/1234.5678',
+          snippet: `Detailed abstract for ${query}`,
+          engine: 'custom_arxiv',
+        },
+      ],
+      test: async () => ({ ok: true, latencyMs: 15, message: 'arXiv OK' }),
+    };
+
+    registerSearchEngineProvider(mockCustomEngine);
+
+    const list = await searchEngineRegistry.getEngineInfoList(baseMockConfig);
+    const hasCustom = list.some((e) => e.id === 'custom_arxiv');
+    assert.strictEqual(hasCustom, true, 'Custom search engine should be listed dynamically');
+
+    const searchRes = await searchEngineRegistry.search('Quantum Computing', 3, {
+      ...baseMockConfig,
+      web_search_provider: 'custom_arxiv',
+    });
+
+    assert.strictEqual(searchRes.engineUsed, 'arXiv Research Index');
+    assert.strictEqual(searchRes.results.length, 1);
+    assert.strictEqual(searchRes.results[0].engine, 'custom_arxiv');
+  });
+
+  await t.test('3. Auto Cascade Fallback Mechanism', async () => {
+    // When no Firecrawl key is provided, search cascades gracefully to DuckDuckGo/Wikipedia
+    const outcome = await searchEngineRegistry.search('TypeScript tutorial', 2, {
+      ...baseMockConfig,
+      web_search_provider: 'auto',
+    });
+
+    assert.ok(outcome.results.length >= 0, 'Should return results or handled empty response');
+    assert.ok(outcome.cascadeTrail && outcome.cascadeTrail.length > 0, 'Cascade trail should be populated');
+  });
+
+  await t.test('4. Web Search Tool Execution', async () => {
+    const emptyRes = await executeWebSearch('');
+    assert.match(emptyRes, /empty/i, 'Empty query should be rejected with clear message');
+
+    const validRes = await executeWebSearch('TypeScript');
+    assert.ok(typeof validRes === 'string', 'Should return formatted text response');
+    assert.ok(validRes.length > 0);
+  });
+
+  await t.test('5. Tool Toggles & Dynamic TOOLS.md Generation', () => {
+    const state = getToolsState();
+    assert.ok(Array.isArray(state.tools) && state.tools.length > 10, 'Should return tool registry');
+
+    const toggles = {
+      read_file: true,
+      write_file: true,
+      patch_file: true,
+      run_scratch_script: false,
+    };
+
+    const savedState = saveToolsToggles(toggles);
+    const disabledTool = savedState.tools.find((t) => t.id === 'run_scratch_script');
+    assert.strictEqual(disabledTool?.enabled, false, 'run_scratch_script should be disabled');
+
+    const md = generateToolsMdContent(toggles);
+    assert.ok(!md.includes('<run_scratch_script>'), 'Disabled tool must not be present in generated TOOLS.md');
+    assert.ok(md.includes('<read_file'), 'Enabled tool must be present in generated TOOLS.md');
+  });
+});

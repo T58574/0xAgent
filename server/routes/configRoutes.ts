@@ -144,3 +144,45 @@ configRouter.get('/models', (_req, res) => {
   }
 });
 
+// Web Search Engines & Diagnostics
+configRouter.get('/search-engines', async (_req, res) => {
+  try {
+    const { searchEngineRegistry } = await import('../searchEngineRegistry');
+    const cfg = loadConfig();
+    const engines = await searchEngineRegistry.getEngineInfoList(cfg);
+    res.json({
+      engines,
+      activeProvider: cfg.web_search_provider || 'auto',
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+configRouter.post('/web-search/test', async (req, res) => {
+  try {
+    const { searchEngineRegistry } = await import('../searchEngineRegistry');
+    const { query, provider, firecrawl_api_key, firecrawl_api_url, searxng_url } = req.body || {};
+
+    if (!query || !query.trim()) {
+      res.status(400).json({ error: 'Search query is required' });
+      return;
+    }
+
+    const currentConfig = loadConfig();
+    const testConfig = {
+      ...currentConfig,
+      web_search_provider: provider || currentConfig.web_search_provider || 'auto',
+      firecrawl_api_key: firecrawl_api_key !== undefined ? firecrawl_api_key : currentConfig.firecrawl_api_key,
+      firecrawl_api_url: firecrawl_api_url !== undefined ? firecrawl_api_url : currentConfig.firecrawl_api_url,
+      searxng_url: searxng_url !== undefined ? searxng_url : currentConfig.searxng_url,
+    };
+
+    const outcome = await searchEngineRegistry.search(query.trim(), 5, testConfig);
+    res.json(outcome);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+

@@ -184,11 +184,48 @@ export interface Translations {
     backToChat: string;
     tabs: {
       general: string;
+      tools: string;
       customizations: string;
       personas: string;
       themes: string;
       localServer: string;
       security: string;
+    };
+    toolsTab: {
+      title: string;
+      subtitle: string;
+      searchEngineTitle: string;
+      searchEngineDesc: string;
+      activeEngine: string;
+      autoCascade: string;
+      autoCascadeDesc: string;
+      firecrawlKeyLabel: string;
+      firecrawlKeyPlaceholder: string;
+      firecrawlKeyHint: string;
+      firecrawlUrlLabel: string;
+      searxngUrlLabel: string;
+      testSearchTitle: string;
+      testSearchPlaceholder: string;
+      testSearchBtn: string;
+      testing: string;
+      testResults: string;
+      latency: string;
+      engineUsed: string;
+      cascadeTrail: string;
+      noResults: string;
+      toolsManagementTitle: string;
+      toolsManagementDesc: string;
+      enableAll: string;
+      recommendedPreset: string;
+      readOnlyPreset: string;
+      catFiles: string;
+      catWeb: string;
+      catMemory: string;
+      catTerminal: string;
+      catInteractive: string;
+      requiresApproval: string;
+      toolEnabled: string;
+      toolDisabled: string;
     };
     general: {
       title: string;

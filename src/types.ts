@@ -93,6 +93,18 @@ export type AppTheme =
 
 export type AppLanguage = 'en' | 'ru';
 
+export type WebSearchProvider = 'auto' | 'firecrawl' | 'searxng' | 'duckduckgo' | 'wikipedia' | string;
+
+export interface SearchEngineInfo {
+  id: WebSearchProvider;
+  name: string;
+  description: string;
+  requiresKey: boolean;
+  defaultUrl?: string;
+  isConfigured: boolean;
+  isAvailable: boolean;
+}
+
 export interface AppConfig {
   api_url: string;
   model_name: string;
@@ -121,6 +133,11 @@ export interface AppConfig {
   tts_config?: TtsConfig | null;
   proactive_companion_enabled?: boolean | null;
   permission_preset?: PermissionPreset | null;
+  web_search_provider?: WebSearchProvider | null;
+  firecrawl_api_key?: string | null;
+  firecrawl_api_url?: string | null;
+  searxng_url?: string | null;
+  tool_toggles?: Record<string, boolean> | null;
 }
 
 export type PermissionPreset = 'readonly' | 'workspace-write' | 'prompt' | 'unrestricted';

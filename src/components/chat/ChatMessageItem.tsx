@@ -100,7 +100,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
         >
           {isUser ? (
             /* User Bubble */
-            <div className="relative w-fit max-w-[88%] sm:max-w-[78%] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-accent)]/20 rounded-2xl rounded-tr-[4px] px-3.5 py-2 sm:px-4 sm:py-2.5 shadow-sm text-sm leading-relaxed select-text space-y-1.5 transition-all">
+            <div className="relative w-fit max-w-[88%] sm:max-w-[78%] bg-[var(--theme-accent)]/10 text-[var(--theme-text)] border border-[var(--theme-accent)]/20 rounded-2xl rounded-tr-md px-3.5 py-2 sm:px-4 sm:py-2.5 shadow-sm text-sm leading-relaxed select-text space-y-1.5 transition-all">
               {msg.images && msg.images.length > 0 && (
                 <div className="flex flex-wrap gap-2 justify-end mb-2">
                   {msg.images.map((imgSrc, imgIdx) => (
@@ -137,7 +137,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                           showToast(err.message || t.common.error, 'error');
                         }
                       }}
-                      className="px-1.5 py-0.5 rounded-md hover:bg-white/15 text-[var(--theme-text-muted)] hover:text-white transition-all inline-flex items-center gap-1 cursor-pointer"
+                      className="px-2 py-0.5 rounded-lg hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border border-transparent hover:border-[var(--theme-border)] transition-all inline-flex items-center gap-1 cursor-pointer"
                       title={t.chat.editMessage}
                     >
                       <RotateCcw size={10} />
@@ -149,7 +149,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
             </div>
           ) : (
             /* Assistant Bubble */
-            <div className="relative w-fit max-w-[96%] sm:max-w-[85%] bento-card text-[var(--theme-text)] border border-[var(--theme-border)] rounded-2xl rounded-tl-[4px] px-3.5 py-2.5 sm:px-4.5 sm:py-3 shadow-md text-[13.5px] leading-relaxed select-text space-y-2.5 transition-all">
+            <div className="relative w-fit max-w-[96%] sm:max-w-[85%] bento-card text-[var(--theme-text)] border border-[var(--theme-border)] rounded-2xl rounded-tl-md px-3.5 py-2.5 sm:px-4.5 sm:py-3 shadow-md text-[13.5px] leading-relaxed select-text space-y-2.5 transition-all">
               {reasoningEnabled && (hasThinking || isActivelyGenerating) && (
                 <div className="mb-2 w-full">
                   <ReasoningViewer
@@ -166,7 +166,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                 <div className="space-y-1">
                   <NotionMarkdown content={cleanContent(text)} />
                   <div className="flex justify-end items-center gap-1.5 pt-0.5">
-                    <span className="text-[10px] text-[var(--theme-text-muted)] opacity-60 font-sans select-none">
+                    <span className="text-[10px] text-[var(--theme-text-muted)] opacity-80 font-sans select-none">
                       {formatTime(msg.timestamp)}
                     </span>
                     {currentSession?.id && (
@@ -185,7 +185,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
                             showToast(err.message || t.common.error, 'error');
                           }
                         }}
-                        className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/5 px-1.5 py-0.5 rounded-md transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
+                        className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] px-2 py-0.5 rounded-lg border border-transparent hover:border-[var(--theme-border)] transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
                         title={t.chat.retryMessage}
                       >
                         <RotateCcw size={10} />

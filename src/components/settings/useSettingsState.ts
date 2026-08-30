@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
-import { AppConfig, AppTheme, ReasoningEffortLevel } from '../../types';
+import { AppConfig, AppTheme, ReasoningEffortLevel, WebSearchProvider } from '../../types';
 
 export function useSettingsState(
   config: AppConfig | null,
   onSaveConfig: (updated: AppConfig) => Promise<void>,
-  initialSubtab?: 'general' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security'
+  initialSubtab?: 'general' | 'tools' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security'
 ) {
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security'>(initialSubtab || 'general');
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'tools' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security'>(initialSubtab || 'general');
 
   // General state
   const [language, setLanguage] = useState<'en' | 'ru'>((config?.language as 'en' | 'ru') || 'en');
@@ -32,6 +32,12 @@ export function useSettingsState(
   const [ttsPlayInBrowser, setTtsPlayInBrowser] = useState(true);
   const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
   const [proactiveCompanionEnabled, setProactiveCompanionEnabled] = useState(true);
+
+  // Web Search & Tools state
+  const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>('auto');
+  const [firecrawlApiKey, setFirecrawlApiKey] = useState('');
+  const [firecrawlApiUrl, setFirecrawlApiUrl] = useState('https://api.firecrawl.dev');
+  const [searxngUrl, setSearxngUrl] = useState('http://localhost:8080');
 
   // Active theme state
   const [activeTheme, setActiveTheme] = useState<AppTheme>('obsidian');
@@ -120,6 +126,11 @@ export function useSettingsState(
       setProactiveCompanionEnabled(config.proactive_companion_enabled);
     }
 
+    if (config.web_search_provider) setWebSearchProvider(config.web_search_provider);
+    if (config.firecrawl_api_key !== undefined && config.firecrawl_api_key !== null) setFirecrawlApiKey(config.firecrawl_api_key);
+    if (config.firecrawl_api_url) setFirecrawlApiUrl(config.firecrawl_api_url);
+    if (config.searxng_url) setSearxngUrl(config.searxng_url);
+
     const theme = (config.active_theme as AppTheme) || 'obsidian';
     setActiveTheme(theme);
     document.documentElement.setAttribute('data-theme', theme);
@@ -203,6 +214,10 @@ export function useSettingsState(
           },
           proactive_companion_enabled: proactiveCompanionEnabled,
           active_theme: activeTheme,
+          web_search_provider: webSearchProvider,
+          firecrawl_api_key: firecrawlApiKey.trim() || null,
+          firecrawl_api_url: firecrawlApiUrl.trim() || 'https://api.firecrawl.dev',
+          searxng_url: searxngUrl.trim() || 'http://localhost:8080',
           local_server: {
             exe_path: exePath.trim() || null,
             model_path: modelPath.trim() || null,
@@ -272,6 +287,10 @@ export function useSettingsState(
     wakeWordEnabled,
     proactiveCompanionEnabled,
     activeTheme,
+    webSearchProvider,
+    firecrawlApiKey,
+    firecrawlApiUrl,
+    searxngUrl,
     exePath,
     modelPath,
     host,
@@ -363,6 +382,14 @@ export function useSettingsState(
     setProactiveCompanionEnabled,
     activeTheme,
     handleSelectTheme,
+    webSearchProvider,
+    setWebSearchProvider,
+    firecrawlApiKey,
+    setFirecrawlApiKey,
+    firecrawlApiUrl,
+    setFirecrawlApiUrl,
+    searxngUrl,
+    setSearxngUrl,
     exePath,
     setExePath,
     modelPath,
@@ -415,14 +442,14 @@ export function useSettingsState(
     setCustomArgs,
     specDraftModel,
     setSpecDraftModel,
-    specType,
-    setSpecType,
     specDraftNgl,
     setSpecDraftNgl,
     specDraftNMax,
     setSpecDraftNMax,
     specDraftPMin,
     setSpecDraftPMin,
+    specType,
+    setSpecType,
     jinja,
     setJinja,
     reasoningPreserve,

@@ -483,7 +483,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
 
       <form onSubmit={handleFormSubmit}>
         <div className={`bento-card rounded-3xl p-1.5 sm:p-2 px-3 sm:px-4 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-[var(--theme-accent)] transition-all duration-200 ease-out flex items-end gap-2 sm:gap-3 shadow-xl ${isExpanded ? 'ring-1 ring-[var(--theme-accent)]/30' : ''}`}>
-          <button type="button" onClick={() => fileInputRef.current?.click()} className="p-1.5 sm:p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title={t.chat.attachFile}>
+          <button type="button" onClick={() => fileInputRef.current?.click()} className="w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full flex items-center justify-center text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title={t.chat.attachFile} aria-label={t.chat.attachFile}>
             <Plus size={18} className="sm:w-[19px] sm:h-[19px]" />
           </button>
 
@@ -498,7 +498,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
           />
 
           {inputText.length > 30 && (
-            <button type="button" onClick={() => setIsExpanded(!isExpanded)} className="p-1.5 sm:p-2 rounded-full text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title={isExpanded ? '[-]' : '[+]'}>
+            <button type="button" onClick={() => setIsExpanded(!isExpanded)} className="w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full flex items-center justify-center text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0 self-center mb-0.5" title={isExpanded ? '[-]' : '[+]'} aria-label={isExpanded ? 'Collapse' : 'Expand'}>
               {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
           )}
@@ -515,6 +515,7 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
                 : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
             }`}
             title={daemonVoiceState === 'recording' ? t.chat.voiceListening : t.chat.voiceInput}
+            aria-label={daemonVoiceState === 'recording' ? t.chat.voiceListening : t.chat.voiceInput}
           >
             {daemonVoiceState === 'recording' ? (
               <>
@@ -538,11 +539,11 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
 
           <div className="flex items-center shrink-0 self-center">
             {isBusy && onCancelAgent ? (
-              <button type="button" onClick={onCancelAgent} className="w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/30 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95" title={t.chat.stopTooltip}>
+              <button type="button" onClick={onCancelAgent} className="w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-500/30 flex items-center justify-center transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95" title={t.chat.stopTooltip} aria-label={t.chat.stopTooltip}>
                 <Square size={13} fill="currentColor" />
               </button>
             ) : (
-              <button type="submit" disabled={!canSubmit} className={`w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full flex items-center justify-center transition-all shadow-sm ${canSubmit ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 shadow-md hover:scale-105 active:scale-95 cursor-pointer font-bold' : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-40'}`} title={t.chat.sendTooltip}>
+              <button type="submit" disabled={!canSubmit} className={`w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full flex items-center justify-center transition-all shadow-sm ${canSubmit ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:opacity-90 shadow-md hover:scale-105 active:scale-95 cursor-pointer font-bold' : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] cursor-not-allowed border border-[var(--theme-border)] opacity-40'}`} title={t.chat.sendTooltip} aria-label={t.chat.sendTooltip}>
                 <ArrowUp size={17} strokeWidth={2.5} />
               </button>
             )}
@@ -551,33 +552,33 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
       </form>
 
       {/* Responsive Horizontal Chips Bar */}
-      <div className="flex items-center justify-between gap-1.5 overflow-x-auto scrollbar-none px-2 pt-2 text-xs text-[var(--theme-text-muted)] font-mono touch-pan-x w-full">
-        <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center justify-between gap-1.5 sm:gap-2 overflow-x-auto scrollbar-none px-1 sm:px-2 pt-2 text-xs text-[var(--theme-text-muted)] font-mono touch-pan-x w-full">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {personas.length > 0 && (
-            <button type="button" onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'persona' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={t.chat.persona}>
+            <button type="button" onClick={() => setOpenMenu(openMenu === 'persona' ? 'none' : 'persona')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'persona' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={t.chat.persona} aria-label={t.chat.persona}>
               <User size={13} />
               <span className="truncate max-w-[90px] text-xs">{currentPersona.name}</span>
             </button>
           )}
 
-          <button type="button" onClick={() => { fetchModelsAndStatus(); setOpenMenu(openMenu === 'model' ? 'none' : 'model'); }} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'model' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={t.chat.model}>
+          <button type="button" onClick={() => { fetchModelsAndStatus(); setOpenMenu(openMenu === 'model' ? 'none' : 'model'); }} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'model' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={t.chat.model} aria-label={t.chat.model}>
             {isLocalActive ? <Cpu size={13} /> : <Cloud size={13} />}
             <span className="truncate max-w-[120px] text-xs font-semibold">{getDisplayTitle(activeModelId)}</span>
           </button>
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <button type="button" onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'reasoning' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`}>
+          <button type="button" onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'reasoning' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`} aria-label={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`}>
             <Sparkles size={13} className="opacity-70" />
             <span className="text-[11px] uppercase font-bold">{reasoningEffort}</span>
           </button>
 
-          <button type="button" onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'permission' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={`${t.chat.permission}: ${permissionPreset}`}>
+          <button type="button" onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'permission' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.permission}: ${permissionPreset}`} aria-label={`${t.chat.permission}: ${permissionPreset}`}>
             <Shield size={13} />
             <span className="text-[11px] hidden sm:inline font-semibold capitalize">{permissionPreset === 'workspace-write' ? 'project' : permissionPreset}</span>
           </button>
 
-          <button type="button" onClick={() => setOpenMenu(openMenu === 'slash' ? 'none' : 'slash')} className={`inline-flex items-center gap-1 px-2 py-1 rounded-xl transition-all cursor-pointer border shrink-0 ${openMenu === 'slash' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent font-semibold'}`} title={t.chat.slashCommands}>
+          <button type="button" onClick={() => setOpenMenu(openMenu === 'slash' ? 'none' : 'slash')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'slash' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={t.chat.slashCommands} aria-label={t.chat.slashCommands}>
             <Terminal size={13} />
             <span className="text-xs font-bold">/</span>
           </button>

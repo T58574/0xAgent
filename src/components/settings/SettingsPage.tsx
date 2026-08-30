@@ -1,8 +1,9 @@
 import React from 'react';
-import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User, Sparkles, Shield } from 'lucide-react';
+import { Sliders, Palette, Cpu, Check, RefreshCw, ChevronLeft, User, Sparkles, Shield, Wrench } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { useI18n } from '../../i18n';
 import { GeneralTab } from './GeneralTab';
+import { ToolsTab } from './ToolsTab';
 import { PersonasTab } from './PersonasTab';
 import { ThemesTab } from './ThemesTab';
 import { LocalServerTab } from './LocalServerTab';
@@ -14,7 +15,7 @@ interface SettingsPageProps {
   config: AppConfig | null;
   onSaveConfig: (updated: AppConfig) => Promise<void>;
   onCancel: () => void;
-  initialSubtab?: 'general' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security';
+  initialSubtab?: 'general' | 'tools' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security';
   currentSessionId?: string | null;
 }
 
@@ -71,6 +72,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
         <div className="w-full md:w-60 bg-[var(--theme-panel)] border-r border-[var(--theme-border)] p-3 shrink-0 flex flex-row md:flex-col gap-1.5 select-none overflow-x-auto scrollbar-none">
           {[
             { id: 'general', label: t.settings.tabs.general, icon: Sliders },
+            { id: 'tools', label: t.settings.tabs.tools, icon: Wrench },
             { id: 'customizations', label: t.settings.tabs.customizations, icon: Sparkles },
             { id: 'personas', label: t.settings.tabs.personas, icon: User },
             { id: 'themes', label: t.settings.tabs.themes, icon: Palette },
@@ -145,6 +147,19 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
               setWakeWordEnabled={s.setWakeWordEnabled}
               proactiveCompanionEnabled={s.proactiveCompanionEnabled}
               setProactiveCompanionEnabled={s.setProactiveCompanionEnabled}
+            />
+          )}
+
+          {s.activeSubtab === 'tools' && (
+            <ToolsTab
+              webSearchProvider={s.webSearchProvider}
+              setWebSearchProvider={s.setWebSearchProvider}
+              firecrawlApiKey={s.firecrawlApiKey}
+              setFirecrawlApiKey={s.setFirecrawlApiKey}
+              firecrawlApiUrl={s.firecrawlApiUrl}
+              setFirecrawlApiUrl={s.setFirecrawlApiUrl}
+              searxngUrl={s.searxngUrl}
+              setSearxngUrl={s.setSearxngUrl}
             />
           )}
 

@@ -29,7 +29,7 @@ export const PlanProgressStrip: React.FC<PlanProgressStripProps> = ({ todos = []
         >
           {/* Left Title & Status */}
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="px-2 py-0.5 rounded-md bg-white/10 text-[10px] font-mono font-semibold text-[var(--theme-text)] shrink-0 border border-white/10">
+            <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] text-[10px] font-mono font-semibold text-[var(--theme-text)] shrink-0 border border-[var(--theme-border)]">
               :: {t.chat.planProgress.toUpperCase()} [{completed}/{total}]
             </span>
 
@@ -48,7 +48,7 @@ export const PlanProgressStrip: React.FC<PlanProgressStripProps> = ({ todos = []
           {/* Right Progress bar & expand button */}
           <div className="flex items-center gap-2.5 shrink-0">
             <div className="flex items-center gap-1.5 w-20 sm:w-28">
-              <div className="flex-1 bg-white/10 h-1.5 rounded-full overflow-hidden">
+              <div className="flex-1 bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] h-1.5 rounded-full overflow-hidden">
                 <div
                   className="bg-emerald-400 h-full transition-all duration-300 rounded-full"
                   style={{ width: `${percent}%` }}
@@ -59,7 +59,8 @@ export const PlanProgressStrip: React.FC<PlanProgressStripProps> = ({ todos = []
 
             <button
               type="button"
-              className="p-1 rounded-lg hover:bg-white/10 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors"
+              className="p-1 rounded-lg hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+              aria-label={isExpanded ? t.tools.hideDetails : t.tools.viewDetails}
             >
               {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
@@ -81,7 +82,7 @@ export const PlanProgressStrip: React.FC<PlanProgressStripProps> = ({ todos = []
                       ? 'bg-emerald-500/10 text-[var(--theme-text)] border border-emerald-500/20 font-medium'
                       : isDone
                       ? 'text-[var(--theme-text-muted)] line-through opacity-70'
-                      : 'text-[var(--theme-text)] hover:bg-white/5'
+                      : 'text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                   }`}
                 >
                   <div className="mt-0.5 shrink-0">
@@ -90,13 +91,13 @@ export const PlanProgressStrip: React.FC<PlanProgressStripProps> = ({ todos = []
                     ) : isCurrent ? (
                       <Circle size={13} className="text-emerald-400 animate-spin" />
                     ) : (
-                      <Clock size={13} className="text-[var(--theme-text-muted)] opacity-60" />
+                      <Clock size={13} className="text-[var(--theme-text-muted)] opacity-80" />
                     )}
                   </div>
 
                   <span className="flex-1 leading-tight break-words">{todo.content}</span>
 
-                  <span className="text-[10px] font-mono shrink-0 uppercase opacity-60">
+                  <span className="text-[10px] font-mono shrink-0 uppercase opacity-75">
                     {isDone ? '[OK]' : isCurrent ? '[>]' : '[..]'}
                   </span>
                 </div>

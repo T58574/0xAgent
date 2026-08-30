@@ -121,11 +121,11 @@ export const ToolCard: React.FC<ToolCardProps> = React.memo(({ tool, onRespond, 
       case 'running':
         return { label: t.tools.statusRunning, color: 'text-theme-accent border-[var(--theme-accent)]/30 bg-[var(--theme-accent)]/10 animate-pulse', iconName: 'progress_activity' };
       case 'rejected':
-        return { label: t.tools.statusRejected, color: 'text-theme-muted border-theme-border bg-white/5', iconName: 'cancel' };
+        return { label: t.tools.statusRejected, color: 'text-theme-muted border-theme-border bg-[var(--theme-border-subtle)]', iconName: 'cancel' };
       case 'pending':
         return { label: t.tools.pendingApproval, color: 'text-amber-400 border-amber-500/30 bg-amber-500/10', iconName: 'warning' };
       default:
-        return { label: tool.status.toUpperCase(), color: 'text-theme-muted border-theme-border bg-white/5', iconName: 'info' };
+        return { label: tool.status.toUpperCase(), color: 'text-theme-muted border-theme-border bg-[var(--theme-border-subtle)]', iconName: 'info' };
     }
   }, [tool.status, t.tools]);
 
@@ -358,9 +358,10 @@ export const ToolCard: React.FC<ToolCardProps> = React.memo(({ tool, onRespond, 
                     {parsedArgs.options.map((opt: string) => (
                       <button
                         key={opt}
+                        type="button"
                         disabled={isSubmitting}
                         onClick={() => handleAction(opt)}
-                        className="flat-btn px-3 py-1 rounded-md text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40"
+                        className="flat-btn px-3 py-1.5 rounded-xl text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 cursor-pointer disabled:opacity-40"
                       >
                         {opt}
                       </button>
@@ -383,12 +384,12 @@ export const ToolCard: React.FC<ToolCardProps> = React.memo(({ tool, onRespond, 
                     disabled={isSubmitting}
                     onChange={(e) => setCustomAnswer(e.target.value)}
                     placeholder={t.chat.customAnswerPlaceholder}
-                    className="flex-1 px-3 py-1.5 rounded-md flat-input text-xs text-theme-text focus:outline-none"
+                    className="flex-1 px-3 py-1.5 rounded-xl flat-input text-xs text-theme-text focus:outline-none"
                   />
                   <button
                     type="submit"
                     disabled={!customAnswer.trim() || isSubmitting}
-                    className="flat-btn px-3.5 py-1.5 rounded-md text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
+                    className="flat-btn px-3.5 py-1.5 rounded-xl text-xs font-medium text-emerald-400 border-emerald-500/40 hover:bg-emerald-500/10 disabled:opacity-40 flex items-center gap-1.5 cursor-pointer"
                   >
                     {isSubmitting && <MaterialIcon name="progress_activity" size={13} className="animate-spin text-emerald-400" />}
                     <span>{isSubmitting ? `${t.common.loading}...` : t.chat.submitAnswer}</span>
@@ -400,16 +401,16 @@ export const ToolCard: React.FC<ToolCardProps> = React.memo(({ tool, onRespond, 
         )}
 
         {tool.name === 'update_user_profile' && (
-          <div className="rounded-md p-2.5 bg-black/40 border border-theme-border flex items-start gap-2.5 text-xs">
+          <div className="rounded-xl p-2.5 bg-black/40 border border-theme-border flex items-start gap-2.5 text-xs">
             <MaterialIcon name="person" size={16} className="text-theme-accent shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1 space-y-1 font-sans">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-theme-text text-[11.5px]">USER.md:</span>
-                <span className="px-1.5 py-0.2 rounded bg-white/5 border border-theme-border text-[10px] font-mono text-theme-muted uppercase">
+                <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] border border-theme-border text-[10px] font-mono text-theme-muted uppercase">
                   {parsedArgs.category || 'profile'}
                 </span>
               </div>
-              <div className="text-[12px] text-theme-text font-mono bg-black/30 p-1.5 rounded border border-white/5">
+              <div className="text-[12px] text-theme-text font-mono bg-black/30 p-1.5 rounded-lg border border-[var(--theme-border-subtle)]">
                 {parsedArgs.trait || parsedArgs.content || '(empty)'}
               </div>
             </div>
@@ -417,17 +418,17 @@ export const ToolCard: React.FC<ToolCardProps> = React.memo(({ tool, onRespond, 
         )}
 
         {tool.name === 'update_persona_file' && (
-          <div className="rounded-md p-2.5 bg-black/40 border border-theme-border flex items-start gap-2.5 text-xs">
+          <div className="rounded-xl p-2.5 bg-black/40 border border-theme-border flex items-start gap-2.5 text-xs">
             <MaterialIcon name="psychology" size={16} className="text-theme-accent shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1 space-y-1 font-sans">
               <div className="flex items-center gap-2">
                 <span className="font-semibold text-theme-text text-[11.5px]">SOUL.md:</span>
-                <span className="px-1.5 py-0.2 rounded bg-white/5 border border-theme-border text-[10px] font-mono text-theme-muted">
+                <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] border border-theme-border text-[10px] font-mono text-theme-muted">
                   {parsedArgs.file || 'SOUL.md'}
                 </span>
               </div>
               {parsedArgs.content && (
-                <div className="text-[10.5px] font-mono whitespace-pre-wrap max-h-32 overflow-y-auto bg-black/30 p-2 rounded border border-white/5 text-theme-muted">
+                <div className="text-[10.5px] font-mono whitespace-pre-wrap max-h-32 overflow-y-auto bg-black/30 p-2 rounded-lg border border-[var(--theme-border-subtle)] text-theme-muted">
                   {parsedArgs.content}
                 </div>
               )}
@@ -452,7 +453,7 @@ export const ToolCard: React.FC<ToolCardProps> = React.memo(({ tool, onRespond, 
             type="button"
             disabled={isSubmitting}
             onClick={() => handleAction(false)}
-            className="px-3.5 py-1.5 rounded-md text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 border border-rose-500/30"
+            className="px-3.5 py-1.5 rounded-xl text-rose-400 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40 border border-rose-500/30"
           >
             <MaterialIcon name="close" size={14} />
             <span>{t.tools.reject}</span>
@@ -461,7 +462,7 @@ export const ToolCard: React.FC<ToolCardProps> = React.memo(({ tool, onRespond, 
             type="button"
             disabled={isSubmitting}
             onClick={() => handleAction(true)}
-            className="px-4 py-1.5 rounded-md btn-primary text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-40"
+            className="px-4 py-1.5 rounded-xl btn-primary text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer disabled:opacity-40"
           >
             {isSubmitting ? (
               <MaterialIcon name="progress_activity" size={14} className="animate-spin" />
