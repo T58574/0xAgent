@@ -10,6 +10,7 @@ import { loopBreaker } from './agent/loopBreaker';
 import { handleOutputSpill } from './agent/outputSpiller';
 import { evaluateToolPermission, READONLY_TOOLS } from './agent/permissionGuard';
 import { runCompactionPipeline } from './agent/compactionPipeline';
+import { memoryWorker } from './agent/memoryWorker';
 import { fetchLlmResponse, readLlmStream, PRIMARY_TEXT_MODEL, DEFAULT_FALLBACK_CHAIN, GEMMA_MODEL, FAST_LITE_MODEL, NATIVE_AUDIO_MODEL } from './agent/llmClient';
 import {
   PendingConfirmation,
@@ -69,7 +70,9 @@ export async function runAgentLoop(
         break;
       }
 
-      const fullSystemPrompt = buildFullSystemPrompt(sessionConfig);
+      const lastUserMsg = session.messages.filter((m) => m.role === 'user').slice(-1)[0];
+      const latestUserQuery = typeof lastUserMsg?.content === 'string' ? lastUserMsg.content : '';
+      const fullSystemPrompt = buildFullSystemPrompt(sessionConfig, latestUserQuery);
       const compactionRes = await runCompactionPipeline(session, sessionConfig, fullSystemPrompt, broadcast);
       const messages = compactionRes.messages;
 
@@ -222,6 +225,15 @@ export async function runAgentLoop(
             continue;
           }
         }
+
+        // Async debounced background memory ingestion
+        memoryWorker.pushEvent({
+          sessionId,
+          userMessage: latestUserQuery,
+          assistantMessage: assistantMessage.content,
+          personaId: sessionConfig.active_persona_id || 'default',
+          timestamp: Date.now(),
+        });
 
         broadcast('agent-status-changed', { sessionId, status: 'idle' });
         break;

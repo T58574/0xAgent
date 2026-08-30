@@ -3,7 +3,7 @@ import { getSystemPromptMemoryContext } from '../memory';
 import { getActivePersona, getUnifiedToolsContext } from '../personas';
 import { getWorkspace0xAgentMdContext } from '../tools';
 
-export function buildFullSystemPrompt(config: AppConfig): string {
+export function buildFullSystemPrompt(config: AppConfig, userQuery?: string): string {
   const modelNameLower = (config.model_name || '').toLowerCase();
   const modelPathLower = (config.local_server?.model_path || '').toLowerCase();
   const isGemmaModel = modelNameLower.includes('gemma') || modelPathLower.includes('gemma');
@@ -13,7 +13,8 @@ export function buildFullSystemPrompt(config: AppConfig): string {
   const isReasoningExplicitlyOff = config.reasoning_enabled === false || config.reasoning_effort === 'off';
   const thinkTrigger = isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
 
-  const memoryContext = getSystemPromptMemoryContext();
+  const activePersona = getActivePersona();
+  const memoryContext = getSystemPromptMemoryContext(activePersona.metadata.id, userQuery);
   const envContext = `\n\n# SYSTEM ENVIRONMENT
 - OS: Windows (${process.platform})
 - Shell: PowerShell
@@ -27,7 +28,6 @@ export function buildFullSystemPrompt(config: AppConfig): string {
 Before modifying files, inspect the codebase first (<read_file>, <list_dir>, <grep_search>), formulate a concise plan, and verify changes after editing.`
     : '';
 
-  const activePersona = getActivePersona();
   const personaContext = `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
 
 ## SOUL.md

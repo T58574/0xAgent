@@ -188,7 +188,9 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       if (!cfg.local_server) cfg.local_server = {};
       cfg.local_server.exe_path = targetExe;
       cfg.local_server.model_path = targetModel;
+      cfg.model_name = `local:${path.basename(targetModel)}`;
       saveConfig(cfg);
+      broadcast('config-changed', cfg);
 
       const { args } = buildLlamaServerArgs({ targetModel, host, port, body, localServerConfig: cfg.local_server, workspaceDir: cfg.workspace_dir, onLog: appendServerLog });
       const launchTimestamp = Date.now();

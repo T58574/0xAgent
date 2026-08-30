@@ -59,11 +59,14 @@ export function cleanContent(content: string): string {
   // Block-format grep_search: <grep_search>...</grep_search>
   cleaned = cleaned.replace(/<grep_search\s*>[\s\S]*?<\/grep_search>/gi, "");
   
+  // 2b. Strip any raw tool response blocks
+  cleaned = cleaned.replace(/<tool_response\b[\s\S]*?(?:<\/tool_response>|$)/gi, "");
+
   // 3. Strip any orphaned SEARCH / REPLACE diff blocks leaked outside XML tags
   cleaned = cleaned.replace(/<<<<<<< SEARCH[\s\S]*?>>>>>>> REPLACE/gi, "");
 
   // 4. Remove orphaned standalone closing tags
-  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|ask_?user_?questions?|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|tool_?call|tool-call|function_?call|function|code_run|todo_write|update_?user_?profile|update_?persona_?file|bash|powershell|shell)\s*>/gi, "");
+  cleaned = cleaned.replace(/<\/(?:read_file|write_file|patch_file|list_dir|grep_search|fff_search|web_search|read_web_page|execute_command|save_knowledge|search_knowledge|list_knowledge|run_scratch_script|ask_user|ask_user_question|ask_?user_?questions?|spawn_subagent|send_subagent_message|interrupt_subagent|list_subagents|tool_?call|tool-call|function_?call|function|code_run|todo_write|update_?user_?profile|update_?persona_?file|tool_response|bash|powershell|shell)\s*>/gi, "");
 
   // 5. Remove empty code fences and excess vertical spacing
   cleaned = cleaned.replace(/```[a-z]*\s*```/gi, "");

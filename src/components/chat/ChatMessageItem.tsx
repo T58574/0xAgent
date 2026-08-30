@@ -50,6 +50,11 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
     const { t } = useI18n();
     const isUser = msg.role === 'user';
     const isSystem = msg.role === 'system';
+    const isTool = msg.role === 'tool';
+
+    if (isTool) {
+      return null;
+    }
 
     if (isSystem) {
       return (

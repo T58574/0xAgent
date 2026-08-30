@@ -34,8 +34,8 @@ export const ChatTimelineScrubber: React.FC<ChatTimelineScrubberProps> = ({
   const railRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
 
-  // Filter messages that have timestamps
-  const validMessages = messages.filter((m) => !!m.timestamp);
+  // Filter messages that have timestamps and are not internal tool protocol messages
+  const validMessages = messages.filter((m) => m.role !== 'tool' && !!m.timestamp);
 
   // Check if chat container actually has scrollable overflow
   useEffect(() => {

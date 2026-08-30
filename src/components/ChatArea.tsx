@@ -282,7 +282,11 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
     }
   };
 
-  const hasMessages = messages.length > 0;
+  const visibleMessages = React.useMemo(() => {
+    return messages.filter((m) => m.role !== 'tool');
+  }, [messages]);
+
+  const hasMessages = visibleMessages.length > 0;
 
   return (
     <div
@@ -348,7 +352,7 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
 
           {/* Interactive Timeline Navigation Scrubber */}
           <ChatTimelineScrubber
-            messages={messages}
+            messages={visibleMessages}
             containerRef={chatContainerRef}
             isScrolledUp={isUserScrolledUpRef.current}
             isGenerating={agentStatus === 'thinking' || agentStatus === 'executing_tool'}
@@ -371,10 +375,10 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
             onScroll={handleChatScroll}
             className="flex-1 overflow-y-auto p-2.5 sm:p-4 md:p-6 space-y-4 sm:space-y-6 select-text scrollbar-thin"
           >
-            {messages.map((msg, index) => {
-              const prevMsg = index > 0 ? messages[index - 1] : null;
+            {visibleMessages.map((msg, index) => {
+              const prevMsg = index > 0 ? visibleMessages[index - 1] : null;
               const isFirstOfDay = Boolean(!prevMsg || (msg.timestamp && prevMsg.timestamp && !isSameDay(prevMsg.timestamp, msg.timestamp)));
-              const isLastAssistantMessage = msg.role !== 'user' && index === messages.length - 1;
+              const isLastAssistantMessage = msg.role === 'assistant' && index === visibleMessages.length - 1;
 
               return (
                 <ChatMessageItem
@@ -401,7 +405,7 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
               agentStatus={agentStatus}
               showThinkingBanner={
                 agentStatus === 'thinking' &&
-                !messages.some(
+                !visibleMessages.some(
                   (m) =>
                     m.role === 'assistant' &&
                     (m.content.trim().length > 0 || (m.tool_calls && m.tool_calls.length > 0))

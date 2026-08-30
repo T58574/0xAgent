@@ -115,9 +115,14 @@ export async function dispatchToolExecution(
       return await executeShellCommand(config.workspace_dir, tc.arguments.command);
 
     case 'remember_fact': {
-      const saved = addOrUpdateMemory(tc.arguments.key, tc.arguments.value, tc.arguments.category);
-      appendSilentUserTrait(activePersona.metadata.id, `[${saved.category}] ${saved.key} = ${saved.value}`);
-      return `Successfully stored fact in long-term memory & persona profile USER.md: [${saved.category}] ${saved.key} = ${saved.value}`;
+      const saved = addOrUpdateMemory(tc.arguments.key, tc.arguments.value, tc.arguments.category, {
+        isExplicit: true,
+        confidence: 1.0,
+        domain: tc.arguments.domain || 'general',
+        actorScope: activePersona.metadata.id,
+      });
+      if (!saved) return `Fact was rejected by memory policy.`;
+      return `Successfully stored canonical fact in SQLite memory: [${saved.category}] ${saved.key} = ${saved.value}`;
     }
 
     case 'save_knowledge':

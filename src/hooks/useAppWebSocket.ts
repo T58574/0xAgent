@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as api from '../services/api';
 import { sounds } from '../services/soundEffects';
-import { ChatSession, ChatMessage, LiveTelemetry, ToolCallInfo, PersonaMetadata, TodoItem } from '../types';
+import { ChatSession, ChatMessage, LiveTelemetry, ToolCallInfo, PersonaMetadata, TodoItem, AppConfig } from '../types';
 
 interface UseAppWebSocketParams {
   currentSessionIdRef: React.MutableRefObject<string | null>;
@@ -320,6 +320,12 @@ export function useAppWebSocket({
       }
     );
 
+    const unConfig = api.listen<AppConfig>('config-changed', (event) => {
+      if (event.payload) {
+        setConfig(event.payload);
+      }
+    });
+
     return () => {
       if (streamThrottleTimerRef.current) {
         clearTimeout(streamThrottleTimerRef.current);
@@ -334,6 +340,7 @@ export function useAppWebSocket({
       un5();
       unPersona();
       unTodos();
+      unConfig();
       window.removeEventListener('0xagent-ws-reconnected', onWsReconnected);
     };
   }, [workspaceDir]);

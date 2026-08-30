@@ -329,11 +329,88 @@ export interface ServerStatusInfo {
   port: number;
 }
 
+export interface MemorySource {
+  id: string;
+  session_id: string;
+  message_id?: string;
+  source_type: 'explicit_command' | 'conversation_extraction' | 'manual_edit';
+  raw_quote?: string;
+  created_at: number;
+}
+
+export type MemoryCategory = 'profile' | 'preference' | 'interest' | 'fact' | 'user_preference' | 'project_convention' | 'architecture' | 'general';
+export type MemoryStatus = 'active' | 'candidate' | 'superseded' | 'invalidated' | 'conflict';
+
+export interface CanonicalMemory {
+  id: string;
+  subject_id: string;
+  category: MemoryCategory;
+  domain: string;
+  key: string;
+  value: string;
+  confidence: number;
+  is_explicit: number;
+  importance: number;
+  status: MemoryStatus;
+  source_id?: string;
+  created_at: number;
+  updated_at: number;
+  last_confirmed_at: number;
+}
+
+export interface Episode {
+  id: string;
+  subject_id: string;
+  session_id: string;
+  title: string;
+  summary: string;
+  importance: number;
+  lifecycle: 'active' | 'consolidated' | 'archived';
+  event_timestamp: number;
+  source_id?: string;
+  created_at: number;
+  last_accessed_at: number;
+}
+
+export interface PersonaRelationship {
+  subject_id: string;
+  persona_id: string;
+  familiarity: number;
+  formality: number;
+  warmth: number;
+  humor_level: number;
+  preferred_address?: string;
+  relationship_summary?: string;
+  shared_references?: string[];
+  interaction_count: number;
+  updated_at: number;
+}
+
+export interface MemoryAuditEntry {
+  id?: number;
+  memory_id: string;
+  operation: 'NEW' | 'UPDATE' | 'DELETE' | 'INVALIDATE' | 'CONFLICT' | 'RESOLVE';
+  old_status?: string;
+  new_status?: string;
+  old_value?: string;
+  new_value?: string;
+  reason?: string;
+  applied_by: 'user_explicit' | 'extractor_worker' | 'consolidation_job' | 'admin';
+  actor_scope?: string;
+  timestamp: number;
+}
+
 export interface MemoryItem {
   id: string;
   key: string;
   value: string;
-  category: 'user_preference' | 'project_convention' | 'architecture' | 'fact' | 'general';
+  category: MemoryCategory;
+  subject_id?: string;
+  domain?: string;
+  confidence?: number;
+  is_explicit?: number;
+  importance?: number;
+  status?: MemoryStatus;
   createdAt: number;
   updatedAt: number;
 }
