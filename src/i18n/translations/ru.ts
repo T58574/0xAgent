@@ -7,7 +7,7 @@ export const ru: Translations = {
     jarvis: 'Джарвис',
     settings: 'Настройки',
     analytics: 'Аналитика',
-    knowledge: 'База знаний',
+    knowledge: 'Знания',
     newChat: 'Новый диалог',
     switchLanguage: 'Язык',
     lanShare: 'LAN Доступ',

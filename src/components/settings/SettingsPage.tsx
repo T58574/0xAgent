@@ -18,6 +18,7 @@ interface SettingsPageProps {
   onCancel: () => void;
   initialSubtab?: 'general' | 'tools' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security';
   currentSessionId?: string | null;
+  onOpenMemorySkills?: () => void;
 }
 
 export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
@@ -26,6 +27,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
   onCancel,
   initialSubtab,
   currentSessionId,
+  onOpenMemorySkills,
 }) => {
   const s = useSettingsState(config, onSaveConfig, initialSubtab);
   const { t } = useI18n();
@@ -123,6 +125,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
               onLanguageSelect={(lang) => {
                 s.setLanguage(lang);
               }}
+              onOpenMemorySkills={onOpenMemorySkills}
               apiUrl={s.apiUrl}
               setApiUrl={s.setApiUrl}
               groqApiKey={s.groqApiKey}

@@ -10,6 +10,12 @@ import {
   LogOut,
   Sparkles,
   CheckCircle2,
+  Wifi,
+  Copy,
+  Check,
+  Brain,
+  ExternalLink,
+  RefreshCw,
 } from 'lucide-react';
 import * as api from '../../services/api';
 import { useI18n } from '../../i18n';
@@ -22,6 +28,7 @@ import { SettingsHeader, SettingsSection, SettingToggleCard } from './common';
 
 interface GeneralTabProps {
   onLanguageSelect?: (lang: 'en' | 'ru') => void;
+  onOpenMemorySkills?: () => void;
   apiUrl: string;
   setApiUrl: (val: string) => void;
   groqApiKey: string;
@@ -54,6 +61,7 @@ interface GeneralTabProps {
 
 export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   onLanguageSelect,
+  onOpenMemorySkills,
   apiUrl,
   setApiUrl,
   groqApiKey,
@@ -85,6 +93,33 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
 }) => {
   const { language, setLanguage, t } = useI18n();
   const [testingVoice, setTestingVoice] = React.useState(false);
+
+  // LAN Sharing state
+  const [lanUrls, setLanUrls] = React.useState<string[]>([]);
+  const [lanLoading, setLanLoading] = React.useState(false);
+  const [copiedUrl, setCopiedUrl] = React.useState<string | null>(null);
+
+  const fetchLanInfo = React.useCallback(async () => {
+    setLanLoading(true);
+    try {
+      const info = await api.get_lan_info();
+      setLanUrls(info.urls || []);
+    } catch (err) {
+      console.error('Failed to load LAN info:', err);
+    } finally {
+      setLanLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    fetchLanInfo();
+  }, [fetchLanInfo]);
+
+  const handleCopyUrl = (url: string) => {
+    navigator.clipboard.writeText(url);
+    setCopiedUrl(url);
+    setTimeout(() => setCopiedUrl(null), 2000);
+  };
 
   const handleLogout = async () => {
     await api.logout();
@@ -169,7 +204,105 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
         </Card>
       </SettingsSection>
 
-      {/* 3. Connection & API Keys */}
+      {/* 3. LAN & Local Network Sharing */}
+      <SettingsSection
+        title={t.nav.lanTitle}
+        badge="LAN & Wi-Fi"
+        description={t.nav.lanDesc}
+      >
+        <Card variant="default" className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wifi size={16} className="text-[var(--theme-accent)]" />
+              <span className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.nav.lanShare}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={fetchLanInfo}
+              className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
+              title="Refresh network interfaces"
+            >
+              <RefreshCw size={13} className={lanLoading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+
+          {lanLoading ? (
+            <div className="flex items-center justify-center gap-2 py-3 text-xs text-[var(--theme-text-muted)]">
+              <RefreshCw size={13} className="animate-spin" />
+              <span>{t.common.loading}...</span>
+            </div>
+          ) : lanUrls.length === 0 ? (
+            <div className="text-xs text-[var(--theme-text-muted)] py-2 text-center">
+              {t.nav.lanEmpty}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {lanUrls.map((url, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)] transition-colors"
+                >
+                  <span className="font-mono text-xs text-[var(--theme-text)] truncate select-all font-semibold mr-2">
+                    {url}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyUrl(url)}
+                    className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer shrink-0"
+                    title={t.nav.lanCopy}
+                  >
+                    {copiedUrl === url ? (
+                      <Check size={13} className="text-emerald-500" />
+                    ) : (
+                      <Copy size={13} />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </SettingsSection>
+
+      {/* 4. Memory Engine & Skills Hub */}
+      {onOpenMemorySkills && (
+        <SettingsSection
+          title={t.nav.memorySkills}
+          badge="Memory Engine v1.0"
+          description="Долговременная память фактов пользователя, кастомные навыки AGY Skills и правила поведения."
+        >
+          <Card variant="default">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-[var(--theme-accent)]/10 text-[var(--theme-accent)] border border-[var(--theme-accent)]/20">
+                  <Brain size={20} />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-[var(--theme-text)]">
+                    {t.nav.memorySkills} & AGY Skills
+                  </h4>
+                  <p className="text-[11px] text-[var(--theme-text-muted)]">
+                    Просмотр и редактирование воспоминаний, правил SOUL/USER и дерева навыков.
+                  </p>
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={onOpenMemorySkills}
+                icon={<ExternalLink size={13} />}
+                className="shrink-0"
+              >
+                Открыть хаб навыков
+              </Button>
+            </div>
+          </Card>
+        </SettingsSection>
+      )}
+
+      {/* 5. Connection & API Keys */}
       <SettingsSection
         title={t.settings.general.connectionTitle}
         badge="Cloud & Local Endpoints"

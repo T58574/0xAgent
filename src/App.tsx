@@ -380,12 +380,9 @@ export default function App() {
         workspaceDir={activeSessionWorkspace}
         onSelectWorkspace={handleSelectWorkspace}
         onUpdateSessionWorkspace={handleUpdateCurrentSessionWorkspace}
-        onToggleLogs={() => setShowLogsDrawer(!showLogsDrawer)}
         isServerOffline={isServerOffline}
         onStartServer={handleStartServer}
-        onConfigChanged={(updated) => setConfig(updated)}
         onNewChat={() => handleCreateSession('Новый диалог', 'auto')}
-        onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
         liveTelemetry={liveTelemetry}
       />
 
@@ -434,6 +431,7 @@ export default function App() {
                   onCancel={() => setActiveView('chat')}
                   initialSubtab={settingsSubtab}
                   currentSessionId={currentSessionId}
+                  onOpenMemorySkills={() => setIsMemorySkillsOpen(true)}
                 />
               </div>
             )}

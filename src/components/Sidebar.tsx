@@ -15,11 +15,9 @@ import {
   Sparkles,
   Terminal,
   X,
-  Code,
   Settings as SettingsIcon,
   BarChart2,
   BookOpen,
-  Bot,
 } from 'lucide-react';
 import { ChatSession, FileNode } from '../types';
 import { WorkspaceTree } from './WorkspaceTree';
@@ -525,14 +523,9 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           {/* 3. MOBILE VIEWS QUICK NAVIGATION DRAWER SECTION */}
           {onChangeView && (
             <div className="p-2 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-card-bg)] md:hidden space-y-1">
-              <div className="px-2 py-1 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider font-bold">
-                {t.nav.settings}
-              </div>
-              <div className="grid grid-cols-3 gap-1">
+              <div className="grid grid-cols-4 gap-1">
                 {[
                   { id: 'chat', label: t.nav.chat, icon: MessageSquare },
-                  { id: 'workspace', label: t.nav.workspace, icon: Code },
-                  { id: 'jarvis', label: t.nav.jarvis, icon: Bot },
                   { id: 'knowledge', label: t.nav.knowledge, icon: BookOpen },
                   { id: 'analytics', label: t.nav.analytics, icon: BarChart2 },
                   { id: 'settings', label: t.nav.settings, icon: SettingsIcon },
