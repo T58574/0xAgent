@@ -1,17 +1,19 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Layers, Database, MessageSquare, ShieldCheck, Cpu } from 'lucide-react';
-import { LiveTelemetry, MessageMetrics, AppConfig } from '../../types';
+import { LiveTelemetry, MessageMetrics, AppConfig, ChatSession } from '../../types';
 import { useI18n } from '../../i18n';
 
 interface ContextBudgetGaugeProps {
   liveTelemetry?: LiveTelemetry | null;
   lastMessageMetrics?: MessageMetrics | null;
+  currentSession?: ChatSession | null;
   config?: AppConfig | null;
 }
 
 export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(({
   liveTelemetry,
   lastMessageMetrics,
+  currentSession,
   config,
 }) => {
   const { t } = useI18n();
@@ -35,21 +37,63 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
     liveTelemetry?.contextMax ||
     lastMessageMetrics?.contextMax ||
     config?.local_server?.ctx_size ||
+    config?.max_tokens ||
     32768;
 
-  const usedTokens =
-    liveTelemetry?.contextUsed ||
-    lastMessageMetrics?.contextUsed ||
-    lastMessageMetrics?.totalTokens ||
-    0;
+  const messages = currentSession?.messages || [];
+
+  // Find last assistant message with saved metrics in session history
+  const lastAssistantMsgWithMetrics = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant' && messages[i].metrics) {
+        return messages[i];
+      }
+    }
+    return null;
+  }, [messages]);
+
+  // Calculate estimated tokens from conversation text if no metrics exist
+  const dialogueTokens = useMemo(() => {
+    if (messages.length === 0) return 0;
+    let totalChars = 0;
+    messages.forEach((m) => {
+      totalChars += (m.content || '').length;
+      if (m.tool_calls) {
+        m.tool_calls.forEach((tc) => {
+          totalChars += (typeof tc.arguments === 'string' ? tc.arguments.length : JSON.stringify(tc.arguments || {}).length);
+          totalChars += (tc.output || tc.result || '').length;
+        });
+      }
+    });
+    return Math.max(1, Math.round(totalChars / 3.5));
+  }, [messages]);
+
+  const sessionMetrics = lastMessageMetrics || lastAssistantMsgWithMetrics?.metrics;
+
+  const usedTokens = useMemo(() => {
+    if (liveTelemetry && typeof liveTelemetry.contextUsed === 'number' && liveTelemetry.contextUsed > 0) {
+      return liveTelemetry.contextUsed;
+    }
+    if (sessionMetrics && typeof sessionMetrics.contextUsed === 'number' && sessionMetrics.contextUsed > 0) {
+      return sessionMetrics.contextUsed;
+    }
+    if (sessionMetrics && typeof sessionMetrics.totalTokens === 'number' && sessionMetrics.totalTokens > 0) {
+      return sessionMetrics.totalTokens;
+    }
+    if (messages.length > 0) {
+      return 650 + 280 + dialogueTokens;
+    }
+    return 0;
+  }, [liveTelemetry?.contextUsed, sessionMetrics, messages.length, dialogueTokens]);
 
   const pct = Math.min(100, Math.max(0, Math.round((usedTokens / maxTokens) * 100)));
 
-  // Estimate breakdown categories if not explicitly supplied
-  const breakdown = liveTelemetry?.contextBreakdown || lastMessageMetrics?.contextBreakdown;
-  const systemTokens = breakdown?.systemTokens ?? Math.min(usedTokens, 750);
-  const memoryTokens = breakdown?.memoryTokens ?? Math.min(Math.max(0, usedTokens - systemTokens), 450);
-  const historyTokens = breakdown?.historyTokens ?? Math.max(0, usedTokens - systemTokens - memoryTokens);
+  // Detailed token breakdown
+  const breakdown = liveTelemetry?.contextBreakdown || sessionMetrics?.contextBreakdown;
+  const hasMessages = messages.length > 0;
+  const systemTokens = breakdown?.systemTokens ?? (hasMessages ? Math.min(usedTokens, 650) : 0);
+  const memoryTokens = breakdown?.memoryTokens ?? (hasMessages ? Math.min(Math.max(0, usedTokens - systemTokens), 280) : 0);
+  const historyTokens = breakdown?.historyTokens ?? (hasMessages ? Math.max(0, usedTokens - systemTokens - memoryTokens) : 0);
   const freeTokens = Math.max(0, maxTokens - usedTokens);
   const compactionTier = breakdown?.compactionTier ?? (pct > 85 ? 2 : pct > 70 ? 1 : 0);
 

@@ -391,6 +391,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
         {/* Real-time Context Budget Gauge & Breakdown */}
         <ContextBudgetGauge
           liveTelemetry={liveTelemetry}
+          currentSession={currentSession}
           config={config}
         />
 
