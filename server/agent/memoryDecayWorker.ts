@@ -18,118 +18,141 @@ export async function runMemoryDecayCycle(): Promise<MemoryDecayStats> {
   let archivedCount = 0;
   let conflictsResolved = 0;
 
-  // ==========================================================================
-  // 1. HALF-LIFE CONFIDENCE DECAY
-  // ==========================================================================
-  const activeMemories = db.prepare(`
-    SELECT id, confidence, last_used_at, created_at, usage_count, status
-    FROM canonical_memories
-    WHERE status = 'active'
-      AND scope IN ('user', 'project', 'persona')
-      AND (expires_at IS NULL OR expires_at > ?)
-  `).all(nowDateIso) as any[];
+  // Wrap entire decay & hygiene cycle in an immediate transaction
+  db.exec('BEGIN IMMEDIATE;');
 
-  for (const mem of activeMemories) {
-    const referenceTime = mem.last_used_at
-      ? new Date(mem.last_used_at).getTime()
-      : (typeof mem.created_at === 'number' ? mem.created_at : new Date(mem.created_at).getTime());
-
-    if (isNaN(referenceTime)) continue;
-
-    const daysSinceUse = (now - referenceTime) / (1000 * 60 * 60 * 24);
-    if (daysSinceUse <= 1) continue; // No decay within the first 24 hours
-
-    const decayFactor = Math.pow(0.5, daysSinceUse / HALF_LIFE_DAYS);
-    const newConfidence = Math.max(0.01, Math.round(mem.confidence * decayFactor * 1000) / 1000);
-
-    if (newConfidence < ARCHIVE_THRESHOLD) {
-      db.prepare(`
-        UPDATE canonical_memories
-        SET status = 'archived', updated_at = ?
-        WHERE id = ?
-      `).run(now, mem.id);
-
-      archivedCount++;
-
-      // Log in memory audit log
-      try {
-        db.prepare(`
-          INSERT INTO memory_audit_log (
-            id, memory_id, event_type, old_state, new_state, actor_type, rationale, created_at
-          ) VALUES (?, ?, 'auto_archived', ?, ?, 'system', 'decay_below_threshold', ?)
-        `).run(
-          `aud_${uuidv4().substring(0, 8)}`,
-          mem.id,
-          JSON.stringify({ status: 'active', confidence: mem.confidence }),
-          JSON.stringify({ status: 'archived', confidence: newConfidence }),
-          now
-        );
-      } catch {}
-    } else if (newConfidence < mem.confidence - 0.02) {
-      db.prepare(`
-        UPDATE canonical_memories
-        SET confidence = ?, updated_at = ?
-        WHERE id = ?
-      `).run(newConfidence, now, mem.id);
-
-      decayedCount++;
-    }
-  }
-
-  // ==========================================================================
-  // 2. CONFLICT RESOLUTION & DEDUPLICATION
-  // ==========================================================================
-  const duplicateGroups = db.prepare(`
-    SELECT scope, subject_id, IFNULL(persona_id, '') AS p_id, IFNULL(project_id, '') AS proj_id, domain, key, COUNT(*) as cnt
-    FROM canonical_memories
-    WHERE status = 'active'
-    GROUP BY scope, subject_id, IFNULL(persona_id, ''), IFNULL(project_id, ''), domain, key
-    HAVING cnt > 1
-  `).all() as any[];
-
-  for (const group of duplicateGroups) {
-    const records = db.prepare(`
-      SELECT id, confidence, updated_at, created_at
+  try {
+    // ==========================================================================
+    // 1. HALF-LIFE CONFIDENCE DECAY & ARCHIVAL (Batch SQL)
+    // ==========================================================================
+    // Identify memories eligible for decay (> 1 day old)
+    const decayCandidates = db.prepare(`
+      SELECT id, confidence, last_used_at, created_at
       FROM canonical_memories
       WHERE status = 'active'
-        AND scope = ?
-        AND subject_id = ?
-        AND IFNULL(persona_id, '') = ?
-        AND IFNULL(project_id, '') = ?
-        AND domain = ?
-        AND key = ?
-      ORDER BY confidence DESC, updated_at DESC, created_at DESC
-    `).all(group.scope, group.subject_id, group.p_id, group.proj_id, group.domain, group.key) as any[];
+        AND scope IN ('user', 'project', 'persona')
+        AND (expires_at IS NULL OR expires_at > ?)
+        AND (julianday('now') - julianday(COALESCE(NULLIF(last_used_at, ''), datetime(created_at / 1000, 'unixepoch')))) > 1.0
+    `).all(nowDateIso) as any[];
 
-    if (records.length > 1) {
-      const winner = records[0];
-      const losers = records.slice(1);
+    if (decayCandidates.length > 0) {
+      // Fast in-database bulk decay calculation
+      db.prepare(`
+        UPDATE canonical_memories
+        SET confidence = MAX(0.01, ROUND(confidence * POWER(0.5, (julianday('now') - julianday(COALESCE(NULLIF(last_used_at, ''), datetime(created_at / 1000, 'unixepoch')))) / 90.0), 3)),
+            updated_at = ?
+        WHERE status = 'active'
+          AND scope IN ('user', 'project', 'persona')
+          AND (expires_at IS NULL OR expires_at > ?)
+          AND (julianday('now') - julianday(COALESCE(NULLIF(last_used_at, ''), datetime(created_at / 1000, 'unixepoch')))) > 1.0
+      `).run(now, nowDateIso);
 
-      for (const loser of losers) {
+      decayedCount = decayCandidates.length;
+
+      // Identify newly degraded memories falling below archival threshold (< 0.1)
+      const archiveCandidates = db.prepare(`
+        SELECT id, confidence
+        FROM canonical_memories
+        WHERE status = 'active' AND confidence < ?
+      `).all(ARCHIVE_THRESHOLD) as any[];
+
+      if (archiveCandidates.length > 0) {
         db.prepare(`
           UPDATE canonical_memories
-          SET status = 'superseded', updated_at = ?
-          WHERE id = ?
-        `).run(now, loser.id);
+          SET status = 'archived', updated_at = ?
+          WHERE status = 'active' AND confidence < ?
+        `).run(now, ARCHIVE_THRESHOLD);
 
-        conflictsResolved++;
+        archivedCount = archiveCandidates.length;
 
-        try {
-          db.prepare(`
-            INSERT INTO memory_audit_log (
-              id, memory_id, event_type, old_state, new_state, actor_type, rationale, created_at
-            ) VALUES (?, ?, 'superseded', ?, ?, 'system', ?, ?)
-          `).run(
-            `aud_${uuidv4().substring(0, 8)}`,
-            loser.id,
-            JSON.stringify({ status: 'active', id: loser.id }),
-            JSON.stringify({ status: 'superseded', winner_id: winner.id }),
-            `Superseded by memory ${winner.id} with higher confidence`,
-            now
-          );
-        } catch {}
+        // Batch insert audit log for auto-archived memories
+        const insertAuditStmt = db.prepare(`
+          INSERT INTO memory_audit_log (
+            memory_id, operation, old_status, new_status, reason, applied_by, actor_scope, timestamp
+          ) VALUES (?, 'UPDATE', 'active', 'archived', 'decay_below_threshold', 'system', 'decay_worker', ?)
+        `);
+
+        for (const arch of archiveCandidates) {
+          try {
+            insertAuditStmt.run(arch.id, now);
+          } catch {}
+        }
       }
     }
+
+    // ==========================================================================
+    // 2. CONFLICT RESOLUTION & DEDUPLICATION (Batch SQL)
+    // ==========================================================================
+    const duplicateGroups = db.prepare(`
+      SELECT scope, subject_id, IFNULL(persona_id, '') AS p_id, IFNULL(project_id, '') AS proj_id, domain, key, COUNT(*) as cnt
+      FROM canonical_memories
+      WHERE status = 'active'
+      GROUP BY scope, subject_id, IFNULL(persona_id, ''), IFNULL(project_id, ''), domain, key
+      HAVING cnt > 1
+    `).all() as any[];
+
+    if (duplicateGroups.length > 0) {
+      const selectRecordsStmt = db.prepare(`
+        SELECT id, confidence, updated_at, created_at
+        FROM canonical_memories
+        WHERE status = 'active'
+          AND scope = ?
+          AND subject_id = ?
+          AND IFNULL(persona_id, '') = ?
+          AND IFNULL(project_id, '') = ?
+          AND domain = ?
+          AND key = ?
+        ORDER BY confidence DESC, updated_at DESC, created_at DESC
+      `);
+
+      const supersedeStmt = db.prepare(`
+        UPDATE canonical_memories
+        SET status = 'superseded', updated_at = ?
+        WHERE id = ?
+      `);
+
+      const auditConflictStmt = db.prepare(`
+        INSERT INTO memory_audit_log (
+          memory_id, operation, old_status, new_status, reason, applied_by, actor_scope, timestamp
+        ) VALUES (?, 'RESOLVE', 'active', 'superseded', ?, 'system', 'decay_worker', ?)
+      `);
+
+      for (const group of duplicateGroups) {
+        const records = selectRecordsStmt.all(
+          group.scope,
+          group.subject_id,
+          group.p_id,
+          group.proj_id,
+          group.domain,
+          group.key
+        ) as any[];
+
+        if (records.length > 1) {
+          const winner = records[0];
+          const losers = records.slice(1);
+
+          for (const loser of losers) {
+            supersedeStmt.run(now, loser.id);
+            conflictsResolved++;
+
+            try {
+              auditConflictStmt.run(
+                loser.id,
+                `Superseded by memory ${winner.id} with higher confidence (${winner.confidence})`,
+                now
+              );
+            } catch {}
+          }
+        }
+      }
+    }
+
+    db.exec('COMMIT;');
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK;');
+    } catch {}
+    throw error;
   }
 
   const durationMs = Date.now() - startTime;

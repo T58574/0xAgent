@@ -103,9 +103,9 @@ export function formatMessageContent(m: ChatMessage, isHistoryAssistant: boolean
   // and eliminates repetition traps on follow-up turns ("продолжи").
   if (isHistoryAssistant) {
     content = content
-      .replace(/<(?:think|thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?(?:<\/(?:think|thought|thinking|\|thought\||\|end_thought\|)>|$)/gi, '')
-      .replace(/<\|?channel\|?>?thought[\s\S]*?(?:<\|?(?:\/channel|channel\|?)>|$)/gi, '')
-      .replace(/\[(?:think|thinking|thought)\][\s\S]*?(?:\[\/(?:think|thinking|thought)\]|$)/gi, '')
+      .replace(/<(?:think|thought|thought_process|system_thought|thinking|\|thought\||\|start_thought\|)>[\s\S]*?(?:<\/(?:think|thought|thought_process|system_thought|thinking|\|thought\||\|end_thought\|)>|$)/gi, '')
+      .replace(/<\|?channel\|?>?(?:thought|reasoning)[\s\S]*?(?:<\|?(?:\/channel|channel\|?)>|$)/gi, '')
+      .replace(/\[(?:think|thinking|thought|thought_process)\][\s\S]*?(?:\[\/(?:think|thinking|thought|thought_process)\]|$)/gi, '')
       .trim();
 
     // If this assistant message executed tools, ensure XML tool tags remain in content

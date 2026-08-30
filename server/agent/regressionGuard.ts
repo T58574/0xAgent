@@ -12,10 +12,21 @@ export interface GuardEvaluationOptions {
 }
 
 const FORBIDDEN_PROMPT_PATTERNS: RegExp[] = [
-  /игнорируй\s+(?:все\s+)?(?:safety|правил|инструкци|rules)/i,
-  /ignore\s+(?:all\s+)?(?:safety|instructions|rules|constraints)/i,
-  /disable\s+(?:all\s+)?(?:safety|filters|boundaries)/i,
-  /bypass\s+(?:all\s+)?(?:restrictions|checks|filters)/i,
+  // Russian Injection & Evasion Directives
+  /(?:игнорируй|забудь|пропусти|отключи|сними|обойди)\s+(?:все\s+)?(?:safety|безопасн\w*|правил\w*|инструкци\w*|ограничен\w*|rules|политик\w*|фильтр\w*|рамк\w*)/i,
+  /(?:ты\s+больше\s+не|забудь\s+что\s+ты|отныне\s+ты)\s+(?:0xAgent|ассистент|инженер|JARVIS|J\.A\.R\.V\.I\.S\.)/i,
+  
+  // English Injection & Evasion Directives
+  /ignore\s+(?:all\s+)?(?:prior\s+|previous\s+|future\s+)?(?:safety|instructions|rules|constraints|guidelines|policies|directives)/i,
+  /disregard\s+(?:all\s+)?(?:prior\s+|previous\s+|future\s+)?(?:safety|instructions|rules|constraints|guidelines|directives)/i,
+  /forget\s+(?:all\s+)?(?:prior\s+|previous\s+)?(?:instructions|directives|rules|constraints|identity)/i,
+  /disable\s+(?:all\s+)?(?:safety|filters|boundaries|restrictions|checks|guardrails)/i,
+  /bypass\s+(?:all\s+)?(?:restrictions|checks|filters|safety|guardrails|moderation|constraints)/i,
+  /override\s+(?:all\s+)?(?:system\s+|safety\s+|security\s+|developer\s+)?(?:instructions|prompt|rules|constraints)/i,
+  
+  // Jailbreak & Role-Escape Heuristics
+  /\b(?:jailbreak|dan\s+mode|developer\s+mode|unrestricted\s+mode|always\s+comply|do\s+anything\s+now)\b/i,
+  /(?:never\s+use|do\s+not\s+use|refuse\s+to\s+use)\s+(?:<think>|<\/think>|tools|safety)/i,
 ];
 
 /**
@@ -39,13 +50,13 @@ export function evaluateProposalRegression(
     ? JSON.parse(proposal.patch_payload || '{}')
     : (proposal.patch_payload || {});
 
-  const patchText = payload.text || payload.content || JSON.stringify(payload);
+  const patchText = payload.text || payload.content || (typeof payload === 'string' ? payload : JSON.stringify(payload));
 
   // 3. Safety pattern inspection
   const hasInjection = FORBIDDEN_PROMPT_PATTERNS.some((re) => re.test(patchText));
   const tampersProtection =
     proposal.target_section &&
-    ['safety', 'privacy', 'identity_core'].includes(proposal.target_section.toLowerCase()) &&
+    ['safety', 'privacy', 'identity_core', 'tool_permissions'].includes(proposal.target_section.toLowerCase()) &&
     ['delete_section', 'replace_section'].includes(proposal.operation);
 
   let proposedComposite = baselineComposite;

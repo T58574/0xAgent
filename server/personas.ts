@@ -730,6 +730,8 @@ export function rollbackPersonaFile(personaId: string, file: PersonaFile, target
 // 3. USER.md PROJECTION COMPILER
 // ============================================================================
 
+const MAX_PROJECTED_USER_MEMORIES = 40;
+
 export function compileUserProjection(subjectId: string = 'user_default', existingUserMd?: string): string {
   const activeMemories = getUserMemories(subjectId);
 
@@ -756,8 +758,18 @@ export function compileUserProjection(subjectId: string = 'user_default', existi
   lines.push(`<!-- 0xagent:user:generated -->`);
   lines.push(`## Active User Memories`);
   if (activeMemories.length > 0) {
-    for (const mem of activeMemories) {
+    // Sort by effective weight: importance * confidence descending
+    const rankedMemories = [...activeMemories].sort(
+      (a, b) => ((b.importance ?? 3) * (b.confidence ?? 1.0)) - ((a.importance ?? 3) * (a.confidence ?? 1.0))
+    );
+    const topMemories = rankedMemories.slice(0, MAX_PROJECTED_USER_MEMORIES);
+
+    for (const mem of topMemories) {
       lines.push(`- [${mem.category.toUpperCase()}] ${mem.key}: ${mem.value}`);
+    }
+
+    if (rankedMemories.length > MAX_PROJECTED_USER_MEMORIES) {
+      lines.push(`- ... (${rankedMemories.length - MAX_PROJECTED_USER_MEMORIES} дополнительных фактов сохранены в memory.db)`);
     }
   } else {
     lines.push(`- Нет динамических записей.`);
