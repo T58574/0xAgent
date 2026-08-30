@@ -8,15 +8,18 @@ This document serves as the authoritative architectural blueprint and operating 
 
 ## 1. Technology Stack & Overview
 
-- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS 4 + Lucide Icons.
+- **Frontend**: React 19 + TypeScript + Vite + TailwindCSS 4 + Monaco Code Editor + Lucide Icons.
 - **Backend**: Node.js (TypeScript via `tsx` watch mode) + Express + WebSockets (`ws`).
+- **CLI & Supervisor**: `bin/0xagent.js` CLI Hub + Native C# Windows Tray Launcher (`0xAgent.exe`, ~15 KB, ~8 MB RAM).
 - **Ports**: Backend API `3001`, Vite UI `5173`, Local LLM `11434`.
 - **Data Persistence**: `~/.0xagent/` directory:
   - `config.json`: App and local server configuration.
-  - `prompts/`: System prompt files (`default.md`, `coding_agent.md`, etc.).
+  - `bin/`: CLI executables (`0xagent.cmd`, `0xagent.ps1`, `0xagent`).
+  - `app/`: Codebase root (when installed via 1-click script).
+  - `personas/`: Persona profiles (`SOUL.md`, `USER.md`, `TOOLS.md`).
   - `data/sessions/`: Chat history session JSON files.
-  - `memory.json`: Long-term agent facts and preferences.
-  - `skills/`: Extensible agent skill instruction markdown files.
+  - `workspaces/`: Sandboxed autonomous agent workspaces.
+  - `spill/`: Disk logs for spilled tool outputs (>24 KB).
   - `llama/`: Installed versions of `llama.cpp` binaries (`llama-server.exe` / `llama.exe`).
   - `models/`: Downloaded `.gguf` model files.
 
@@ -25,234 +28,67 @@ This document serves as the authoritative architectural blueprint and operating 
 ## 2. Project Structure (Key Files)
 
 ```
-server/
-  index.ts       — Main server: ALL API routes, WebSocket, llama.cpp child process manager
-  agent.ts       — Agent loop: LLM call → parse tool calls → execute → repeat
-  config.ts      — Config & prompt file I/O
-  session.ts     — Chat session CRUD
-  tools.ts       — Tool implementations (read/write/patch/grep/exec/shell)
-  memory.ts      — Persistent agent memory
-  skills.ts      — Skill files management
-  hardware.ts    — GPU auto-detection (Win32_VideoController)
-  ggufParser.ts  — GGUF binary header parser
-
-src/
-  App.tsx                — Root app: routing, session management, WS listeners
-  types.ts               — Shared TypeScript interfaces (AppConfig, LocalServerConfig, etc.)
-  services/api.ts        — REST + WebSocket client wrappers
-  components/
-    ChatArea.tsx          — Chat messages, input, voice input, 1-click launch banner
-    ToolCard.tsx          — Tool call approval/rejection UI card
-    settings/
-      SettingsPage.tsx    — Settings orchestrator (tabs, debounced auto-save)
-      LocalServerTab.tsx  — llama.cpp server config + GitHub installer UI
+0xAgent/
+├── bin/
+│   └── 0xagent.js        — Universal CLI hub (start, config, update, status, purge-vram, stop)
+├── install.ps1           — 1-Click interactive Windows installer
+├── install.sh            — 1-Click interactive Unix/macOS installer
+├── launcher/
+│   └── TrayLauncher.cs   — Ultra-lightweight native C# tray supervisor (<15 KB)
+├── server/
+│   ├── index.ts          — Express API (:3001), WebSocket (/ws), process supervisor
+│   ├── agent.ts          — Primary LLM streaming loop & orchestrator
+│   ├── agent/            — Compactor, loop breaker, spiller, code sandbox, permission guard
+│   ├── tools.ts          — Sandboxed workspace file, patch, terminal & search tools
+│   ├── config.ts         — Configuration persistence (~/.0xagent/config.json)
+│   ├── session.ts        — Session manager, dialogue history, forking
+│   ├── hardware.ts       — GPU/VRAM auto-detection (Win32_VideoController)
+│   ├── fffService.ts     — Native Rust Fast File Finder (@ff-labs/fff-node)
+│   └── searxngService.ts — Privacy web search aggregator
+├── src/
+│   ├── App.tsx           — Root component, routing, split-screen layout, WS subscriptions
+│   ├── types.ts          — Single Source of Truth TypeScript interfaces
+│   ├── i18n/             — Bilingual dictionaries (en.ts, ru.ts)
+│   └── components/       — Chat, Editor, Settings, HUDs, and popovers
+├── tests/                — Comprehensive node:test suites (90+ automated tests)
 ```
 
 ---
 
-## 3. Backend API Routes Quick Reference
+## 3. Core Architectural Invariants & Rules
 
-### Config & Settings
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/config` | Load full app config |
-| POST | `/api/config` | Save full app config |
-
-### Chat Sessions
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/sessions` | List all sessions |
-| GET | `/api/sessions/:id` | Load session by ID |
-| POST | `/api/sessions` | Create new session `{ title }` |
-| POST | `/api/sessions/:id/save` | Save session |
-| DELETE | `/api/sessions/:id` | Delete session |
-
-### Agent Execution
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/send-message` | Trigger agent loop `{ sessionId }` |
-| POST | `/api/cancel-agent` | Cancel agent `{ sessionId }` |
-| POST | `/api/respond-to-tool` | Approve/reject tool `{ sessionId, toolCallId, approve }` |
-
-### System Prompts
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/prompts` | List prompt files |
-| GET | `/api/prompts/:filename` | Read prompt content |
-| POST | `/api/prompts/:filename` | Write prompt `{ content }` |
-| DELETE | `/api/prompts/:filename` | Delete prompt |
-| POST | `/api/prompts-select` | Set active prompt `{ filename }` |
-
-### Memory & Skills
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/memories` | List memories (`?query=...`) |
-| POST | `/api/memories` | Add/update `{ key, value, category }` |
-| DELETE | `/api/memories/:id` | Delete memory |
-| GET | `/api/skills` | List skills |
-| GET | `/api/skills/:name` | Read skill |
-| POST | `/api/skills/:name` | Write skill |
-| DELETE | `/api/skills/:name` | Delete skill |
-
-### Workspace & Files
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/select-workspace` | Native folder picker |
-| POST | `/api/select-file` | Native file picker `{ filter }` |
-| GET | `/api/workspace-tree` | File tree (`?workspaceDir=...`) |
-| GET | `/api/read-file-raw` | Read file (`?path=...`) |
-| POST | `/api/write-file-raw` | Write file `{ path, content }` |
-
-### Local LLM Server (llama.cpp)
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/start-local-server` | Spawn llama-server process |
-| POST | `/api/stop-local-server` | Kill llama-server process |
-| GET | `/api/server-health` | Health check (`?host=...&port=...`) |
-| GET | `/api/server-slots` | Live slot metrics |
-
-### GGUF Model & llama.cpp Management
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/llama-releases` | GitHub releases (15-min cache) |
-| GET | `/api/installed-llama-versions` | Locally installed versions |
-| POST | `/api/install-llama-version` | Download/install version |
-| POST | `/api/select-installed-llama` | Switch active version |
-| GET | `/api/gguf-models` | Recommended model catalog |
-| POST | `/api/download-model` | Download GGUF model |
-| POST | `/api/parse-gguf` | Parse GGUF metadata |
-| GET | `/api/scan-models-dir` | Scan directory for models |
-
-### Other
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/detect-hardware` | GPU auto-detection |
-| POST | `/api/transcribe-audio` | Groq Whisper STT |
-| GET | `/api/get-local-ips` | LAN IP addresses |
+1. **Single Source of Types (`src/types.ts`)**: Never duplicate interfaces. Both frontend and backend import from `src/types.ts`.
+2. **Safe Code Rendering (Zero XSS)**: Never use `dangerouslySetInnerHTML`. Code and markdown are tokenized safely via React elements.
+3. **Patching Standard (`patch_file`)**: Always use `patch_file` with `SEARCH`/`REPLACE` blocks for existing files (>50 lines). `write_file` is reserved for new or small files only.
+4. **Fast File & Web Search**: Use `fffService` for workspace file discovery (<3 ms) and `searxngService`/`webReaderService` for web research without token bloat.
+5. **Strict Async I/O**: Synchronous blocking calls (`fs.readFileSync`, `execSync`) are prohibited on request/event paths. Use `fs.promises` and async child processes.
+6. **Zero-Falsy Serialization**: Never check boolean/numeric configuration via `if (prop)`. Explicitly validate `if (val !== undefined && val !== null)` so `0` and `false` are not overwritten with defaults.
+7. **Local LLM Defaults**: When spawning `llama-server.exe`, explicitly supply `-fa on`, `-np 1` (single slot), rounded integer `--top-k`, and quantized KV cache (`-ctk q8_0 -ctv q8_0`) for large models. Stop the local server automatically when switching to cloud models to free VRAM.
+8. **Token & Context Protection**:
+   - Model-free tool output pruning (`toolResultPruner.ts`) trims old tool outputs in context.
+   - Loop breaker (`loopBreaker.ts`) halts repetitive tool calls (warning at 3, halt at 5).
+   - Massive command outputs (>24 KB) spill to `~/.0xagent/spill/*.log` with truncated context references.
+9. **Zero-Emoji UI Policy**: No unicode emojis in HUDs, toasts, cards, or telemetry. Use Material Design 3 icons (`MaterialIcon`) or monospaced ASCII indicators (`[OK]`, `[ERR]`, `[>]`, `::`).
+10. **Dual Documentation Synchronization**: When updating `README.md`, always synchronously update `README.ru.md` to keep documentation in complete parity.
+11. **Tool Expansion Protocol**: Adding or changing a tool requires updates in:
+    - Tool logic in `server/tools/` or `server/tools.ts`
+    - Dispatcher in `server/agent/toolDispatcher.ts` and parser in `server/agent/toolParser.ts`
+    - Type definitions in `src/types.ts`
+    - System prompt instructions in `server/agent/promptBuilder.ts`
+    - Unit tests in `tests/`
+12. **Mandatory Automated Test Pass**: Before concluding any task or committing changes, run `npm test`. All 90+ tests must pass with 0 failures.
 
 ---
 
-## 4. WebSocket Events
+## 4. Development & Operational Commands
 
-Connection: `ws://localhost:3001/ws`. Messages: `{ event, payload }`.
-
-| Event | Payload | Description |
-|-------|---------|-------------|
-| `agent-status-changed` | `"idle" \| "thinking" \| "waiting_approval" \| "executing_tool"` | Agent state |
-| `agent-message-start` | `{ sessionId, messageId }` | New assistant message |
-| `agent-token-stream` | `{ sessionId, messageId, token, fullContent }` | Streaming LLM tokens |
-| `agent-tools-updated` | `{ sessionId, messageId, tools[] }` | Tool calls parsed |
-| `agent-tool-status-changed` | `{ sessionId, toolCallId, status, output? }` | Tool status |
-| `agent-error` | `string \| { sessionId, message }` | Error / status notification |
-| `llama-server-log` | `string` | Live llama-server stdout/stderr |
-
----
-
-## 5. Process Lifetime & Launcher Supervisor
-
-1. **`start.bat` & PowerShell Launcher (`scripts/start.ps1`)**:
-   - `start.bat` delegates execution to `scripts/start.ps1` with UTF-8 encoding (`chcp 65001`).
-   - `scripts/cleanup.ps1`: Clears any processes bound to ports **3001** (Backend API) and **5173** (Vite UI), as well as any background instances of `llama-server.exe`, `llama.exe`, or orphaned `node.exe` processes running 0xAgent.
-   - **Log Retention & Archive Cycle**: Session output is captured into `logs/0xAgent_YYYY-MM-DD_HH-MM-SS.log`. If raw log count reaches 10, older logs are compressed into `.zip` archives inside `logs/archive/`.
-   - **Process Trap**: `finally` block in `start.ps1` and Node process signal handlers (`SIGINT`, `SIGTERM`, `exit`, `uncaughtException`) ensure zero orphaned processes remain when exiting.
-   - **Manual Cleanup**: `npm run stop` executes `scripts/cleanup.ps1`.
-
----
-
-## 6. Local LLM Engine (`llama.cpp`) Management
-
-- Local GGUF models are executed via `llama.cpp` binaries spawned directly by the Node backend (`server/index.ts`).
-- **Endpoint `/api/start-local-server`**:
-  - Spawns `llama-server.exe` with configured parameters (`-m`, `-c`, `-ngl`, `-t`, `-b`, `-ub`, `--temp`, `--min-p`, `--repeat-penalty`, `-fa on`, `-np 1`, `--no-mmap`, `--mlock`, `--embedding`, `--cont-batching`, `-ctk`, `-ctv`).
-  - **Flash Attention**: Must always use `-fa on` or `--flash-attn on` (modern llama.cpp b10423+ syntax).
-  - **Parallel Slots**: Default to `-np 1` to prevent 4x VRAM multiplier for single-agent use.
-  - **30B+ on 16GB VRAM**: Requires `-fa on`, `-ctk q8_0 -ctv q8_0`, and context <= 16k.
-  - Auto-detects installed binaries in `~/.0xagent/llama/` and GGUF models in `~/.0xagent/models/` if parameters are omitted.
-  - Calls `killProcessOnPort(port)` before spawn to handle orphaned processes from tsx restarts.
-  - Streams stdout/stderr real-time logs over WebSocket (`llama-server-log` event).
-- **Endpoint `/api/stop-local-server`**:
-  - Terminates the active `llama-server.exe` process tree using `taskkill /F /T /PID` on Windows.
-
----
-
-## 7. Configuration & State Persistence Rules (CRITICAL)
-
-- **Auto-save Mechanism**: `SettingsPage.tsx` uses a 600ms debounced `useEffect` to automatically save changes to `/api/config`.
-- **CRITICAL RULE (Zero Falsy Bug)**: When adding or updating configuration fields in `SettingsPage.tsx` or `AppConfig` (`src/types.ts`), you **MUST** ensure that `useEffect` on `config` load restores **ALL** fields from `config.local_server` into state using strict `val !== undefined && val !== null` checks.
-  - *Never use truthiness checks like `if (ls.threads)` because values like `0` ("0 = Auto") or `false` will be discarded and overwritten with defaults on startup!*
-
----
-
-## 8. UI Features & Error Handling Architecture
-
-1. **Interactive Warning Banner & 1-Click Launch (`src/components/ChatArea.tsx`)**:
-   - Polls `/api/server-health` every 3000ms.
-   - Renders a prominent warning banner above the chat input box in both empty hero view (`!hasMessages`) and chat history view (`hasMessages`) when the local server is offline:
-     `⚠️ Локальный LLM Сервер не запущен на порту 11434!` Button: `🚀 Запустить LLM Сервер в 1-клик`.
-   - Clicking the button starts the server via `/api/start-local-server`, polls `/health` readiness, and automatically sends any typed user prompt once ready.
-
-2. **System Error Persisting & Instant Dialogue Rendering**:
-   - On LLM failure or network disconnect, `server/agent.ts` and `server/index.ts` push the error message directly into `session.messages`, update `session.updated_at`, save to disk (`saveSession`), and broadcast `agent-error`.
-   - `App.tsx` catches `agent-error` WebSocket events and instantly reloads/renders the session so errors appear immediately inside the chat dialogue without delay.
-
-3. **Multimodal Vision Image Analysis (`src/components/ChatArea.tsx` & `server/agent.ts`)**:
-   - Supports image attachment (PNG, JPEG, WEBP) via file picker or drag-and-drop.
-   - Encodes images to Base64 Data URLs (`data:image/...;base64,...`) and stores them in `ChatMessage.images`.
-   - Formats user prompt payloads using OpenAI Chat Completions Vision standard (`{ type: 'image_url', image_url: { url: ... } }`) for `llama-server.exe` / GGUF vision models (Llama 3.2 Vision, Qwen2-VL, Llava, Moondream).
-
----
-
-## 9. Agent Tool System & Unified TOOLS.md Architecture
-
-The agent uses XML-tagged tool calls parsed from LLM responses in `agent.ts`.
-Tools configuration is decoupled from Personas and managed globally in `server/toolsConfig.ts`.
-
-- **Persistence**: `~/.0xagent/tools_config.json` (toggles) & `~/.0xagent/TOOLS.md` (unified global system prompt snippet loaded in `agent.ts`).
-- **UI Management**: Configurable via the **Инструменты (TOOLS.md)** tab under Settings -> Personas. Each tool can be toggled on/off to optimize context length.
-- **Endpoints**:
-  - `GET /api/tools`: Get active tools list, toggle states, and `TOOLS.md` content.
-  - `POST /api/tools/toggles`: Update tool enabled/disabled states and regenerate `TOOLS.md`.
-  - `POST /api/tools/md`: Save custom `TOOLS.md` content directly.
-
-| Tool | Category | Requires Approval | Description |
-|------| font-mono |:-:|---|
-| `read_file` | Files | No | Read file contents |
-| `write_file` | Files | **Yes** | Write/create file |
-| `patch_file` | Files | **Yes** | Surgical search/replace patch |
-| `create_directory` | Files | No | Recursive directory creation |
-| `get_file_info` | Files | No | File/folder metadata inspection |
-| `list_dir` | Files | No | List directory contents |
-| `grep_search` | Files | No | Regex search across files |
-| `execute_command` | Terminal | **Yes** | Execute PowerShell command |
-| `remember_fact` | Memory | No | Store persistent memory |
-| `recall_memories` | Memory | No | Query stored memories |
-| `list_skills` | Skills | No | List available skills |
-| `execute_skill` | Skills | No | Execute a skill instruction |
-| `search_sessions` | Sessions | No | Search chat history |
-| `run_scratch_script` | Terminal | **Yes** | Run temporary script |
-| `ask_user` | Interactive | N/A | Ask user for clarification |
-| `spawn_subagent` | Agents | No | Spawn a sub-agent |
-
----
-
-## 11. UI/UX Design System & Resource Governance
-
-1. **Persona-Style Popovers**: All dropdown menus (Model Selector, Persona Selector, Slash Commands `/`, LAN sharing) follow a uniform design language:
-   - Radius: `rounded-2xl` (16px).
-   - Glassmorphism: `bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] shadow-2xl`.
-   - Upward/Contextual placement: `bottom-full mb-2` inside bottom inputs.
-   - Clean flat item rows with monochromatic transparency instead of nested cards and rainbow badges.
-2. **Contextual Input Controls**: Selection of models and personas is embedded directly inside `FloatingCommandBar.tsx` next to the chat prompt, keeping the top `Navbar.tsx` light and minimal.
-3. **Auto-Free VRAM on Model Switch**: Switching to an API model (Google AI Studio) automatically stops `llama-server.exe` (`api.stop_local_server()`) to free GPU memory and CPU threads.
-4. **Sidebar Ergonomics**: Sidebar collapse toggle is anchored at the vertical center (50% height) on the outer edge, with a floating button on the viewport edge when collapsed.
-5. **Modern Typography**: Strict use of `Inter` for UI and `JetBrains Mono` for code and tokens.
-
----
-
-## 12. Verification Checklist for Developers / AI Models
-
-When making changes to 0xAgent:
-1. Run `npx tsc --noEmit` to verify type safety across frontend and backend.
-2. Run `npm run build` to verify Vite production build.
-3. Test process cleanup using `powershell -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1`.
-
+```bash
+npm run dev              # Run backend (:3001) and Vite frontend (:5173) concurrently
+node bin/0xagent.js      # CLI Hub: start, config, update, status, purge-vram, stop
+npm run build            # Typecheck (tsc) and build production frontend
+npm test                 # Run subsystem and unit tests (all suites)
+npm run bridge           # Run 0xAgent Diagnostic Bridge for backend & MTP model benchmarking
+npm run audit:security   # Run OPSEC and security audit script
+npm run build:launcher   # Compile native C# Windows tray launcher (0xAgent.exe)
+npm run stop             # Clean up hanging processes and ports (scripts/cleanup.ps1)
+```

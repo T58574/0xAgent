@@ -7,16 +7,22 @@
 
 ## 📁 Key File Map
 
+### Core CLI & Installers
+- `bin/0xagent.js` — Universal CLI Hub (`0xagent start`, `config`, `update`, `status`, `purge-vram`, `stop`).
+- `install.ps1` — 1-Click interactive Windows installer with dependency checks, C# tray build, and PATH binding.
+- `install.sh` — 1-Click interactive Unix/macOS installer and CLI linker.
+- `launcher/TrayLauncher.cs` — Native C# Windows System Tray supervisor (~15 KB, ~8 MB RAM).
+
 ### Backend Core (`server/`)
 - `index.ts` — Express API (`:3001`), WebSocket gateway (`/ws`), and process supervisor for `llama-server.exe`.
 - `agent.ts` — Autonomous agent orchestrator (prompt execution loop, streaming, tool dispatching).
 - `agent/` — Agent submodules:
-  - `llmClient.ts` — Universal LLM client (local llama.cpp & Google AI Studio).
+  - `llmClient.ts` — Universal LLM client (local llama.cpp & Google AI Studio Gemini).
   - `toolDispatcher.ts` / `toolParser.ts` — Tool execution and robust XML/tag parsing (`<toolcall>`, `<tool_call>`).
-  - `promptBuilder.ts` — System prompt construction, persona injection, and context assembly.
+  - `promptBuilder.ts` — Dynamic system prompt construction, persona injection, and context assembly.
   - `contextManager.ts` / `compactionPipeline.ts` — 4-tier context compression and token management.
   - `toolResultPruner.ts` — Model-free syntactic trimming of historical tool outputs.
-  - `loopBreaker.ts` — Infinite tool loop detection and breaker.
+  - `loopBreaker.ts` — Infinite tool loop & cyclic oscillation breaker.
   - `outputSpiller.ts` — Automatic spilling of massive tool outputs (>24 KB) to disk.
   - `codeRuntime.ts` — Sandboxed Node.js VM runtime for `<code_run>` batch operations.
   - `permissionGuard.ts` — Security presets (`readonly`, `workspace-write`, `prompt`, `unrestricted`).
@@ -41,11 +47,14 @@
   - `chat/` — Chat components (`ReasoningViewer.tsx`, `FloatingCommandBar.tsx`, `PlanProgressStrip.tsx`).
   - `settings/` — Settings tabs (General, LLM Server, Personas, Themes, Security).
   - `common/` — Shared UI elements (`MaterialIcon.tsx`, `AsciiCanvasEngine.tsx`).
+- `i18n/` — Bilingual translation dictionaries (`en.ts`, `ru.ts`).
 - `services/api.ts` & `services/wsService.ts` — REST API and WebSocket communication layers.
 - `index.css` — Glassmorphism styles and 4 color themes (`obsidian`, `cyber`, `graphite`, `matrix`).
 
 ### Data Directory (`~/.0xagent/`)
 - `config.json` — Persistent configuration.
+- `bin/` — Global CLI executables (`0xagent.cmd`, `0xagent.ps1`, `0xagent`).
+- `app/` — Codebase installation directory.
 - `data/sessions/` — Chat sessions in JSON.
 - `personas/` — Persona profiles (`SOUL.md`, `USER.md`, `TOOLS.md`).
 - `workspaces/` — Auto-generated sandbox directories for isolated tasks.
@@ -68,18 +77,24 @@
    - Loop breaker (`loopBreaker.ts`) halts repetitive tool calls (warning at 3, halt at 5).
    - Massive command outputs (>24 KB) spill to `~/.0xagent/spill/*.log` with truncated context references.
 9. **Zero-Emoji UI & Design Policy**: No unicode emojis in HUDs, toasts, cards, or telemetry. Use Material Design 3 icons (`MaterialIcon`) or monospaced ASCII indicators (`[OK]`, `[ERR]`, `[>]`, `::`). Popups use persona glassmorphism (`rounded-2xl`, `backdrop-blur-2xl`).
-10. **Workspace Isolation**: Never write persona files (`SOUL.md`, `USER.md`) to the user workspace root. Use `<update_user_profile>` and `<update_persona_file>` which target `~/.0xagent/personas/`.
-11. **Robust Error Handling**: Wrap user/LLM regex in `try/catch`. Never return fake success responses on caught task/tool errors.
-12. **Model & Agent Testing Protocol (0xAgent Bridge)**: Never test models via ad-hoc standalone CLI commands or isolated configs. Always test through the 0xAgent Bridge (`npm run bridge` or `scripts/agent-bridge.ts`), which authenticates against the live 0xAgent backend API (`POST /api/start-local-server`, `GET /api/server-health`, `/v1/chat/completions`) using the active application configuration, tracking real-time t/s, MTP draft acceptance rates, and memory telemetry.
+10. **Dual Documentation Synchronization**: When updating `README.md`, always synchronously update `README.ru.md` to keep all user-facing documentation in complete parity.
+11. **Tool Expansion Protocol**: Adding or changing a tool requires updates in:
+    - Tool logic in `server/tools/` or `server/tools.ts`
+    - Dispatcher in `server/agent/toolDispatcher.ts` and parser in `server/agent/toolParser.ts`
+    - Type definitions in `src/types.ts`
+    - System prompt instructions in `server/agent/promptBuilder.ts`
+    - Corresponding unit test in `tests/`
+12. **Mandatory Automated Test Pass**: Before concluding any task or committing changes, run `npm test`. All 90+ tests must pass with 0 failures.
 
 ---
 
-## 🛠 Development Commands
+## 🛠 Development & Operational Commands
 
 ```bash
 npm run dev              # Run backend (:3001) and Vite frontend (:5173) concurrently
+node bin/0xagent.js      # CLI Hub: start, config, update, status, purge-vram, stop
 npm run build            # Typecheck (tsc) and build production frontend
-npm test                 # Run subsystem and unit tests
+npm test                 # Run subsystem and unit tests (all suites)
 npm run bridge           # Run 0xAgent Diagnostic Bridge for backend & MTP model benchmarking
 npm run audit:security   # Run OPSEC and security audit script
 npm run build:launcher   # Compile native C# Windows tray launcher (0xAgent.exe)
