@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Brain, X, Copy, Check, ChevronRight } from 'lucide-react';
 import { LiveTelemetry } from '../../types';
 import { extractThoughtSteps, ThoughtStep } from '../../utils/helpers';
-import { MaterialIcon } from '../common/MaterialIcon';
 import { useI18n } from '../../i18n';
 
 interface ReasoningViewerProps {
@@ -9,6 +9,7 @@ interface ReasoningViewerProps {
   isLive?: boolean;
   thinkingSeconds?: number;
   liveTelemetry?: LiveTelemetry | null;
+  tokenCount?: number;
   defaultExpanded?: boolean;
 }
 
@@ -19,6 +20,7 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
   isLive = false,
   thinkingSeconds = 0,
   liveTelemetry,
+  tokenCount,
   defaultExpanded = false,
 }) => {
   const { language, t } = useI18n();
@@ -28,8 +30,9 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
   const [spinnerFrame, setSpinnerFrame] = useState(0);
   const [liveSeconds, setLiveSeconds] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
-  // ASCII Spinner & Live Stopwatch interval for live thinking HUD only
+  // Live stopwatch and spinner interval
   useEffect(() => {
     if (!isLive) {
       setLiveSeconds(0);
@@ -50,35 +53,41 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
 
   const displaySeconds = isLive ? liveSeconds : thinkingSeconds;
 
-  // Auto-scroll to bottom of live stream if user keeps autoScroll on
+  // Auto-scroll when live thoughts stream
   useEffect(() => {
     if (isLive && isOpen && autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [thinking, isLive, isOpen, autoScroll]);
 
-  // Extract dynamic last thought line for live ticker preview while collapsed (memoized)
-  const lastThoughtSnippet = useMemo(() => {
-    if (!thinking || !thinking.trim()) {
-      return isLive ? t.chat.thinking : t.chat.reasoningTitle;
-    }
-    const lines = thinking.trim().split('\n');
-    const lastLine = lines[lines.length - 1] || '';
-    const clean = lastLine.replace(/^[-*#\d\.\)\s]+/, '').trim();
-    return clean.length > 75 ? `${clean.substring(0, 72)}...` : (clean || t.chat.thinking);
-  }, [thinking, isLive, t]);
+  // Close when clicking outside panel
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [isOpen]);
 
-  // Extract structured steps lazily only when expanded or when short
+  const wordCount = useMemo(() => {
+    if (!thinking.trim()) return 0;
+    return thinking.trim().split(/\s+/).filter(Boolean).length;
+  }, [thinking]);
+
+  const estimatedTokens = useMemo(() => {
+    if (tokenCount !== undefined && tokenCount > 0) return tokenCount;
+    if (liveTelemetry?.tokenCount !== undefined && liveTelemetry.tokenCount > 0) return liveTelemetry.tokenCount;
+    return wordCount > 0 ? Math.round(wordCount * 1.35) : 0;
+  }, [tokenCount, liveTelemetry, wordCount]);
+
   const steps: ThoughtStep[] = useMemo(() => {
     if (!isOpen && !isLive) return [];
     if (!thinking.trim()) return [];
     return extractThoughtSteps(thinking);
   }, [thinking, isOpen, isLive]);
-
-  const wordCount = useMemo(() => {
-    if (!thinking.trim()) return 0;
-    return thinking.trim().split(/\s+/).length;
-  }, [thinking]);
 
   const handleCopy = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -88,191 +97,145 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
   };
 
   return (
-    <div className="w-full rounded-2xl bento-card border border-[var(--theme-border)] overflow-hidden transition-all duration-200 shadow-sm font-mono">
-      {/* 1. COLLAPSIBLE HEADER BAR */}
+    <div className="relative inline-block font-sans text-xs select-none">
+      {/* 1. BACKGROUND-LESS COMPACT BUTTON AT BOTTOM-LEFT */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] flex items-center justify-between gap-2.5 text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer select-none transition-colors group"
+        className={`px-2 py-0.5 rounded-lg text-[11px] font-mono transition-all flex items-center gap-1.5 cursor-pointer border ${
+          isOpen
+            ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs'
+            : 'bg-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent'
+        }`}
+        title={t.chat.reasoningTitle}
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          {/* ASCII Live Spinner Generator */}
-          <div className="shrink-0 flex items-center justify-center">
-            {isLive ? (
-              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-[var(--theme-accent)]/15 border border-[var(--theme-accent)]/30 text-[var(--theme-accent)] font-bold text-xs">
-                {ASCII_SPINNER_FRAMES[spinnerFrame]}
-              </span>
-            ) : (
-              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] text-xs font-bold">
-                ::
-              </span>
-            )}
-          </div>
-
-          {/* Title & Live Thought Snippet Ticker */}
-          <div className="flex flex-col text-left min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap text-xs">
-              <span className="font-bold text-[var(--theme-text)]">
-                {isLive ? t.chat.thinking : t.chat.reasoningTitle}
-              </span>
-
-              {/* Status / Step Badges */}
-              {!isLive && steps.length > 1 && (
-                <span className="px-2 py-0.5 rounded-md text-[10px] bg-[var(--theme-border-subtle)] text-[var(--theme-text)] border border-[var(--theme-border)] font-semibold">
-                  {steps.length} {language === 'ru' ? 'этапа' : 'steps'}
-                </span>
-              )}
-
-              {!isLive && wordCount > 0 && (
-                <span className="px-2 py-0.5 rounded-md text-[10px] bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)] hidden sm:inline">
-                  {wordCount} {language === 'ru' ? 'слов' : 'words'}
-                </span>
-              )}
-            </div>
-
-            {/* Dynamic Live Thought Snippet (Visible when Collapsed) */}
-            {!isOpen && (
-              <span className="text-[11px] text-[var(--theme-text-muted)] truncate block pt-0.5">
-                {isLive ? (
-                  <span className="inline-flex items-center gap-1.5 text-[var(--theme-text)] font-medium">
-                    <span className="text-[10px] font-bold text-sky-500">›</span>
-                    {lastThoughtSnippet}
-                  </span>
-                ) : (
-                  lastThoughtSnippet
-                )}
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Right Info: Live Telemetry Metrics, Stopwatch & ASCII Toggle */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Live Speed (t/s) */}
-          {liveTelemetry?.tokensPerSec !== undefined && liveTelemetry.tokensPerSec > 0 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-500/10 border border-sky-500/30 text-[10px] text-sky-600 dark:text-sky-300 font-bold">
-              <MaterialIcon name="bolt" size={12} />
-              <span>{liveTelemetry.tokensPerSec.toFixed(1)} t/s</span>
-            </span>
-          )}
-
-          {/* Live Token Count */}
-          {liveTelemetry?.tokenCount !== undefined && liveTelemetry.tokenCount > 0 && (
-            <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-semibold">
-              <MaterialIcon name="memory" size={12} className="text-[var(--theme-text-muted)]" />
-              <span>{liveTelemetry.tokenCount} tok</span>
-            </span>
-          )}
-
-          {/* Live Context Window */}
-          {liveTelemetry?.contextUsed !== undefined && (
-            <span className="hidden md:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text-muted)]">
-              <MaterialIcon name="storage" size={12} />
-              <span>{liveTelemetry.contextUsed.toLocaleString()}{liveTelemetry.contextMax ? ` / ${liveTelemetry.contextMax.toLocaleString()}` : ''}</span>
-            </span>
-          )}
-
-          {/* Live Stopwatch Timer */}
-          {(isLive || displaySeconds > 0) && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[10px] text-[var(--theme-text)] font-bold">
-              <MaterialIcon name="schedule" size={12} />
-              <span>{displaySeconds.toFixed(1)}s</span>
-            </span>
-          )}
-
-          {/* ASCII Expand/Collapse Button */}
-          <span className="px-2 py-0.5 rounded-lg bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] group-hover:bg-[var(--theme-accent)] group-hover:text-[var(--theme-accent-text)] text-[11px] font-bold transition-all">
-            {isOpen ? '[-]' : '[+]'}
+        <Brain size={12} className={isLive ? 'text-[var(--theme-accent)] animate-pulse' : 'text-[var(--theme-text-muted)]'} />
+        
+        {isLive ? (
+          <span className="flex items-center gap-1 text-[var(--theme-text)] font-semibold">
+            <span>{ASCII_SPINNER_FRAMES[spinnerFrame]}</span>
+            <span>{t.chat.reasoning}</span>
+            <span className="opacity-70 font-mono">({displaySeconds.toFixed(1)}s)</span>
           </span>
-        </div>
+        ) : (
+          <span className="flex items-center gap-1">
+            <span className="font-semibold text-[var(--theme-text)]">{t.chat.reasoning}</span>
+            <span className="text-[10px] text-[var(--theme-text-muted)] opacity-80">
+              · {estimatedTokens > 0 ? `${estimatedTokens} tok · ` : ''}{wordCount} {language === 'ru' ? 'слов' : 'words'}{displaySeconds > 0 ? ` · ${displaySeconds.toFixed(1)}s` : ''}
+            </span>
+          </span>
+        )}
+
+        <ChevronRight size={11} className={`transition-transform duration-150 opacity-60 ${isOpen ? 'rotate-90' : ''}`} />
       </button>
 
-      {/* 2. EXPANDED REASONING CANVAS */}
+      {/* 2. INDEPENDENT SIDE FLYOUT PANEL */}
       {isOpen && (
-        <div className="bg-[var(--theme-input-bg)] border-t border-[var(--theme-border)] text-[var(--theme-text)] text-xs select-text transition-all duration-200">
-          {/* Toolbar inside expanded view */}
-          <div className="px-4 py-2 bg-[var(--theme-card-bg)] border-b border-[var(--theme-border)] flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] select-none">
-            <div className="flex items-center gap-2">
-              <span className="text-sky-500 font-bold">›</span>
-              <span className="font-bold text-[11px] text-[var(--theme-text)]">{t.chat.reasoningTitle}</span>
+        <div
+          ref={panelRef}
+          className="fixed left-4 right-4 sm:left-auto sm:right-auto sm:absolute sm:bottom-full sm:left-0 mb-2 z-50 w-auto sm:w-[420px] max-w-[94vw] bg-[var(--theme-panel)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden animate-fadeIn select-text font-mono"
+        >
+          {/* Header */}
+          <div className="px-3.5 py-2.5 bg-[var(--theme-card-bg)] border-b border-[var(--theme-border)] flex items-center justify-between select-none">
+            <div className="flex items-center gap-2 min-w-0">
+              <Brain size={13} className="text-[var(--theme-text)] shrink-0" />
+              <span className="font-bold text-xs text-[var(--theme-text)] truncate">
+                {t.chat.reasoningTitle}
+              </span>
+              <span className="text-[10px] text-[var(--theme-text-muted)] font-mono shrink-0">
+                ({wordCount} {language === 'ru' ? 'слов' : 'words'}{displaySeconds > 0 ? ` · ${displaySeconds.toFixed(1)}s` : ''})
+              </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 shrink-0">
               {isLive && (
                 <button
                   type="button"
                   onClick={() => setAutoScroll(!autoScroll)}
-                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition-colors cursor-pointer ${
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer ${
                     autoScroll
-                      ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)] shadow-sm'
-                      : 'bg-[var(--theme-card-bg)] border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]'
+                      ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] border-[var(--theme-accent)]'
+                      : 'bg-transparent text-[var(--theme-text-muted)] border-[var(--theme-border)]'
                   }`}
-                  title={autoScroll ? '[SCROLL: ON]' : '[SCROLL: OFF]'}
+                  title="Автопрокрутка"
                 >
-                  <span>{autoScroll ? '[SCROLL: ON]' : '[SCROLL: OFF]'}</span>
+                  AUTO
                 </button>
               )}
 
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-all cursor-pointer shadow-sm"
+                className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
                 title={t.chat.copyCode}
               >
-                <span>{copied ? `[${t.chat.copied.toUpperCase()}]` : `[${t.common.copy.toUpperCase()}]`}</span>
+                {copied ? <Check size={13} className="text-[var(--theme-text)]" /> : <Copy size={13} />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                className="p-1.5 rounded-lg text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer"
+                title={t.common.close}
+              >
+                <X size={13} />
               </button>
             </div>
           </div>
 
-          {/* Structured Step Flow / Raw Stream Content */}
+          {/* Independent Scrollable Body */}
           <div
             ref={scrollRef}
-            className="p-4 space-y-3 max-h-80 overflow-y-auto scrollbar-thin text-[11.5px] leading-relaxed text-[var(--theme-text)]"
+            className="p-3.5 space-y-2.5 max-h-80 sm:max-h-96 overflow-y-auto scrollbar-thin text-xs text-[var(--theme-text)] leading-relaxed"
           >
             {isLive ? (
               thinking.trim() ? (
-                <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11.5px] text-[var(--theme-text)] font-mono whitespace-pre-wrap leading-relaxed select-text shadow-sm">
+                <div className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] whitespace-pre-wrap leading-relaxed">
                   {thinking}
                 </div>
               ) : (
-                <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic font-mono flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] animate-ping inline-block shrink-0" />
                   <span>[ {t.chat.promptPrefilling} ]</span>
                 </div>
               )
             ) : thinking.trim() ? (
-              steps.map((step) => (
-                <div
-                  key={step.stepNumber}
-                  className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] space-y-2 shadow-sm"
-                >
-                  {/* Step Header */}
-                  <div className="flex items-center gap-2 text-[var(--theme-text)] font-bold text-[11px]">
-                    <span className="px-2 py-0.5 rounded-md bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] text-[10px] font-bold">
-                      [{step.stepNumber < 10 ? `0${step.stepNumber}` : step.stepNumber}]
-                    </span>
-                    <span>{step.title}</span>
-                  </div>
-
-                  {/* Step Body */}
-                  {step.content && (
-                    <div className="pl-6 text-[11px] text-[var(--theme-text)] whitespace-pre-wrap leading-relaxed select-text font-mono">
-                      {step.content}
+              steps.length > 1 ? (
+                steps.map((step) => (
+                  <div
+                    key={step.stepNumber}
+                    className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] space-y-1.5 shadow-xs"
+                  >
+                    <div className="flex items-center gap-2 font-bold text-[11px] text-[var(--theme-text)]">
+                      <span className="px-1.5 py-0.2 rounded bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[9px]">
+                        {step.stepNumber < 10 ? `0${step.stepNumber}` : step.stepNumber}
+                      </span>
+                      <span>{step.title}</span>
                     </div>
-                  )}
+                    {step.content && (
+                      <div className="pl-4 text-[11px] text-[var(--theme-text)] whitespace-pre-wrap leading-relaxed opacity-90">
+                        {step.content}
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] whitespace-pre-wrap leading-relaxed text-[11.5px]">
+                  {thinking}
                 </div>
-              ))
+              )
             ) : (
-              <div className="p-3.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic font-mono">
+              <div className="p-3 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[11px] text-[var(--theme-text-muted)] italic">
                 [ {t.chat.reasoning} ]
               </div>
             )}
 
-            {/* Live blinking cursor during streaming */}
             {isLive && (
               <div className="flex items-center gap-2 pt-1 text-[var(--theme-text)] text-xs">
                 <span className="inline-block w-2 h-3.5 bg-[var(--theme-accent)] animate-pulse" />
-                <span className="text-[10px] text-[var(--theme-text-muted)] italic font-semibold">{thinking.trim() ? t.chat.thinking : t.chat.promptPrefilling}</span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] italic font-semibold">
+                  {thinking.trim() ? t.chat.thinking : t.chat.promptPrefilling}
+                </span>
               </div>
             )}
           </div>
@@ -281,3 +244,5 @@ export const ReasoningViewer: React.FC<ReasoningViewerProps> = React.memo(({
     </div>
   );
 });
+
+ReasoningViewer.displayName = 'ReasoningViewer';

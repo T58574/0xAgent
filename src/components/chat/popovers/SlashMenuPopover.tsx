@@ -42,23 +42,23 @@ export const SlashMenuPopover: React.FC<SlashMenuPopoverProps> = ({
         />
       )}
 
-      <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:bottom-full sm:mb-3 sm:left-0 sm:right-0 w-auto max-w-[calc(100vw-24px)] bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 animate-fadeIn rounded-2xl">
+      <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:bottom-full sm:mb-3 sm:left-0 sm:right-0 w-auto max-w-[calc(100vw-24px)] bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] z-50 animate-fadeIn rounded-2xl">
         <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider flex items-center justify-between border-b border-[var(--theme-border)] mb-1">
-          <span className="font-bold text-[var(--theme-text)]">Команды</span>
+          <span className="font-bold text-[var(--theme-text)]">Команды (Slash Commands)</span>
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline">Tab / ↵ для выбора</span>
             {onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="sm:hidden p-0.5 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
+                className="sm:hidden p-0.5 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
               >
                 <X size={12} />
               </button>
             )}
           </div>
         </div>
-        <div className="max-h-56 sm:max-h-48 overflow-y-auto space-y-1 scrollbar-thin">
+        <div className="max-h-56 sm:max-h-52 overflow-y-auto space-y-1 scrollbar-thin">
           {commands.map((item, idx) => {
             const isSelected = idx === selectedIndex;
             return (
@@ -71,7 +71,7 @@ export const SlashMenuPopover: React.FC<SlashMenuPopoverProps> = ({
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                   isSelected
-                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold shadow-sm'
+                    ? 'session-item-active text-[var(--theme-text)] font-semibold border border-[var(--theme-border)] shadow-xs'
                     : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                 }`}
               >
@@ -79,24 +79,24 @@ export const SlashMenuPopover: React.FC<SlashMenuPopoverProps> = ({
                   <div
                     className={`p-1.5 rounded-lg shrink-0 ${
                       isSelected
-                        ? 'bg-white/20 text-[var(--theme-accent-text)]'
+                        ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)]'
                         : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)]'
                     }`}
                   >
                     {item.icon}
                   </div>
                   <div className="min-w-0">
-                    <div className="font-bold text-xs truncate">{item.label}</div>
+                    <div className="font-semibold text-xs truncate text-[var(--theme-text)]">{item.label}</div>
                     <div
                       className={`text-[11px] truncate ${
-                        isSelected ? 'opacity-80' : 'text-[var(--theme-text-muted)]'
+                        isSelected ? 'text-[var(--theme-text-muted)] opacity-90' : 'text-[var(--theme-text-muted)]'
                       }`}
                     >
                       {item.description}
                     </div>
                   </div>
                 </div>
-                <span className="font-mono text-[10px] opacity-75 shrink-0">{item.cmd}</span>
+                <span className="font-mono text-[10px] opacity-75 shrink-0 text-[var(--theme-text-muted)]">{item.cmd}</span>
               </button>
             );
           })}

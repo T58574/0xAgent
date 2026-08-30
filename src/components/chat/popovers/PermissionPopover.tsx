@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shield, Check, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { PermissionPreset } from '../../../types';
 import { useI18n } from '../../../i18n';
 
@@ -49,23 +49,20 @@ export const PermissionPopover: React.FC<PermissionPopoverProps> = ({
         />
       )}
 
-      <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:bottom-full sm:mb-3 sm:right-2 w-auto sm:w-76 max-w-[calc(100vw-24px)] bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 animate-fadeIn rounded-2xl">
+      <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:bottom-full sm:mb-3 sm:right-2 w-auto sm:w-80 max-w-[calc(100vw-24px)] bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] z-50 animate-fadeIn rounded-2xl">
         <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
           <span className="font-bold text-[var(--theme-text)]">
-            {language === 'ru' ? 'Безопасность (Permissions)' : 'Permissions & Security'}
+            {language === 'ru' ? 'Режим безопасности' : 'Security Mode'}
           </span>
-          <div className="flex items-center gap-1.5">
-            <Shield size={12} className="opacity-60" />
-            {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                className="sm:hidden p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:hidden p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
+            >
+              <X size={12} />
+            </button>
+          )}
         </div>
         <div className="space-y-1">
           {presets.map((preset) => {
@@ -80,22 +77,18 @@ export const PermissionPopover: React.FC<PermissionPopoverProps> = ({
                 }}
                 className={`w-full flex items-start justify-between p-2.5 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                   isActive
-                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                    ? 'session-item-active text-[var(--theme-text)] font-semibold border border-[var(--theme-border)] shadow-xs'
                     : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                 }`}
               >
                 <div className="min-w-0 pr-2">
-                  <div className="font-bold text-xs">{preset.title}</div>
-                  <div
-                    className={`text-[10px] leading-tight ${
-                      isActive ? 'opacity-80' : 'text-[var(--theme-text-muted)]'
-                    }`}
-                  >
+                  <div className="font-semibold text-xs text-[var(--theme-text)]">{preset.title}</div>
+                  <div className="text-[10px] leading-tight text-[var(--theme-text-muted)] mt-0.5">
                     {preset.desc}
                   </div>
                 </div>
                 {isActive && (
-                  <Check size={14} className="text-[var(--theme-accent-text)] shrink-0 mt-0.5" />
+                  <Check size={14} className="text-[var(--theme-text)] shrink-0 mt-0.5" />
                 )}
               </button>
             );

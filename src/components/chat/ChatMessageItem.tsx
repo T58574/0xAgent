@@ -206,76 +206,92 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = React.memo(
           ) : (
             /* Assistant Bubble */
             <div className="relative w-fit max-w-[96%] sm:max-w-[85%] bento-card text-[var(--theme-text)] border border-[var(--theme-border)] rounded-2xl rounded-tl-md px-3.5 py-2.5 sm:px-4.5 sm:py-3 shadow-md text-[13.5px] leading-relaxed select-text space-y-2.5 transition-all">
-              {reasoningEnabled && (hasThinking || isActivelyGenerating) && (
-                <div className="mb-2 w-full">
-                  <ReasoningViewer
-                    thinking={thinking}
-                    isLive={isActivelyGenerating}
-                    thinkingSeconds={isActivelyGenerating ? thinkingSeconds : (msg.metrics?.evalDurationMs ? msg.metrics.evalDurationMs / 1000 : 0)}
-                    liveTelemetry={isActivelyGenerating ? liveTelemetry : null}
-                    defaultExpanded={false}
-                  />
+              {!text && isActivelyGenerating && !hasTools && (
+                <div className="py-1">
+                  <div className="flex items-center gap-2 text-xs text-[var(--theme-text-muted)] font-mono animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-[var(--theme-accent)] inline-block" />
+                    <span>{t.chat.thinking}...</span>
+                  </div>
                 </div>
               )}
 
               {text && (
                 <div className="space-y-1">
                   <NotionMarkdown content={cleanContent(text)} />
-                  <div className="flex justify-end items-center gap-2 pt-0.5">
-                    <span className="text-[10px] text-[var(--theme-text-muted)] opacity-80 font-sans select-none">
-                      {formatTime(msg.timestamp)}
-                    </span>
-
-                    {/* Action Bar for Assistant message */}
-                    <div className="inline-flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                      <button
-                        type="button"
-                        onClick={handleCopy}
-                        className="p-1 rounded-md hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
-                        title={t.chat.copyCode}
-                      >
-                        {copied ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-                      </button>
-
-                      {currentSession?.id && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={handleFork}
-                            className="p-1 rounded-md hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
-                            title={t.chat.forkSession}
-                          >
-                            <GitFork size={11} />
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              try {
-                                sounds.playRollback();
-                                if (onRollbackSession) {
-                                  await onRollbackSession(msg.id, 'to_assistant');
-                                } else {
-                                  await api.rollback_session(currentSession.id, msg.id, 'to_assistant');
-                                }
-                                showToast(t.chat.retryMessage, 'info');
-                              } catch (err: any) {
-                                showToast(err.message || t.common.error, 'error');
-                              }
-                            }}
-                            className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] px-2 py-0.5 rounded-md border border-transparent hover:border-[var(--theme-border)] transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
-                            title={t.chat.retryMessage}
-                          >
-                            <RotateCcw size={10} />
-                            <span>{t.chat.retryMessage}</span>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
                 </div>
               )}
+
+              {/* Bottom Metadata & Action Strip */}
+              <div className="flex items-center justify-between gap-2 pt-1 border-t border-[var(--theme-border)]/40 mt-1">
+                {/* LEFT: Background-less Reasoning Button */}
+                <div className="flex items-center">
+                  {reasoningEnabled && (hasThinking || isActivelyGenerating) && (
+                    <ReasoningViewer
+                      thinking={thinking}
+                      isLive={isActivelyGenerating}
+                      thinkingSeconds={isActivelyGenerating ? thinkingSeconds : (msg.metrics?.evalDurationMs ? msg.metrics.evalDurationMs / 1000 : 0)}
+                      liveTelemetry={isActivelyGenerating ? liveTelemetry : null}
+                      tokenCount={msg.metrics?.tokenCount || msg.metrics?.completionTokens}
+                      defaultExpanded={false}
+                    />
+                  )}
+                </div>
+
+                {/* RIGHT: Timestamp & Actions */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-[var(--theme-text-muted)] opacity-80 font-sans select-none">
+                    {formatTime(msg.timestamp)}
+                  </span>
+
+                  {/* Action Bar for Assistant message */}
+                  <div className="inline-flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      className="p-1 rounded-md hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+                      title={t.chat.copyCode}
+                    >
+                      {copied ? <Check size={11} className="text-[var(--theme-text)]" /> : <Copy size={11} />}
+                    </button>
+
+                    {currentSession?.id && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={handleFork}
+                          className="p-1 rounded-md hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+                          title={t.chat.forkSession}
+                        >
+                          <GitFork size={11} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              sounds.playRollback();
+                              if (onRollbackSession) {
+                                await onRollbackSession(msg.id, 'to_assistant');
+                              } else {
+                                await api.rollback_session(currentSession.id, msg.id, 'to_assistant');
+                              }
+                              showToast(t.chat.retryMessage, 'info');
+                            } catch (err: any) {
+                              showToast(err.message || t.common.error, 'error');
+                            }
+                          }}
+                          className="text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] px-2 py-0.5 rounded-md border border-transparent hover:border-[var(--theme-border)] transition-all inline-flex items-center gap-1 cursor-pointer text-[10px]"
+                          title={t.chat.retryMessage}
+                        >
+                          <RotateCcw size={10} />
+                          <span>{t.chat.retryMessage}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
 
               {msg.tool_calls && msg.tool_calls.length > 0 && (
                 <div className="space-y-2 pt-1 w-full">

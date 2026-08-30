@@ -46,16 +46,16 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
         />
       )}
 
-      <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:bottom-full sm:mb-3 sm:left-12 sm:w-80 max-w-[calc(100vw-24px)] bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)]/95 backdrop-blur-2xl z-50 animate-fadeIn rounded-2xl">
+      <div className="fixed inset-x-3 bottom-20 sm:absolute sm:inset-auto sm:bottom-full sm:mb-3 sm:left-12 sm:w-84 max-w-[calc(100vw-24px)] bento-card p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel)] z-50 animate-fadeIn rounded-2xl">
         {/* Cloud API Models */}
         <div className="px-3 py-1.5 text-[10px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider border-b border-[var(--theme-border)] mb-1 flex items-center justify-between">
           <span className="font-bold text-[var(--theme-text)]">
-            {language === 'ru' ? 'Облачные API (Google AI)' : 'Cloud APIs (Google AI Studio)'}
+            {language === 'ru' ? 'Облачные модели (Cloud API)' : 'Cloud API Models'}
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="sm:hidden p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)]"
+            className="sm:hidden p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
           >
             <X size={12} />
           </button>
@@ -73,7 +73,7 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
                 }}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                   isActive
-                    ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                    ? 'session-item-active text-[var(--theme-text)] font-semibold border border-[var(--theme-border)] shadow-xs'
                     : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                 }`}
               >
@@ -81,17 +81,17 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
                   {m.isAudio ? (
                     <Volume2
                       size={14}
-                      className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
+                      className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
                     />
                   ) : (
                     <Cloud
                       size={14}
-                      className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
+                      className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
                     />
                   )}
-                  <span className="truncate">{m.name}</span>
+                  <span className="truncate font-semibold">{m.name}</span>
                 </div>
-                {isActive && <Check size={13} className="text-[var(--theme-accent-text)] shrink-0" />}
+                {isActive && <Check size={13} className="text-[var(--theme-text)] shrink-0" />}
               </button>
             );
           })}
@@ -111,7 +111,7 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
             type="button"
             onClick={onToggleServer}
             disabled={isStartingServer}
-            className="px-2 py-0.5 rounded-lg bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-semibold text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-colors shadow-sm"
+            className="px-2 py-0.5 rounded-lg bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
           >
             {isStartingServer ? (
               <RefreshCw size={8} className="animate-spin" />
@@ -151,18 +151,21 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
                     }}
                     className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
                       isActive
-                        ? 'bg-[var(--theme-accent)] text-[var(--theme-accent-text)] font-bold shadow-sm'
+                        ? 'session-item-active text-[var(--theme-text)] font-semibold border border-[var(--theme-border)] shadow-xs'
                         : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <HardDrive
                         size={13}
-                        className={isActive ? 'text-[var(--theme-accent-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
+                        className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
                       />
                       <span className="truncate font-medium">{m.title || m.fileName}</span>
                     </div>
-                    <span className="text-[10px] font-mono opacity-60 shrink-0 font-bold">{m.sizeGB}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-[10px] font-mono opacity-60 font-bold">{m.sizeGB}</span>
+                      {isActive && <Check size={13} className="text-[var(--theme-text)] shrink-0" />}
+                    </div>
                   </button>
                 );
               })

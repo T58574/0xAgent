@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Mic,
   Shield,
-  Sparkles,
   Maximize2,
   Minimize2,
 } from 'lucide-react';
@@ -584,9 +583,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <button type="button" onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'reasoning' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`} aria-label={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`}>
-            <Sparkles size={13} className="opacity-70" />
-            <span className="text-[11px] uppercase font-bold">{reasoningEffort}</span>
+          <button type="button" onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')} className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'reasoning' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`} aria-label={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`}>
+            <span className="text-[11px] uppercase font-mono tracking-wider font-bold">{reasoningEffort.toUpperCase()}</span>
           </button>
 
           <button type="button" onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'permission' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.permission}: ${permissionPreset}`} aria-label={`${t.chat.permission}: ${permissionPreset}`}>
