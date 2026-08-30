@@ -44,7 +44,8 @@ export function initPersonas(): void {
   
   const ensurePersona = (id: string, data: any) => {
     const personaDir = path.join(dir, id);
-    if (!fs.existsSync(personaDir)) {
+    const metaPath = path.join(personaDir, 'metadata.json');
+    if (!fs.existsSync(personaDir) || !fs.existsSync(metaPath)) {
       createPersonaDirectory(id, data);
     } else {
       // Ensure baseline versions exist in DB

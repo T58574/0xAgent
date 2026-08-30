@@ -7,7 +7,6 @@ import {
   ChevronRight,
   ChevronDown,
   FolderTree,
-  History,
   Search,
   MessageSquare,
   GitBranch,
@@ -23,6 +22,7 @@ import { ChatSession, FileNode } from '../types';
 import { WorkspaceTree } from './WorkspaceTree';
 import { getWorkspaceBaseName, formatRelativeTime, isAutoWorkspace } from '../utils/helpers';
 import { useI18n } from '../i18n';
+import { SessionTimelineModal, formatDialogCount } from './chat/SessionTimelineModal';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -55,11 +55,12 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   activeView,
   onChangeView,
 }) => {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const [showFileExplorer, setShowFileExplorer] = useState(false);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [searchFilter, setSearchFilter] = useState('');
   const [isHoveringHistory, setIsHoveringHistory] = useState(false);
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
   const [showNewChatMenu, setShowNewChatMenu] = useState(false);
   const newChatMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -557,29 +558,36 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             </div>
           )}
 
-          {/* 4. BOTTOM FOOTER: SESSION HISTORY & ASCII RISING PARTICLES ON HOVER */}
-          <div
+          {/* 4. BOTTOM FOOTER: SESSION TIMELINE TRIGGER & ASCII RISING PARTICLES ON HOVER */}
+          <button
+            type="button"
+            onClick={() => setIsTimelineOpen(true)}
             onMouseEnter={() => setIsHoveringHistory(true)}
             onMouseLeave={() => setIsHoveringHistory(false)}
-            className="p-3 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-panel)] relative overflow-hidden group transition-all"
+            className="w-full p-3.5 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-panel)] hover:bg-[var(--theme-border-subtle)] relative overflow-hidden group transition-all text-center cursor-pointer select-none"
+            title={language === 'ru' ? 'Открыть хронологию всех диалогов' : 'Open session timeline'}
           >
             {/* Interactive ASCII Particle Canvas */}
             <AsciiParticleFlow isActive={isHoveringHistory} />
 
-            <div className="relative z-10 flex items-center justify-between text-xs text-[var(--theme-text-muted)] font-medium">
-              <div className="flex items-center gap-2">
-                <History size={15} className="text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] transition-colors" />
-                <span className="group-hover:text-[var(--theme-text)] transition-colors font-semibold">{t.sidebar.sessions}</span>
-              </div>
-              <span className="px-2.5 py-0.5 rounded-md bg-[var(--theme-border-subtle)] text-[var(--theme-text)] font-bold text-xs border border-[var(--theme-border)]">
-                {sessions.length}
-              </span>
+            <div className="relative z-10 flex items-center justify-center text-xs font-mono text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] font-semibold transition-colors">
+              <span>{formatDialogCount(sessions.length, language)}</span>
             </div>
-          </div>
+          </button>
 
         </div>
 
       </aside>
+
+      {/* Session Timeline Popover Modal */}
+      <SessionTimelineModal
+        isOpen={isTimelineOpen}
+        onClose={() => setIsTimelineOpen(false)}
+        sessions={sessions}
+        currentSessionId={currentSessionId}
+        onSelectSession={onSelectSession}
+        onDeleteSession={onDeleteSession}
+      />
     </>
   );
 });
