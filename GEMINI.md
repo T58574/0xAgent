@@ -1,7 +1,7 @@
 # GEMINI.md — 0xAgent Architecture & Developer Guide
 
 ## 🚀 Overview
-**0xAgent** is a local-first autonomous AI coding agent and Web-IDE platform (React 19 + Node.js/Express + local llama.cpp / hybrid cloud LLMs).
+**0xAgent** is a local-first autonomous AI conversational agent, companion & Web-IDE platform (React 19 + Node.js/Express + SQLite WAL + local llama.cpp / hybrid cloud LLMs).
 
 ---
 
@@ -17,6 +17,7 @@
 - `index.ts` — Express API (`:3001`), WebSocket gateway (`/ws`), and process supervisor for `llama-server.exe`.
 - `agent.ts` — Autonomous agent orchestrator (prompt execution loop, streaming, tool dispatching).
 - `agent/` — Agent submodules:
+  - `memoryWorker.ts` — Asynchronous debounced background memory ingestion worker.
   - `llmClient.ts` — Universal LLM client (local llama.cpp & Google AI Studio Gemini).
   - `toolDispatcher.ts` / `toolParser.ts` — Tool execution and robust XML/tag parsing (`<toolcall>`, `<tool_call>`).
   - `promptBuilder.ts` — Dynamic system prompt construction, persona injection, and context assembly.
@@ -27,6 +28,8 @@
   - `codeRuntime.ts` — Sandboxed Node.js VM runtime for `<code_run>` batch operations.
   - `permissionGuard.ts` — Security presets (`readonly`, `workspace-write`, `prompt`, `unrestricted`).
   - `voiceDaemonManager.ts` / `voiceMacroService.ts` — Native voice spotting and zero-token OS macros.
+- `memory.ts` — Memory Engine v1.0 (CRUD, Write Policy, deterministic router, token budget allocator).
+- `memoryDb.ts` — Native `node:sqlite` connection manager, WAL mode, tables and FTS5 triggers.
 - `jarvisSupervisor.ts` / `proactiveCompanion.ts` — Voice companion orchestrator, sparks engine, and activity watcher.
 - `voice_daemon.py` — Native Python onnx speech recognizer daemon (sherpa-onnx / Moonshine).
 - `tools/` & `tools.ts` — Tool implementations (file system, patches, search, terminal execution).
@@ -60,6 +63,7 @@
 - `index.css` — Glassmorphism styles and 2 clean brutal themes (`graphite`, `light`).
 
 ### Data Directory (`~/.0xagent/`)
+- `memory.db` — SQLite canonical database (WAL mode: canonical memories, episodes, relationships, audit log, FTS5).
 - `config.json` — Persistent configuration.
 - `bin/` — Global CLI executables (`0xagent.cmd`, `0xagent.ps1`, `0xagent`).
 - `app/` — Codebase installation directory.
@@ -84,6 +88,7 @@
    - Model-free tool output pruning (`toolResultPruner.ts`) trims old tool outputs in context.
    - Loop breaker (`loopBreaker.ts`) halts repetitive tool calls (warning at 3, halt at 5).
    - Massive command outputs (>24 KB) spill to `~/.0xagent/spill/*.log` with truncated context references.
+   - Memory Engine v1.0 enforces dynamic token budgeting (0..400 tokens) with 0 memories for casual dialogue.
 9. **Atomic UI & Zero-Slop Design Policy**:
    - Strictly prohibit writing ad-hoc raw HTML controls (`<button>`, `<input>`, `<select>`, `<textarea>`, raw `<dialog>`) styled with haphazard utility classes (`bg-white/10`, custom borders). Always import and compose from `src/components/ui/` (`Button`, `Input`, `Select`, `Toggle`, `Badge`, `Card`, `Modal`).
    - Settings views must strictly follow `CustomizationsTab.tsx` and `src/components/settings/common/` as the canonical layout template (`SettingsHeader` → `SettingsSection` → `Card` → `SettingItemRow`).
@@ -96,7 +101,7 @@
     - Type definitions in `src/types.ts`
     - System prompt instructions in `server/agent/promptBuilder.ts`
     - Corresponding unit test in `tests/`
-12. **Mandatory Automated Test Pass**: Before concluding any task or committing changes, run `npm test`. All 90+ tests must pass with 0 failures.
+12. **Mandatory Automated Test Pass**: Before concluding any task or committing changes, run `npm test`. All 100+ tests must pass with 0 failures.
 13. **I18n Strict Parity**: When adding or modifying UI labels, placeholders, or settings keys, always synchronously update BOTH `src/i18n/translations/en.ts` AND `src/i18n/translations/ru.ts`. Never hardcode raw untranslated text strings directly into JSX templates.
 
 ---

@@ -1,190 +1,108 @@
-# 0xAgent Architecture Overview
+# 0xAgent System Architecture
 
 > **Version:** 0.1.0  
-> **Platform:** Windows (primary), macOS (partial)
+> **Platform:** Windows (PowerShell / Native Tray), macOS/Linux (CLI)  
+> **Core Stack:** Node.js (TypeScript) + Express (`:3001`) + React 19 + TailwindCSS 4 + SQLite WAL (`node:sqlite`) + local `llama.cpp` / Hybrid Cloud
 
 ---
 
-## System Architecture
+## 1. High-Level Topology
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    start.bat (Entry Point)               │
-│                        ↓                                 │
-│              scripts/start.ps1 (Supervisor)              │
-│         ┌──────────────────────────────┐                 │
-│         │  Log Rotation & Archiving    │                 │
-│         │  Port/Process Cleanup        │                 │
-│         │  Exit Trap (finally block)   │                 │
-│         └──────────────────────────────┘                 │
-│                        ↓                                 │
-│    ┌───────────────────┴────────────────────┐            │
-│    │                                        │            │
-│    ▼                                        ▼            │
-│ [SERVER] tsx watch server/index.ts    [CLIENT] vite      │
-│   Port 3001 (API + WebSocket)           Port 5173 (UI)  │
-│    │                                        │            │
-│    ├─ Express REST API                      ├─ React 19  │
-│    ├─ WebSocket Server (ws)                 ├─ TailwindCSS│
-│    ├─ Agent Loop (agent.ts)                 ├─ Lucide Icons│
-│    ├─ llama.cpp Child Process Manager       └─ TypeScript │
-│    └─ GGUF Parser / Hardware Detector                    │
-└─────────────────────────────────────────────────────────┘
-                        ↕
-              ┌─────────────────────┐
-              │  ~/.0xagent/        │
-              │  ├─ config.json     │
-              │  ├─ memory.json     │
-              │  ├─ prompts/        │
-              │  ├─ skills/         │
-              │  ├─ data/sessions/  │
-              │  ├─ llama/          │
-              │  └─ models/         │
-              └─────────────────────┘
+```text
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 0xAgent Architecture                                   │
+├────────────────────────────────────────┬───────────────────────────────────────────────┤
+│           Frontend Layer (UI)          │             Backend Subsystems                │
+│ ┌────────────────────────────────────┐ │ ┌───────────────────────────────────────────┐ │
+│ │ React 19 + TypeScript + Vite       │ │ │ Express REST API (:3001) & WS (/ws)       │ │
+│ │ ├─ ChatArea (Timeline & Reasoning) │ │ │ ├─ Agent Orchestrator (agent.ts)          │ │
+│ │ ├─ Monaco Code Editor              │ │ │ ├─ Memory Engine v1.0 (SQLite WAL + FTS5) │ │
+│ │ ├─ Jarvis Sanctuary Visualizer     │ │ │ ├─ Jarvis Supervisor (Sparks & Voice)     │ │
+│ │ ├─ Knowledge Vault (RAG)           │ │ │ ├─ FastMTP Speculative Decoding Manager   │ │
+│ │ ├─ Settings Tabs (LLM, Personas)   │ │ │ ├─ Sandboxed Tool Dispatcher & Spiller    │ │
+│ │ └─ Memory & Skills Modal           │ │ │ └─ llama.cpp Child Process Supervisor     │ │
+│ └────────────────────────────────────┘ │ └───────────────────────────────────────────┘ │
+└────────────────────────────────────────┴───────────────────────────────────────────────┘
+                                         ↕
+                    ┌──────────────────────────────────────────┐
+                    │       Data Storage (~/.0xagent/)         │
+                    │ ├─ memory.db (SQLite Canonical Store)    │
+                    │ ├─ config.json (Global Configuration)    │
+                    │ ├─ data/sessions/ (Chat Session Logs)    │
+                    │ ├─ knowledge_base/ (RAG Vault & Index)   │
+                    │ ├─ personas/ (SOUL, USER, TOOLS profiles)│
+                    │ ├─ workspaces/ (Sandboxed agent folders) │
+                    │ ├─ spill/ (Truncated tool outputs >24KB) │
+                    │ ├─ llama/ (Installed llama.cpp binaries) │
+                    │ └─ models/ (Local GGUF models)           │
+                    └──────────────────────────────────────────┘
 ```
 
 ---
 
-## Project File Structure
+## 2. Core Backend Subsystems
 
-```
+### A. Agent Execution Loop (`server/agent.ts`)
+1. **Dynamic Prompt Assembly (`promptBuilder.ts`)**: Injects persona identity (`SOUL.md`), user profile & active memories from `memory.ts`, tool schemas, and workspace rules.
+2. **Context Compaction Pipeline (`compactionPipeline.ts`)**: 4-tier compaction that strips historical `<think>` reasoning traces from past assistant turns to preserve the KV cache.
+3. **Speculative / Streaming Response (`llmClient.ts`)**: Streams tokens from local `llama-server.exe` or cloud API (Gemini).
+4. **Tool Parsing & Dispatch (`toolParser.ts` / `toolDispatcher.ts`)**: Parses XML tags (`<read_file>`, `<patch_file>`, `<execute_command>`, `<save_knowledge>`) with fallback regex for unclosed tags.
+5. **Loop Breaker (`loopBreaker.ts`)**: Halts repetitive tool loops (warning at 3 oscillations, halt at 5).
+6. **Output Spiller (`outputSpiller.ts`)**: Automatically writes massive tool outputs (>24 KB) to `~/.0xagent/spill/*.log` and provides a short summary reference.
+
+### B. Memory Engine v1.0 (`server/memory.ts` & `server/memoryDb.ts`)
+- **Native SQLite WAL**: Stored in `~/.0xagent/memory.db`.
+- **Write Policy & Candidate Review**: Distinguishes between explicit user commands (confidence 1.0, immediate save) and inferred facts (confidence gating, candidate status, or ignore).
+- **Deterministic Router**: Emits 0 memories for casual chat; ranks relevant facts and FTS5 episodes within a dynamic token budget (0..400 tokens).
+- **Background Worker (`memoryWorker.ts`)**: Asynchronously ingests conversational facts on 20s debounce without delaying the main LLM response.
+
+### C. Jarvis Companion & Voice System (`server/jarvisSupervisor.ts`)
+- **Proactive Sparks Engine (`proactiveCompanion.ts`)**: Emits proactive suggestions and actions based on user activity and system events.
+- **Voice Intercom Daemon (`voiceDaemonManager.ts` / `voice_daemon.py`)**: Local Python speech recognition (sherpa-onnx / Moonshine / Whisper).
+- **TTS Audio Engine (`ttsService.ts`)**: Synthesizes and caches voice responses.
+
+### D. Speculative Decoding & FastMTP (`server/routes/llama/`)
+- Supports loading draft models alongside primary 9B/27B models for accelerated speculative token generation in llama.cpp.
+
+---
+
+## 3. Directory Layout
+
+```text
 0xAgent/
-├── start.bat                    # Entry point — invokes scripts/start.ps1
-├── package.json                 # npm scripts: dev, build, stop
-├── tsconfig.json                # TypeScript config (frontend + backend)
-├── vite.config.ts               # Vite dev server + proxy config
-├── GEMINI.md                    # AI model architectural blueprint
-│
-├── scripts/
-│   ├── start.ps1                # Supervisor: cleanup → log rotation → concurrently
-│   └── cleanup.ps1              # Kill stale processes on ports 3001/5173/llama
-│
-├── server/                      # Backend (Node.js + Express + TypeScript)
-│   ├── index.ts                 # Main server: all API routes, WebSocket, llama manager
-│   ├── agent.ts                 # Agent loop: LLM ↔ tool execution cycle
-│   ├── config.ts                # Config & prompt file I/O (~/.0xagent/)
-│   ├── session.ts               # Chat session CRUD (~/.0xagent/data/sessions/)
-│   ├── tools.ts                 # Tool implementations (read/write/patch/grep/exec)
-│   ├── memory.ts                # Persistent agent memory (~/.0xagent/memory.json)
-│   ├── skills.ts                # Extensible skill files (~/.0xagent/skills/)
-│   ├── hardware.ts              # GPU auto-detection (Win32_VideoController / wmic)
-│   └── ggufParser.ts            # GGUF binary header parser for model metadata
-│
-├── src/                         # Frontend (React 19 + TypeScript)
-│   ├── main.tsx                 # React entry point
-│   ├── App.tsx                  # Root app: routing, session management, WS listeners
-│   ├── types.ts                 # Shared TypeScript interfaces
-│   ├── index.css                # TailwindCSS 4 + custom design tokens
-│   │
-│   ├── services/
-│   │   └── api.ts               # REST + WebSocket client wrappers
-│   │
-│   ├── components/
-│   │   ├── ChatArea.tsx          # Chat messages, input, voice, 1-click launch banner
-│   │   ├── Header.tsx            # Top navigation bar
-│   │   ├── BottomPanel.tsx       # Bottom toolbar panel
-│   │   ├── WorkspaceTree.tsx     # File tree sidebar
-│   │   ├── CodeEditor.tsx        # Inline code viewer/editor
-│   │   ├── FileViewer.tsx        # Raw file content viewer
-│   │   ├── ToolCard.tsx          # Tool call approval/rejection UI
-│   │   ├── MemorySkillsModal.tsx # Memory & Skills management modal
-│   │   ├── ModelPickerModal.tsx  # GGUF model scanner/picker modal
-│   │   │
-│   │   └── settings/
-│   │       ├── SettingsPage.tsx   # Settings orchestrator (tabs, auto-save)
-│   │       ├── GeneralTab.tsx     # General settings (API URL, model, tokens)
-│   │       ├── LocalServerTab.tsx # llama.cpp server config + installer UI
-│   │       ├── PromptsTab.tsx     # System prompts editor
-│   │       ├── ColorsTab.tsx      # Custom theme color picker
-│   │       └── ThemesTab.tsx      # Preset theme selector
-│   │
-│   └── utils/
-│       └── helpers.ts            # Utility functions
-│
-├── logs/                        # Runtime logs (auto-rotated)
-│   └── archive/                 # Compressed old logs (.zip)
-│
-└── models/                      # Local GGUF model files (gitignored)
+├── bin/
+│   └── 0xagent.js               — Universal CLI Hub (start, status, config, stop)
+├── docs/                        — Complete Documentation (architecture, memory, api, guides)
+├── launcher/
+│   └── TrayLauncher.cs          — Native C# Windows System Tray supervisor (<15 KB)
+├── server/
+│   ├── index.ts                 — Express server, WebSocket gateway, process supervisor
+│   ├── agent.ts                 — Autonomous agent execution loop
+│   ├── agent/                   — Prompt builder, memory worker, compactor, loop breaker
+│   ├── memory.ts                — Memory Engine API, Write Policy, Deterministic Router
+│   ├── memoryDb.ts              — Native node:sqlite database manager & FTS5 triggers
+│   ├── personas.ts              — Persona manager (SOUL, USER, TOOLS profiles)
+│   ├── knowledgeBase.ts         — Knowledge Vault manager and manifest index
+│   ├── hardware.ts              — GPU & VRAM hardware detection (Win32_VideoController)
+│   ├── fffService.ts            — High-speed fuzzy file finder (@ff-labs/fff-node)
+│   ├── searxngService.ts        — Privacy-first web search aggregator
+│   └── tools.ts                 — Sandboxed file system & terminal tools
+├── src/                         — React 19 Frontend (Atomic Design System)
+│   ├── App.tsx                  — Root component & split-screen orchestrator
+│   ├── types.ts                 — Single Source of Truth TypeScript interfaces
+│   ├── components/ui/           — Atomic Design System (Button, Input, Select, Card, Modal)
+│   ├── components/chat/         — Chat timeline, reasoning HUD, floating command bar
+│   ├── components/settings/     — Tabbed configuration views
+│   └── i18n/                    — Bilingual translation dictionaries (en.ts, ru.ts)
+└── tests/                       — Automated test suites (100+ tests)
 ```
 
 ---
 
-## Data Storage (`~/.0xagent/`)
+## 4. Key Architectural Invariants
 
-| Path | Format | Purpose |
-|---|---|---|
-| `config.json` | JSON | All app settings: API URL, model name, theme, local_server params |
-| `memory.json` | JSON | Agent long-term facts and user preferences |
-| `prompts/` | `.md` files | System prompt templates (default.md, coding_agent.md, etc.) |
-| `skills/` | `.md` files | Extensible agent skill instruction files |
-| `data/sessions/` | JSON files | Chat history sessions (one file per session) |
-| `llama/` | Directories | Installed llama.cpp versions (e.g. `llama/b10099/`) |
-| `models/` | `.gguf` files | Downloaded GGUF model files |
-
----
-
-## Agent Tool System
-
-The agent uses XML-tagged tool calls parsed from LLM responses. Tools available:
-
-| Tool | XML Format | Description |
-|---|---|---|
-| `read_file` | `<read_file path="..." />` | Read file contents |
-| `write_file` | `<write_file path="...">content</write_file>` | Write file (create/overwrite) |
-| `patch_file` | `<patch_file path="...">SEARCH/REPLACE</patch_file>` | Surgical file patching |
-| `list_dir` | `<list_dir path="..." />` | List directory contents |
-| `grep_search` | `<grep_search pattern="..." path="..." />` | Regex search in files |
-| `execute_command` | `<execute_command>cmd</execute_command>` | Execute PowerShell command |
-| `remember_fact` | `<remember_fact key="..." value="..." />` | Store persistent memory |
-| `recall_memories` | `<recall_memories query="..." />` | Query stored memories |
-| `list_skills` | `<list_skills />` | List available skills |
-| `execute_skill` | `<execute_skill name="..." />` | Execute a skill |
-| `search_sessions` | `<search_sessions query="..." />` | Search chat history |
-| `run_scratch_script` | `<run_scratch_script language="...">code</run_scratch_script>` | Run temporary script |
-| `ask_user` | `<ask_user question="..." />` | Ask user clarification |
-| `spawn_subagent` | `<spawn_subagent role="..." goal="..." />` | Spawn a sub-agent |
-
-### Tool Confirmation Flow
-
-Destructive tools (`write_file`, `patch_file`, `execute_command`) require user approval:
-
-1. Agent parses tool calls from LLM response
-2. Backend broadcasts `agent-tools-updated` with status `"pending"`
-3. Frontend renders `ToolCard` with Approve/Reject buttons
-4. User clicks → `POST /api/respond-to-tool` → agent continues or skips
-
----
-
-## Process Management
-
-### Startup Flow (`start.bat` → `scripts/start.ps1`)
-
-1. Set UTF-8 encoding (`chcp 65001`)
-2. Run `scripts/cleanup.ps1` — kill stale processes on ports 3001, 5173, and any llama-server/llama.exe
-3. Archive logs if count > 10 → compress to `logs/archive/`
-4. Launch `npm run dev` (concurrently: tsx + vite)
-5. Capture output to `logs/0xAgent_YYYY-MM-DD_HH-MM-SS.log`
-6. On exit: `finally` block runs cleanup again
-
-### Exit Handlers (Node.js — `server/index.ts`)
-
-Signals `SIGINT`, `SIGTERM`, `exit`, `uncaughtException` all call `cleanupOnExit()` which kills the active llama-server child process via `taskkill /F /T /PID`.
-
-### Orphan Process Protection
-
-When `tsx` restarts the Node server (file change), the module-level `activeLlamaProcess` reference is lost. The function `killProcessOnPort(port)` uses `netstat` + `taskkill` to find and kill any process holding the target port before spawning a new llama-server.
-
----
-
-## Configuration Auto-Save Mechanism
-
-**CRITICAL for developers:**
-
-`SettingsPage.tsx` uses a 600ms debounced `useEffect` to auto-save all settings to `POST /api/config`. When the config loads, `useEffect` restores all `config.local_server` fields into React state.
-
-⚠️ **If you add a new field to `LocalServerConfig` in `types.ts`, you MUST also:**
-1. Add a `useState` hook in `SettingsPage.tsx`
-2. Restore its value from `config.local_server` in the `useEffect` on config load
-3. Include it in the debounced save payload
-
-**Failure to do this causes the debounced auto-save to overwrite `config.json` with default values, destroying user settings.**
+1. **Single Source of Types**: `src/types.ts` is the single source of truth for all types across backend and frontend.
+2. **Zero-Slop UI & Atomic Design**: Never write ad-hoc raw HTML controls. Always compose from `src/components/ui/` (`Button`, `Input`, `Select`, `Card`, `Modal`).
+3. **Safe Code Rendering**: Zero `dangerouslySetInnerHTML`. Code and markdown are tokenized safely via React elements.
+4. **Patching Standard**: Use `patch_file` with compact `SEARCH`/`REPLACE` blocks for modifying existing files.
+5. **Strict Async I/O**: Synchronous blocking calls (`fs.readFileSync`, `execSync`) are prohibited on request and event paths.

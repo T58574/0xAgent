@@ -1,509 +1,219 @@
 # 0xAgent Backend API Reference
 
-> Base URL: `http://localhost:3001/api`  
-> WebSocket: `ws://localhost:3001/ws`  
-> Content-Type: `application/json`
+> **Base URL:** `http://localhost:3001/api` (or `https://localhost:3001/api`)  
+> **WebSocket:** `ws://localhost:3001/ws` (or `wss://localhost:3001/ws`)  
+> **Content-Type:** `application/json`
 
 ---
 
-## Table of Contents
+## 1. Table of Contents
 
-- [Configuration](#configuration)
-- [Chat Sessions](#chat-sessions)
-- [Agent Execution](#agent-execution)
-- [System Prompts](#system-prompts)
-- [Memory](#memory)
-- [Skills](#skills)
-- [Workspace & Files](#workspace--files)
-- [Local LLM Server (llama.cpp)](#local-llm-server-llamacpp)
-- [GGUF Model Management](#gguf-model-management)
-- [Hardware Detection](#hardware-detection)
-- [Audio Transcription](#audio-transcription)
-- [Network](#network)
-- [WebSocket Events](#websocket-events)
+- [Configuration](#2-configuration)
+- [Chat Sessions](#3-chat-sessions)
+- [Memory Engine v1.0](#4-memory-engine-v10)
+- [Personas System](#5-personas-system)
+- [Knowledge Vault (RAG)](#6-knowledge-vault-rag)
+- [Skills](#7-skills)
+- [Jarvis Companion & Voice](#8-jarvis-companion--voice)
+- [Local LLM Server (llama.cpp)](#9-local-llm-server-llamacpp)
+- [Hardware & Diagnostics](#10-hardware--diagnostics)
+- [WebSocket Realtime Events](#11-websocket-realtime-events)
 
 ---
 
-## Configuration
+## 2. Configuration
 
 ### `GET /api/config`
-Returns the full application configuration.
-
-**Response:** `AppConfig` object (see [Types](#types)).
+Returns application settings.
+- **Response:** `AppConfig`
 
 ### `POST /api/config`
-Saves the full application configuration to `~/.0xagent/config.json`.
-
-**Body:** `AppConfig` object.  
-**Response:** `{ success: true }`
+Updates application settings (`~/.0xagent/config.json`).
+- **Body:** `AppConfig`
+- **Response:** `{ success: true }`
 
 ---
 
-## Chat Sessions
+## 3. Chat Sessions
 
 ### `GET /api/sessions`
-Lists all saved chat sessions.
-
-**Response:** `ChatSession[]`
+Returns list of session summaries.
+- **Response:** `SessionSummary[]`
 
 ### `GET /api/sessions/:id`
-Loads a specific session by ID.
-
-**Response:** `ChatSession`  
-**Error:** `404` if session not found.
+Loads full chat session with messages.
+- **Response:** `ChatSession`
 
 ### `POST /api/sessions`
 Creates a new chat session.
-
-**Body:** `{ title: string }`  
-**Response:** `ChatSession`
-
-### `POST /api/sessions/:id/save`
-Saves/updates a chat session.
-
-**Body:** Full `ChatSession` object.  
-**Response:** `{ success: true }`
+- **Body:** `{ title?: string, workspace_dir?: string }`
+- **Response:** `ChatSession`
 
 ### `DELETE /api/sessions/:id`
-Deletes a session.
+Deletes a chat session file.
+- **Response:** `{ success: true }`
 
-**Response:** `{ success: true }`
-
----
-
-## Agent Execution
-
-### `POST /api/send-message`
-Triggers the agent loop for a session. The last user message in the session is processed by the LLM. Results are streamed via WebSocket events.
-
-**Body:** `{ sessionId: string }`  
-**Response:** `{ success: true }`
-
-> **Note:** This is a non-blocking call. The agent runs asynchronously and pushes results via WebSocket.
-
-### `POST /api/cancel-agent`
-Cancels the active agent execution for a session.
-
-**Body:** `{ sessionId: string }`  
-**Response:** `{ success: true }`
-
-### `POST /api/respond-to-tool`
-Approves or rejects a pending tool call confirmation.
-
-**Body:**
-```json
-{
-  "sessionId": "string",
-  "toolCallId": "string",
-  "approve": true | false
-}
-```
-**Response:** `{ success: boolean }`
+### `POST /api/sessions/:id/rollback`
+Rolls back session history to a specific message ID.
+- **Body:** `{ messageId: string }`
+- **Response:** `{ success: true, session: ChatSession }`
 
 ---
 
-## System Prompts
-
-Files stored in `~/.0xagent/prompts/`. Each file is a `.md` document.
-
-### `GET /api/prompts`
-Lists all available prompt files.
-
-**Response:** `PromptFileInfo[]`
-
-### `GET /api/prompts/:filename`
-Returns the content of a specific prompt file.
-
-**Response:** `{ filename: string, content: string }`
-
-### `POST /api/prompts/:filename`
-Creates or updates a prompt file.
-
-**Body:** `{ content: string }`  
-**Response:** `{ success: true }`
-
-### `DELETE /api/prompts/:filename`
-Deletes a prompt file.
-
-**Response:** `{ success: true }`
-
-### `POST /api/prompts-select`
-Sets the active system prompt file.
-
-**Body:** `{ filename: string }`  
-**Response:** Updated `AppConfig`
-
----
-
-## Memory
-
-Persistent agent facts stored in `~/.0xagent/memory.json`.
+## 4. Memory Engine v1.0
 
 ### `GET /api/memories`
-Lists all memories. Supports optional `?query=<text>` to filter by keyword.
-
-**Response:** `MemoryItem[]`
+Lists active canonical memories. Optional query string filter: `?query=...`
+- **Response:** `MemoryItem[]`
 
 ### `POST /api/memories`
-Adds or updates a memory entry.
-
-**Body:**
-```json
-{
-  "key": "string",
-  "value": "string",
-  "category": "user_preference" | "project_convention" | "architecture" | "fact" | "general"
-}
-```
-**Response:** `MemoryItem`
+Creates or updates a memory item.
+- **Body:** `{ key: string, value: string, category?: string, domain?: string, importance?: number, is_explicit?: boolean }`
+- **Response:** `MemoryItem`
 
 ### `DELETE /api/memories/:id`
-Deletes a memory entry.
+Marks a memory item as invalidated.
+- **Response:** `{ success: boolean }`
 
-**Response:** `{ success: boolean }`
+### `GET /api/memories/candidates`
+Returns list of candidate memories pending review ($0.70 \le \text{confidence} < 0.90$).
+- **Response:** `CanonicalMemory[]`
+
+### `POST /api/memories/resolve`
+Resolves candidate or conflicting memories.
+- **Body:** `{ memoryId: string, resolution: 'accept' | 'reject', reason?: string }`
+- **Response:** `{ success: boolean }`
+
+### `GET /api/memories/episodes`
+Searches episodes via FTS5 full-text index.
+- **Query Params:** `query` (string), `limit` (number, default: 10)
+- **Response:** `Episode[]`
+
+### `POST /api/memories/episodes`
+Creates a new episodic memory record.
+- **Body:** `{ sessionId?: string, title: string, summary: string, importance?: number, eventTimestamp?: number }`
+- **Response:** `Episode`
+
+### `GET /api/memories/relationships/:personaId`
+Gets relationship state for the specified persona.
+- **Response:** `PersonaRelationship`
+
+### `POST /api/memories/relationships/:personaId`
+Updates relationship state for the specified persona.
+- **Body:** `Partial<PersonaRelationship>`
+- **Response:** `PersonaRelationship`
 
 ---
 
-## Skills
+## 5. Personas System
 
-Extensible agent skill instruction files stored in `~/.0xagent/skills/`.
+### `GET /api/personas`
+Returns all available personas with metadata and active state.
+- **Response:** `PersonaDetail[]`
+
+### `POST /api/personas/activate`
+Switches the active persona.
+- **Body:** `{ id: string }`
+- **Response:** `{ success: true, activeId: string }`
+
+### `POST /api/personas`
+Creates or updates a persona profile.
+- **Body:** `{ id: string, name: string, description: string, soul: string, user: string, tools: string }`
+- **Response:** `PersonaDetail`
+
+---
+
+## 6. Knowledge Vault (RAG)
+
+### `GET /api/knowledge`
+Lists all knowledge entries from the manifest.
+- **Response:** `KnowledgeEntry[]`
+
+### `POST /api/knowledge`
+Creates or updates a knowledge entry.
+- **Body:** `{ title: string, category: string, content: string, tags?: string[], summary?: string }`
+- **Response:** `KnowledgeEntry`
+
+### `DELETE /api/knowledge/:id`
+Deletes a knowledge entry.
+- **Response:** `{ success: boolean }`
+
+---
+
+## 7. Skills
 
 ### `GET /api/skills`
-Lists all skills.
-
-**Response:** `SkillInfo[]`
+Returns all available AGY skill instruction definitions.
+- **Response:** `SkillInfo[]`
 
 ### `GET /api/skills/:name`
-Returns the content of a specific skill.
-
-**Response:** `{ name: string, content: string }`
-
-### `POST /api/skills/:name`
-Creates or updates a skill.
-
-**Body:** `{ content: string }`  
-**Response:** `{ success: true }`
-
-### `DELETE /api/skills/:name`
-Deletes a skill.
-
-**Response:** `{ success: true }`
+Returns raw Markdown content of the specified skill.
+- **Response:** `{ name: string, content: string }`
 
 ---
 
-## Workspace & Files
+## 8. Jarvis Companion & Voice
 
-### `POST /api/select-workspace`
-Opens a native folder picker dialog to select the active workspace directory. Saves the selection to config.
+### `GET /api/jarvis/state`
+Returns aggregated companion telemetry, active workers, sparks, and speech status.
+- **Response:** `JarvisState`
 
-**Response:** `{ folder: string | null }`
+### `POST /api/jarvis/sparks/:id/accept`
+Executes action associated with a spark proposal.
+- **Response:** `{ success: boolean }`
 
-### `POST /api/select-file`
-Opens a native file picker dialog.
+### `POST /api/jarvis/sparks/:id/dismiss`
+Dismisses a spark proposal.
+- **Response:** `{ success: boolean }`
 
-**Body:** `{ filter?: string }` — e.g. `"Executable Files (*.exe)|*.exe|All Files (*.*)|*.*"`  
-**Response:** `{ filePath: string | null }`
-
-### `GET /api/workspace-tree`
-Returns the file tree of the active workspace.
-
-**Query:** `?workspaceDir=<path>` (optional override)  
-**Response:** `FileNode[]`
-
-### `GET /api/read-file-raw`
-Reads a file's raw content.
-
-**Query:** `?path=<absolute_file_path>`  
-**Response:** `{ content: string }`
-
-### `POST /api/write-file-raw`
-Writes content to a file.
-
-**Body:** `{ path: string, content: string }`  
-**Response:** `{ success: true }`
+### `POST /api/tts/speak`
+Synthesizes speech and returns cached base64 audio.
+- **Body:** `{ text: string, category?: string }`
+- **Response:** `{ audioBase64: string, cached: boolean }`
 
 ---
 
-## Local LLM Server (llama.cpp)
+## 9. Local LLM Server (llama.cpp)
 
-### `POST /api/start-local-server`
-Spawns a local `llama-server.exe` child process. Auto-detects executable in `~/.0xagent/llama/` and model in `~/.0xagent/models/` if not explicitly set. Kills any orphaned process on the target port before launching.
+### `GET /api/llama/status`
+Returns process status, host, port, active model, and PID.
+- **Response:** `ServerStatusInfo`
 
-**Body (all fields optional):**
-```json
-{
-  "exePath": "C:\\...\\llama-server.exe",
-  "modelPath": "C:\\...\\model.gguf",
-  "host": "127.0.0.1",
-  "port": 11434,
-  "ctxSize": 4096,
-  "gpuLayers": 99,
-  "threads": 8,
-  "batchSize": 2048,
-  "ubatchSize": 512,
-  "temp": 0.7,
-  "repeatPenalty": 1.1,
-  "minP": 0.08,
-  "flashAttn": false,
-  "mmap": true,
-  "mlock": false,
-  "embedding": false,
-  "contBatching": false
-}
-```
-**Response:** `{ success: true, host: string, port: number, message: string }`
+### `POST /api/llama/start`
+Launches `llama-server.exe` with configured model and hardware flags.
+- **Response:** `{ success: boolean, message: string }`
 
-> Logs are streamed via WebSocket event `llama-server-log`.
+### `POST /api/llama/stop`
+Terminates running `llama-server.exe` process.
+- **Response:** `{ success: boolean }`
 
-### `POST /api/stop-local-server`
-Terminates the active llama-server process tree.
-
-**Response:** `{ success: true, message: string }`
-
-### `GET /api/server-status`
-Returns live state of the local llama-server child process.
-
-**Response:**
-```json
-{
-  "running": true,
-  "pid": 12345,
-  "exePath": "C:\\...\\llama-server.exe",
-  "modelPath": "C:\\...\\model.gguf",
-  "host": "127.0.0.1",
-  "port": 11434
-}
-```
-
-### `GET /api/server-health`
-Proxies a health check to the local llama.cpp server.
-
-**Query:** `?host=127.0.0.1&port=11434`  
-**Response:** `{ ok: boolean, status: "ok" | "loading" | "stopped" }`
-
-### `GET /api/server-slots`
-Queries live inference slot metrics from the llama.cpp server.
-
-**Query:** `?host=127.0.0.1&port=11434`  
-**Response:** `{ ok: boolean, totalSlots: number, activeSlots: number }`
+### `GET /api/llama/models`
+Scans `~/.0xagent/models/` and returns available GGUF files with binary metadata.
+- **Response:** `GgufModelInfo[]`
 
 ---
 
-## GGUF Model Management
+## 10. Hardware & Diagnostics
 
-### `GET /api/llama-releases`
-Fetches GitHub releases for `ggerganov/llama.cpp` with a 15-minute TTL cache.
+### `GET /api/hardware`
+Detects GPU, VRAM capacity, CPU, and recommends optimal Vulkan/CUDA offload parameters.
+- **Response:** `HardwareInfo`
 
-**Query:** `?refresh=true` to force cache invalidation.  
-**Response:** Array of release objects with `tag`, `name`, `published_at`, `assets[]`.
-
-### `GET /api/installed-llama-versions`
-Scans `~/.0xagent/llama/` for locally installed llama.cpp versions.
-
-**Response:** `{ tag: string, exePath: string, isCurrent: boolean }[]`
-
-### `POST /api/install-llama-version`
-Downloads and installs a specific llama.cpp release from GitHub, or switches to an already-installed version.
-
-**Body:**
-```json
-{
-  "tag": "b10099",
-  "downloadUrl": "https://github.com/.../llama-b10099-bin-win-cuda.zip",
-  "assetName": "llama-b10099-bin-win-cuda.zip"
-}
-```
-**Response:** `{ exePath: string, message: string }`
-
-### `POST /api/select-installed-llama`
-Switches the active llama.cpp version to an already-installed one (no download).
-
-**Body:** `{ exePath: string }`  
-**Response:** `{ exePath: string, message: string }`
-
-### `GET /api/gguf-models`
-Returns a static list of recommended GGUF models with download URLs.
-
-**Response:** Array of `{ id, name, desc, filename, url, size }`
-
-### `POST /api/download-model`
-Downloads a GGUF model to `~/.0xagent/models/`.
-
-**Body:** `{ downloadUrl: string, fileName: string }`  
-**Response:** `{ modelPath: string }`
-
-### `POST /api/parse-gguf`
-Parses GGUF file headers and returns model metadata.
-
-**Body:** `{ filePath: string }`  
-**Response:** `GgufMetadata`
-
-### `GET /api/scan-models-dir`
-Recursively scans a directory for `.gguf` files and returns their metadata.
-
-**Query:** `?dirPath=<path>` (defaults to `~/.0xagent/models/`)  
-**Response:** `{ dirPath: string, models: GgufMetadata[] }`
+### `GET /api/diagnostics`
+Runs 7-point health check across SQLite, TTS, GGUF paths, and process supervisors.
+- **Response:** `DiagnosticReport`
 
 ---
 
-## Hardware Detection
+## 11. WebSocket Realtime Events
 
-### `GET /api/detect-hardware`
-Auto-detects GPU hardware using `Win32_VideoController` (Windows) or Apple Silicon (macOS).
+Connect via `ws://localhost:3001/ws` (or `wss://localhost:3001/ws`).
 
-**Response:** `HardwareInfo`
-```json
-{
-  "vendor": "NVIDIA" | "AMD" | "Intel" | "Apple" | "CPU",
-  "gpuName": "AMD Radeon RX 7800 XT",
-  "recommendedBuild": "Vulkan (bin-win-vulkan)",
-  "recommendedAssetKeywords": ["bin-win-vulkan", "bin-win-x64"],
-  "isAutoDetected": true
-}
-```
-
----
-
-## Audio Transcription
-
-### `POST /api/transcribe-audio`
-Transcribes audio via the Groq Whisper API.
-
-**Body:**
-```json
-{
-  "audioBase64": "<base64 encoded audio>",
-  "apiKey": "gsk_..."
-}
-```
-**Response:** `{ text: string }`
-
----
-
-## Network
-
-### `GET /api/get-local-ips`
-Returns all local IPv4 network addresses for LAN access to the UI.
-
-**Response:** `{ urls: string[] }` — e.g. `["http://192.168.x.x:5173"]`
-
----
-
-## WebSocket Events
-
-WebSocket connection path: `ws://localhost:3001/ws`
-
-All messages are JSON: `{ event: string, payload: any }`
-
-| Event | Payload | Description |
-|---|---|---|
-| `agent-status-changed` | `"idle" \| "thinking" \| "waiting_approval" \| "executing_tool"` | Agent execution status changed |
-| `agent-message-start` | `{ sessionId, messageId }` | New assistant message started |
-| `agent-token-stream` | `{ sessionId, messageId, token, fullContent }` | Streaming token from LLM |
-| `agent-tools-updated` | `{ sessionId, messageId, tools: ToolCallInfo[] }` | Tool calls parsed from response |
-| `agent-tool-status-changed` | `{ sessionId, toolCallId, status, output? }` | Tool execution status update |
-| `agent-error` | `string \| { sessionId, message }` | System error or status notification |
-| `llama-server-log` | `string` | Live stdout/stderr output from llama-server process (ANSI stripped) |
-| `llama-server-status` | `{ status: "running" \| "stopped", pid?, host?, port?, error? }` | Real-time llama-server process status update |
-
----
-
-## Types
-
-### `AppConfig`
-```typescript
-interface AppConfig {
-  api_url: string;               // LLM API endpoint (e.g. "http://127.0.0.1:11434/v1")
-  model_name: string;            // Model identifier
-  system_prompt: string;         // Active system prompt text
-  active_prompt_file?: string;   // Active prompt filename
-  workspace_dir?: string;        // Active workspace directory path
-  groq_api_key?: string;         // Groq API key for Whisper transcription
-  active_theme?: string;         // UI theme name
-  theme_colors?: ThemeColors;    // Custom theme color overrides
-  reasoning_enabled?: boolean;   // Show <think> reasoning blocks
-  temperature?: number;          // LLM temperature
-  max_tokens?: number;           // Max response tokens
-  api_timeout_sec?: number;      // API request timeout
-  auto_save_history?: boolean;   // Auto-save chat sessions
-  sound_notifications?: boolean; // Audio notifications
-  compact_chat?: boolean;        // Compact chat layout
-  local_server?: LocalServerConfig;
-}
-```
-
-### `LocalServerConfig`
-```typescript
-interface LocalServerConfig {
-  exe_path?: string;        // Path to llama-server.exe
-  model_path?: string;      // Path to .gguf model file
-  host?: string;            // Server bind host (default: "127.0.0.1")
-  port?: number;            // Server bind port (default: 11434)
-  ctx_size?: number;        // Context window size (-c)
-  threads?: number;         // CPU threads (-t)
-  gpu_layers?: number;      // GPU offload layers (-ngl)
-  temp?: number;            // Temperature (--temp)
-  batch_size?: number;      // Batch size (-b)
-  ubatch_size?: number;     // Micro-batch size (-ub)
-  min_p?: number;           // Min P sampling (--min-p)
-  repeat_penalty?: number;  // Repeat penalty (--repeat-penalty)
-  flash_attn?: boolean;     // Flash Attention (-fa)
-  embedding?: boolean;      // Embedding mode (--embedding)
-  cont_batching?: boolean;  // Continuous batching (--cont-batching)
-  prompt_cache?: boolean;   // Prompt cache toggle
-  mlock?: boolean;          // Lock model in RAM (--mlock)
-  mmap?: boolean;           // Memory-map model (--mmap / --no-mmap)
-}
-```
-
-### `ChatSession`
-```typescript
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: ChatMessage[];
-  created_at: number;   // Unix timestamp ms
-  updated_at: number;   // Unix timestamp ms
-}
-```
-
-### `ChatMessage`
-```typescript
-interface ChatMessage {
-  id: string;
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  timestamp: number;
-  tool_calls?: ToolCallInfo[];
-}
-```
-
-### `ToolCallInfo`
-```typescript
-interface ToolCallInfo {
-  id: string;
-  name: string;
-  arguments: string;  // JSON string
-  status: "pending" | "approved" | "rejected" | "running" | "completed" | "error";
-  output?: string;
-}
-```
-
-### `GgufMetadata`
-```typescript
-interface GgufMetadata {
-  filePath: string;
-  fileName: string;
-  fileSizeFormatted: string;
-  fileSizeBytes: number;
-  magicValid: boolean;
-  version: number;
-  architecture: string;
-  modelName: string;
-  quantization: string;
-  blockCount: number;
-  contextLength: number;
-  expertCount: number;
-  isMmproj: boolean;
-}
-```
+| Event Name | Direction | Payload | Description |
+| :--- | :--- | :--- | :--- |
+| `agent-user-message` | Client $\to$ Server | `{ sessionId, content }` | Sends prompt to agent execution loop |
+| `agent-message-start` | Server $\to$ Client | `{ id, role, sessionId }` | Indicates assistant response stream started |
+| `agent-message-chunk` | Server $\to$ Client | `{ id, chunk, sessionId }` | Live streaming token chunk |
+| `agent-status-changed` | Server $\to$ Client | `{ sessionId, status }` | `idle`, `thinking`, `executing_tool` |
+| `agent-tools-updated` | Server $\to$ Client | `{ sessionId, tools }` | Tool execution status and approval requests |
+| `jarvis-state-updated` | Server $\to$ Client | `JarvisState` | Realtime visualizer and spark updates |
