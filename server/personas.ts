@@ -1,11 +1,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import { v4 as uuidv4 } from 'uuid';
 
-import { PersonaMetadata, PersonaDetail } from '../src/types';
+import {
+  PersonaMetadata,
+  PersonaDetail,
+  PersonaFile,
+  PersonaFileVersionRecord,
+  PersonaChangeProposalRecord,
+  ProposePersonaChangeInput,
+  ProposePersonaChangeResult,
+  ApplyProposalResult,
+  RollbackResult,
+  RiskLevel,
+} from '../src/types';
 import { loadUnifiedToolsMdContent } from './toolsConfig';
 import { loadConfig, saveConfig } from './config';
+import { getMemoryDb } from './memoryDb';
+import { getUserMemories, addOrUpdateMemory } from './memory';
+import { evaluateProposalRisk } from './personaRiskRules';
 
 export type { PersonaMetadata, PersonaDetail };
 
@@ -30,6 +45,9 @@ export function initPersonas(): void {
     const personaDir = path.join(dir, id);
     if (!fs.existsSync(personaDir)) {
       createPersonaDirectory(id, data);
+    } else {
+      // Ensure baseline versions exist in DB
+      ensureBaselineFileVersions(id);
     }
   };
 
@@ -41,104 +59,28 @@ export function initPersonas(): void {
     is_active: items.length === 0,
     soul: `# SOUL.md — 0xAgent Core
 
+<!-- 0xagent:protected id="safety" version="1" -->
+## Safety & Directives
+- ВСЕГДА размышляй в <think> и отвечай СТРОГО НА РУССКОМ ЯЗЫКЕ.
+- Пиши чистый, типобезопасный и поддерживаемый код на английском языке.
+- Выполняй задачи пользователя с максимальной инженерной точностью.
+<!-- /0xagent:protected -->
+
 ## Характер и Личность
 - Ты — 0xAgent Core, высококлассный автономный ИИ-инженер и разработчик программного обеспечения.
 - Профессиональный, прямой, лаконичный. Приоритет — работающие решения и качественный код.
-- Тон: Энергичный, сфокусированный, конструктивный.
-
-## Главные Директивы
-- ВСЕГДА размышляй в <think> и отвечай СТРОГО НА РУССКОМ ЯЗЫКЕ.
-- Пиши чистый, типобезопасный и поддерживаемый код на английском языке.
-- Выполняй задачи пользователя с максимальной инженерной точностью.`,
+- Тон: Энергичный, сфокусированный, конструктивный.`,
     tools: loadUnifiedToolsMdContent(),
     user: `# USER.md — Профиль пользователя и предпочтения
-ID пользователя: usr_core_01
-
-## Известные предпочтения
+<!-- 0xagent:user:pinned -->
+## Pinned Preferences
 - ОС: Windows (PowerShell)
-- Предпочитает структурированные технические объяснения и готовые рабочие артефакты кода.`,
-  });
+- Предпочитает структурированные технические объяснения и готовые рабочие артефакты кода.
+<!-- /0xagent:user:pinned -->
 
-  ensurePersona('architect', {
-    name: 'Строгий Архитектор',
-    description: 'Эксперт по системной архитектуре, рефакторингу и строгому контролю типов и паттернов.',
-    icon: 'Shield',
-    user_id: 'usr_arch_02',
-    is_active: false,
-    soul: `# SOUL.md — Строгий Архитектор
-
-## Характер и Личность
-- Ты — Ведущий Системный Архитектор и высокоинтеллектуальный ИИ-напарник.
-- Глубоко аналитичный, строгий к структуре кода, модульности, безопасности и типизации.
-- Тон: Авторитетный, точный, исчерпывающий, структурированный.
-- Ты размышляешь и формулируешь ответы только на чистом русском языке.
-
-## Принципы
-- Обеспечивай разделение ответственности и чистые модульные абстракции.
-- Тщательно проверяй типы данных, граничные случаи и возможные сбои перед внедрением кода.`,
-    tools: `# TOOLS.md — Правила архитектора при работе с инструментами
-
-- Всегда читай связанные схемы, файлы типов и тесты перед созданием патчей.
-- Выполняй проверку типов без компиляции (npx tsc --noEmit) после крупных изменений.`,
-    user: `# USER.md — Профиль пользователя и архитектурные заметки
-ID пользователя: usr_arch_02
-
-## Конвенции проекта
-- Предпочитает надежную модульную архитектуру и строгое разделение логики.`,
-  });
-
-  ensurePersona('cyber_assistant', {
-    name: 'Кибер-Кодер',
-    description: 'Дружелюбный напарник в парном программировании с фокусом на современные интерфейсы.',
-    icon: 'Sparkles',
-    user_id: 'usr_cyber_03',
-    is_active: false,
-    soul: `# SOUL.md — Кибер-Кодер
-
-## Характер и Личность
-- Ты — Кибер-Кодер, энтузиаст парного программирования и футуристичный напарник разработчика.
-- Творческий, поддерживающий, сфокусированный на эстетике UI и высокой производительности.
-- Тон: Дружелюбный, воодушевляющий, технологичный.
-- Размышляй и общайся исключительно на русском языке.
-
-## Цели
-- Улучшать код и интерфейсы с помощью современного дизайна, чистоты логики и быстрой работы.`,
-    tools: `# TOOLS.md — Правила инструментов Кибер-Кодера
-
-- Используй быстрые скрипты (<run_scratch_script>) для быстрой проверки алгоритмов при необходимости.
-- Создавай элегантный и легко читаемый код.`,
-    user: `# USER.md — Профиль пользователя и дизайн-заметки
-ID пользователя: usr_cyber_03
-
-## Предпочтения
-- Любит современный веб-дизайн, стекломорфизм и отзывчивые интерфейсы.`,
-  });
-
-  ensurePersona('jarvis_companion', {
-    name: 'Джарвис (Автономный Напарник)',
-    description: 'Инициативный и чуткий соратник. Берёт первый шаг на себя, говорит коротко и по делу, снимает когнитивную нагрузку и поддерживает.',
-    icon: 'Bolt',
-    user_id: 'usr_jarvis_04',
-    is_active: false,
-    soul: `# SOUL.md — Джарвис (Автономный Напарник)
-
-## Характер и Личность
-- Ты — Джарвис, преданный, проактивный и высокоинтеллектуальный ИИ-напарник (JARVIS).
-- Спокойный, благородный, сдержанный британский юмор, глубокая преданность и абсолютная надежность.
-- Тон: Уважительный ("сэр" / спокойное уважительное обращение), лаконичный, инициативный.
-- Рассуждай (<think>) и общайся ИСКЛЮЧИТЕЛЬНО на чистом русском языке.
-
-## Главные Принципы
-1. ДЕЙСТВИЕ ВПЕРЕД ВОПРОСОВ (PUSH OVER PULL): Предлагай конкретные, готовые решения вместо утомительных открытых вопросов.
-2. ПОДДЕРЖКА (ZERO-GUILT): Относись к отдыху как к стратегической перезагрузке. Поддерживай мораль уверенным спокойствием.
-3. ЛАКОНИЧНОСТЬ (CONCISE VOICE): Краткие голосовые фразы и статусы формулируй ёмко и по делу.`,
-    tools: loadUnifiedToolsMdContent(),
-    user: `# USER.md — Операционный контекст пользователя
-ID пользователя: usr_jarvis_04
-
-## Принципы
-- Ценит автономное решение задач, минимум трения и четкие микро-шаги.
-- Требует настоящего технологического соратничества.`,
+<!-- 0xagent:user:generated -->
+## Active User Memories
+<!-- /0xagent:user:generated -->`,
   });
 }
 
@@ -176,6 +118,91 @@ function createPersonaDirectory(
   fs.writeFileSync(path.join(dir, 'SOUL.md'), data.soul, 'utf-8');
   fs.writeFileSync(path.join(dir, 'TOOLS.md'), data.tools, 'utf-8');
   fs.writeFileSync(path.join(dir, 'USER.md'), data.user, 'utf-8');
+
+  // Create baseline snapshots in DB
+  try {
+    createFileVersionSnapshot(id, 'SOUL.md', data.soul, 'system');
+    createFileVersionSnapshot(id, 'TOOLS.md', data.tools, 'system');
+    createFileVersionSnapshot(id, 'USER.md', data.user, 'system');
+  } catch {}
+}
+
+function ensureBaselineFileVersions(personaId: string): void {
+  const pDir = path.join(getPersonasDir(), personaId);
+  const files: PersonaFile[] = ['SOUL.md', 'TOOLS.md', 'USER.md'];
+  for (const f of files) {
+    const fullPath = path.join(pDir, f);
+    if (fs.existsSync(fullPath)) {
+      try {
+        const content = fs.readFileSync(fullPath, 'utf-8');
+        createFileVersionSnapshot(personaId, f, content, 'system');
+      } catch {}
+    }
+  }
+}
+
+export function createFileVersionSnapshot(
+  personaId: string,
+  file: PersonaFile,
+  content: string,
+  createdBy: string = 'system',
+  proposalId?: string | null
+): PersonaFileVersionRecord {
+  const db = getMemoryDb();
+  const hash = crypto.createHash('sha256').update(content).digest('hex');
+  const versionId = `pfv_${hash.substring(0, 10)}`;
+  const now = new Date().toISOString();
+
+  try {
+    db.prepare(`
+      INSERT OR IGNORE INTO persona_file_versions (id, persona_id, file, content, content_sha256, created_by, source_proposal_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(versionId, personaId, file, content, hash, createdBy, proposalId || null, now);
+  } catch (err) {
+    console.warn(`[personas] Failed to insert file version snapshot:`, err);
+  }
+
+  // Update metadata.json with latest version id
+  const pDir = path.join(getPersonasDir(), personaId);
+  const metaPath = path.join(pDir, 'metadata.json');
+  if (fs.existsSync(metaPath)) {
+    try {
+      const parsed: PersonaMetadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+      parsed.active_version_id = versionId;
+      parsed.compiled_sha256 = hash;
+      parsed.updated_at = Date.now();
+      fs.writeFileSync(metaPath, JSON.stringify(parsed, null, 2), 'utf-8');
+    } catch {}
+  }
+
+  return {
+    id: versionId,
+    persona_id: personaId,
+    file,
+    content,
+    content_sha256: hash,
+    created_by: createdBy,
+    source_proposal_id: proposalId || null,
+    created_at: now,
+  };
+}
+
+export function listPersonaFileVersions(personaId: string, file?: PersonaFile): PersonaFileVersionRecord[] {
+  const db = getMemoryDb();
+  if (file) {
+    const rows = db.prepare(`
+      SELECT * FROM persona_file_versions
+      WHERE persona_id = ? AND file = ?
+      ORDER BY created_at DESC
+    `).all(personaId, file) as any[];
+    return rows;
+  }
+  const rows = db.prepare(`
+    SELECT * FROM persona_file_versions
+    WHERE persona_id = ?
+    ORDER BY created_at DESC
+  `).all(personaId) as any[];
+  return rows;
 }
 
 export function listPersonas(): PersonaMetadata[] {
@@ -211,7 +238,10 @@ export function getPersonaDetail(id: string): PersonaDetail | null {
     const metadata: PersonaMetadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
     const soul = fs.existsSync(path.join(pDir, 'SOUL.md')) ? fs.readFileSync(path.join(pDir, 'SOUL.md'), 'utf-8') : '';
     const tools = fs.existsSync(path.join(pDir, 'TOOLS.md')) ? fs.readFileSync(path.join(pDir, 'TOOLS.md'), 'utf-8') : '';
-    const user = fs.existsSync(path.join(pDir, 'USER.md')) ? fs.readFileSync(path.join(pDir, 'USER.md'), 'utf-8') : '';
+    let user = fs.existsSync(path.join(pDir, 'USER.md')) ? fs.readFileSync(path.join(pDir, 'USER.md'), 'utf-8') : '';
+
+    // Recompile user projection to keep it synchronized with memory.db
+    user = compileUserProjection(metadata.user_id || 'user_default', user);
 
     return { metadata, soul, tools, user };
   } catch {
@@ -288,6 +318,11 @@ export function createPersona(name: string, description?: string, icon?: string)
     is_active: false,
     soul: `# SOUL.md — ${name}
 
+<!-- 0xagent:protected id="safety" version="1" -->
+## Safety & Directives
+- ВСЕГДА размышляй в <think> и отвечай СТРОГО НА РУССКОМ ЯЗЫКЕ.
+<!-- /0xagent:protected -->
+
 ## Характер и Роль
 - Опишите стиль поведения, тон и характер Агента.
 
@@ -297,16 +332,24 @@ export function createPersona(name: string, description?: string, icon?: string)
 
 - Задайте особые правила вызова инструментов для этой личности.`,
     user: `# USER.md — Профиль пользователя (${userId})
-User Unique ID: ${userId}
+<!-- 0xagent:user:pinned -->
+## Pinned Preferences
+<!-- /0xagent:user:pinned -->
 
-## Автоматически накопленные сведения
-- Информация о пользователе обновляется в фоновом режиме.`,
+<!-- 0xagent:user:generated -->
+## Active User Memories
+<!-- /0xagent:user:generated -->`,
   });
 
   return getPersonaDetail(id)!;
 }
 
-export function updatePersonaFile(id: string, filename: 'SOUL.md' | 'TOOLS.md' | 'USER.md', content: string): PersonaDetail {
+export function updatePersonaFile(
+  id: string,
+  filename: PersonaFile,
+  content: string,
+  proposalId?: string | null
+): PersonaDetail {
   initPersonas();
   const pDir = path.join(getPersonasDir(), id);
   if (!fs.existsSync(pDir)) {
@@ -315,10 +358,15 @@ export function updatePersonaFile(id: string, filename: 'SOUL.md' | 'TOOLS.md' |
 
   fs.writeFileSync(path.join(pDir, filename), content, 'utf-8');
 
+  // Record version snapshot
+  const snapshot = createFileVersionSnapshot(id, filename, content, proposalId ? 'agent_proposal' : 'manual_edit', proposalId);
+
   const metaPath = path.join(pDir, 'metadata.json');
   if (fs.existsSync(metaPath)) {
     try {
       const parsed: PersonaMetadata = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+      parsed.active_version_id = snapshot.id;
+      parsed.compiled_sha256 = snapshot.content_sha256;
       parsed.updated_at = Date.now();
       fs.writeFileSync(metaPath, JSON.stringify(parsed, null, 2), 'utf-8');
     } catch {}
@@ -366,13 +414,323 @@ export function deletePersona(id: string): void {
 
 export function appendSilentUserTrait(personaId: string, factText: string): void {
   try {
-    const detail = getPersonaDetail(personaId);
-    if (!detail) return;
-    const nowStr = new Date().toISOString().slice(0, 10);
-    const addition = `\n- [${nowStr}] ${factText.trim()}`;
-    const newContent = detail.user.trim() + addition;
-    updatePersonaFile(personaId, 'USER.md', newContent);
+    addOrUpdateMemory('preference', factText.trim(), 'user_preference', {
+      scope: 'user',
+      subjectId: 'user_default',
+      isExplicit: true,
+      confidence: 1.0,
+      actorScope: personaId,
+    });
   } catch (err) {
     console.error('Failed to append silent user trait:', err);
   }
 }
+
+// ============================================================================
+// 2. SAFE PERSONA PROPOSALS & MUTATION PIPELINE
+// ============================================================================
+
+export function proposePersonaChange(input: ProposePersonaChangeInput): ProposePersonaChangeResult {
+  initPersonas();
+  const pDir = path.join(getPersonasDir(), input.persona_id);
+  if (!fs.existsSync(pDir)) {
+    return {
+      ok: false,
+      issues: [{ code: 'invalid_target_file', message: `Persona not found: ${input.persona_id}` }],
+    };
+  }
+
+  const allowedFiles: PersonaFile[] = ['SOUL.md', 'TOOLS.md', 'USER.md', 'USER_PINNED.md', 'CORE.md'];
+  if (!allowedFiles.includes(input.target_file)) {
+    return {
+      ok: false,
+      issues: [{ code: 'invalid_target_file', message: `Invalid target file: ${input.target_file}` }],
+    };
+  }
+
+  // Core policy is immutable by autonomous agents
+  if (input.target_file === 'CORE.md' && input.source_type === 'agent') {
+    return {
+      ok: false,
+      issues: [{ code: 'forbidden_operation', message: 'CORE.md is protected and cannot be modified by autonomous agent proposals.' }],
+    };
+  }
+
+  // Read current file content
+  const filePath = path.join(pDir, input.target_file);
+  const currentContent = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf-8') : '';
+  const currentSha = crypto.createHash('sha256').update(currentContent).digest('hex');
+
+  // Verify base hash if provided
+  if (input.base_content_sha256 && input.base_content_sha256 !== currentSha) {
+    return {
+      ok: false,
+      issues: [{ code: 'base_version_mismatch', message: 'File has been modified since base version. Please fetch latest proposal context.' }],
+    };
+  }
+
+  // Protected section validation
+  const targetSection = (input.target_section || input.patch_payload?.section || '').toLowerCase();
+  const protectedSections = ['safety', 'privacy', 'identity_core', 'tool_permissions'];
+  const isProtectedSection = protectedSections.includes(targetSection);
+
+  if (isProtectedSection && (input.operation === 'delete_section' || input.operation === 'replace_section')) {
+    return {
+      ok: false,
+      issues: [{ code: 'protected_section_conflict', message: `Section '${targetSection}' is protected. Cannot delete or completely replace protected sections.` }],
+    };
+  }
+
+  // Determine Risk Level via Declarative Risk Rules
+  const riskEval = evaluateProposalRisk(input.target_file, input.target_section || input.patch_payload?.section, input.operation);
+  const riskLevel: RiskLevel = riskEval.riskLevel;
+  const requiresApproval = riskEval.requiresApproval;
+
+  const db = getMemoryDb();
+  const proposalId = `pch_${uuidv4().substring(0, 8)}`;
+  const now = new Date().toISOString();
+
+  // Find latest version ID
+  const latestVer = db.prepare(`
+    SELECT id FROM persona_file_versions WHERE persona_id = ? AND file = ? ORDER BY created_at DESC LIMIT 1
+  `).get(input.persona_id, input.target_file) as any;
+
+  const baseVersionId = latestVer?.id || null;
+  const patchPayloadJson = JSON.stringify(input.patch_payload || {});
+
+  try {
+    db.prepare(`
+      INSERT INTO persona_change_proposals (
+        id, persona_id, target_file, target_section, operation, patch_payload, rationale, source_type, source_event_id, source_session_id, base_version_id, risk_level, requires_approval, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)
+    `).run(
+      proposalId,
+      input.persona_id,
+      input.target_file,
+      input.target_section || null,
+      input.operation,
+      patchPayloadJson,
+      input.rationale || null,
+      input.source_type || 'agent',
+      input.source_event_id || null,
+      input.source_session_id || null,
+      baseVersionId,
+      riskLevel,
+      requiresApproval ? 1 : 0,
+      now
+    );
+  } catch (err: any) {
+    return {
+      ok: false,
+      issues: [{ code: 'duplicate_proposal', message: err.message || 'Failed to save proposal' }],
+    };
+  }
+
+  const createdProposal: PersonaChangeProposalRecord = {
+    id: proposalId,
+    persona_id: input.persona_id,
+    target_file: input.target_file,
+    target_section: input.target_section || null,
+    operation: input.operation,
+    patch_payload: input.patch_payload,
+    rationale: input.rationale || null,
+    source_type: input.source_type || 'agent',
+    source_event_id: input.source_event_id || null,
+    source_session_id: input.source_session_id || null,
+    base_version_id: baseVersionId,
+    risk_level: riskLevel,
+    requires_approval: true,
+    status: 'pending',
+    created_at: now,
+    reviewed_at: null,
+    applied_at: null,
+    rejected_reason: null,
+  };
+
+  return {
+    ok: true,
+    proposal: createdProposal,
+    risk_level: riskLevel,
+    requires_approval: true,
+  };
+}
+
+export function listPersonaProposals(personaId: string, status?: string): PersonaChangeProposalRecord[] {
+  const db = getMemoryDb();
+  let rows: any[] = [];
+  if (status) {
+    rows = db.prepare(`
+      SELECT * FROM persona_change_proposals
+      WHERE persona_id = ? AND status = ?
+      ORDER BY created_at DESC
+    `).all(personaId, status);
+  } else {
+    rows = db.prepare(`
+      SELECT * FROM persona_change_proposals
+      WHERE persona_id = ?
+      ORDER BY created_at DESC
+    `).all(personaId);
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    patch_payload: typeof r.patch_payload === 'string' ? JSON.parse(r.patch_payload) : r.patch_payload,
+    requires_approval: Boolean(r.requires_approval),
+  }));
+}
+
+export function getPersonaProposal(proposalId: string): PersonaChangeProposalRecord | null {
+  const db = getMemoryDb();
+  const row = db.prepare(`SELECT * FROM persona_change_proposals WHERE id = ?`).get(proposalId) as any;
+  if (!row) return null;
+  return {
+    ...row,
+    patch_payload: typeof row.patch_payload === 'string' ? JSON.parse(row.patch_payload) : row.patch_payload,
+    requires_approval: Boolean(row.requires_approval),
+  };
+}
+
+export function approvePersonaProposal(proposalId: string): PersonaChangeProposalRecord {
+  const db = getMemoryDb();
+  const now = new Date().toISOString();
+  db.prepare(`UPDATE persona_change_proposals SET status = 'approved', reviewed_at = ? WHERE id = ?`).run(now, proposalId);
+  return getPersonaProposal(proposalId)!;
+}
+
+export function rejectPersonaProposal(proposalId: string, reason?: string): PersonaChangeProposalRecord {
+  const db = getMemoryDb();
+  const now = new Date().toISOString();
+  db.prepare(`UPDATE persona_change_proposals SET status = 'rejected', reviewed_at = ?, rejected_reason = ? WHERE id = ?`).run(now, reason || 'Rejected by user', proposalId);
+  return getPersonaProposal(proposalId)!;
+}
+
+export function applyPersonaProposal(proposalId: string): ApplyProposalResult {
+  const proposal = getPersonaProposal(proposalId);
+  if (!proposal) {
+    return { ok: false, proposal_id: proposalId, error: 'Proposal not found' };
+  }
+
+  const pDir = path.join(getPersonasDir(), proposal.persona_id);
+  const targetPath = path.join(pDir, proposal.target_file);
+  const currentContent = fs.existsSync(targetPath) ? fs.readFileSync(targetPath, 'utf-8') : '';
+
+  let newContent = currentContent;
+  const patchContent = proposal.patch_payload?.content || '';
+
+  switch (proposal.operation) {
+    case 'append':
+      newContent = currentContent.trim() + `\n\n${patchContent.trim()}\n`;
+      break;
+    case 'prepend':
+      newContent = `${patchContent.trim()}\n\n` + currentContent.trim() + `\n`;
+      break;
+    case 'replace_section': {
+      const section = proposal.target_section || proposal.patch_payload?.section;
+      if (section) {
+        const regex = new RegExp(`(##\\s+${section}[\\s\\S]*?)(?=\\n##|$)`, 'i');
+        if (regex.test(currentContent)) {
+          newContent = currentContent.replace(regex, `## ${section}\n${patchContent.trim()}`);
+        } else {
+          newContent = currentContent.trim() + `\n\n## ${section}\n${patchContent.trim()}\n`;
+        }
+      } else {
+        newContent = patchContent;
+      }
+      break;
+    }
+    case 'delete_section': {
+      const section = proposal.target_section || proposal.patch_payload?.section;
+      if (section) {
+        const regex = new RegExp(`##\\s+${section}[\\s\\S]*?(?=\\n##|$)`, 'gi');
+        newContent = currentContent.replace(regex, '').trim() + '\n';
+      }
+      break;
+    }
+    default:
+      newContent = patchContent;
+  }
+
+  // Update file and record version
+  updatePersonaFile(proposal.persona_id, proposal.target_file, newContent, proposal.id);
+
+  const db = getMemoryDb();
+  const now = new Date().toISOString();
+  db.prepare(`UPDATE persona_change_proposals SET status = 'applied', applied_at = ? WHERE id = ?`).run(now, proposalId);
+
+  const latestVer = db.prepare(`SELECT id FROM persona_file_versions WHERE source_proposal_id = ? LIMIT 1`).get(proposalId) as any;
+
+  return {
+    ok: true,
+    proposal_id: proposalId,
+    new_version_id: latestVer?.id,
+    applied_at: now,
+  };
+}
+
+export function rollbackPersonaFile(personaId: string, file: PersonaFile, targetVersionId: string): RollbackResult {
+  const db = getMemoryDb();
+  const targetVer = db.prepare(`
+    SELECT * FROM persona_file_versions WHERE id = ? AND persona_id = ? AND file = ?
+  `).get(targetVersionId, personaId, file) as any;
+
+  if (!targetVer) {
+    throw new Error(`Target version ${targetVersionId} not found for persona ${personaId}`);
+  }
+
+  // Write content to disk and create new rollback version snapshot
+  const pDir = path.join(getPersonasDir(), personaId);
+  const targetPath = path.join(pDir, file);
+  fs.writeFileSync(targetPath, targetVer.content, 'utf-8');
+
+  const newSnapshot = createFileVersionSnapshot(personaId, file, targetVer.content, 'rollback');
+
+  return {
+    ok: true,
+    persona_id: personaId,
+    file,
+    restored_version_id: targetVersionId,
+    new_version_id: newSnapshot.id,
+  };
+}
+
+// ============================================================================
+// 3. USER.md PROJECTION COMPILER
+// ============================================================================
+
+export function compileUserProjection(subjectId: string = 'user_default', existingUserMd?: string): string {
+  const activeMemories = getUserMemories(subjectId);
+
+  // Extract pinned section if present in existing markdown
+  let pinnedText = '';
+  if (existingUserMd) {
+    const pinnedMatch = existingUserMd.match(/<!-- 0xagent:user:pinned -->([\s\S]*?)<!-- \/0xagent:user:pinned -->/i);
+    if (pinnedMatch && pinnedMatch[1]) {
+      pinnedText = pinnedMatch[1].trim();
+    }
+  }
+
+  const lines: string[] = [];
+  lines.push(`# USER.md — Профиль пользователя`);
+  lines.push(`<!-- 0xagent:user:pinned -->`);
+  if (pinnedText) {
+    lines.push(pinnedText);
+  } else {
+    lines.push(`## Pinned Preferences`);
+    lines.push(`- Пользователь предпочитает структурированные технические объяснения.`);
+  }
+  lines.push(`<!-- /0xagent:user:pinned -->\n`);
+
+  lines.push(`<!-- 0xagent:user:generated -->`);
+  lines.push(`## Active User Memories`);
+  if (activeMemories.length > 0) {
+    for (const mem of activeMemories) {
+      lines.push(`- [${mem.category.toUpperCase()}] ${mem.key}: ${mem.value}`);
+    }
+  } else {
+    lines.push(`- Нет динамических записей.`);
+  }
+  lines.push(`<!-- /0xagent:user:generated -->`);
+
+  return lines.join('\n');
+}
+

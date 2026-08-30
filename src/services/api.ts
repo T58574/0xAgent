@@ -256,6 +256,21 @@ export const save_persona_file = (id: string, filename: 'SOUL.md' | 'TOOLS.md' |
   post<PersonaDetail>(`/personas/${encodeURIComponent(id)}/file`, { filename, content });
 export const delete_persona = (id: string) => del<void>(`/personas/${encodeURIComponent(id)}`);
 
+// Persona Proposals & Evolution Pipeline
+export const get_persona_proposals = (id: string, status?: string) =>
+  get<any[]>(status ? `/personas/${encodeURIComponent(id)}/proposals?status=${encodeURIComponent(status)}` : `/personas/${encodeURIComponent(id)}/proposals`);
+export const approve_persona_proposal = (id: string, proposalId: string) =>
+  post<any>(`/personas/${encodeURIComponent(id)}/proposals/${encodeURIComponent(proposalId)}/approve`, {});
+export const reject_persona_proposal = (id: string, proposalId: string, reason?: string) =>
+  post<any>(`/personas/${encodeURIComponent(id)}/proposals/${encodeURIComponent(proposalId)}/reject`, { reason });
+export const apply_persona_proposal = (id: string, proposalId: string) =>
+  post<any>(`/personas/${encodeURIComponent(id)}/proposals/${encodeURIComponent(proposalId)}/apply`, {});
+export const get_persona_history = (id: string, file?: string) =>
+  get<any[]>(file ? `/personas/${encodeURIComponent(id)}/history?file=${encodeURIComponent(file)}` : `/personas/${encodeURIComponent(id)}/history`);
+export const rollback_persona_file = (id: string, file: string, version_id: string) =>
+  post<any>(`/personas/${encodeURIComponent(id)}/rollback`, { file, version_id });
+export const get_eval_benchmark = () => get<any>('/eval/benchmark');
+
 export async function get_summarizer_prompt(): Promise<string> {
   const data = await get<{ content: string }>('/summarizer-prompt');
   return data.content;

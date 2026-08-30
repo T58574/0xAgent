@@ -193,15 +193,13 @@ describe('Jarvis Companion & Voice Intercom Test Suite', () => {
     });
   });
 
-  describe('4. Personas System & Jarvis Companion Profile', () => {
-    it('should initialize and load jarvis_companion persona correctly', () => {
+  describe('4. Personas System & Default Clean Profile', () => {
+    it('should initialize and load default persona correctly', () => {
       initPersonas();
-      const detail = getPersonaDetail('jarvis_companion');
-      assert.ok(detail, 'jarvis_companion persona must exist');
-      assert.equal(detail.metadata.id, 'jarvis_companion');
-      assert.ok(detail.soul.includes('SOUL.md — Джарвис') || detail.soul.includes('Jarvis Companion'), 'SOUL.md must contain Jarvis persona definitions');
-      assert.ok(detail.soul.includes('ZERO-GUILT') || detail.soul.includes('ПОДДЕРЖКА'), 'SOUL.md must enforce zero-guilt directive');
-      assert.ok(detail.soul.includes('PUSH OVER PULL') || detail.soul.includes('ДЕЙСТВИЕ ВПЕРЕД'), 'SOUL.md must enforce push over pull directive');
+      const detail = getPersonaDetail('default');
+      assert.ok(detail, 'default persona must exist');
+      assert.equal(detail.metadata.id, 'default');
+      assert.ok(detail.soul.includes('SOUL.md — 0xAgent Core'), 'SOUL.md must contain 0xAgent Core persona definitions');
       assert.ok(detail.tools.length > 0, 'TOOLS.md must not be empty');
       assert.ok(detail.user.length > 0, 'USER.md must not be empty');
     });

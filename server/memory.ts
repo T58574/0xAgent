@@ -6,9 +6,12 @@ import {
   MemoryAuditEntry,
   MemoryCategory,
   MemoryStatus,
+  MemoryScope,
   MemoryItem,
 } from '../src/types';
 import { getMemoryDb } from './memoryDb';
+import { resolveProjectForWorkspace } from './projectService';
+import { inferPromptMode, allocateScopedMemories } from './budgetManager';
 
 export { getMemoryDb };
 
@@ -19,6 +22,7 @@ export type {
   MemoryAuditEntry,
   MemoryCategory,
   MemoryStatus,
+  MemoryScope,
   MemoryItem,
 };
 
@@ -46,13 +50,19 @@ export function normalizeCategory(c?: string): MemoryCategory {
 // ============================================================================
 
 export interface AddMemoryOptions {
+  scope?: MemoryScope;
   subjectId?: string;
+  projectId?: string | null;
+  personaId?: string | null;
+  sessionId?: string | null;
   domain?: string;
+  displayText?: string | null;
   isExplicit?: boolean | number;
   confidence?: number;
   importance?: number;
   sourceId?: string;
   actorScope?: string;
+  expiresAt?: string | null;
 }
 
 export function addOrUpdateMemory(
@@ -63,14 +73,20 @@ export function addOrUpdateMemory(
 ): MemoryItem | null {
   const db = getMemoryDb();
   const now = Date.now();
-  const subjectId = options.subjectId || DEFAULT_SUBJECT_ID;
+  const scope: MemoryScope = options.scope || (category === 'project_convention' || category === 'architecture' ? 'project' : 'user');
+  const subjectId = scope === 'user' ? (options.subjectId || DEFAULT_SUBJECT_ID) : DEFAULT_SUBJECT_ID;
+  const projectId = options.projectId || null;
+  const personaId = options.personaId || null;
+  const sessionId = options.sessionId || null;
+  const displayText = options.displayText || null;
+  const expiresAt = options.expiresAt || null;
   const cat = normalizeCategory(category);
   const domain = options.domain || 'general';
   const isExp = options.isExplicit ? 1 : 0;
   const conf = options.confidence !== undefined ? options.confidence : (isExp ? 1.0 : 0.85);
   const imp = options.importance !== undefined ? options.importance : 3;
   const sourceId = options.sourceId || null;
-  const actorScope = options.actorScope || 'user_explicit';
+  const actorScope = options.actorScope || (isExp ? 'user_explicit' : 'extractor_worker');
 
   // Memory Write Policy
   // Explicit commands bypass confidence gate.
@@ -94,15 +110,22 @@ export function addOrUpdateMemory(
 
   if (existing) {
     if (existing.value === value) {
-      // Re-confirmation: update timestamp and confidence
+      // Re-confirmation: update timestamp, confidence, and scope fields
       db.prepare(`
         UPDATE canonical_memories 
-        SET confidence = MAX(confidence, ?), last_confirmed_at = ?, updated_at = ?
+        SET confidence = MAX(confidence, ?), last_confirmed_at = ?, updated_at = ?,
+            scope = ?, project_id = COALESCE(?, project_id), persona_id = COALESCE(?, persona_id),
+            session_id = COALESCE(?, session_id), display_text = COALESCE(?, display_text)
         WHERE id = ?
-      `).run(conf, now, now, existing.id);
+      `).run(conf, now, now, scope, projectId, personaId, sessionId, displayText, existing.id);
 
       return mapCanonicalToMemoryItem({
         ...existing,
+        scope,
+        project_id: projectId || existing.project_id,
+        persona_id: personaId || existing.persona_id,
+        session_id: sessionId || existing.session_id,
+        display_text: displayText || existing.display_text,
         confidence: Math.max(existing.confidence, conf),
         last_confirmed_at: now,
         updated_at: now,
@@ -133,9 +156,9 @@ export function addOrUpdateMemory(
   const newId = `mem_${now}_${Math.random().toString(36).substring(2, 6)}`;
   db.prepare(`
     INSERT INTO canonical_memories (
-      id, subject_id, category, domain, key, value, confidence, is_explicit, importance, status, source_id, created_at, updated_at, last_confirmed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(newId, subjectId, cat, domain, key, value, conf, isExp, imp, status, sourceId, now, now, now);
+      id, scope, subject_id, project_id, persona_id, session_id, category, domain, key, value, display_text, confidence, is_explicit, importance, status, source_id, expires_at, created_at, updated_at, last_confirmed_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(newId, scope, subjectId, projectId, personaId, sessionId, cat, domain, key, value, displayText, conf, isExp, imp, status, sourceId, expiresAt, now, now, now);
 
   logAuditEntry(db, {
     memory_id: newId,
@@ -150,18 +173,54 @@ export function addOrUpdateMemory(
 
   return {
     id: newId,
+    scope,
     key,
     value,
     category: cat,
     subject_id: subjectId,
+    project_id: projectId,
+    persona_id: personaId,
+    session_id: sessionId,
     domain,
+    display_text: displayText,
     confidence: conf,
     is_explicit: isExp,
     importance: imp,
     status,
+    source_id: sourceId,
     createdAt: now,
     updatedAt: now,
   };
+}
+
+export function getUserMemories(subjectId: string = DEFAULT_SUBJECT_ID): MemoryItem[] {
+  const db = getMemoryDb();
+  const rows = db.prepare(`
+    SELECT * FROM canonical_memories
+    WHERE scope = 'user' AND subject_id = ? AND status = 'active'
+    ORDER BY importance DESC, updated_at DESC
+  `).all(subjectId) as any[];
+  return rows.map(mapCanonicalToMemoryItem);
+}
+
+export function getProjectMemories(projectId: string): MemoryItem[] {
+  const db = getMemoryDb();
+  const rows = db.prepare(`
+    SELECT * FROM canonical_memories
+    WHERE scope = 'project' AND project_id = ? AND status = 'active'
+    ORDER BY importance DESC, updated_at DESC
+  `).all(projectId) as any[];
+  return rows.map(mapCanonicalToMemoryItem);
+}
+
+export function getPersonaMemories(personaId: string): MemoryItem[] {
+  const db = getMemoryDb();
+  const rows = db.prepare(`
+    SELECT * FROM canonical_memories
+    WHERE scope = 'persona' AND persona_id = ? AND status = 'active'
+    ORDER BY importance DESC, updated_at DESC
+  `).all(personaId) as any[];
+  return rows.map(mapCanonicalToMemoryItem);
 }
 
 export function loadMemories(subjectId: string = DEFAULT_SUBJECT_ID): MemoryItem[] {
@@ -460,6 +519,8 @@ export function routeAndRankMemories(options: {
   userQuery?: string;
   activePersonaId?: string;
   subjectId?: string;
+  projectId?: string | null;
+  workspaceDir?: string | null;
   maxTokenBudget?: number;
 }): MemoryRoutingResult {
   const subjectId = options.subjectId || DEFAULT_SUBJECT_ID;
@@ -467,14 +528,19 @@ export function routeAndRankMemories(options: {
   const query = (options.userQuery || '').trim().toLowerCase();
   const maxTokens = options.maxTokenBudget || 400;
 
+  let resolvedProjectId = options.projectId;
+  if (!resolvedProjectId && options.workspaceDir) {
+    try {
+      const proj = resolveProjectForWorkspace(options.workspaceDir);
+      resolvedProjectId = proj.id;
+    } catch {}
+  }
+
   const relationship = getPersonaRelationship(personaId, subjectId);
+  const promptMode = inferPromptMode(query);
 
   // Invariant 1: Casual dialogue / empty greetings -> 0 memories injected
-  const isCasual =
-    query.length === 0 ||
-    /^(привет|хай|здравствуй|hello|hi|hey|ok|ок|спасибо|thanks|ясно|понял|давай|продолжи|следующий|круто)[\s!.,?]*$/i.test(
-      query
-    );
+  const isCasual = promptMode === 'small_talk';
 
   if (isCasual) {
     return {
@@ -486,15 +552,28 @@ export function routeAndRankMemories(options: {
   }
 
   const db = getMemoryDb();
-  const allActiveFacts = db.prepare(`
-    SELECT * FROM canonical_memories 
-    WHERE subject_id = ? AND status = 'active'
-    ORDER BY importance DESC, updated_at DESC
-  `).all(subjectId) as unknown as CanonicalMemory[];
+  let allActiveFacts: CanonicalMemory[] = [];
+
+  if (resolvedProjectId) {
+    allActiveFacts = db.prepare(`
+      SELECT * FROM canonical_memories 
+      WHERE (subject_id = ? OR (scope = 'project' AND project_id = ?)) AND status = 'active'
+      ORDER BY importance DESC, updated_at DESC
+    `).all(subjectId, resolvedProjectId) as unknown as CanonicalMemory[];
+  } else {
+    allActiveFacts = db.prepare(`
+      SELECT * FROM canonical_memories 
+      WHERE subject_id = ? AND status = 'active'
+      ORDER BY importance DESC, updated_at DESC
+    `).all(subjectId) as unknown as CanonicalMemory[];
+  }
 
   // Scoring facts
   const scoredFacts = allActiveFacts.map((f) => {
     let score = f.importance * 1.5 + f.confidence * 2.0;
+    if (f.scope === 'project') {
+      score += 2.0; // Project context boost
+    }
     const keyLower = f.key.toLowerCase();
     const valLower = f.value.toLowerCase();
 
@@ -534,40 +613,20 @@ export function routeAndRankMemories(options: {
     matchedEpisodes = searchEpisodesFts(query, 3, subjectId);
   }
 
-  // Dynamic Token Budgeting
-  let currentTokens = 0;
-  const finalFacts: CanonicalMemory[] = [];
-  const finalEpisodes: Episode[] = [];
-
-  for (const item of scoredFacts) {
-    const line = `- [${item.fact.category.toUpperCase()}] ${item.fact.key}: ${item.fact.value}`;
-    const tokens = estimateTokens(line);
-    if (currentTokens + tokens <= maxTokens * 0.75) {
-      finalFacts.push(item.fact);
-      currentTokens += tokens;
-    }
-    if (finalFacts.length >= 8) break;
-  }
-
-  for (const ep of matchedEpisodes) {
-    const line = `- [EPISODE ${ep.title}]: ${ep.summary}`;
-    const tokens = estimateTokens(line);
-    if (currentTokens + tokens <= maxTokens) {
-      finalEpisodes.push(ep);
-      currentTokens += tokens;
-    }
-  }
+  // Dynamic Token Budgeting via BudgetManager
+  const factsList = scoredFacts.map((s) => s.fact);
+  const plan = allocateScopedMemories(factsList, matchedEpisodes, promptMode, { total_max: maxTokens });
 
   return {
-    injectedFacts: finalFacts,
-    injectedEpisodes: finalEpisodes,
+    injectedFacts: plan.allocatedFacts,
+    injectedEpisodes: plan.allocatedEpisodes,
     relationship,
-    tokenCountEstimate: currentTokens,
+    tokenCountEstimate: plan.totalEstimatedTokens,
   };
 }
 
-export function getSystemPromptMemoryContext(activePersonaId: string = 'default', userQuery?: string): string {
-  const result = routeAndRankMemories({ activePersonaId, userQuery });
+export function getSystemPromptMemoryContext(activePersonaId: string = 'default', userQuery?: string, workspaceDir?: string): string {
+  const result = routeAndRankMemories({ activePersonaId, userQuery, workspaceDir });
   const lines: string[] = [];
 
   // Persona Relationship Context (if defined and non-trivial)
@@ -609,15 +668,24 @@ export function getSystemPromptMemoryContext(activePersonaId: string = 'default'
 function mapCanonicalToMemoryItem(row: any): MemoryItem {
   return {
     id: row.id,
+    scope: row.scope || 'user',
     key: row.key,
     value: row.value,
     category: row.category,
     subject_id: row.subject_id,
+    project_id: row.project_id || null,
+    persona_id: row.persona_id || null,
+    session_id: row.session_id || null,
     domain: row.domain,
+    display_text: row.display_text || null,
     confidence: row.confidence,
     is_explicit: row.is_explicit,
     importance: row.importance,
     status: row.status,
+    source_id: row.source_id || null,
+    usage_count: row.usage_count || 0,
+    last_used_at: row.last_used_at || null,
+    expires_at: row.expires_at || null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

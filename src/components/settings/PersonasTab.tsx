@@ -8,8 +8,10 @@ import {
   Save,
   Sliders,
   Check,
+  GitPullRequest,
 } from 'lucide-react';
 import { PersonaMetadata, PersonaDetail, ToolDefinition } from '../../types';
+import { PersonaProposalsModal } from './PersonaProposalsModal';
 import {
   get_personas,
   get_persona_detail,
@@ -58,6 +60,7 @@ export const PersonasTab: React.FC = () => {
 
   // New Persona Modal
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isProposalsOpen, setIsProposalsOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newDesc, setNewDesc] = useState('');
 
@@ -368,6 +371,14 @@ export const PersonasTab: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setIsProposalsOpen(true)}
+                      icon={<GitPullRequest size={13} />}
+                    >
+                      Evolution Studio
+                    </Button>
                     {personaDetail.metadata.id !== activePersonaId && (
                       <Button
                         variant="secondary"
@@ -577,6 +588,16 @@ export const PersonasTab: React.FC = () => {
           />
         </form>
       </Modal>
+
+      {/* 6. Evolution & Proposals Studio Modal */}
+      {personaDetail && (
+        <PersonaProposalsModal
+          isOpen={isProposalsOpen}
+          onClose={() => setIsProposalsOpen(false)}
+          persona={personaDetail.metadata}
+          onPersonaUpdated={() => loadDetail(personaDetail.metadata.id)}
+        />
+      )}
     </div>
   );
 };

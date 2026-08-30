@@ -74,7 +74,7 @@ function initSchema(db: DatabaseSync): void {
       confidence REAL NOT NULL DEFAULT 1.0,
       is_explicit INTEGER NOT NULL DEFAULT 0,
       importance INTEGER NOT NULL DEFAULT 3,
-      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'candidate', 'superseded', 'invalidated', 'conflict')),
+      status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'candidate', 'superseded', 'invalidated', 'conflict', 'archived', 'rejected')),
       source_id TEXT REFERENCES memory_sources(id),
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -153,6 +153,75 @@ function initSchema(db: DatabaseSync): void {
       embedding BLOB NOT NULL,
       created_at INTEGER NOT NULL
     );
+
+    -- 7. PROJECTS / WORKSPACE IDENTITY
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      repo_root TEXT,
+      workspace_dir TEXT,
+      git_remote TEXT,
+      fingerprint TEXT UNIQUE,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('discovered', 'active', 'archived', 'merged')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      last_seen_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_projects_status ON projects(status);
+    CREATE INDEX IF NOT EXISTS idx_projects_workspace_dir ON projects(workspace_dir);
+    CREATE INDEX IF NOT EXISTS idx_projects_git_remote ON projects(git_remote);
+
+    -- 8. PROJECT PATH ALIASES
+    CREATE TABLE IF NOT EXISTS project_path_aliases (
+      project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+      path TEXT NOT NULL,
+      normalized_path TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (project_id, normalized_path)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_project_path_aliases_path ON project_path_aliases(normalized_path);
+
+    -- 9. PERSONA FILE VERSIONS
+    CREATE TABLE IF NOT EXISTS persona_file_versions (
+      id TEXT PRIMARY KEY,
+      persona_id TEXT NOT NULL,
+      file TEXT NOT NULL CHECK (file IN ('SOUL.md', 'TOOLS.md', 'USER.md', 'USER_PINNED.md', 'CORE.md')),
+      content TEXT NOT NULL,
+      content_sha256 TEXT NOT NULL,
+      created_by TEXT NOT NULL DEFAULT 'system',
+      source_proposal_id TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (persona_id, file, content_sha256)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_persona_file_versions_persona_file ON persona_file_versions(persona_id, file, created_at DESC);
+
+    -- 10. PERSONA CHANGE PROPOSALS
+    CREATE TABLE IF NOT EXISTS persona_change_proposals (
+      id TEXT PRIMARY KEY,
+      persona_id TEXT NOT NULL,
+      target_file TEXT NOT NULL CHECK (target_file IN ('SOUL.md', 'TOOLS.md', 'USER.md', 'USER_PINNED.md', 'CORE.md')),
+      target_section TEXT,
+      operation TEXT NOT NULL CHECK (operation IN ('append', 'prepend', 'replace_section', 'insert_after', 'insert_before', 'delete_section', 'set_metadata')),
+      patch_payload TEXT NOT NULL,
+      rationale TEXT,
+      source_type TEXT NOT NULL DEFAULT 'agent' CHECK (source_type IN ('agent', 'user', 'reflection', 'migration', 'system')),
+      source_event_id TEXT,
+      source_session_id TEXT,
+      base_version_id TEXT REFERENCES persona_file_versions(id),
+      risk_level TEXT NOT NULL DEFAULT 'medium' CHECK (risk_level IN ('low', 'medium', 'high', 'critical')),
+      requires_approval INTEGER NOT NULL DEFAULT 1,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected', 'applied', 'reverted', 'expired')),
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      reviewed_at TEXT,
+      applied_at TEXT,
+      rejected_reason TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_persona_change_proposals_persona ON persona_change_proposals(persona_id, status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_persona_change_proposals_status ON persona_change_proposals(status, created_at DESC);
   `);
 
   // FTS5 Synchronization triggers
@@ -170,6 +239,136 @@ function initSchema(db: DatabaseSync): void {
       INSERT INTO episodes_fts(rowid, title, summary) VALUES (new.rowid, new.title, new.summary);
     END;
   `);
+
+  // 11. Additive column migrations on canonical_memories
+  migrateCanonicalMemoriesColumns(db);
+
+  // 12. Create views & perform scope backfill
+  createScopedViewsAndBackfill(db);
+}
+
+function migrateCanonicalMemoriesColumns(db: DatabaseSync): void {
+  try {
+    const tableInfo = db.prepare(`PRAGMA table_info(canonical_memories)`).all() as { name: string }[];
+    const existingCols = new Set(tableInfo.map((c) => c.name));
+
+    if (!existingCols.has('scope')) {
+      db.exec(`ALTER TABLE canonical_memories ADD COLUMN scope TEXT NOT NULL DEFAULT 'user';`);
+    }
+    if (!existingCols.has('project_id')) {
+      db.exec(`ALTER TABLE canonical_memories ADD COLUMN project_id TEXT;`);
+    }
+    if (!existingCols.has('persona_id')) {
+      db.exec(`ALTER TABLE canonical_memories ADD COLUMN persona_id TEXT;`);
+    }
+    if (!existingCols.has('session_id')) {
+      db.exec(`ALTER TABLE canonical_memories ADD COLUMN session_id TEXT;`);
+    }
+    if (!existingCols.has('display_text')) {
+      db.exec(`ALTER TABLE canonical_memories ADD COLUMN display_text TEXT;`);
+    }
+    if (!existingCols.has('usage_count')) {
+      db.exec(`ALTER TABLE canonical_memories ADD COLUMN usage_count INTEGER NOT NULL DEFAULT 0;`);
+    }
+    if (!existingCols.has('last_used_at')) {
+      db.exec(`ALTER TABLE canonical_memories ADD COLUMN last_used_at TEXT;`);
+    }
+    if (!existingCols.has('expires_at')) {
+      db.exec(`ALTER TABLE canonical_memories ADD COLUMN expires_at TEXT;`);
+    }
+
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_canonical_memories_scope_status ON canonical_memories(scope, status);
+      CREATE INDEX IF NOT EXISTS idx_canonical_memories_user_scope ON canonical_memories(subject_id, scope, status);
+      CREATE INDEX IF NOT EXISTS idx_canonical_memories_project_scope ON canonical_memories(project_id, scope, status);
+      CREATE INDEX IF NOT EXISTS idx_canonical_memories_persona_scope ON canonical_memories(persona_id, scope, status);
+      CREATE INDEX IF NOT EXISTS idx_canonical_memories_session_scope ON canonical_memories(session_id, scope, status);
+      CREATE INDEX IF NOT EXISTS idx_canonical_memories_domain_key ON canonical_memories(domain, key);
+    `);
+  } catch (err) {
+    console.error('[memoryDb] Error migrating canonical_memories columns:', err);
+  }
+}
+
+function createScopedViewsAndBackfill(db: DatabaseSync): void {
+  try {
+    db.exec(`
+      CREATE VIEW IF NOT EXISTS active_user_memories AS
+      SELECT *
+      FROM canonical_memories
+      WHERE scope = 'user'
+        AND status = 'active'
+        AND (expires_at IS NULL OR expires_at > datetime('now'))
+      ORDER BY importance DESC, confidence DESC, updated_at DESC;
+
+      CREATE VIEW IF NOT EXISTS active_project_memories AS
+      SELECT *
+      FROM canonical_memories
+      WHERE scope = 'project'
+        AND status = 'active'
+        AND project_id IS NOT NULL
+        AND (expires_at IS NULL OR expires_at > datetime('now'))
+      ORDER BY importance DESC, confidence DESC, updated_at DESC;
+
+      CREATE VIEW IF NOT EXISTS active_persona_memories AS
+      SELECT *
+      FROM canonical_memories
+      WHERE scope = 'persona'
+        AND status = 'active'
+        AND persona_id IS NOT NULL
+        AND (expires_at IS NULL OR expires_at > datetime('now'))
+      ORDER BY importance DESC, confidence DESC, updated_at DESC;
+    `);
+
+    // Backfill scope classifications
+    db.exec(`
+      UPDATE canonical_memories
+      SET
+        scope = 'user',
+        subject_id = 'user_default',
+        persona_id = NULL,
+        project_id = NULL,
+        session_id = NULL
+      WHERE domain IN (
+        'user',
+        'user_profile',
+        'user_preference',
+        'preference',
+        'preferences',
+        'profile',
+        'identity'
+      ) AND (scope IS NULL OR scope = 'user');
+
+      UPDATE canonical_memories
+      SET
+        scope = 'project',
+        persona_id = NULL,
+        session_id = NULL
+      WHERE domain IN (
+        'project',
+        'project_convention',
+        'architecture',
+        'repo',
+        'workspace',
+        'codebase'
+      ) AND (scope IS NULL OR scope = 'user');
+
+      UPDATE canonical_memories
+      SET
+        scope = 'persona',
+        project_id = NULL,
+        session_id = NULL
+      WHERE domain IN (
+        'persona',
+        'persona_style',
+        'style',
+        'tone',
+        'voice'
+      ) AND (scope IS NULL OR scope = 'user');
+    `);
+  } catch (err) {
+    console.error('[memoryDb] Error creating views or backfilling scopes:', err);
+  }
 }
 
 function migrateLegacyJsonIfEmpty(db: DatabaseSync): void {

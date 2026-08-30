@@ -64,17 +64,28 @@ export interface PersonaMetadata {
   name: string;
   description: string;
   icon: string;
-  user_id: string;
+  user_id?: string;
   is_active: boolean;
   created_at: number;
   updated_at: number;
+  active_version_id?: string;
+  compiled_sha256?: string;
 }
+
+export type PersonaFile =
+  | 'SOUL.md'
+  | 'TOOLS.md'
+  | 'USER.md'
+  | 'USER_PINNED.md'
+  | 'CORE.md';
 
 export interface PersonaDetail {
   metadata: PersonaMetadata;
   soul: string;
   tools: string;
   user: string;
+  pinnedUser?: string;
+  core?: string;
 }
 
 export type AppTheme =
@@ -338,21 +349,145 @@ export interface MemorySource {
   created_at: number;
 }
 
+export type MemoryScope = 'core' | 'user' | 'persona' | 'project' | 'session';
 export type MemoryCategory = 'profile' | 'preference' | 'interest' | 'fact' | 'user_preference' | 'project_convention' | 'architecture' | 'general';
-export type MemoryStatus = 'active' | 'candidate' | 'superseded' | 'invalidated' | 'conflict';
+export type MemoryStatus = 'active' | 'candidate' | 'superseded' | 'invalidated' | 'conflict' | 'archived' | 'rejected';
+export type MemoryDomain = string;
+
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+export type ProposalStatus = 'pending' | 'approved' | 'rejected' | 'applied' | 'reverted' | 'expired';
+export type ProposalOperation = 'append' | 'prepend' | 'replace_section' | 'insert_after' | 'insert_before' | 'delete_section' | 'set_metadata';
+export type ProposalSourceType = 'agent' | 'user' | 'reflection' | 'migration' | 'system';
+export type ProjectStatus = 'discovered' | 'active' | 'archived' | 'merged';
+
+export interface ProjectRecord {
+  id: string;
+  name: string | null;
+  repo_root: string | null;
+  workspace_dir: string | null;
+  git_remote: string | null;
+  fingerprint: string | null;
+  status: ProjectStatus;
+  created_at: string;
+  updated_at: string;
+  last_seen_at: string;
+}
+
+export interface ProjectPathAlias {
+  project_id: string;
+  path: string;
+  normalized_path: string;
+  last_seen_at: string;
+}
+
+export interface PersonaFileVersionRecord {
+  id: string;
+  persona_id: string;
+  file: PersonaFile;
+  content: string;
+  content_sha256: string;
+  created_by: string;
+  source_proposal_id: string | null;
+  created_at: string;
+}
+
+export interface PersonaPatchPayload {
+  section?: string;
+  content?: string;
+  anchorHeading?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface PersonaChangeProposalRecord {
+  id: string;
+  persona_id: string;
+  target_file: PersonaFile;
+  target_section: string | null;
+  operation: ProposalOperation;
+  patch_payload: PersonaPatchPayload;
+  rationale: string | null;
+  source_type: ProposalSourceType;
+  source_event_id: string | null;
+  source_session_id: string | null;
+  base_version_id: string | null;
+  risk_level: RiskLevel;
+  requires_approval: boolean;
+  status: ProposalStatus;
+  created_at: string;
+  reviewed_at: string | null;
+  applied_at: string | null;
+  rejected_reason: string | null;
+}
+
+export interface ProposePersonaChangeInput {
+  persona_id: string;
+  target_file: PersonaFile;
+  target_section?: string;
+  operation: ProposalOperation;
+  patch_payload: PersonaPatchPayload;
+  rationale?: string;
+  source_type?: ProposalSourceType;
+  source_event_id?: string;
+  source_session_id?: string;
+  base_content_sha256?: string;
+}
+
+export interface ProposalValidationIssue {
+  code:
+    | 'protected_section_conflict'
+    | 'base_version_mismatch'
+    | 'token_budget_exceeded'
+    | 'forbidden_operation'
+    | 'invalid_target_file'
+    | 'unsafe_source'
+    | 'duplicate_proposal';
+  message: string;
+}
+
+export interface ProposePersonaChangeResult {
+  ok: boolean;
+  proposal?: PersonaChangeProposalRecord;
+  issues?: ProposalValidationIssue[];
+  risk_level?: RiskLevel;
+  requires_approval?: boolean;
+}
+
+export interface ApplyProposalResult {
+  ok: boolean;
+  proposal_id: string;
+  new_version_id?: string;
+  applied_at?: string;
+  error?: string;
+}
+
+export interface RollbackResult {
+  ok: boolean;
+  persona_id: string;
+  file: PersonaFile;
+  restored_version_id: string;
+  new_version_id: string;
+}
 
 export interface CanonicalMemory {
   id: string;
+  scope?: MemoryScope;
   subject_id: string;
+  project_id?: string | null;
+  persona_id?: string | null;
+  session_id?: string | null;
   category: MemoryCategory;
   domain: string;
   key: string;
   value: string;
+  display_text?: string | null;
   confidence: number;
   is_explicit: number;
   importance: number;
   status: MemoryStatus;
-  source_id?: string;
+  source_id?: string | null;
+  usage_count?: number;
+  last_used_at?: string | null;
+  expires_at?: string | null;
   created_at: number;
   updated_at: number;
   last_confirmed_at: number;
@@ -402,17 +537,66 @@ export interface MemoryAuditEntry {
 
 export interface MemoryItem {
   id: string;
+  scope?: MemoryScope;
   key: string;
   value: string;
   category: MemoryCategory;
   subject_id?: string;
+  project_id?: string | null;
+  persona_id?: string | null;
+  session_id?: string | null;
   domain?: string;
+  display_text?: string | null;
   confidence?: number;
   is_explicit?: number;
   importance?: number;
   status?: MemoryStatus;
+  source_id?: string | null;
+  usage_count?: number;
+  last_used_at?: string | null;
+  expires_at?: string | null;
   createdAt: number;
   updatedAt: number;
+}
+
+export type PromptMode =
+  | 'small_talk'
+  | 'chat_assist'
+  | 'coding_task'
+  | 'debugging'
+  | 'architecture_review';
+
+export interface PromptTokenBudget {
+  core_max?: number;
+  user_max?: number;
+  project_max?: number;
+  persona_max?: number;
+  episodic_max?: number;
+  session_max?: number;
+  total_max: number;
+  corePolicy?: number;
+  persona?: number;
+  tools?: number;
+  projectMemory?: number;
+  userMemory?: number;
+  episodicMemory?: number;
+  sessionMemory?: number;
+}
+
+export interface PromptPrefixMeta {
+  corePolicyVersion: string;
+  personaId: string;
+  personaVersionId?: string;
+  personaCompiledSha256?: string;
+  toolSchemaVersion: string;
+}
+
+export interface BuiltPrompt {
+  prefix: string;
+  prefixMeta: PromptPrefixMeta;
+  dynamicMemoryBlock: string;
+  tokenEstimate: number;
+  budget: PromptTokenBudget;
 }
 
 export interface SkillInfo {

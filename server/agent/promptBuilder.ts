@@ -14,7 +14,7 @@ export function buildFullSystemPrompt(config: AppConfig, userQuery?: string): st
   const thinkTrigger = isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
 
   const activePersona = getActivePersona();
-  const memoryContext = getSystemPromptMemoryContext(activePersona.metadata.id, userQuery);
+  const memoryContext = getSystemPromptMemoryContext(activePersona.metadata.id, userQuery, config.workspace_dir || undefined);
   const envContext = `\n\n# SYSTEM ENVIRONMENT
 - OS: Windows (${process.platform})
 - Shell: PowerShell
@@ -33,12 +33,13 @@ Before modifying files, inspect the codebase first (<read_file>, <list_dir>, <gr
 ## SOUL.md
 ${activePersona.soul}
 
-## USER.md (${activePersona.metadata.user_id})
+## USER.md (Global User Profile)
 ${activePersona.user}
 
 ## ISOLATION & MEMORY RULES:
 - Each conversation is isolated. Do not carry over unrelated past session state.
-- Call <update_user_profile> only when the user explicitly requests remembering personal preferences.
+- Call <update_user_profile> to store personal preferences into global memory.db.
+- Use <propose_persona_change> when suggesting updates to persona directives.
 - Never write USER.md or SOUL.md files to the workspace root directory.`;
 
   const toolExecutionDirective = `\n\n# TOOL EXECUTION PROTOCOL
@@ -47,6 +48,7 @@ ${activePersona.user}
    - Creating files: ALWAYS use <write_file path="...">...</write_file> (parent directories are created automatically).
    - Modifying existing files: ALWAYS use <patch_file path="..."> with compact SEARCH/REPLACE blocks (3-8 lines).
    - Knowledge Base: use <save_knowledge>. User profile: use <update_user_profile>.
+   - Persona directives: use <propose_persona_change>.
    - JS runtime (<code_run>): use ONLY for algorithmic calculations, data parsing, or multi-step batch operations. Do NOT wrap simple file creation in JS scripts.
 3. Use relative paths (e.g. path="src/index.ts").
 4. Close all XML tags properly.
@@ -73,19 +75,23 @@ ${activePersona.user}
   const unifiedToolsContext = getUnifiedToolsContext();
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
 
-  return (
-    thinkTrigger +
+  // Cacheable Stable Prefix
+  const stablePrefix =
     languageProtocolDirective +
     toolExecutionDirective +
     unifiedToolsContext +
     gemmaToolDirective +
-    reasoningDirective +
     envContext +
+    personaContext;
+
+  // Dynamic Context
+  const dynamicContext =
+    reasoningDirective +
     planningContext +
-    personaContext +
     memoryContext +
-    workspaceMdContext
-  );
+    workspaceMdContext;
+
+  return thinkTrigger + stablePrefix + dynamicContext;
 }
 
 export function formatMessageContent(m: ChatMessage, isHistoryAssistant: boolean = false): string | any[] {

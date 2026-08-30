@@ -21,7 +21,7 @@ import {
 } from '../tools';
 import { addOrUpdateMemory, queryMemories } from '../memory';
 import { listSkills, readSkill } from '../skills';
-import { getActivePersona, appendSilentUserTrait, updatePersonaFile } from '../personas';
+import { getActivePersona, appendSilentUserTrait, updatePersonaFile, proposePersonaChange } from '../personas';
 import { listSessions, loadSession, saveSession } from '../session';
 import { executeCodeProgram } from './codeRuntime';
 import { userQuestionService } from './userQuestionService';
@@ -298,8 +298,45 @@ export async function dispatchToolExecution(
         return 'Error: trait content cannot be empty for update_user_profile.';
       }
       appendSilentUserTrait(activePersona.metadata.id, `[${category}] ${trait.trim()}`);
-      addOrUpdateMemory(`user_${category}`, trait.trim(), category);
-      return `[OK] Профиль пользователя (${activePersona.metadata.user_id}) успешно дополнен в ~/.0xagent/personas/${activePersona.metadata.id}/USER.md: [${category}] ${trait.trim()}`;
+      addOrUpdateMemory(`user_${category}`, trait.trim(), category, {
+        scope: 'user',
+        subjectId: 'user_default',
+        isExplicit: true,
+        confidence: 1.0,
+      });
+      return `[OK] Пользовательский факт успешно записан в глобальную память (memory.db / scope: user) и скомпилирован в USER.md: [${category}] ${trait.trim()}`;
+    }
+
+    case 'propose_persona_change': {
+      const filename = (tc.arguments.file || tc.arguments.filename || 'SOUL.md') as 'SOUL.md' | 'TOOLS.md' | 'USER.md' | 'USER_PINNED.md' | 'CORE.md';
+      const section = tc.arguments.section;
+      const operation = tc.arguments.operation || 'append';
+      const rationale = tc.arguments.rationale || 'Autonomous agent persona self-improvement';
+      const content = tc.arguments.content || '';
+
+      const res = proposePersonaChange({
+        persona_id: activePersona.metadata.id,
+        target_file: filename,
+        target_section: section,
+        operation,
+        patch_payload: {
+          section,
+          content,
+        },
+        rationale,
+        source_type: 'agent',
+        source_session_id: sessionId,
+      });
+
+      if (!res.ok) {
+        return `[FAIL] Proposal rejected by validation: ${res.issues?.map((i) => i.message).join('; ')}`;
+      }
+
+      if (broadcast) {
+        broadcast('persona-proposal-created', { proposal: res.proposal });
+      }
+
+      return `[PROPOSAL CREATED] Предложение об изменении личности зарегистрировано (ID: ${res.proposal?.id}, Риск: ${res.risk_level?.toUpperCase()}, Требует подтверждения: ${res.requires_approval}).`;
     }
 
     case 'update_persona_file': {

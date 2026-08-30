@@ -28,6 +28,7 @@ const TOOL_NAME_MAP: Record<string, string> = {
   list_knowledge: 'list_knowledge', listknowledge: 'list_knowledge',
   update_user_profile: 'update_user_profile', updateuserprofile: 'update_user_profile', user_profile: 'update_user_profile', update_profile: 'update_user_profile',
   update_persona_file: 'update_persona_file', updatepersonafile: 'update_persona_file', persona_file: 'update_persona_file',
+  propose_persona_change: 'propose_persona_change', proposepersonachange: 'propose_persona_change', persona_change: 'propose_persona_change',
   propose_pull_request: 'propose_pull_request', pull_request: 'propose_pull_request', propose_staged_changes: 'propose_pull_request',
 };
 
@@ -124,6 +125,20 @@ const DECLARATIVE_RULES: ToolRule[] = [
     },
   },
   { regex: /<update_?persona_?file\b(?:\s+file=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/update_?persona_?file>/gi, handler: (m) => ({ idPrefix: 'persona', name: 'update_persona_file', args: { file: m[1] || 'SOUL.md', content: m[2] ? m[2].trim() : '' } }) },
+  {
+    regex: /<propose_?persona_?change\b(?:\s+file=["']([^"']+)["'])?(?:\s+section=["']([^"']+)["'])?(?:\s+operation=["']([^"']+)["'])?(?:\s+rationale=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/propose_?persona_?change>/gi,
+    handler: (m) => ({
+      idPrefix: 'persona_prop',
+      name: 'propose_persona_change',
+      args: {
+        file: m[1] || 'SOUL.md',
+        section: m[2] || undefined,
+        operation: m[3] || 'append',
+        rationale: m[4] || undefined,
+        content: m[5] ? m[5].trim() : '',
+      },
+    }),
+  },
 // 9. Exec & Interactive tools
   {
     regex: /<(?:execute_command|executecommand|run_command|runcommand|exec|shell)\s+(?:command|cmd)=["']([^"']+)["']\s*\/?>/gi,

@@ -6,6 +6,7 @@ import {
   removeActiveSessionStream,
 } from './agentState';
 import { strip_ai_reasoning_fluff } from './fluffSanitizer';
+import { filterCloudPayload } from './cloudPrivacyFilter';
 import { estimatePromptTokens } from '../summarizer';
 
 export const PRIMARY_TEXT_MODEL = 'gemini-3.6-flash';
@@ -178,6 +179,7 @@ export async function fetchLlmResponse(
     }
 
     const cloudEndpoint = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    const { sanitizedMessages } = filterCloudPayload(messages);
 
     for (const candidateModel of modelCandidates) {
       activeModelName = candidateModel;
@@ -186,7 +188,7 @@ export async function fetchLlmResponse(
 
       const requestBody: any = {
         model: candidateModel,
-        messages,
+        messages: sanitizedMessages,
         stream: true,
         temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
         max_tokens: effectiveMaxTokens,

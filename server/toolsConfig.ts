@@ -153,22 +153,22 @@ new replacement lines
   {
     id: 'update_user_profile',
     name: 'update_user_profile',
-    description: 'Save user preferences into persona USER.md.',
+    description: 'Save user preferences into global memory.db and persona USER.md projection.',
     category: 'memory',
     requiresApproval: false,
     enabled: true,
     xmlSpec: `14. <update_user_profile trait="..." category="preferences|profile" />
-   - Update user profile in persona. Do not write USER.md in workspace!`,
+   - Update global user profile in memory.db. Do not write USER.md in workspace!`,
   },
   {
-    id: 'update_persona_file',
-    name: 'update_persona_file',
-    description: 'Update persona file (SOUL.md, USER.md, TOOLS.md).',
+    id: 'propose_persona_change',
+    name: 'propose_persona_change',
+    description: 'Propose a structured patch/change to persona SOUL.md or TOOLS.md with safe validation and user approval.',
     category: 'memory',
-    requiresApproval: false,
+    requiresApproval: true,
     enabled: true,
-    xmlSpec: `15. <update_persona_file file="SOUL.md|USER.md|TOOLS.md">content</update_persona_file>
-   - Update persona file.`,
+    xmlSpec: `15. <propose_persona_change file="SOUL.md|TOOLS.md" section="section_name" operation="append|prepend|replace_section|delete_section" rationale="...">content</propose_persona_change>
+   - Propose a safe change to persona directives or tools rules. Direct raw file overwriting is blocked.`,
   },
   {
     id: 'todo_write',

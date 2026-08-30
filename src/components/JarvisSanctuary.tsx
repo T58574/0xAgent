@@ -440,7 +440,7 @@ export const JarvisSanctuary: React.FC<JarvisSanctuaryProps> = ({
             liveTelemetry={liveTelemetry}
             config={config}
             personas={personas}
-            activePersonaId="jarvis_companion"
+            activePersonaId={activePersonaId}
             onSelectPersona={onSelectPersona}
           />
         </div>
