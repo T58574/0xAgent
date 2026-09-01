@@ -83,6 +83,7 @@ Manage the entire platform from any terminal via the unified `0xagent` CLI:
 Unlike conventional wrappers requiring external servers (like Ollama or vLLM), **0xAgent is the first all-in-one platform featuring a native, built-in inference supervisor**, a 24/7 personal assistant module (**Veronica**), and a production-grade autonomous agent harness out of the box with zero complex setup.
 
 ### 🤖 Module «Veronica» — Personal AI Assistant & Telegram Supervisor
+*See full guide: [docs/veronica.md](docs/veronica.md)*
 - **Deterministic SQLite Audit Journal**: All background tasks, heartbeats, git commits, and project states are stored in an isolated `veronica.db` (WAL mode) with an In-Memory Single-Writer FIFO queue.
 - **Telegram Bot Gateway (`grammy`)**: Control tasks, query project progress, and receive instant proactive notifications on completion, crashes, or timeouts (`/status`, `/projects`, `/today`, `/yesterday`, `/run`, `/kill`).
 - **Token-Dense Context Engine**: Generates ultra-compact project summaries (~150-250 tokens) via `0xagent veronica context <project>` so background agents get up to speed instantly without consuming context windows.
