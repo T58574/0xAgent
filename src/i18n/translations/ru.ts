@@ -5,6 +5,7 @@ export const ru: Translations = {
     chat: 'Чат',
     workspace: 'Проект',
     jarvis: 'Джарвис',
+    veronica: 'Вероника',
     settings: 'Настройки',
     analytics: 'Аналитика',
     knowledge: 'Знания',

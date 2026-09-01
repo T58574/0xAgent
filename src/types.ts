@@ -125,6 +125,8 @@ export interface SystemPromptItem {
   editable?: boolean;
 }
 
+export type ActiveView = 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge' | 'veronica';
+
 export interface RemoteNodeConfig {
   enabled?: boolean;
   host: string;

@@ -8,6 +8,7 @@ export const en: Translations = {
     settings: 'Settings',
     analytics: 'Analytics',
     knowledge: 'Knowledge',
+    veronica: 'Veronica',
     newChat: 'New Chat',
     switchLanguage: 'Language',
     lanShare: 'LAN Share',

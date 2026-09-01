@@ -7,6 +7,7 @@ export interface Translations {
     settings: string;
     analytics: string;
     knowledge: string;
+    veronica: string;
     newChat: string;
     switchLanguage: string;
     lanShare: string;

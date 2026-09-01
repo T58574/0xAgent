@@ -14,8 +14,9 @@ import {
   Settings as SettingsIcon,
   BarChart2,
   BookOpen,
+  Bot,
 } from 'lucide-react';
-import { ChatSession, FileNode } from '../types';
+import { ChatSession, FileNode, ActiveView } from '../types';
 import { WorkspaceTree } from './WorkspaceTree';
 import { getWorkspaceBaseName, formatRelativeTime, isAutoWorkspace } from '../utils/helpers';
 import { useI18n } from '../i18n';
@@ -33,8 +34,8 @@ interface SidebarProps {
   onSelectWorkspace: () => void;
   workspaceTreeNodes?: FileNode[];
   onFileClick?: (path: string, name: string) => void;
-  activeView?: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge';
-  onChangeView?: (view: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge') => void;
+  activeView?: ActiveView;
+  onChangeView?: (view: ActiveView) => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = React.memo(({
@@ -493,10 +494,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
           {/* 3. MOBILE VIEWS QUICK NAVIGATION DRAWER SECTION */}
           {onChangeView && (
             <div className="p-2 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-card-bg)] md:hidden space-y-1">
-              <div className="grid grid-cols-4 gap-1">
+              <div className="grid grid-cols-5 gap-1">
                 {[
                   { id: 'chat', label: t.nav.chat, icon: MessageSquare },
                   { id: 'knowledge', label: t.nav.knowledge, icon: BookOpen },
+                  { id: 'veronica', label: t.nav.veronica, icon: Bot },
                   { id: 'analytics', label: t.nav.analytics, icon: BarChart2 },
                   { id: 'settings', label: t.nav.settings, icon: SettingsIcon },
                 ].map((tab) => {

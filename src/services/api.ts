@@ -239,6 +239,14 @@ export const get_server_logs = () => get<{ logs: string[]; logFilePath: string; 
 export const get_lan_info = () => get<{ urls: string[] }>('/get-local-ips');
 export const get_local_ips = () => get<{ urls: string[] }>('/get-local-ips');
 
+// Veronica & Remote Node API
+export const get_veronica_status = () => get<any>('/veronica/status');
+export const get_veronica_projects = () => get<{ projects: any[] }>('/veronica/projects');
+export const spawn_veronica_task = (params: { project: string; skill: string; runtime_profile?: string; autonomy_level?: string; custom_prompt?: string }) =>
+  post<{ success: boolean; task: any }>('/veronica/tasks/spawn', params);
+export const kill_veronica_task = (taskId: string) =>
+  post<{ success: boolean }>(`/veronica/tasks/${encodeURIComponent(taskId)}/kill`, {});
+
 // Memories & Skills
 export const get_memories = (query?: string) =>
   get<MemoryItem[]>(query ? `/memories?query=${encodeURIComponent(query)}` : '/memories');

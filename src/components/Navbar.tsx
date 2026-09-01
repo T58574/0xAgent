@@ -4,17 +4,18 @@ import {
   Settings as SettingsIcon,
   BarChart2,
   BookOpen,
+  Bot,
   Menu,
   Plus,
 } from 'lucide-react';
-import { AppConfig, ChatSession, LiveTelemetry } from '../types';
+import { AppConfig, ChatSession, LiveTelemetry, ActiveView } from '../types';
 import { useI18n } from '../i18n';
 import { ContextBudgetGauge } from './chat/ContextBudgetGauge';
 
 interface NavbarProps {
   onToggleSidebar?: () => void;
-  activeView: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge';
-  onChangeView: (view: 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge') => void;
+  activeView: ActiveView;
+  onChangeView: (view: ActiveView) => void;
   config: AppConfig | null;
   currentSession?: ChatSession | null;
   workspaceDir?: string | null;
@@ -62,6 +63,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
           {[
             { id: 'chat', label: t.nav.chat, icon: MessageSquare },
             { id: 'knowledge', label: t.nav.knowledge, icon: BookOpen },
+            { id: 'veronica', label: t.nav.veronica, icon: Bot },
             { id: 'analytics', label: t.nav.analytics, icon: BarChart2 },
             { id: 'settings', label: t.nav.settings, icon: SettingsIcon },
           ].map((tab) => {

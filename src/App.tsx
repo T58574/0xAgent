@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import * as api from './services/api';
 import { sounds } from './services/soundEffects';
-import { AppConfig, LiveTelemetry, JarvisState, PersonaMetadata } from './types';
+import { AppConfig, LiveTelemetry, JarvisState, PersonaMetadata, ActiveView } from './types';
 import { getWorkspaceBaseName } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -19,6 +19,7 @@ const AnalyticsPage = lazy(() => import('./components/analytics/AnalyticsPage').
 const KnowledgeVault = lazy(() => import('./components/KnowledgeVault').then((m) => ({ default: m.KnowledgeVault })));
 const JarvisSanctuary = lazy(() => import('./components/JarvisSanctuary').then((m) => ({ default: m.JarvisSanctuary })));
 const JarvisWidget = lazy(() => import('./components/JarvisWidget').then((m) => ({ default: m.JarvisWidget })));
+const VeronicaPage = lazy(() => import('./components/veronica/VeronicaPage').then((m) => ({ default: m.VeronicaPage })));
 import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { useI18n } from './i18n';
@@ -63,7 +64,7 @@ export default function App() {
   const [showLogsDrawer, setShowLogsDrawer] = useState<boolean>(false);
 
   // Navigation view & Sidebar state
-  const [activeView, setActiveView] = useState<'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge'>('chat');
+  const [activeView, setActiveView] = useState<ActiveView>('chat');
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(() => {
     if (typeof window !== 'undefined') return window.innerWidth >= 768;
     return true;
@@ -443,6 +444,16 @@ export default function App() {
                   sessions={sessions}
                   serverLogs={logs}
                   onRefresh={() => window.location.reload()}
+                />
+              </div>
+            )}
+
+            {/* VERONICA VIEW */}
+            {activeView === 'veronica' && (
+              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-2xl sm:rounded-[26px]">
+                <VeronicaPage
+                  config={config}
+                  onSaveConfig={handleSaveConfig}
                 />
               </div>
             )}
