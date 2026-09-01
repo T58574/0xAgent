@@ -472,5 +472,7 @@ export function useSettingsState(
     serverLogsAutoScroll,
     setServerLogsAutoScroll,
     saveStatus,
+    config,
+    onSaveConfig,
   };
 }

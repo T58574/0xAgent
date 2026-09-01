@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Layers, FolderGit2, Cpu, Settings as SettingsIcon, CheckCircle2, XCircle } from 'lucide-react';
+import { Bot, Layers, FolderGit2, Settings as SettingsIcon } from 'lucide-react';
 import { VeronicaTasksTab } from './VeronicaTasksTab';
 import { VeronicaProjectsTab } from './VeronicaProjectsTab';
-import { VeronicaComputeNodeTab } from './VeronicaComputeNodeTab';
 import { VeronicaSettingsTab } from './VeronicaSettingsTab';
 import { AppConfig } from '../../types';
 import * as api from '../../services/api';
@@ -12,7 +11,7 @@ interface VeronicaPageProps {
   onSaveConfig: (updatedConfig: AppConfig) => Promise<void>;
 }
 
-type VeronicaSubTab = 'tasks' | 'projects' | 'compute' | 'settings';
+type VeronicaSubTab = 'tasks' | 'projects' | 'settings';
 
 export const VeronicaPage: React.FC<VeronicaPageProps> = ({
   config,
@@ -39,8 +38,7 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
   const subTabs = [
     { id: 'tasks', label: 'Задачи & Журнал', icon: Layers, count: status?.active_tasks },
     { id: 'projects', label: 'Проекты & Контекст', icon: FolderGit2 },
-    { id: 'compute', label: 'Compute Node (LAN)', icon: Cpu, isOnline: status?.remote_gpu_online },
-    { id: 'settings', label: 'Настройки', icon: SettingsIcon },
+    { id: 'settings', label: 'Настройки Вероники', icon: SettingsIcon },
   ];
 
   return (
@@ -78,16 +76,10 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs">
-              <span className="text-[var(--theme-text-muted)]">Compute Node:</span>
-              {status?.remote_gpu_online ? (
-                <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                  <CheckCircle2 size={12} /> Online
-                </span>
-              ) : (
-                <span className="flex items-center gap-1 text-[var(--theme-text-muted)]">
-                  <XCircle size={12} /> Standalone
-                </span>
-              )}
+              <span className="text-[var(--theme-text-muted)]">Active Tasks:</span>
+              <span className="font-mono font-bold text-[var(--theme-accent)]">
+                {status?.active_tasks ?? 0}
+              </span>
             </div>
           </div>
         </div>
@@ -102,18 +94,19 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveSubTab(tab.id as VeronicaSubTab)}
-                className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shrink-0 ${
+                className={`px-4 py-2.5 rounded-2xl text-xs font-semibold flex items-center gap-2.5 transition-all cursor-pointer border shrink-0 ${
                   isActive
-                    ? 'bg-[var(--theme-accent)] text-white shadow-xs'
-                    : 'bg-[var(--theme-card-bg)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border border-[var(--theme-border)]'
+                    ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs ring-1 ring-[var(--theme-accent)]/30 font-bold'
+                    : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
                 }`}
               >
-                <Icon size={14} />
+                <Icon
+                  size={15}
+                  className={isActive ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text-muted)]'}
+                />
                 <span>{tab.label}</span>
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
-                    isActive ? 'bg-white/20 text-white' : 'bg-[var(--theme-accent)]/10 text-[var(--theme-accent)]'
-                  }`}>
+                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-blue-500/20 text-blue-400 border border-blue-500/30">
                     {tab.count}
                   </span>
                 )}
@@ -122,18 +115,14 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
           })}
         </div>
 
-        {/* Tab Content Panels */}
-        <div className="pt-1">
-          {activeSubTab === 'tasks' && <VeronicaTasksTab onRefresh={fetchStatus} />}
+        {/* Subtab Panels */}
+        <div className="w-full">
+          {activeSubTab === 'tasks' && <VeronicaTasksTab />}
           {activeSubTab === 'projects' && <VeronicaProjectsTab />}
-          {activeSubTab === 'compute' && (
-            <VeronicaComputeNodeTab config={config} onSaveConfig={onSaveConfig} />
-          )}
           {activeSubTab === 'settings' && (
             <VeronicaSettingsTab config={config} onSaveConfig={onSaveConfig} />
           )}
         </div>
-
       </div>
     </div>
   );

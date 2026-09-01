@@ -6,6 +6,7 @@ import { loadConfig, saveConfig } from '../config';
 import { parseGgufMetadata } from '../ggufParser';
 import { voiceDaemonManager } from '../agent/voiceDaemonManager';
 import { stopLlamaServerProcess } from './llamaRoutes';
+import { restartTelegramBot } from '../veronica/telegram/bot';
 
 export const configRouter = Router();
 
@@ -21,6 +22,10 @@ configRouter.get('/config', (_req, res) => {
 configRouter.post('/config', (req, res) => {
   try {
     saveConfig(req.body);
+
+    if (req.body.veronica !== undefined) {
+      restartTelegramBot();
+    }
 
     if (req.body.tts_config && typeof req.body.tts_config.wake_word_enabled === 'boolean') {
       voiceDaemonManager.syncWithConfig(req.body.tts_config.wake_word_enabled);

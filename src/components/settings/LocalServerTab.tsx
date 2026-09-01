@@ -12,9 +12,13 @@ import { InstalledVersionsSection } from './localServer/InstalledVersionsSection
 import { ServerPerformanceParams } from './localServer/ServerPerformanceParams';
 import { ServerLogsConsole } from './localServer/ServerLogsConsole';
 import { CrashAdviserCard } from './localServer/CrashAdviserCard';
+import { RemoteNodeSection } from './localServer/RemoteNodeSection';
 import { useLocalServerProcess } from './localServer/useLocalServerProcess';
+import { AppConfig } from '../../types';
 
 interface LocalServerTabProps {
+  config?: AppConfig | null;
+  onSaveConfig?: (updatedConfig: AppConfig) => Promise<void>;
   exePath: string;
   setExePath: (val: string) => void;
   modelPath: string;
@@ -90,10 +94,12 @@ interface LocalServerTabProps {
   setApiUrl: (val: string) => void;
 }
 
-type LocalServerSubtab = 'config' | 'params' | 'logs';
+type LocalServerSubtab = 'config' | 'params' | 'remote_node' | 'logs';
 
 export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) => {
   const {
+    config,
+    onSaveConfig,
     exePath,
     setExePath,
     modelPath,
@@ -283,6 +289,22 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
           <span>{t.settings.localServer.subtabParams}</span>
           <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
             {ctxSize.toLocaleString()} tok
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubtab('remote_node')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+            activeSubtab === 'remote_node'
+              ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs ring-1 ring-[var(--theme-accent)]/30 font-bold'
+              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+          }`}
+        >
+          <Cpu size={14} className={activeSubtab === 'remote_node' ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text-muted)]'} />
+          <span>Compute Node (LAN)</span>
+          <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-[var(--theme-input-bg)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
+            {config?.remote_node?.enabled ? 'Online' : 'LAN'}
           </span>
         </button>
 
@@ -672,7 +694,17 @@ export const LocalServerTab: React.FC<LocalServerTabProps> = React.memo((props) 
       )}
 
       {/* ===================================================================== */}
-      {/* SUBTAB 3: LOGS & CONSOLE TERMINAL                                     */}
+      {/* SUBTAB 3: REMOTE COMPUTE NODE (LAN)                                   */}
+      {/* ===================================================================== */}
+      {activeSubtab === 'remote_node' && (
+        <RemoteNodeSection
+          config={config || null}
+          onSaveConfig={onSaveConfig || (async () => {})}
+        />
+      )}
+
+      {/* ===================================================================== */}
+      {/* SUBTAB 4: LOGS & CONSOLE TERMINAL                                     */}
       {/* ===================================================================== */}
       {activeSubtab === 'logs' && (
         <div className="space-y-6">

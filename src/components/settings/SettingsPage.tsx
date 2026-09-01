@@ -135,6 +135,8 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
 
           {s.activeSubtab === 'local_server' && (
             <LocalServerTab
+              config={s.config}
+              onSaveConfig={s.onSaveConfig}
               exePath={s.exePath}
               setModelPath={s.setModelPath}
               modelPath={s.modelPath}
