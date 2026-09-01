@@ -279,7 +279,6 @@ export const ru: Translations = {
       voiceTestPhrase: 'Все системы Jarvis функционируют в штатном режиме, сэр.',
       connectionTitle: 'Параметры API подключения',
       apiUrl: 'API Endpoint URL',
-      groqApiKey: 'Groq API Key (Whisper)',
       behaviorTitle: 'Поведение и интерфейс',
       reasoningTitle: 'Цепочка рассуждений',
       reasoningDesc: 'Отображать блок мыслей <think> в ответах',

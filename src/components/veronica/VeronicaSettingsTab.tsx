@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Bot, Eye, EyeOff, Plus, Trash2, Sliders, Save } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bot, Eye, EyeOff, Plus, Trash2, Sliders, Save, Sparkles } from 'lucide-react';
 import { Card, Button, Input, Select, Toggle, Badge } from '../ui';
 import { AppConfig, VeronicaConfig } from '../../types';
 import { useToast } from '../../context/ToastContext';
+import * as api from '../../services/api';
 
 interface VeronicaSettingsTabProps {
   config: AppConfig | null;
@@ -25,7 +26,17 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
   const [watchdogInterval, setWatchdogInterval] = useState(veronicaCfg.watchdog_interval_sec || 15);
   const [heartbeatTimeout, setHeartbeatTimeout] = useState(veronicaCfg.default_heartbeat_timeout_sec || 300);
   const [cliPath, setCliPath] = useState(veronicaCfg.antigravity_cli_path || 'agy');
+  const [model, setModel] = useState(veronicaCfg.model || 'inherit');
+  const [effort, setEffort] = useState(veronicaCfg.effort || 'auto');
+  const [agent, setAgent] = useState(veronicaCfg.agent || 'default');
+  const [availableModels, setAvailableModels] = useState<{ local: string[]; antigravity: { slug: string; name: string }[] }>({ local: [], antigravity: [] });
+  const [availableAgents, setAvailableAgents] = useState<{ slug: string; name: string; description?: string }[]>([]);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get_veronica_models().then(setAvailableModels).catch(() => {});
+    api.get_veronica_agents().then((res) => setAvailableAgents(res.agents || [])).catch(() => {});
+  }, []);
 
   const handleAddWhitelistUser = () => {
     const num = parseInt(newUserId.trim(), 10);
@@ -51,6 +62,9 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
         watchdog_interval_sec: Number(watchdogInterval),
         default_heartbeat_timeout_sec: Number(heartbeatTimeout),
         antigravity_cli_path: cliPath.trim() || 'agy',
+        model: model !== 'inherit' ? model : null,
+        effort: effort !== 'auto' ? effort as any : null,
+        agent: agent !== 'default' ? agent : null,
       };
 
       await onSaveConfig({
@@ -65,6 +79,26 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
     }
   };
 
+  const modelOptions = [
+    { value: 'inherit', label: 'Default / Auto (Inherit Host Model)' },
+    ...availableModels.antigravity.map((m) => ({
+      value: m.slug,
+      label: `⚡ ${m.name}`,
+    })),
+    ...availableModels.local.map((m) => ({
+      value: m,
+      label: `🧠 Local: ${m}`,
+    })),
+  ];
+
+  const agentOptions = [
+    { value: 'default', label: 'Default General Agent' },
+    ...availableAgents.map((a) => ({
+      value: a.slug,
+      label: `🤖 ${a.name}`,
+    })),
+  ];
+
   return (
     <div className="space-y-6">
       {/* Header Save Strip */}
@@ -75,7 +109,7 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
           </div>
           <div>
             <h3 className="text-sm font-bold text-[var(--theme-text)]">Настройки Персонального Ассистента</h3>
-            <p className="text-xs text-[var(--theme-text-muted)]">Конфигурация Telegram-бота, безопасности и таймаутов</p>
+            <p className="text-xs text-[var(--theme-text-muted)]">Конфигурация Telegram-бота, моделей и параметров выполнения</p>
           </div>
         </div>
 
@@ -91,6 +125,54 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {/* Model, Effort & Agent Runtime Configuration */}
+        <Card className="p-6 space-y-5">
+          <div className="border-b border-[var(--theme-border)] pb-3">
+            <h4 className="text-sm font-bold text-[var(--theme-text)] flex items-center gap-2">
+              <Sparkles size={16} className="text-[var(--theme-accent)]" />
+              <span>Движок, Модели & Субагенты</span>
+            </h4>
+          </div>
+
+          <div className="space-y-4">
+            <Select
+              label="Модель по умолчанию (--model)"
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              options={modelOptions}
+            />
+            <p className="text-[11px] text-[var(--theme-text-muted)]">
+              Определяет модель для запуска через Antigravity CLI или локальный сервер.
+            </p>
+
+            <Select
+              label="Уровень рассуждений по умолчанию (--effort)"
+              value={effort}
+              onChange={(e) => setEffort(e.target.value as any)}
+              options={[
+                { value: 'auto', label: 'Auto / По умолчанию' },
+                { value: 'low', label: 'Low — Минимальное время размышлений' },
+                { value: 'medium', label: 'Medium — Сбалансированный режим' },
+                { value: 'high', label: 'High — Глубокий анализ задач' },
+              ]}
+            />
+
+            <Select
+              label="Специализированный Агент (--agent)"
+              value={agent}
+              onChange={(e) => setAgent(e.target.value)}
+              options={agentOptions}
+            />
+
+            <Input
+              label="Команда / Путь Antigravity CLI"
+              placeholder="agy"
+              value={cliPath}
+              onChange={(e) => setCliPath(e.target.value)}
+            />
+          </div>
+        </Card>
+
         {/* Telegram Bot Settings */}
         <Card className="p-6 space-y-5">
           <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3">
@@ -167,49 +249,42 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
           </div>
         </Card>
 
-        {/* Watchdog & Execution Bounds */}
-        <Card className="p-6 space-y-5">
+        {/* Watchdog & Autonomy Bounds */}
+        <Card className="p-6 space-y-5 md:col-span-2">
           <div className="border-b border-[var(--theme-border)] pb-3">
             <h4 className="text-sm font-bold text-[var(--theme-text)] flex items-center gap-2">
               <Sliders size={16} className="text-[var(--theme-accent)]" />
-              <span>Безопасность & Параметры Watchdog</span>
+              <span>Безопасность, Автономность & Watchdog</span>
             </h4>
           </div>
 
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Select
-              label="Уровень автономности по умолчанию"
+              label="Уровень автономности"
               value={autonomyLevel}
               onChange={(e) => setAutonomyLevel(e.target.value as any)}
               options={[
                 { value: 'L0', label: 'L0 — Только чтение и анализ' },
-                { value: 'L1', label: 'L1 — Анализ и генерация предложений' },
-                { value: 'L2', label: 'L2 — Изменение файлов и тесты (По умолчанию)' },
-                { value: 'L3', label: 'L3 — Автоматическое создание Git коммитов' },
-                { value: 'L4', label: 'L4 — Автоматический Merge веток' },
-                { value: 'L5', label: 'L5 — Автономный Production Deploy' },
+                { value: 'L1', label: 'L1 — Анализ и предложения' },
+                { value: 'L2', label: 'L2 — Правка файлов и тесты' },
+                { value: 'L3', label: 'L3 — Авто-коммиты в Git' },
+                { value: 'L4', label: 'L4 — Авто-Merge веток' },
+                { value: 'L5', label: 'L5 — Автономный Deploy' },
               ]}
             />
 
             <Input
-              label="Интервал проверки Watchdog (секунды)"
+              label="Интервал проверки Watchdog (сек)"
               type="number"
               value={String(watchdogInterval)}
               onChange={(e) => setWatchdogInterval(Number(e.target.value))}
             />
 
             <Input
-              label="Таймаут отсутствия Heartbeat (секунды)"
+              label="Таймаут Heartbeat (сек)"
               type="number"
               value={String(heartbeatTimeout)}
               onChange={(e) => setHeartbeatTimeout(Number(e.target.value))}
-            />
-
-            <Input
-              label="Команда / Путь Antigravity CLI"
-              placeholder="agy"
-              value={cliPath}
-              onChange={(e) => setCliPath(e.target.value)}
             />
           </div>
         </Card>

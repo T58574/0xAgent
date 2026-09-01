@@ -98,7 +98,6 @@ export function getDefaultConfig(): AppConfig {
     active_prompt_file: 'default.md',
     workspace_dir: null,
     language: 'en',
-    groq_api_key: null,
     theme_colors: {
       bg_color: '#090d16',
       text_color: '#f8fafc',

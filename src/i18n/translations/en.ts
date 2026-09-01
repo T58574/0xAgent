@@ -279,7 +279,6 @@ export const en: Translations = {
       voiceTestPhrase: 'Jarvis systems fully operational, sir.',
       connectionTitle: 'API Connection Parameters',
       apiUrl: 'API Endpoint URL',
-      groqApiKey: 'Groq API Key (Whisper)',
       behaviorTitle: 'UI Behavior & Preferences',
       reasoningTitle: 'Chain of Thought (<think>)',
       reasoningDesc: 'Display reasoning block in model responses',

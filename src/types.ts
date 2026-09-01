@@ -142,6 +142,10 @@ export interface VeronicaConfig {
   default_autonomy_level?: 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
   watchdog_interval_sec?: number;
   default_heartbeat_timeout_sec?: number;
+  model?: string | null;
+  effort?: 'low' | 'medium' | 'high' | 'auto' | null;
+  agent?: string | null;
+  print_timeout?: string | null;
 }
 
 export interface AppConfig {
@@ -152,7 +156,6 @@ export interface AppConfig {
   active_persona_id?: string | null;
   workspace_dir?: string | null;
   language?: AppLanguage | null;
-  groq_api_key?: string | null;
   active_theme?: AppTheme | string | null;
   theme_colors?: ThemeColors | null;
   models_path?: string | null;

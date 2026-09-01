@@ -136,6 +136,15 @@ describe('Veronica Orchestrator & Project Management Architecture', () => {
       assert.ok(details.includes('LogisticsApp'));
       assert.ok(details.includes('12.5%'));
     });
+
+    it('should list available models and build model select keyboard', () => {
+      const models = MessageBuilder.listAvailableModels();
+      assert.ok(Array.isArray(models), 'Models should be an array');
+      const msg = MessageBuilder.buildModelSelectMessage('Qwen3.8-27B-CRACK-IQ3_M.gguf');
+      assert.ok(msg.includes('Выбор активной модели'));
+      const kb = MessageBuilder.buildModelSelectKeyboard(models, 'Qwen3.8-27B-CRACK-IQ3_M.gguf');
+      assert.ok(kb, 'Model keyboard should be generated');
+    });
   });
 
   describe('5. Veronica Orchestrator Intent Handling', () => {

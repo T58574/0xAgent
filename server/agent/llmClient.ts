@@ -155,9 +155,9 @@ export async function fetchLlmResponse(
       }
     }
   } else {
-    // Custom OpenAI-compatible endpoint (e.g. Groq / Ollama / Custom API)
+    // Custom OpenAI-compatible endpoint (e.g. Ollama / LAN / Custom API)
     const customEndpoint = config.api_url || 'http://127.0.0.1:11434/v1/chat/completions';
-    const apiKey = config.groq_api_key || '';
+    const apiKey = '';
     const { sanitizedMessages } = filterCloudPayload(messages);
 
     const requestBody: any = {

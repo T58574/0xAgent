@@ -283,7 +283,6 @@ export interface Translations {
       logoutLabel: string;
       connectionTitle: string;
       apiUrl: string;
-      groqApiKey: string;
       behaviorTitle: string;
       reasoningTitle: string;
       reasoningDesc: string;

@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { loadConfig } from '../../config';
 import { taskRegistry } from '../core/taskRegistry';
 import { projectDiscovery } from '../core/projectDiscovery';
@@ -88,8 +89,10 @@ export class VeronicaOrchestrator {
       }
     }
 
-    // 2. High-speed local heuristic matching (Zero Latency & Zero LLM dependency)
-    const lower = cleanText.toLowerCase();
+    // 2. High-speed local heuristic matching (Strip leading bot addressing)
+    let stripped = cleanText.replace(/^(?:вероника|ника|бот|ассистент)[\s,!:—-]+/i, '').trim();
+    if (!stripped) stripped = cleanText;
+    const lower = stripped.toLowerCase();
 
     // Greetings
     if (/^(привет|здравствуй|здравствуйте|добрый день|доброе утро|добрый вечер|ку|хай|салют|hello|hi)[!.]*$/i.test(lower)) {
@@ -144,7 +147,7 @@ export class VeronicaOrchestrator {
       }
     }
 
-    // 3. LLM Orchestrator Reasoning with robust fallback
+    // 3. LLM Orchestrator Reasoning across the 3 strict backends
     return await this.generateLlmResponse(userId, cleanText);
   }
 
@@ -198,11 +201,12 @@ CAPABILITIES:
     ];
 
     try {
-      const rawResponse = await this.callLlm(config, messages);
+      const rawResponse = await this.callLlm(config, messages, systemPrompt, userText);
       return await this.processLlmOutput(userId, rawResponse);
     } catch (err: any) {
-      console.warn('[Veronica Orchestrator] LLM invocation failed, using intelligent fallback:', err?.message || err);
-      
+      const errDetail = err?.cause?.message || err?.cause?.code || err?.message || String(err);
+      console.warn('[Veronica Orchestrator] All LLM backends exhausted:', errDetail);
+
       // Graceful conversational fallback
       return (
         `Сэр, приняла ваше сообщение: <i>«${this.escapeHtml(userText)}»</i>.\n\n` +
@@ -242,61 +246,96 @@ CAPABILITIES:
   }
 
   /**
-   * Universal LLM call (Groq Cloud API -> Local llama-server) with strict timeouts
+   * 2 Strict Execution Engines for Veronica:
+   * 1. Local LLM (llama-server.exe / local GGUF model via 127.0.0.1:11434)
+   * 2. Antigravity Headless CLI (agy -p)
    */
-  private async callLlm(config: any, messages: { role: string; content: string }[]): Promise<string> {
+  private async callLlm(
+    config: any,
+    messages: { role: string; content: string }[],
+    systemPrompt: string,
+    userText: string
+  ): Promise<string> {
     const timeoutMs = 4000;
+    const errors: string[] = [];
 
-    // 1. Groq API (Cloud Inference & STT)
-    if (config.groq_api_key) {
-      try {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${config.groq_api_key}`,
-          },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile',
-            messages,
-            temperature: 0.3,
-            max_tokens: 2048,
-          }),
-          signal: AbortSignal.timeout(timeoutMs),
-        });
-
-        if (res.ok) {
-          const json: any = await res.json();
-          const text = json.choices?.[0]?.message?.content;
-          if (text) return text;
-        }
-      } catch (groqErr) {
-        console.warn('[Veronica Orchestrator] Groq API fallback:', groqErr);
-      }
-    }
-
-    // 3. Local llama-server fallback
+    // Backend 1: Local llama-server
     const localHost = config.local_server?.host || '127.0.0.1';
     const localPort = config.local_server?.port || 11434;
 
-    const localRes = await fetch(`http://${localHost}:${localPort}/v1/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: config.model_name || 'local',
-        messages,
-        temperature: 0.4,
-        max_tokens: 2048,
-      }),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+    try {
+      const localRes = await fetch(`http://${localHost}:${localPort}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: config.model_name || 'local',
+          messages,
+          temperature: 0.4,
+          max_tokens: 2048,
+        }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
 
-    if (!localRes.ok) {
-      throw new Error(`Local LLM responded with HTTP ${localRes.status}`);
+      if (localRes.ok) {
+        const localJson: any = await localRes.json();
+        const text = localJson.choices?.[0]?.message?.content;
+        if (text) return text;
+      } else {
+        errors.push(`Local LLM HTTP ${localRes.status}`);
+      }
+    } catch (localErr: any) {
+      const detail = localErr?.cause?.code || localErr?.cause?.message || localErr?.message;
+      errors.push(`Local LLM (${localHost}:${localPort}): ${detail}`);
+      console.warn(`[Veronica Orchestrator] [Local LLM Offline]:`, detail);
     }
 
-    const localJson: any = await localRes.json();
-    return localJson.choices?.[0]?.message?.content || 'Ответ не получен.';
+    // Backend 3: Antigravity Headless CLI (agy)
+    try {
+      const cliPath = config.veronica?.antigravity_cli_path || 'agy';
+      const promptPayload = `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
+
+      const agyOutput = await new Promise<string>((resolve, reject) => {
+        const child = spawn(cliPath, ['-p', promptPayload, '--dangerously-skip-permissions', '--output-format', 'text'], {
+          shell: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
+
+        let out = '';
+        let errOut = '';
+        child.stdout?.on('data', (d) => (out += d.toString()));
+        child.stderr?.on('data', (d) => (errOut += d.toString()));
+
+        const timer = setTimeout(() => {
+          try {
+            child.kill();
+          } catch {}
+          reject(new Error('Antigravity CLI timed out after 12s'));
+        }, 12000);
+
+        child.on('close', (code) => {
+          clearTimeout(timer);
+          if (code === 0 && out.trim()) {
+            resolve(out.trim());
+          } else {
+            reject(new Error(`agy exited with code ${code}: ${errOut || 'no output'}`));
+          }
+        });
+
+        child.on('error', (err) => {
+          clearTimeout(timer);
+          reject(err);
+        });
+      });
+
+      if (agyOutput) {
+        return agyOutput;
+      }
+    } catch (agyErr: any) {
+      errors.push(`Antigravity CLI: ${agyErr?.message || agyErr}`);
+      console.warn(`[Veronica Orchestrator] [Antigravity CLI Fallback Error]:`, agyErr?.message || agyErr);
+    }
+
+    throw new Error(errors.join(' | '));
   }
 
   private escapeHtml(text: string): string {

@@ -1,12 +1,25 @@
 import { spawn, ChildProcess } from 'node:child_process';
 import { RuntimeAdapter, SpawnTaskOptions } from './runtimeAdapter';
-import { AgentTask } from '../types';
+import { AgentTask, TaskStatus } from '../types';
 import { taskRegistry } from '../core/taskRegistry';
 import { loadConfig } from '../../config';
 import { VeronicaLogger } from '../core/logger';
 import { projectDiscovery } from '../core/projectDiscovery';
 import { projectDocManager } from '../core/projectDocManager';
 import { notificationService } from '../telegram/notificationService';
+
+export interface AntigravityModelInfo {
+  slug: string;
+  name: string;
+  description?: string;
+  effort?: string;
+}
+
+export interface AntigravityAgentInfo {
+  slug: string;
+  name: string;
+  description?: string;
+}
 
 export class AntigravityAdapter implements RuntimeAdapter {
   private static instance: AntigravityAdapter;
@@ -33,6 +46,30 @@ export class AntigravityAdapter implements RuntimeAdapter {
         resolve(false);
       }
     });
+  }
+
+  public getAvailableAntigravityModels(): AntigravityModelInfo[] {
+    return [
+      { slug: 'gemini-3.7-flash-high', name: 'Gemini 3.7 Flash (High Reasoning)', effort: 'high' },
+      { slug: 'gemini-3.7-flash-medium', name: 'Gemini 3.7 Flash (Medium Reasoning)', effort: 'medium' },
+      { slug: 'gemini-3.6-flash-high', name: 'Gemini 3.6 Flash (High Reasoning)', effort: 'high' },
+      { slug: 'gemini-3.6-flash-medium', name: 'Gemini 3.6 Flash (Medium Reasoning)', effort: 'medium' },
+      { slug: 'gemini-3.5-flash-medium', name: 'Gemini 3.5 Flash (Medium Reasoning)', effort: 'medium' },
+      { slug: 'gemini-3.1-pro-high', name: 'Gemini 3.1 Pro (High Reasoning)', effort: 'high' },
+      { slug: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', effort: 'high' },
+      { slug: 'inherit', name: 'Default Antigravity Inherited Model', effort: 'auto' },
+    ];
+  }
+
+  public getAvailableAntigravityAgents(): AntigravityAgentInfo[] {
+    return [
+      { slug: 'default', name: 'Default General Agent', description: 'Universal autonomous problem solver' },
+      { slug: 'critic', name: 'Staff Architect & Critic', description: 'Adversarial peer critic for rigorous technical design review' },
+      { slug: 'research', name: 'Codebase & Web Researcher', description: 'Read-only exploratory deep research agent' },
+      { slug: 'layout-qa-accessibility', name: 'Layout QA & Accessibility', description: 'Pixel-level spacing and WCAG accessibility review' },
+      { slug: 'ux-psychology-designer', name: 'UX Psychology Designer', description: 'Cognitive laws, Gestalt, Miller & Hick law audits' },
+      { slug: 'multi-agent-orchestrator', name: 'Multi-Agent Orchestrator', description: 'Codebase audit & parallel subagent delegator' },
+    ];
   }
 
   public async spawnTask(options: SpawnTaskOptions): Promise<AgentTask> {
@@ -71,16 +108,39 @@ export class AntigravityAdapter implements RuntimeAdapter {
       prompt = `Perform skill '${options.skill}' on project '${options.project}'. Context: call '0xagent veronica context ${options.project} --task ${task.id}' to receive current status and rules. When done, call '0xagent veronica report --task ${task.id} --status completed --summary "<summary>"'`;
     }
 
+    const selectedModel = options.model || config.veronica?.model;
+    const selectedEffort = options.effort || config.veronica?.effort;
+    const selectedAgent = options.agent || config.veronica?.agent;
+    const selectedTimeout = options.print_timeout || config.veronica?.print_timeout || '15m';
+    const outputFormat = options.output_format || 'text';
+
     const args = [
       '--print', prompt,
       '--dangerously-skip-permissions',
-      '--output-format', 'text',
+      '--output-format', outputFormat,
+      '--print-timeout', selectedTimeout,
       '--add-dir', resolvedProjectPath,
     ];
 
+    if (selectedModel && selectedModel !== 'auto' && selectedModel !== 'inherit' && selectedModel !== 'local') {
+      args.push('--model', selectedModel);
+    }
+    if (selectedEffort && selectedEffort !== 'auto') {
+      args.push('--effort', selectedEffort);
+    }
+    if (selectedAgent && selectedAgent !== 'default' && selectedAgent !== 'none') {
+      args.push('--agent', selectedAgent);
+    }
+    if (options.conversation_id) {
+      args.push('--conversation', options.conversation_id);
+    }
+    if (options.continue_recent) {
+      args.push('--continue');
+    }
+
     VeronicaLogger.log(
       'TASK',
-      `Spawning agy task for project '${options.project}' in '${resolvedProjectPath}' with skill '${options.skill}'`,
+      `Spawning agy task for project '${options.project}' [model: ${selectedModel || 'default'}, effort: ${selectedEffort || 'default'}, agent: ${selectedAgent || 'default'}, timeout: ${selectedTimeout}]`,
       task.id
     );
 
@@ -104,7 +164,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
           const text = data.toString().trim();
           if (text) {
             stdoutAccumulator += '\n' + text;
-            lastOutputSnippet = text.substring(0, 150);
+            lastOutputSnippet = text.substring(0, 200);
             VeronicaLogger.log('TASK', text, task.id);
             taskRegistry.recordHeartbeat(task.id, text.substring(0, 100)).catch(() => {});
           }
@@ -125,20 +185,47 @@ export class AntigravityAdapter implements RuntimeAdapter {
           }
         });
 
-        child.on('close', async (code) => {
+        child.on('close', async (code, signal) => {
           this.activeProcesses.delete(task.id);
           const currentTask = taskRegistry.getTask(task.id);
           if (currentTask && currentTask.status === 'running') {
-            const finalStatus = code === 0 ? 'completed' : 'failed';
-            const cleanSummary =
-              code === 0
-                ? lastOutputSnippet || 'Agent execution finished successfully.'
-                : `Agent process exited with code ${code}`;
+            let finalStatus: TaskStatus = code === 0 ? 'completed' : 'failed';
+            let cleanSummary =
+              lastOutputSnippet ||
+              (code === 0 ? 'Agent execution finished successfully.' : `Agent process exited with code ${code}`);
 
-            VeronicaLogger.log(code === 0 ? 'INFO' : 'ERROR', `Task finished with exit code ${code}`, task.id);
+            // Antigravity Terminal Status parsing (SUCCESS, ERROR, CANCELED, INTERRUPTED, INVALID, WAITING, RUNNING)
+            try {
+              const trimmed = stdoutAccumulator.trim();
+              if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+                const parsed = JSON.parse(trimmed);
+                if (parsed.status) {
+                  const s = String(parsed.status).toUpperCase();
+                  if (s === 'SUCCESS') finalStatus = 'completed';
+                  else if (s === 'ERROR') finalStatus = 'failed';
+                  else if (s === 'CANCELED') finalStatus = 'cancelled';
+                  else if (s === 'INTERRUPTED') finalStatus = 'interrupted';
+                  else if (s === 'INVALID') finalStatus = 'invalid';
+                  else if (s === 'WAITING') finalStatus = 'waiting';
+                  else if (s === 'RUNNING') finalStatus = 'running';
+
+                  if (parsed.response || parsed.summary || parsed.output) {
+                    cleanSummary = String(parsed.response || parsed.summary || parsed.output).substring(0, 500);
+                  }
+                }
+              }
+            } catch {}
+
+            if (signal === 'SIGINT' || signal === 'SIGTERM') {
+              finalStatus = 'interrupted';
+              cleanSummary = `Process was interrupted by signal ${signal}`;
+            }
+
+            VeronicaLogger.log(code === 0 ? 'INFO' : 'WARN', `Task finished with status '${finalStatus}' (exit code ${code})`, task.id);
 
             await taskRegistry.updateTaskStatus(task.id, finalStatus, {
               summary: cleanSummary,
+              result_json: stdoutAccumulator.length > 0 ? stdoutAccumulator.substring(0, 10000) : undefined,
             });
 
             // Log to project changelog
@@ -154,8 +241,10 @@ export class AntigravityAdapter implements RuntimeAdapter {
             if (updatedTask) {
               if (finalStatus === 'completed') {
                 await notificationService.notifyTaskCompleted(updatedTask);
+              } else if (finalStatus === 'interrupted' || finalStatus === 'cancelled') {
+                VeronicaLogger.log('INFO', `Task ${finalStatus}`, task.id);
               } else {
-                await notificationService.notifyTaskCrashed(updatedTask, `Exited with code ${code}`);
+                await notificationService.notifyTaskCrashed(updatedTask, cleanSummary);
               }
             }
           }

@@ -1,15 +1,14 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import * as api from '../services/api';
 
 interface UseAudioRecorderOptions {
-  groqApiKey?: string | null;
-  gainBoost?: number; // e.g. 3.0 (300% boost for quiet mics)
+  gainBoost?: number;
   onTranscribed?: (text: string) => void;
   onError?: (err: string) => void;
 }
 
 export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
-  const { groqApiKey, gainBoost = 3.2, onTranscribed, onError } = options;
+  const { gainBoost = 3.2, onTranscribed, onError } = options;
 
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -62,18 +61,14 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       });
       streamRef.current = stream;
 
-      // Web Audio API Pipeline with Software Gain & Dynamic Compressor
       const AudioCtxClass = window.AudioContext || (window as any).webkitAudioContext;
       const audioCtx = new AudioCtxClass();
       audioContextRef.current = audioCtx;
 
       const source = audioCtx.createMediaStreamSource(stream);
-
-      // 1. Software Gain Boost Node
       const gainNode = audioCtx.createGain();
       gainNode.gain.value = Math.max(1.0, gainBoost);
 
-      // 2. Dynamics Compressor Node to prevent clipping
       const compressor = audioCtx.createDynamicsCompressor();
       compressor.threshold.setValueAtTime(-50, audioCtx.currentTime);
       compressor.knee.setValueAtTime(40, audioCtx.currentTime);
@@ -81,11 +76,9 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
       compressor.release.setValueAtTime(0.25, audioCtx.currentTime);
 
-      // 3. Analyser for real-time visual waveform
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 64;
 
-      // 4. Output Destination for MediaRecorder
       const destination = audioCtx.createMediaStreamDestination();
 
       source.connect(gainNode);
@@ -93,7 +86,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       compressor.connect(analyser);
       compressor.connect(destination);
 
-      // Volume monitoring loop
       const dataArray = new Uint8Array(analyser.frequencyBinCount);
       const updateVolume = () => {
         if (!audioContextRef.current) return;
@@ -108,7 +100,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       };
       updateVolume();
 
-      // Configure MediaRecorder
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : 'audio/webm';
@@ -128,21 +119,17 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
         setIsTranscribing(true);
 
         try {
-          // Convert Blob to Base64
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           reader.onloadend = async () => {
             try {
               const base64Audio = (reader.result as string).split(',')[1];
-              const transcribedText = await api.transcribe_audio(
-                base64Audio,
-                groqApiKey || ''
-              );
-              if (transcribedText && transcribedText.trim()) {
-                onTranscribed?.(transcribedText.trim());
+              const res = await api.send_voice_input(base64Audio, mimeType);
+              if (res && res.text) {
+                onTranscribed?.(res.text.trim());
               }
             } catch (err: any) {
-              const msg = err?.message || 'Ошибка расшифровки голоса';
+              const msg = err?.message || 'Ошибка обработки голосовой команды';
               onError?.(msg);
             } finally {
               setIsTranscribing(false);
@@ -161,38 +148,13 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
       const msg = err?.message || 'Не удалось получить доступ к микрофону';
       onError?.(msg);
     }
-  }, [cleanupAudio, gainBoost, groqApiKey, onError, onTranscribed]);
+  }, [cleanupAudio, gainBoost, onError, onTranscribed, isRecording]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.stop();
     }
-    if (animFrameRef.current) {
-      cancelAnimationFrame(animFrameRef.current);
-      animFrameRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
-    setIsRecording(false);
-    setVolumeLevel(0);
   }, []);
-
-  const toggleRecording = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      startRecording();
-    }
-  }, [isRecording, startRecording, stopRecording]);
-
-  // Unmount cleanup to release mic streams, close AudioContext, and cancel rAF
-  useEffect(() => {
-    return () => {
-      cleanupAudio();
-    };
-  }, [cleanupAudio]);
 
   return {
     isRecording,
@@ -200,7 +162,6 @@ export function useAudioRecorder(options: UseAudioRecorderOptions = {}) {
     volumeLevel,
     startRecording,
     stopRecording,
-    toggleRecording,
     cleanupAudio,
   };
 }

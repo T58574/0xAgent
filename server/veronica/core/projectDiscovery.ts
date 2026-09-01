@@ -33,26 +33,42 @@ export class ProjectDiscovery {
 
   private initDefaultSearchPaths(): void {
     const userHome = os.homedir();
-    const candidatePaths = [
-      path.join(userHome, 'Documents', 'dev'),
-      path.join(userHome, 'dev'),
-      path.join(userHome, 'projects'),
-      path.join(userHome, '.0xagent', 'workspaces'),
-      process.cwd(),
-    ];
+    const primaryDevPath = path.join(userHome, 'Documents', 'dev');
+    const fallbackWorkspacePath = path.join(userHome, '.0xagent', 'workspaces', 'veronica');
 
-    for (const p of candidatePaths) {
-      if (fs.existsSync(p) && !this.devFolders.includes(p)) {
-        this.devFolders.push(p);
+    if (fs.existsSync(primaryDevPath)) {
+      this.devFolders = [primaryDevPath];
+    } else {
+      if (!fs.existsSync(fallbackWorkspacePath)) {
+        try {
+          fs.mkdirSync(fallbackWorkspacePath, { recursive: true });
+        } catch {}
       }
+      this.devFolders = [fallbackWorkspacePath];
     }
   }
 
-  public addSearchPath(dirPath: string): void {
+  public getSearchPaths(): string[] {
+    return [...this.devFolders];
+  }
+
+  public addSearchPath(dirPath: string): boolean {
     const resolved = path.resolve(dirPath);
     if (fs.existsSync(resolved) && !this.devFolders.includes(resolved)) {
       this.devFolders.push(resolved);
+      return true;
     }
+    return false;
+  }
+
+  public removeSearchPath(dirPath: string): boolean {
+    const resolved = path.resolve(dirPath);
+    const idx = this.devFolders.indexOf(resolved);
+    if (idx !== -1) {
+      this.devFolders.splice(idx, 1);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -103,7 +119,8 @@ export class ProjectDiscovery {
         const exists = pPath && fs.existsSync(pPath);
         const key = name.toLowerCase();
 
-        if (!projectsMap.has(key) && exists) {
+        // Avoid adding subdirectories or single files as projects
+        if (!projectsMap.has(key) && exists && fs.statSync(pPath).isDirectory()) {
           projectsMap.set(key, {
             id: p.id,
             name,
@@ -117,7 +134,7 @@ export class ProjectDiscovery {
       }
     } catch {}
 
-    // 3. Sync discovered projects into Veronica database table `projects`
+    // 3. Sync discovered projects into Veronica database table `projects` and prune stale ones
     const discoveredList = Array.from(projectsMap.values());
     await this.syncToVeronicaDb(discoveredList);
 
@@ -143,6 +160,17 @@ export class ProjectDiscovery {
             source: p.source,
           });
           upsertStmt.run(p.name, p.autonomyLevel, settings, Date.now());
+        }
+
+        // Clean up stale projects in DB that no longer exist on disk
+        const currentNames = new Set(projects.map((p) => p.name));
+        const allDbProjects = db.prepare('SELECT name FROM projects').all() as any[];
+        const deleteStmt = db.prepare('DELETE FROM projects WHERE name = ?');
+
+        for (const row of allDbProjects) {
+          if (!currentNames.has(row.name)) {
+            deleteStmt.run(row.name);
+          }
         }
       } catch (err) {
         console.error('[ProjectDiscovery] Sync to veronica.db error:', err);

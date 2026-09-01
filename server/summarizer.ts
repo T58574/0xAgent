@@ -160,11 +160,7 @@ export async function summarizeContext(
       : conversationExcerpt;
 
   try {
-    const apiKey = config.groq_api_key || process.env.GROQ_API_KEY || '';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
 
     const res = await fetch(apiEndpoint, {
       method: 'POST',

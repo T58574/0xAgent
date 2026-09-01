@@ -1,5 +1,7 @@
+import path from 'node:path';
+import fs from 'node:fs';
 import { Bot } from 'grammy';
-import { loadConfig } from '../../config';
+import { loadConfig, saveConfig } from '../../config';
 import { MessageBuilder } from './messageBuilder';
 import { notificationService } from './notificationService';
 import { antigravityAdapter } from '../adapters/antigravityAdapter';
@@ -96,6 +98,20 @@ export function initTelegramBot(): Bot | null {
     bot.command('status', async (ctx) => {
       const msg = MessageBuilder.buildStatusMessage();
       await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
+    });
+
+    async function sendModelMenu(ctx: any) {
+      const config = loadConfig();
+      const currentModel = config.model_name || 'Qwen3.8-27B-CRACK-IQ3_M.gguf';
+      const models = MessageBuilder.listAvailableModels();
+      const msg = MessageBuilder.buildModelSelectMessage(currentModel);
+      const keyboard = MessageBuilder.buildModelSelectKeyboard(models, currentModel);
+      await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: keyboard });
+    }
+
+    // /model
+    bot.command('model', async (ctx) => {
+      await sendModelMenu(ctx);
     });
 
     // /projects
@@ -336,6 +352,35 @@ export function initTelegramBot(): Bot | null {
       }
     });
 
+    bot.callbackQuery(/^veronica:set_model:(.+)$/, async (ctx) => {
+      const chosen = ctx.match[1];
+      const config = loadConfig();
+      config.model_name = chosen === 'agy' ? 'agy' : (chosen.startsWith('local:') ? chosen : `local:${chosen}`);
+      if (chosen !== 'agy' && config.local_server) {
+        const localPath = path.join(process.cwd(), 'models', chosen);
+        if (fs.existsSync(localPath)) {
+          config.local_server.model_path = localPath;
+        }
+      }
+      saveConfig(config);
+      await ctx.answerCallbackQuery({ text: `Выбрана модель: ${chosen}` });
+
+      const models = MessageBuilder.listAvailableModels();
+      const msg = MessageBuilder.buildModelSelectMessage(config.model_name);
+      const keyboard = MessageBuilder.buildModelSelectKeyboard(models, config.model_name);
+      try {
+        await ctx.editMessageText(
+          `✅ <b>Активная модель переключена на:</b> <code>${escapeHtml(chosen)}</code>\n\n${msg}`,
+          { parse_mode: 'HTML', reply_markup: keyboard }
+        );
+      } catch {
+        await ctx.reply(
+          `✅ <b>Активная модель переключена на:</b> <code>${escapeHtml(chosen)}</code>`,
+          { parse_mode: 'HTML' }
+        );
+      }
+    });
+
     // -------------------------------------------------------------
     // Main Text Message Handler (Conversational & Reply Buttons)
     // -------------------------------------------------------------
@@ -376,6 +421,10 @@ export function initTelegramBot(): Bot | null {
             : `⏱ <b>Автоматизации:</b> Нет активных расписаний.\n<i>Вы можете настроить запуск через меню проекта или CLI.</i>`;
 
         await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
+        return;
+      }
+      if (text === '🧠 Модель') {
+        await sendModelMenu(ctx);
         return;
       }
       if (text === '⚙️ Статус') {

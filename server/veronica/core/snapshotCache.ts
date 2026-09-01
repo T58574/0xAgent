@@ -113,7 +113,26 @@ export class SnapshotCache {
       const snap = await this.refreshSnapshot(p.name);
       snapshots.push(snap);
     }
-    return snapshots;
+
+    // Clean up snapshots for projects that no longer exist
+    await writeQueue.enqueue(() => {
+      try {
+        const db = getVeronicaDb();
+        const validNames = new Set(discovered.map((p) => p.name));
+        const allSnapshots = db.prepare('SELECT project FROM project_snapshots').all() as any[];
+        const deleteStmt = db.prepare('DELETE FROM project_snapshots WHERE project = ?');
+
+        for (const s of allSnapshots) {
+          if (!validNames.has(s.project)) {
+            deleteStmt.run(s.project);
+          }
+        }
+      } catch (err) {
+        console.error('[SnapshotCache] Cleanup stale snapshots error:', err);
+      }
+    });
+
+    return this.getAllSnapshots();
   }
 
   /**
@@ -136,21 +155,34 @@ export class SnapshotCache {
   }
 
   /**
-   * Get all project snapshots
+   * Get all project snapshots joined with valid projects in projects table
    */
-  public getAllSnapshots(): ProjectSnapshot[] {
+  public getAllSnapshots(): (ProjectSnapshot & { path?: string; gitRemote?: string | null })[] {
     const db = getVeronicaDb();
-    const stmt = db.prepare('SELECT * FROM project_snapshots ORDER BY last_activity_at DESC');
+    const stmt = db.prepare(`
+      SELECT ps.*, p.settings_json
+      FROM project_snapshots ps
+      JOIN projects p ON ps.project = p.name
+      ORDER BY ps.last_activity_at DESC
+    `);
     const rows: any[] = stmt.all() as any[];
-    return rows.map((r) => ({
-      project: r.project,
-      last_updated: Number(r.last_updated),
-      active_tasks_count: Number(r.active_tasks_count),
-      recent_completions: r.recent_completions,
-      pending_attention_count: Number(r.pending_attention_count),
-      last_activity_at: Number(r.last_activity_at),
-      dense_context_summary: r.dense_context_summary,
-    }));
+    return rows.map((r) => {
+      let settings: any = {};
+      try {
+        settings = JSON.parse(r.settings_json || '{}');
+      } catch {}
+      return {
+        project: r.project,
+        path: settings.path || '',
+        gitRemote: settings.gitRemote || null,
+        last_updated: Number(r.last_updated),
+        active_tasks_count: Number(r.active_tasks_count),
+        recent_completions: r.recent_completions,
+        pending_attention_count: Number(r.pending_attention_count),
+        last_activity_at: Number(r.last_activity_at),
+        dense_context_summary: r.dense_context_summary,
+      };
+    });
   }
 }
 

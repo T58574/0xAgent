@@ -8,6 +8,9 @@ export type TaskStatus =
   | 'timeout'
   | 'crashed'
   | 'cancelled'
+  | 'interrupted'
+  | 'invalid'
+  | 'waiting'
   | 'awaiting_approval';
 
 export type EventType =

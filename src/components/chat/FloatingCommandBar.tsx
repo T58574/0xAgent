@@ -8,8 +8,6 @@ import {
   User,
   Cloud,
   Cpu,
-  RefreshCw,
-  Mic,
   Shield,
   Maximize2,
   Minimize2,
@@ -25,7 +23,6 @@ import {
   PermissionPopover,
   ReasoningPopover,
 } from './popovers';
-import { MobileMicHelpModal } from './MobileMicHelpModal';
 import { useSlashAutocomplete } from './useSlashAutocomplete';
 import { QuickResponseStrip } from './QuickResponseStrip';
 
@@ -75,16 +72,9 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
   const [permissionPreset, setPermissionPreset] = useState<PermissionPreset>((config?.permission_preset as PermissionPreset) || 'prompt');
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortLevel>((config?.reasoning_effort as ReasoningEffortLevel) || 'auto');
   const [isExpanded, setIsExpanded] = useState(false);
-  const [daemonVoiceState, setDaemonVoiceState] = useState<'idle' | 'recording' | 'processing' | 'stopped'>('idle');
-  const [voicePhraseNotification, setVoicePhraseNotification] = useState<string | null>(null);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [showMicHelpModal, setShowMicHelpModal] = useState(false);
-
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
   const inputTextRef = useRef(inputText);
   inputTextRef.current = inputText;
 
@@ -122,11 +112,8 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
     setPermissionPreset(preset);
     setOpenMenu('none');
     try {
-      let currentCfg = config;
-      if (!currentCfg) {
-        currentCfg = await api.get_config();
-      }
-      const updated: AppConfig = { ...currentCfg, permission_preset: preset };
+      const baseCfg = (config || (await api.get_config())) as AppConfig;
+      const updated: AppConfig = { ...baseCfg, permission_preset: preset };
       if (onConfigChanged) onConfigChanged(updated);
       await api.save_config(updated);
     } catch (err) {
@@ -138,12 +125,9 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
     setReasoningEffort(effort);
     setOpenMenu('none');
     try {
-      let currentCfg = config;
-      if (!currentCfg) {
-        currentCfg = await api.get_config();
-      }
+      const baseCfg = (config || (await api.get_config())) as AppConfig;
       const updated: AppConfig = {
-        ...currentCfg,
+        ...baseCfg,
         reasoning_effort: effort,
         reasoning_enabled: effort !== 'off',
       };
@@ -180,186 +164,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
   const recommendedEffort: ReasoningEffortLevel =
     currentLocalMeta?.recommendedReasoningEffort ||
     (activeModelLower.includes('qwen3') ? 'xhigh' : activeModelLower.includes('deepseek') ? 'high' : activeModelLower.includes('gemma') || activeModelLower.includes('phi') ? 'medium' : 'off');
-
-  const isListeningForWake = Boolean(config?.tts_config?.wake_word_enabled);
-
-  const isMobileDevice = /iphone|ipad|ipod|android/i.test(navigator.userAgent) || window.innerWidth < 768;
-
-  const handleMicClick = async () => {
-    setVoiceError(null);
-
-    // If browser MediaRecorder is currently recording, stop and transcribe
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      try {
-        mediaRecorderRef.current.stop();
-      } catch {}
-      return;
-    }
-
-    // Helper to start in-browser WebAudio MediaRecorder (Primary for Mobile, Fallback for Desktop)
-    const startBrowserRecording = async () => {
-      if (!navigator?.mediaDevices?.getUserMedia) {
-        throw new Error('Web Audio API недоступен в этом браузере');
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      });
-
-      let chosenMime = '';
-      if (typeof MediaRecorder !== 'undefined') {
-        if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-          chosenMime = 'audio/webm;codecs=opus';
-        } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-          chosenMime = 'audio/mp4';
-        } else if (MediaRecorder.isTypeSupported('audio/aac')) {
-          chosenMime = 'audio/aac';
-        } else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) {
-          chosenMime = 'audio/ogg;codecs=opus';
-        }
-      }
-
-      const recorder = new MediaRecorder(stream, chosenMime ? { mimeType: chosenMime } : undefined);
-      mediaRecorderRef.current = recorder;
-      audioChunksRef.current = [];
-
-      recorder.ondataavailable = (e) => {
-        if (e.data && e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || chosenMime || 'audio/webm' });
-        if (blob.size > 200) {
-          setDaemonVoiceState('processing');
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            const resBase64 = (reader.result as string).split(',')[1];
-            const mime = recorder.mimeType || chosenMime || 'audio/webm';
-            try {
-              // 1. Try unified Jarvis voice input (with macro and companion support)
-              const res = await api.send_voice_input(resBase64, mime);
-              if (res && res.text) {
-                setInputText(inputTextRef.current ? `${inputTextRef.current} ${res.text}` : res.text);
-                textareaRef.current?.focus();
-              }
-            } catch {
-              // 2. Fallback to direct Whisper STT transcription
-              try {
-                const text = await api.transcribe_audio(resBase64, config?.groq_api_key || '', mime);
-                if (text && text.trim()) {
-                  setInputText(inputTextRef.current ? `${inputTextRef.current} ${text.trim()}` : text.trim());
-                  textareaRef.current?.focus();
-                }
-              } catch (err: any) {
-                setVoiceError(err.message || 'Ошибка распознавания речи');
-                setTimeout(() => setVoiceError(null), 6000);
-              }
-            } finally {
-              setDaemonVoiceState('idle');
-            }
-          };
-          reader.readAsDataURL(blob);
-        } else {
-          setDaemonVoiceState('idle');
-        }
-      };
-
-      recorder.start(250);
-      setDaemonVoiceState('recording');
-    };
-
-    // Mobile: Always record directly from the mobile device's primary microphone
-    if (isMobileDevice) {
-      const isSecure = window.isSecureContext || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const hasMediaApi = Boolean(
-        navigator?.mediaDevices?.getUserMedia ||
-        (navigator as any)?.getUserMedia ||
-        (navigator as any)?.webkitGetUserMedia
-      );
-
-      if (!isSecure && !hasMediaApi) {
-        setShowMicHelpModal(true);
-        setVoiceError('Требуется HTTPS или флаг браузера для микрофона по Wi-Fi');
-        setTimeout(() => setVoiceError(null), 8000);
-        return;
-      }
-
-      try {
-        await startBrowserRecording();
-        return;
-      } catch (err: any) {
-        console.warn('[WebAudio] Mobile mic error:', err);
-        const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
-        if (!isSecure && !isDenied) {
-          setShowMicHelpModal(true);
-        }
-        setVoiceError(isDenied ? 'Доступ к микрофону заблокирован в настройках браузера' : 'Микрофон заблокирован браузером (откройте через HTTPS)');
-        setTimeout(() => setVoiceError(null), 8000);
-        return;
-      }
-    }
-
-    // Desktop: Trigger local OS voice daemon (with fallback to browser mic)
-    try {
-      const res = await api.toggle_voice_daemon_recording();
-      if (!res.success) {
-        // If desktop daemon has no mic or fails, fallback to browser getUserMedia
-        try {
-          await startBrowserRecording();
-          return;
-        } catch {
-          setVoiceError('Устройство ввода звука недоступно. Проверьте системный микрофон.');
-          setTimeout(() => setVoiceError(null), 6000);
-        }
-      }
-    } catch (err: any) {
-      // If server daemon request failed, try browser mic
-      try {
-        await startBrowserRecording();
-      } catch {
-        setVoiceError(`Ошибка микрофона: ${err?.message || err}`);
-        setTimeout(() => setVoiceError(null), 6000);
-      }
-    }
-  };
-
-  useEffect(() => {
-    const un1 = api.listen<{ text: string }>('jarvis_voice_transcribed', (e) => {
-      if (e.payload?.text) {
-        const cur = inputTextRef.current;
-        setInputText(cur ? `${cur} ${e.payload.text}` : e.payload.text);
-        if (textareaRef.current) textareaRef.current.focus();
-      }
-    });
-
-    const un2 = api.listen<{ state: 'idle' | 'recording' | 'processing' | 'stopped' | 'no_mic'; phrase?: string }>('jarvis_voice_state', (e) => {
-      if (e.payload?.state) {
-        if (e.payload.state === 'no_mic') {
-          setDaemonVoiceState('idle');
-          setVoiceError('Системный микрофон ПК занят или не подключен');
-          setTimeout(() => setVoiceError(null), 6000);
-        } else {
-          setDaemonVoiceState(e.payload.state as any);
-        }
-        if (e.payload.phrase) {
-          setVoicePhraseNotification(e.payload.phrase);
-          setTimeout(() => setVoicePhraseNotification(null), 3000);
-        }
-      }
-    });
-
-    return () => {
-      un1();
-      un2();
-    };
-  }, [setInputText]);
 
   const currentPersona = personas.find((p) => p.id === activePersonaId) || { id: 'default', name: '0xAgent', icon: 'smart_toy' };
 
@@ -424,68 +228,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
         </div>
       )}
 
-      {daemonVoiceState === 'recording' && (
-        <div
-          onClick={handleMicClick}
-          className="flex items-center justify-between px-4 py-2.5 mb-2 rounded-2xl bg-rose-950/80 border border-rose-500/40 text-rose-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-xl shadow-rose-950/50 cursor-pointer"
-          title="Нажмите для остановки записи"
-        >
-          <div className="flex items-center gap-2.5 truncate">
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500" />
-            </span>
-            <span className="font-bold tracking-wider text-[11px] text-white shrink-0">
-              {isMobileDevice ? 'MOBILE MIC :: RECORDING' : 'JARVIS :: RECORDING'}
-            </span>
-            <span className="text-[11px] text-rose-300/80 truncate">
-              {voicePhraseNotification ? `«${voicePhraseNotification}»` : (isMobileDevice ? 'Говорите в телефон... (Нажмите для завершения)' : 'Слушаю вас... (Скажите «Стоп» или кликните)')}
-            </span>
-          </div>
-          <div className="flex items-center gap-1 shrink-0 ml-2">
-            <span className="w-1 h-3 bg-rose-400 rounded-full animate-pulse" />
-            <span className="w-1 h-4 bg-rose-400 rounded-full animate-pulse delay-75" />
-            <span className="w-1 h-2 bg-rose-400 rounded-full animate-pulse delay-150" />
-            <span className="w-1 h-4 bg-rose-400 rounded-full animate-pulse delay-100" />
-            <span className="w-1 h-3 bg-rose-400 rounded-full animate-pulse" />
-          </div>
-        </div>
-      )}
-
-      {daemonVoiceState === 'processing' && (
-        <div className="flex items-center justify-between px-4 py-2.5 mb-2 rounded-2xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] font-mono text-xs backdrop-blur-2xl animate-in fade-in slide-in-from-bottom-1 duration-200 shadow-lg">
-          <div className="flex items-center gap-2">
-            <RefreshCw size={14} className="animate-spin text-[var(--theme-accent)]" />
-            <span className="font-bold tracking-wider text-xs text-[var(--theme-text)]">JARVIS :: GROQ WHISPER</span>
-            <span className="text-xs text-[var(--theme-text-muted)]">Расшифровка голосовой команды...</span>
-          </div>
-        </div>
-      )}
-
-      {voiceError && (
-        <div className="flex items-center justify-between px-4 py-2 mb-2 rounded-2xl bg-rose-950/80 border border-rose-500/40 text-rose-300 font-mono text-xs backdrop-blur-2xl animate-in fade-in duration-200 shadow-lg">
-          <div className="flex items-center gap-2 truncate">
-            <span className="text-rose-400 font-bold">[ERR]:</span>
-            <span className="truncate">{voiceError}</span>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0 ml-2">
-            <button
-              type="button"
-              onClick={() => setShowMicHelpModal(true)}
-              className="px-2.5 py-1 rounded-lg bg-rose-500/30 hover:bg-rose-500/50 text-white font-bold text-[10px] transition-colors cursor-pointer"
-            >
-              Инструкция
-            </button>
-            <button
-              type="button"
-              onClick={() => setVoiceError(null)}
-              className="p-1 text-rose-400 hover:text-white rounded-md hover:bg-rose-900/50 cursor-pointer transition-colors"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {onSelectQuickResponse && (
         <QuickResponseStrip
@@ -517,40 +259,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
               {isExpanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
             </button>
           )}
-
-          <button
-            type="button"
-            onClick={handleMicClick}
-            disabled={daemonVoiceState === 'processing'}
-            className={`w-9 h-9 sm:w-9.5 sm:h-9.5 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0 self-center mb-0.5 relative ${
-              daemonVoiceState === 'recording'
-                ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/50 scale-105 animate-pulse'
-                : daemonVoiceState === 'processing'
-                ? 'bg-[var(--theme-border-subtle)] text-[var(--theme-text)] cursor-wait animate-pulse'
-                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-            }`}
-            title={daemonVoiceState === 'recording' ? t.chat.voiceListening : t.chat.voiceInput}
-            aria-label={daemonVoiceState === 'recording' ? t.chat.voiceListening : t.chat.voiceInput}
-          >
-            {daemonVoiceState === 'recording' ? (
-              <>
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-60 pointer-events-none" />
-                <Square size={13} fill="currentColor" />
-              </>
-            ) : daemonVoiceState === 'processing' ? (
-              <RefreshCw size={15} className="animate-spin text-[var(--theme-text)]" />
-            ) : (
-              <>
-                {isListeningForWake && (
-                  <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--theme-accent)] opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--theme-accent)]" />
-                  </span>
-                )}
-                <Mic size={17} />
-              </>
-            )}
-          </button>
 
           <div className="flex items-center shrink-0 self-center">
             {isBusy && onCancelAgent ? (
@@ -598,8 +306,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
           </button>
         </div>
       </div>
-
-      <MobileMicHelpModal isOpen={showMicHelpModal} onClose={() => setShowMicHelpModal(false)} />
     </div>
   );
 });

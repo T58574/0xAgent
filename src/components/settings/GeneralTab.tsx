@@ -30,8 +30,6 @@ interface GeneralTabProps {
   onSelectTheme?: (theme: AppTheme) => void;
   apiUrl: string;
   setApiUrl: (val: string) => void;
-  groqApiKey: string;
-  setGroqApiKey: (val: string) => void;
   reasoningEnabled: boolean;
   setReasoningEnabled: (val: boolean) => void;
   autoSaveHistory: boolean;

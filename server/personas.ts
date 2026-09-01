@@ -43,12 +43,12 @@ export function getUnifiedToolsContext(): string {
 let isInitialized = false;
 
 export function initPersonas(): void {
+  if (isInitialized) return;
   const dir = getPersonasDir();
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  const subdirs = entries.filter((e) => e.isDirectory());
 
-  // Seed single default persona ONLY if directory is completely empty on fresh first boot
-  if (subdirs.length === 0 && !isInitialized) {
+  // Seed single default persona if not present
+  const defaultDir = path.join(dir, 'default');
+  if (!fs.existsSync(defaultDir)) {
     createPersonaDirectory('default', {
       name: '0xAgent Core',
       description: 'Универсальный высокоскоростной ИИ-разработчик для быстрого написания и отладки кода.',

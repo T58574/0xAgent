@@ -27,7 +27,6 @@ export function useSettingsState(
   const [language, setLanguage] = useState<'en' | 'ru'>((config?.language as 'en' | 'ru') || 'en');
   const [apiUrl, setApiUrl] = useState('');
   const [modelName, setModelName] = useState('');
-  const [groqApiKey, setGroqApiKey] = useState('');
   const [modelsPath, setModelsPath] = useState('');
   const [reasoningEnabled, setReasoningEnabled] = useState(true);
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffortLevel>('auto');
@@ -114,7 +113,6 @@ export function useSettingsState(
     if (config.language) setLanguage(config.language);
     setApiUrl(config.api_url || 'http://127.0.0.1:11434/v1');
     setModelName(config.model_name || 'local:qwen2.5-coder-32b.gguf');
-    setGroqApiKey(config.groq_api_key || '');
     setModelsPath(config.models_path || '');
     setReasoningEnabled(config.reasoning_enabled !== false);
     if (config.reasoning_effort) setReasoningEffort(config.reasoning_effort as ReasoningEffortLevel);
@@ -203,7 +201,6 @@ export function useSettingsState(
           language,
           api_url: apiUrl,
           model_name: modelName,
-          groq_api_key: groqApiKey.trim() || null,
           models_path: modelsPath.trim() || null,
           reasoning_enabled: reasoningEnabled,
           reasoning_effort: reasoningEffort,
@@ -278,7 +275,6 @@ export function useSettingsState(
     language,
     apiUrl,
     modelName,
-    groqApiKey,
     modelsPath,
     reasoningEnabled,
     reasoningEffort,
@@ -351,8 +347,6 @@ export function useSettingsState(
     setApiUrl,
     modelName,
     setModelName,
-    groqApiKey,
-    setGroqApiKey,
     modelsPath,
     setModelsPath,
     reasoningEnabled,

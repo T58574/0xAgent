@@ -186,10 +186,6 @@ export const respond_to_approval = (ticketOrNonce: string, approve: boolean, ove
   post<ApprovalResult>('/respond-to-approval', { ticketOrNonce, approve, overrideText, currentContent });
 export const answer_user_question = (toolCallId: string, answers: any[]) =>
   post<void>('/answer-question', { toolCallId, answers });
-export async function transcribe_audio(audioBase64: string, apiKey?: string, mimeType?: string): Promise<string> {
-  const data = await post<{ text: string }>('/transcribe-audio', { audioBase64, apiKey, mimeType });
-  return data.text;
-}
 
 // Llama Releases & Installation
 export const get_llama_releases = () => get<any[]>('/llama-releases');
@@ -242,8 +238,24 @@ export const get_local_ips = () => get<{ urls: string[] }>('/get-local-ips');
 // Veronica & Remote Node API
 export const get_veronica_status = () => get<any>('/veronica/status');
 export const get_veronica_projects = () => get<{ projects: any[] }>('/veronica/projects');
-export const spawn_veronica_task = (params: { project: string; skill: string; runtime_profile?: string; autonomy_level?: string; custom_prompt?: string }) =>
-  post<{ success: boolean; task: any }>('/veronica/tasks/spawn', params);
+export const rescan_veronica_projects = () => post<{ success: boolean; projects: any[] }>('/veronica/projects/rescan', {});
+export const get_veronica_paths = () => get<{ paths: string[] }>('/veronica/projects/paths');
+export const add_veronica_path = (path: string) => post<{ success: boolean; paths: string[]; projects: any[] }>('/veronica/projects/paths', { path });
+export const get_veronica_models = () => get<{ local: string[]; antigravity: { slug: string; name: string; effort?: string }[] }>('/veronica/models');
+export const get_veronica_agents = () => get<{ agents: { slug: string; name: string; description?: string }[] }>('/veronica/agents');
+export const spawn_veronica_task = (params: {
+  project: string;
+  skill: string;
+  runtime_profile?: string;
+  autonomy_level?: string;
+  custom_prompt?: string;
+  model?: string;
+  effort?: string;
+  agent?: string;
+  print_timeout?: string;
+  conversation_id?: string;
+  continue_recent?: boolean;
+}) => post<{ success: boolean; task: any }>('/veronica/tasks/spawn', params);
 export const kill_veronica_task = (taskId: string) =>
   post<{ success: boolean }>(`/veronica/tasks/${encodeURIComponent(taskId)}/kill`, {});
 

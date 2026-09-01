@@ -1,3 +1,6 @@
+import os from 'node:os';
+import path from 'node:path';
+import fs from 'node:fs';
 import { InlineKeyboard, Keyboard } from 'grammy';
 import { getVeronicaDb } from '../db/veronicaDb';
 import { snapshotCache } from '../core/snapshotCache';
@@ -26,9 +29,76 @@ export class MessageBuilder {
       .text('⚡ Быстрый запуск')
       .text('⏱ Автоматизации')
       .row()
+      .text('🧠 Модель')
       .text('⚙️ Статус')
       .text('❓ Помощь')
       .resized();
+  }
+
+  public static listAvailableModels(): string[] {
+    const candidateDirs = [
+      path.join(process.cwd(), 'models'),
+      path.join(os.homedir(), '.0xagent', 'models'),
+    ];
+    const modelNames: string[] = [];
+    for (const dir of candidateDirs) {
+      if (fs.existsSync(dir)) {
+        try {
+          const files = fs.readdirSync(dir);
+          for (const f of files) {
+            if (f.endsWith('.gguf') && !modelNames.includes(f)) {
+              modelNames.push(f);
+            }
+          }
+        } catch {}
+      }
+    }
+    return modelNames;
+  }
+
+  public static buildModelSelectMessage(currentModel: string): string {
+    const isAgy = currentModel === 'agy' || currentModel === 'antigravity';
+    const isLocal = currentModel.startsWith('local:') || currentModel.endsWith('.gguf');
+    const cleanModelName = currentModel.replace(/^local:/, '');
+
+    const lines: string[] = [
+      `🧠 <b>Выбор активной модели и движка для Вероники:</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `🔹 <b>Текущая модель:</b> <code>${escapeHtml(cleanModelName)}</code>`,
+      `🔹 <b>Движок:</b> ${isAgy ? '⚡ Antigravity CLI Headless (agy)' : isLocal ? '🖥️ Local llama-server (GGUF)' : '🖥️ Local LLM Engine'}`,
+      ``,
+      `<i>Выберите модель или движок из списка ниже для переключения:</i>`,
+    ];
+    return lines.join('\n');
+  }
+
+  public static buildModelSelectKeyboard(models: string[], currentModel: string): InlineKeyboard {
+    const keyboard = new InlineKeyboard();
+    const cleanCurrent = currentModel.replace(/^local:/, '');
+
+    // Local Models
+    for (const m of models) {
+      const isSelected = cleanCurrent === m;
+      const label = `${isSelected ? '🔘' : '⚪'} 🖥️ ${m.length > 25 ? m.substring(0, 22) + '...' : m}`;
+      keyboard.text(label, `veronica:set_model:${m}`).row();
+    }
+
+    // Antigravity Cloud Slugs
+    const agyModels = [
+      { slug: 'gemini-3.7-flash-high', label: '⚡ Gemini 3.7 Flash (High)' },
+      { slug: 'gemini-3.6-flash-high', label: '⚡ Gemini 3.6 Flash (High)' },
+      { slug: 'gemini-3.5-flash-medium', label: '⚡ Gemini 3.5 Flash' },
+      { slug: 'claude-sonnet-4-6', label: '⚡ Claude Sonnet 4.6' },
+      { slug: 'agy', label: '⚡ Antigravity (Default/Auto)' },
+    ];
+
+    for (const am of agyModels) {
+      const isSelected = cleanCurrent === am.slug || (am.slug === 'agy' && (cleanCurrent === 'agy' || cleanCurrent === 'antigravity'));
+      const label = `${isSelected ? '🔘' : '⚪'} ${am.label}`;
+      keyboard.text(label, `veronica:set_model:${am.slug}`).row();
+    }
+
+    return keyboard;
   }
 
   public static buildStatusMessage(): string {
@@ -103,9 +173,8 @@ export class MessageBuilder {
     }
 
     if (paginationRow.length > 0) {
-      const row = new InlineKeyboard();
       for (const btn of paginationRow) {
-        row.text(btn.text, btn.data);
+        keyboard.text(btn.text, btn.data);
       }
       keyboard.row();
     }
