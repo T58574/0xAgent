@@ -21,7 +21,6 @@ import {
   ModelPopover,
   SlashMenuPopover,
   PermissionPopover,
-  ReasoningPopover,
 } from './popovers';
 import { useSlashAutocomplete } from './useSlashAutocomplete';
 import { QuickResponseStrip } from './QuickResponseStrip';
@@ -153,20 +152,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
     getDisplayTitle,
   } = useModelManager(config, onModelChanged, onConfigChanged);
 
-  const activeModelLower = (activeModelId || '').toLowerCase();
-  const currentLocalMeta = isLocalActive
-    ? modelsData?.local?.find((m) => m.filePath === activeModelId || m.fileName === activeModelId || m.title === activeModelId)
-    : null;
-
-  const supportsReasoning = Boolean(
-    currentLocalMeta?.supportsReasoning ||
-    ['qwen3', 'gemma-4', 'deepseek-r1', 'r1-distill', 'phi-4', 'thinking'].some((k) => activeModelLower.includes(k))
-  );
-
-  const recommendedEffort: ReasoningEffortLevel =
-    currentLocalMeta?.recommendedReasoningEffort ||
-    (activeModelLower.includes('qwen3') ? 'xhigh' : activeModelLower.includes('deepseek') ? 'high' : activeModelLower.includes('gemma') || activeModelLower.includes('phi') ? 'medium' : 'off');
-
   const currentPersona = personas.find((p) => p.id === activePersonaId) || { id: 'default', name: '0xAgent', icon: 'smart_toy' };
 
   useEffect(() => {
@@ -221,9 +206,22 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
 
       {openMenu === 'slash' && <SlashMenuPopover commands={filteredSlashCommands} selectedIndex={selectedSlashIndex} onSelectCommand={handleSelectSlash} onClose={() => setOpenMenu('none')} />}
       {openMenu === 'persona' && <PersonaPopover personas={personas} activePersonaId={activePersonaId} onSelectPersona={(id) => onSelectPersona?.(id)} onClose={() => setOpenMenu('none')} />}
-      {openMenu === 'model' && <ModelPopover modelsData={modelsData} serverStatus={serverStatus} activeModelId={activeModelId} isStartingServer={isStartingServer} onSelectCloudModel={selectCloudModel} onSelectLocalModel={selectLocalModel} onToggleServer={toggleServer} onClose={() => setOpenMenu('none')} />}
+      {openMenu === 'model' && (
+        <ModelPopover
+          modelsData={modelsData}
+          serverStatus={serverStatus}
+          activeModelId={activeModelId}
+          isStartingServer={isStartingServer}
+          onSelectCloudModel={selectCloudModel}
+          onSelectLocalModel={selectLocalModel}
+          onToggleServer={toggleServer}
+          onRefreshModels={() => fetchModelsAndStatus(true)}
+          reasoningEffort={reasoningEffort}
+          onSelectReasoningEffort={handleSelectReasoningEffort}
+          onClose={() => setOpenMenu('none')}
+        />
+      )}
       {openMenu === 'permission' && <PermissionPopover permissionPreset={permissionPreset} onSelectPreset={handleSelectPreset} onClose={() => setOpenMenu('none')} />}
-      {openMenu === 'reasoning' && <ReasoningPopover reasoningEffort={reasoningEffort} recommendedEffort={recommendedEffort} supportsReasoning={supportsReasoning} onSelectEffort={handleSelectReasoningEffort} onClose={() => setOpenMenu('none')} />}
 
       {attachedImages.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 mb-2 px-2">
@@ -315,10 +313,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
         </div>
 
         <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-          <button type="button" onClick={() => setOpenMenu(openMenu === 'reasoning' ? 'none' : 'reasoning')} className={`inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'reasoning' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`} aria-label={`${t.chat.reasoning}: ${reasoningEffort.toUpperCase()}`}>
-            <span className="text-[11px] uppercase font-mono tracking-wider font-bold">{reasoningEffort.toUpperCase()}</span>
-          </button>
-
           <button type="button" onClick={() => setOpenMenu(openMenu === 'permission' ? 'none' : 'permission')} className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl min-h-[30px] sm:min-h-[28px] transition-all cursor-pointer border shrink-0 ${openMenu === 'permission' ? 'text-[var(--theme-accent-text)] bg-[var(--theme-accent)] border-[var(--theme-accent)] shadow-sm font-bold' : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-[var(--theme-border)] font-semibold bg-[var(--theme-card-bg)]'}`} title={`${t.chat.permission}: ${permissionPreset === 'unrestricted' ? (language === 'ru' ? 'Полная автоматизация' : 'Full Automation') : (language === 'ru' ? 'Частичная автоматизация' : 'Partial Automation')}`} aria-label={`${t.chat.permission}: ${permissionPreset}`}>
             <Shield size={13} />
             <span className="text-[11px] hidden sm:inline font-semibold">{permissionPreset === 'unrestricted' ? (language === 'ru' ? 'Полная' : 'Full') : (language === 'ru' ? 'Частичная' : 'Partial')}</span>

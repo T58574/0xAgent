@@ -14,7 +14,7 @@ export interface ServerStatusData {
 
 // 24-hour localStorage + memory cache for models list
 const MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const STORAGE_KEY = '0xagent_models_cache_v1';
+const STORAGE_KEY = '0xagent_models_cache_v4';
 
 function getInitialCachedModels(): { data: AvailableModelsResponse | null; timestamp: number } {
   if (typeof window === 'undefined') return { data: null, timestamp: 0 };
@@ -22,7 +22,10 @@ function getInitialCachedModels(): { data: AvailableModelsResponse | null; times
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.data && typeof parsed.timestamp === 'number') {
+      if (
+        parsed?.data?.cloud?.some((m: any) => m.supportedEfforts !== undefined) &&
+        typeof parsed.timestamp === 'number'
+      ) {
         if (Date.now() - parsed.timestamp < MODELS_CACHE_TTL_MS) {
           return parsed;
         }

@@ -9,7 +9,7 @@ import {
   RefreshCw,
   X,
 } from 'lucide-react';
-import { AvailableModelsResponse, LocalModelItem } from '../../../types';
+import { AvailableModelsResponse, LocalModelItem, ReasoningEffortLevel } from '../../../types';
 import { ServerStatusData } from '../../../hooks/useModelManager';
 import { useI18n } from '../../../i18n';
 
@@ -21,6 +21,9 @@ interface ModelPopoverProps {
   onSelectCloudModel: (modelId: string) => void;
   onSelectLocalModel: (model: LocalModelItem) => void;
   onToggleServer: (e: React.MouseEvent) => void;
+  onRefreshModels?: () => void;
+  reasoningEffort?: ReasoningEffortLevel;
+  onSelectReasoningEffort?: (effort: ReasoningEffortLevel) => void;
   onClose: () => void;
 }
 
@@ -32,6 +35,9 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
   onSelectCloudModel,
   onSelectLocalModel,
   onToggleServer,
+  onRefreshModels,
+  reasoningEffort,
+  onSelectReasoningEffort,
   onClose,
 }) => {
   const { language } = useI18n();
@@ -52,13 +58,25 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
           <span className="font-bold text-[var(--theme-text)]">
             {language === 'ru' ? 'Облачные модели (Cloud API)' : 'Cloud API Models'}
           </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="sm:hidden p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
-          >
-            <X size={12} />
-          </button>
+          <div className="flex items-center gap-1.5">
+            {onRefreshModels && (
+              <button
+                type="button"
+                onClick={onRefreshModels}
+                className="p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] cursor-pointer transition-colors"
+                title={language === 'ru' ? 'Обновить список моделей' : 'Refresh models list'}
+              >
+                <RefreshCw size={10} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="sm:hidden p-1 rounded-md text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] cursor-pointer"
+            >
+              <X size={12} />
+            </button>
+          </div>
         </div>
         <div className="space-y-1 mb-2">
           {modelsData.cloud.map((m) => {
@@ -197,33 +215,68 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
                 const isActive =
                   activeModelId === m.id ||
                   activeModelId === m.fileName ||
-                  activeModelId === `local:${m.fileName}`;
+                  activeModelId === `local:${m.fileName}` ||
+                  activeModelId === m.filePath;
                 return (
-                  <button
+                  <div
                     key={m.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectLocalModel(m);
-                      onClose();
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                    className={`rounded-xl transition-all border ${
                       isActive
-                        ? 'session-item-active text-[var(--theme-text)] font-semibold border border-[var(--theme-border)] shadow-xs'
-                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
+                        ? 'session-item-active text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-xs bg-[var(--theme-card-bg)]'
+                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <HardDrive
-                        size={13}
-                        className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
-                      />
-                      <span className="truncate font-medium">{m.title || m.fileName}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-[10px] font-mono opacity-60 font-bold">{m.sizeGB}</span>
-                      {isActive && <Check size={13} className="text-[var(--theme-text)] shrink-0" />}
-                    </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onSelectLocalModel(m);
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-left text-xs cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <HardDrive
+                          size={13}
+                          className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
+                        />
+                        <span className="truncate font-semibold">{m.title || m.fileName}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-[10px] font-mono opacity-60 font-bold">{m.sizeGB}</span>
+                        {isActive && <Check size={13} className="text-[var(--theme-text)] shrink-0" />}
+                      </div>
+                    </button>
+
+                    {/* Inline Effort Selector for Local Model when active */}
+                    {isActive && onSelectReasoningEffort && (
+                      <div className="px-3 pb-2 pt-1 flex items-center justify-between gap-2 border-t border-[var(--theme-border)]/40">
+                        <span className="text-[9px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider">
+                          {language === 'ru' ? 'Effort (Рассуждения):' : 'Reasoning Effort:'}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          {(['off', 'low', 'medium', 'high'] as const).map((eff) => {
+                            const isEffActive = (reasoningEffort || 'off') === eff;
+                            return (
+                              <button
+                                key={eff}
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSelectReasoningEffort(eff);
+                                }}
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-mono transition-colors cursor-pointer border ${
+                                  isEffActive
+                                    ? 'bg-[var(--theme-panel)] text-[var(--theme-text)] font-bold border-[var(--theme-border)] shadow-xs'
+                                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent hover:bg-[var(--theme-border-subtle)]'
+                                }`}
+                              >
+                                {eff}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 );
               })
           )}
