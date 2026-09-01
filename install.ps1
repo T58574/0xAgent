@@ -159,7 +159,7 @@ try {
     Write-Host "  [OK] Git is available." -ForegroundColor Green
     Write-InstallLog "Git check passed." "INFO"
 
-    # 3.2. Check Node.js (>= 20)
+    # 3.2. Check Node.js (>= 24)
     $nodeCmd = Get-Command "node" -ErrorAction SilentlyContinue
     if (-not $nodeCmd) {
         Refresh-SessionEnvPath
@@ -173,11 +173,11 @@ try {
         try {
             $nodeVerStr = & node -v
             $majorVer = [int]($nodeVerStr -replace '^v','' -split '\.')[0]
-            if ($majorVer -lt 20) {
-                Write-Host "  [!] Detected Node.js $nodeVerStr. 0xAgent requires Node.js >= 20.0.0 LTS." -ForegroundColor Yellow
+            if ($majorVer -lt 24) {
+                Write-Host "  [!] Detected Node.js $nodeVerStr. 0xAgent requires Node.js >= 24.0.0." -ForegroundColor Yellow
                 $needNodeInstall = $true
             } else {
-                Write-Host "  [OK] Node.js $nodeVerStr is available (>=20.0.0 LTS)." -ForegroundColor Green
+                Write-Host "  [OK] Node.js $nodeVerStr is available (>=24.0.0)." -ForegroundColor Green
                 Write-InstallLog "Node.js check passed: $nodeVerStr" "INFO"
             }
         } catch {
@@ -187,18 +187,18 @@ try {
 
     if ($needNodeInstall) {
         Write-Host ""
-        Write-Host "  [!] Node.js LTS (>= 20.0.0) is not found." -ForegroundColor Yellow
+        Write-Host "  [!] Node.js (>= 24.0.0) is required (Node 20 is deprecated)." -ForegroundColor Yellow
         Write-Host "      Node.js is the JavaScript runtime engine that powers 0xAgent." -ForegroundColor Gray
         Write-Host "      Official site: https://nodejs.org/" -ForegroundColor Cyan
         Write-Host ""
 
         $installedNode = $false
         if ($hasWinget) {
-            $choice = Read-Host "  Install Node.js LTS (v22) automatically via winget now? (Y/n)"
+            $choice = Read-Host "  Install latest Node.js (v24+) automatically via winget now? (Y/n)"
             if ($choice -ne "n" -and $choice -ne "N") {
-                Write-Host "  [+] Installing Node.js LTS via winget. If a Windows UAC prompt appears, please click YES..." -ForegroundColor Cyan
+                Write-Host "  [+] Installing Node.js via winget. If a Windows UAC prompt appears, please click YES..." -ForegroundColor Cyan
                 try {
-                    Start-Process winget -ArgumentList "install --id OpenJS.NodeJS.LTS -e --source winget --accept-source-agreements --accept-package-agreements" -Wait -NoNewWindow
+                    Start-Process winget -ArgumentList "install --id OpenJS.NodeJS -e --source winget --accept-source-agreements --accept-package-agreements" -Wait -NoNewWindow
                     Refresh-SessionEnvPath
                     $nodeCmd = Get-Command "node" -ErrorAction SilentlyContinue
                     if ($nodeCmd) { $installedNode = $true }
@@ -209,12 +209,13 @@ try {
         }
 
         if (-not $installedNode -and -not (Get-Command "node" -ErrorAction SilentlyContinue)) {
-            Safe-Exit -Message "Node.js >= 20.0.0 LTS is required to run 0xAgent." `
+            Safe-Exit -Message "Node.js >= 24.0.0 is required to run 0xAgent." `
                       -Category "MISSING DEPENDENCY: NODE.JS" `
-                      -Recommendation "1. Download and run the Node.js LTS Windows Installer (.msi) from the official website.`n  2. Finish the setup wizard with standard settings.`n  3. Re-run this 0xAgent installation script." `
+                      -Recommendation "1. Download and run the Node.js Windows Installer (.msi) from the official website (>= v24).`n  2. Finish the setup wizard with standard settings.`n  3. Re-run this 0xAgent installation script." `
                       -HelpUrl "https://nodejs.org/en/download"
         }
     }
+
 
     # 4. Synchronize 0xAgent Codebase
     Write-Host ""

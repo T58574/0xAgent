@@ -69,21 +69,22 @@ echo -e "${GREEN}[OK] Git is available: $(git --version)${NC}"
 
 if ! command -v node &> /dev/null; then
     echo -e "${RED}[!] Node.js is not installed.${NC}"
-    echo -e "    Node.js (>= 20.0.0 LTS) is required to run the 0xAgent runtime."
-    echo -e "    - macOS: brew install node@22"
-    echo -e "    - Ubuntu/Debian: curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs"
-    echo -e "    - NVM: nvm install 22 && nvm use 22"
+    echo -e "    Node.js (>= 24.0.0) is required to run the 0xAgent runtime."
+    echo -e "    - macOS: brew install node@24"
+    echo -e "    - Ubuntu/Debian: curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs"
+    echo -e "    - NVM: nvm install 24 && nvm use 24"
     echo -e "    - Official: https://nodejs.org/"
-    safe_exit "Node.js >= 20.0.0 is required." "https://nodejs.org/"
+    safe_exit "Node.js >= 24.0.0 is required." "https://nodejs.org/"
 fi
 
 NODE_MAJOR=$(node -v | sed 's/^v//' | cut -d. -f1)
-if [ "$NODE_MAJOR" -lt 20 ]; then
-    echo -e "${RED}[!] Detected Node.js $(node -v). 0xAgent requires Node.js >= 20.0.0.${NC}"
-    echo -e "    Please upgrade Node.js (e.g. nvm install 22 || brew upgrade node)"
-    safe_exit "Outdated Node.js version." "https://nodejs.org/"
+if [ "$NODE_MAJOR" -lt 24 ]; then
+    echo -e "${RED}[!] Detected Node.js $(node -v). 0xAgent requires Node.js >= 24.0.0.${NC}"
+    echo -e "    Please upgrade Node.js (e.g. nvm install 24 || brew upgrade node)"
+    safe_exit "Outdated Node.js version. Node >= 24 is required." "https://nodejs.org/"
 fi
-echo -e "${GREEN}[OK] Node.js $(node -v) is available (>=20.0.0).${NC}"
+echo -e "${GREEN}[OK] Node.js $(node -v) is available (>=24.0.0).${NC}"
+
 
 # 2. Clone or Update Codebase
 echo -e "\n${YELLOW}[2/5] Synchronizing 0xAgent Codebase...${NC}"

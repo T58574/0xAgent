@@ -118,7 +118,7 @@ async function main() {
   // 4. Git Commit & Tag
   console.log(`${c.yellow}[4/4] Creating Git commit & tag ${tagName}...${c.reset}`);
   try {
-    execSync(`git add package.json`, { cwd: PROJECT_ROOT });
+    execSync(`git add -A`, { cwd: PROJECT_ROOT });
     execSync(`git commit -m "chore(release): ${tagName}"`, { cwd: PROJECT_ROOT, stdio: 'inherit' });
     execSync(`git tag -a "${tagName}" -m "Release ${tagName}"`, { cwd: PROJECT_ROOT, stdio: 'inherit' });
     console.log(`${c.green}[OK] Created git commit and tag ${tagName}.${c.reset}\n`);
