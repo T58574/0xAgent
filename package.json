@@ -1,6 +1,6 @@
 {
   "name": "0xagent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Autonomous AI Coding Agent & Web-IDE platform powered by local llama.cpp and hybrid cloud LLMs",
   "type": "module",
   "bin": {
@@ -46,7 +46,6 @@
     "release:minor": "node ./scripts/release.cjs minor",
     "release:major": "node ./scripts/release.cjs major"
   },
-
   "dependencies": {
     "@ff-labs/fff-node": "^0.10.3",
     "@tailwindcss/vite": "^4.3.3",
