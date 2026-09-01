@@ -40,8 +40,13 @@
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1",
     "audit:security": "node ./scripts/security_audit.cjs",
     "bridge": "tsx scripts/agent-bridge.ts",
-    "test": "tsx --test tests/**/*.test.ts"
+    "test": "tsx --test tests/**/*.test.ts",
+    "release": "node ./scripts/release.cjs",
+    "release:patch": "node ./scripts/release.cjs patch",
+    "release:minor": "node ./scripts/release.cjs minor",
+    "release:major": "node ./scripts/release.cjs major"
   },
+
   "dependencies": {
     "@ff-labs/fff-node": "^0.10.3",
     "@tailwindcss/vite": "^4.3.3",

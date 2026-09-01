@@ -1,0 +1,76 @@
+name: Release & Automated Distribution
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to release (e.g. v0.2.0)'
+        required: true
+        default: 'v0.2.0'
+      prerelease:
+        description: 'Mark as pre-release / beta'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-release:
+    name: Build, Test & Publish GitHub Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci || npm install --no-audit --no-fund
+
+      - name: Run Test Suite
+        run: npm test
+
+      - name: Build Web Client & Generate Assets
+        run: npm run build
+
+      - name: Build Windows Native Tray Launcher
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-launcher.ps1
+
+      - name: Extract Tag & Release Metadata
+        id: vars
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            TAG_NAME="${{ github.event.inputs.version }}"
+          else
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "tag_name=${TAG_NAME}" >> $GITHUB_OUTPUT
+          echo "clean_version=${TAG_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release with Auto-Changelog
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.vars.outputs.tag_name }}
+          name: 0xAgent ${{ steps.vars.outputs.tag_name }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          files: |
+            0xAgent.exe
+            install.ps1
+            install.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -566,6 +566,16 @@ if (isVeronicaBinary) {
       case 'upgrade':
         cmdUpdate();
         break;
+      case 'release': {
+        const releaseScript = path.join(PROJECT_ROOT, 'scripts', 'release.cjs');
+        if (fs.existsSync(releaseScript)) {
+          const relProc = spawn('node', [releaseScript, ...args.slice(1)], { cwd: PROJECT_ROOT, stdio: 'inherit' });
+          relProc.on('close', (code) => process.exit(code || 0));
+        } else {
+          console.error(`${c.red}[ERR] Release script not found at ${releaseScript}${c.reset}`);
+        }
+        break;
+      }
       case 'purge-vram':
       case 'purge':
         cmdPurgeVram();
@@ -587,11 +597,13 @@ ${c.bold}Commands:${c.reset}
   0xagent config               Interactive settings & models manager
   0xagent status               Show backend health, telemetry & active model
   0xagent update               Pull latest releases from GitHub & rebuild
+  0xagent release [patch|min]  Automated version bump, test pass & GitHub release
   0xagent stop                 Terminate all running processes & free ports
   0xagent purge-vram           Force purge GPU VRAM and terminate inference servers
   0xagent help                 Show this help manual
 `);
         break;
+
       default:
         console.log(`${c.red}[!] Unknown command: ${command}${c.reset}. Run '0xagent help' for usage.`);
         break;

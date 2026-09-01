@@ -126,10 +126,12 @@ describe('Workspace & Persona Synchronization Test Suite', () => {
 
   describe('3. Persona Persistence & Real-time Synchronization', () => {
     it('should activate persona and mark is_active in metadata list', () => {
+      initPersonas();
       const personas = listPersonas();
       assert.ok(personas.length > 0);
 
       const targetPersona = personas.find((p) => p.id !== 'default') || personas[0];
+      assert.ok(targetPersona);
       const updatedList = setActivePersona(targetPersona.id);
       const activeItem = updatedList.find((p) => p.id === targetPersona.id);
       assert.ok(activeItem);
@@ -142,4 +144,5 @@ describe('Workspace & Persona Synchronization Test Suite', () => {
       });
     });
   });
+
 });
