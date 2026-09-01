@@ -254,43 +254,80 @@ export class MessageBuilder {
     } else if (period === 'yesterday') {
       const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
       startOfDay = yesterday.getTime();
-      endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+      endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     } else {
       startOfDay = 0;
       endOfDay = Date.now();
     }
 
-    const stmt = db.prepare(`
+    const journalStmt = db.prepare(`
+      SELECT project, task_id, agent, operation_type, status, summary, changes_json, important, timestamp
+      FROM operational_journal
+      WHERE timestamp >= ? AND timestamp < ?
+      ORDER BY timestamp DESC
+    `);
+    const journalEntries: any[] = journalStmt.all(startOfDay, endOfDay) as any[];
+
+    const taskStmt = db.prepare(`
       SELECT project, skill, status, summary, started_at, finished_at
       FROM agent_tasks
       WHERE started_at >= ? AND started_at < ?
       ORDER BY project, started_at DESC
     `);
-    const tasks: any[] = stmt.all(startOfDay, endOfDay) as any[];
+    const tasks: any[] = taskStmt.all(startOfDay, endOfDay) as any[];
 
-    const periodLabel = period === 'today' ? 'сегодня' : period === 'yesterday' ? 'вчера' : 'все время';
+    const periodLabel = period === 'today' ? 'сегодня' : period === 'yesterday' ? 'вчера' : 'всё время';
 
-    if (tasks.length === 0) {
-      return `📊 <b>Отчет за ${periodLabel}:</b> Задач не выполнялось.`;
+    if (journalEntries.length === 0 && tasks.length === 0) {
+      return `📊 <b>Отчет за ${periodLabel}:</b> Событий и задач не зафиксировано.`;
     }
 
     const lines: string[] = [
-      `📊 <b>Отчет по задачам за ${periodLabel} (${tasks.length}):</b>`,
+      `📊 <b>Сводка активности за ${periodLabel}:</b>`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
     ];
 
-    const grouped: Record<string, any[]> = {};
-    for (const t of tasks) {
-      if (!grouped[t.project]) grouped[t.project] = [];
-      grouped[t.project].push(t);
-    }
+    if (journalEntries.length > 0) {
+      const grouped: Record<string, any[]> = {};
+      for (const entry of journalEntries) {
+        if (!grouped[entry.project]) grouped[entry.project] = [];
+        grouped[entry.project].push(entry);
+      }
 
-    for (const [project, pTasks] of Object.entries(grouped)) {
-      lines.push(`\n📂 <b>${escapeHtml(project)}:</b>`);
-      for (const t of pTasks) {
-        const icon = t.status === 'completed' ? '✅' : t.status === 'running' ? '⏳' : '❌';
-        const summary = escapeHtml(t.summary || 'без описания');
-        lines.push(`  ${icon} <i>${escapeHtml(t.skill)}</i>: ${summary}`);
+      for (const [proj, entries] of Object.entries(grouped)) {
+        lines.push(`\n📂 <b>${escapeHtml(proj)}:</b>`);
+        for (const e of entries) {
+          const icon = e.status === 'completed' || e.status === 'success' ? '✅' : e.status === 'failed' ? '❌' : '⚡';
+          const star = e.important ? ' 🌟' : '';
+          lines.push(`  ${icon} <b>[${escapeHtml(e.operation_type)}]</b> ${escapeHtml(e.summary)}${star}`);
+
+          if (e.changes_json) {
+            try {
+              const changes = JSON.parse(e.changes_json);
+              if (Array.isArray(changes) && changes.length > 0) {
+                for (const ch of changes.slice(0, 3)) {
+                  lines.push(`    ▫️ <i>${escapeHtml(ch)}</i>`);
+                }
+              }
+            } catch {}
+          }
+        }
+      }
+    } else {
+      // Fallback to tasks table
+      const grouped: Record<string, any[]> = {};
+      for (const t of tasks) {
+        if (!grouped[t.project]) grouped[t.project] = [];
+        grouped[t.project].push(t);
+      }
+
+      for (const [project, pTasks] of Object.entries(grouped)) {
+        lines.push(`\n📂 <b>${escapeHtml(project)}:</b>`);
+        for (const t of pTasks) {
+          const icon = t.status === 'completed' ? '✅' : t.status === 'running' ? '⏳' : '❌';
+          const summary = escapeHtml(t.summary || 'без описания');
+          lines.push(`  ${icon} <i>${escapeHtml(t.skill)}</i>: ${summary}`);
+        }
       }
     }
 

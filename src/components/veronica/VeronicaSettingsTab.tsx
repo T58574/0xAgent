@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Eye, EyeOff, Plus, Trash2, Sliders, Save, Sparkles } from 'lucide-react';
+import { Bot, Eye, EyeOff, Plus, Trash2, Sliders, Save, Sparkles, RefreshCw, Zap, ShieldCheck } from 'lucide-react';
 import { Card, Button, Input, Select, Toggle, Badge } from '../ui';
 import { AppConfig, VeronicaConfig } from '../../types';
 import { useToast } from '../../context/ToastContext';
@@ -29,14 +29,33 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
   const [model, setModel] = useState(veronicaCfg.model || 'inherit');
   const [effort, setEffort] = useState(veronicaCfg.effort || 'auto');
   const [agent, setAgent] = useState(veronicaCfg.agent || 'default');
-  const [availableModels, setAvailableModels] = useState<{ local: string[]; antigravity: { slug: string; name: string }[] }>({ local: [], antigravity: [] });
+  const [availableModels, setAvailableModels] = useState<{ local: string[]; antigravity: { slug: string; name: string; effort?: string }[] }>({ local: [], antigravity: [] });
   const [availableAgents, setAvailableAgents] = useState<{ slug: string; name: string; description?: string }[]>([]);
   const [saving, setSaving] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const [lastReloaded, setLastReloaded] = useState<number | null>(null);
 
   useEffect(() => {
     api.get_veronica_models().then(setAvailableModels).catch(() => {});
     api.get_veronica_agents().then((res) => setAvailableAgents(res.agents || [])).catch(() => {});
   }, []);
+
+  const handleHotReload = async () => {
+    try {
+      setReloading(true);
+      const res = await api.reload_veronica_module();
+      if (res.success) {
+        setLastReloaded(res.timestamp || Date.now());
+        showToast('Модуль Вероника успешно и бесшовно перезагружен (Graceful Hot-Reload)', 'success');
+      } else {
+        showToast('Перезагрузка завершилась с предупреждением', 'warning');
+      }
+    } catch (err: any) {
+      showToast(`Ошибка перезагрузки: ${err?.message || err}`, 'error');
+    } finally {
+      setReloading(false);
+    }
+  };
 
   const handleAddWhitelistUser = () => {
     const num = parseInt(newUserId.trim(), 10);
@@ -286,6 +305,45 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
               value={String(heartbeatTimeout)}
               onChange={(e) => setHeartbeatTimeout(Number(e.target.value))}
             />
+          </div>
+        </Card>
+
+        {/* Graceful Hot-Reload Card */}
+        <Card className="p-6 space-y-4 md:col-span-2 bg-[var(--theme-panel)] border border-[var(--theme-border)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--theme-border)] pb-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                <Zap size={18} />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-[var(--theme-text)]">
+                  Graceful Hot-Reload Модуля
+                </h4>
+                <p className="text-xs text-[var(--theme-text-muted)]">
+                  Бесшовная горячая перезагрузка БД, воркеров и Telegram-бота без прерывания 0xAgent и LLM сервера
+                </p>
+              </div>
+            </div>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleHotReload}
+              disabled={reloading}
+              icon={<RefreshCw size={13} className={reloading ? 'animate-spin' : ''} />}
+            >
+              {reloading ? 'Перезагрузка...' : 'Горячая перезагрузка (Hot-Reload)'}
+            </Button>
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-[var(--theme-text-muted)] font-mono">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck size={14} className="text-emerald-400" />
+              <span>Изолированная архитектура :: Zero Downtime Invariant</span>
+            </div>
+            {lastReloaded && (
+              <span>Последняя перезагрузка: {new Date(lastReloaded).toLocaleTimeString()}</span>
+            )}
           </div>
         </Card>
       </div>

@@ -5,6 +5,7 @@ import { notificationService } from '../telegram/notificationService';
 import { projectDiscovery } from '../core/projectDiscovery';
 import { projectDocManager } from '../core/projectDocManager';
 import { antigravityAdapter } from '../adapters/antigravityAdapter';
+import { operationalJournal } from '../core/operationalJournal';
 import { TaskStatus } from '../types';
 
 export interface CliRequest {
@@ -24,6 +25,14 @@ export interface CliRequest {
   skill?: string;
   custom_prompt?: string;
   metrics?: Record<string, any>;
+  changes?: string[] | string;
+  important?: boolean;
+  commit_hash?: string;
+  agent?: string;
+  recent?: boolean;
+  architecture?: boolean;
+  limit?: number;
+  offset?: number;
 }
 
 export class CliHandler {
@@ -41,6 +50,8 @@ export class CliHandler {
         }
         const contextStr = await contextEngine.getProjectContext(req.project, {
           task: req.task_id,
+          recent: req.recent,
+          architecture: req.architecture,
         });
         return { success: true, data: contextStr };
       }
@@ -54,26 +65,77 @@ export class CliHandler {
       }
 
       case 'report': {
-        if (!req.task_id) {
-          return { success: false, error: 'task_id is required' };
+        if (!req.task_id && !req.project) {
+          return { success: false, error: 'Either task_id or project is required' };
         }
         const finalStatus = (req.status as TaskStatus) || 'completed';
-        await taskRegistry.updateTaskStatus(req.task_id, finalStatus, {
-          summary: req.summary || 'Completed',
-        });
-        const task = taskRegistry.getTask(req.task_id);
-        if (task) {
-          if (task.project) {
-            await projectDocManager.appendChangelog(task.project, {
-              author: 'CLI Report',
-              taskId: task.id,
-              action: `Task finished [${finalStatus}]`,
-              details: req.summary || '',
-            });
+        const summary = req.summary || req.message || 'Task completed';
+
+        let targetProject = req.project;
+        let skillName = req.skill || 'custom_task';
+
+        if (req.task_id) {
+          await taskRegistry.updateTaskStatus(req.task_id, finalStatus, {
+            summary,
+          });
+          const task = taskRegistry.getTask(req.task_id);
+          if (task) {
+            targetProject = targetProject || task.project;
+            skillName = task.skill;
+            if (finalStatus === 'completed') {
+              await notificationService.notifyTaskCompleted(task);
+            }
           }
-          await notificationService.notifyTaskCompleted(task);
         }
+
+        if (targetProject) {
+          // Log into Operational Journal
+          const journalEntry = await operationalJournal.logEntry({
+            project: targetProject,
+            task_id: req.task_id || null,
+            agent: req.agent || 'Antigravity Agent',
+            operation_type: skillName,
+            status: finalStatus,
+            summary,
+            changes: req.changes ? (Array.isArray(req.changes) ? req.changes : [req.changes]) : null,
+            important: req.important,
+            commit_hash: req.commit_hash,
+          });
+
+          return { success: true, data: { status: finalStatus, journal_id: journalEntry.id } };
+        }
+
         return { success: true, data: { status: finalStatus } };
+      }
+
+      case 'history': {
+        const history = operationalJournal.getHistory(req.project, {
+          limit: req.limit || 20,
+          offset: req.offset || 0,
+          importantOnly: req.important,
+          task_id: req.task_id,
+        });
+        return { success: true, data: history };
+      }
+
+      case 'state_update': {
+        if (!req.project) {
+          return { success: false, error: 'Project name is required' };
+        }
+        if (req.metrics) {
+          projectDocManager.updateMetrics(req.project, req.metrics);
+        }
+        const entry = await operationalJournal.logEntry({
+          project: req.project,
+          task_id: req.task_id || null,
+          agent: req.agent || 'State Manager',
+          operation_type: 'state_update',
+          status: 'completed',
+          summary: req.summary || req.message || 'State updated',
+          changes: req.changes ? (Array.isArray(req.changes) ? req.changes : [req.changes]) : null,
+          important: req.important,
+        });
+        return { success: true, data: entry };
       }
 
       case 'error': {
@@ -93,6 +155,17 @@ export class CliHandler {
           });
           const task = taskRegistry.getTask(req.task_id);
           if (task) {
+            if (task.project) {
+              await operationalJournal.logEntry({
+                project: task.project,
+                task_id: task.id,
+                agent: req.agent || 'Antigravity Agent',
+                operation_type: 'incident',
+                status: 'failed',
+                summary: `Fatal error: ${req.message || 'Agent crashed'}`,
+                important: true,
+              });
+            }
             await notificationService.notifyTaskCrashed(task, req.message || 'Fatal agent error');
           }
         }
@@ -126,11 +199,15 @@ export class CliHandler {
           await projectDocManager.savePassport(req.project, req.content);
         }
         if (req.message || req.action) {
-          await projectDocManager.appendChangelog(req.project, {
-            author: req.task_id ? `Task ${req.task_id.substring(0, 8)}` : 'Agent CLI',
-            taskId: req.task_id,
-            action: req.action || 'Documentation Update',
-            details: req.message || req.summary || '',
+          await operationalJournal.logEntry({
+            project: req.project,
+            task_id: req.task_id || null,
+            agent: req.agent || (req.task_id ? `Task ${req.task_id.substring(0, 8)}` : 'Agent CLI'),
+            operation_type: req.action || 'doc_update',
+            status: 'completed',
+            summary: req.message || req.summary || 'Documentation update',
+            changes: req.changes ? (Array.isArray(req.changes) ? req.changes : [req.changes]) : null,
+            important: req.important,
           });
         }
         if (req.metrics) {
@@ -144,6 +221,24 @@ export class CliHandler {
         return { success: true, data: projects };
       }
 
+      case 'project_status': {
+        if (!req.project) {
+          return { success: false, error: 'Project name is required' };
+        }
+        const overview = await projectDocManager.getConsolidatedOverview(req.project);
+        const metrics = projectDocManager.getMetrics(req.project);
+        const history = operationalJournal.getHistory(req.project, { limit: 5 });
+        return {
+          success: true,
+          data: {
+            project: req.project,
+            overview,
+            metrics,
+            recent_activity: history,
+          },
+        };
+      }
+
       case 'task_create': {
         if (!req.project) {
           return { success: false, error: 'Project name is required' };
@@ -154,6 +249,21 @@ export class CliHandler {
           custom_prompt: req.custom_prompt || req.message,
         });
         return { success: true, data: task };
+      }
+
+      case 'task_update': {
+        if (!req.task_id) {
+          return { success: false, error: 'task_id is required' };
+        }
+        const updateStatus = (req.status as TaskStatus) || 'running';
+        await taskRegistry.updateTaskStatus(req.task_id, updateStatus, {
+          summary: req.summary,
+        });
+        if (req.action || req.progress) {
+          await taskRegistry.recordHeartbeat(req.task_id, req.action, req.progress);
+        }
+        const updatedTask = taskRegistry.getTask(req.task_id);
+        return { success: true, data: updatedTask };
       }
 
       case 'task_get': {
@@ -199,3 +309,4 @@ export class CliHandler {
     }
   }
 }
+

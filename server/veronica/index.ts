@@ -9,7 +9,10 @@ import { taskRegistry } from './core/taskRegistry';
 import { remoteNodeService } from '../remoteNodeService';
 import { snapshotCache } from './core/snapshotCache';
 
+import { writeQueue } from './db/writeQueue';
+
 let isModuleInitialized = false;
+let backupIntervalTimer: NodeJS.Timeout | null = null;
 
 export async function initVeronicaModule(): Promise<boolean> {
   const config = loadConfig();
@@ -47,10 +50,12 @@ export async function initVeronicaModule(): Promise<boolean> {
     initTelegramBot();
 
     // 7. Schedule daily backups & retention cleaner (every 24h)
-    setInterval(() => {
+    if (backupIntervalTimer) clearInterval(backupIntervalTimer);
+    backupIntervalTimer = setInterval(() => {
       createDatabaseBackup();
       runRetentionCleanup();
     }, 24 * 60 * 60 * 1000);
+    backupIntervalTimer.unref?.();
 
     isModuleInitialized = true;
     console.log('[Veronica] [OK] Veronica Engine successfully initialized.');
@@ -64,11 +69,47 @@ export async function initVeronicaModule(): Promise<boolean> {
 export function shutdownVeronicaModule(): void {
   if (!isModuleInitialized) return;
   console.log('[Veronica] Shutting down Veronica module...');
+  if (backupIntervalTimer) {
+    clearInterval(backupIntervalTimer);
+    backupIntervalTimer = null;
+  }
   processWatchdog.stop();
   veronicaScheduler.stop();
   stopTelegramBot();
   closeVeronicaDatabase();
   isModuleInitialized = false;
+}
+
+export async function reloadVeronicaModule(): Promise<{ success: boolean; status: VeronicaModuleStatus; timestamp: number }> {
+  console.log('[Veronica] [HOT-RELOAD] Gracefully reloading Veronica module...');
+  try {
+    // 1. Drain write queue
+    await writeQueue.drain().catch(() => {});
+
+    // 2. Stop watchdogs and schedulers
+    processWatchdog.stop();
+    veronicaScheduler.stop();
+    stopTelegramBot();
+
+    // 3. Mark uninitialized
+    isModuleInitialized = false;
+
+    // 4. Re-run startup initialization
+    const ok = await initVeronicaModule();
+    console.log('[Veronica] [HOT-RELOAD] [OK] Veronica module successfully reloaded without parent disruption.');
+    return {
+      success: ok,
+      status: getVeronicaStatus(),
+      timestamp: Date.now(),
+    };
+  } catch (err: any) {
+    console.error('[Veronica] [HOT-RELOAD] [FAIL] Error reloading Veronica module:', err);
+    return {
+      success: false,
+      status: getVeronicaStatus(),
+      timestamp: Date.now(),
+    };
+  }
 }
 
 export function getVeronicaStatus(): VeronicaModuleStatus {

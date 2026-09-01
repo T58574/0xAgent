@@ -1,5 +1,7 @@
 import { getVeronicaDb } from '../db/veronicaDb';
 import { snapshotCache } from './snapshotCache';
+import { operationalJournal } from './operationalJournal';
+import { projectDocManager } from './projectDocManager';
 
 export interface ContextOptions {
   task?: string;
@@ -35,6 +37,18 @@ export class ContextEngine {
     const autonomy = projRow?.autonomy_level || 'L2';
     parts.push(`AUTONOMY:${autonomy}`);
 
+    // Architecture / Tech stack excerpt if requested
+    if (options?.architecture) {
+      try {
+        const passport = await projectDocManager.getPassport(project);
+        const archSection = passport.split(/##\s*🛠?\s*Tech Stack/i)[1]?.split(/##/)[0]?.trim();
+        if (archSection) {
+          const archClean = archSection.replace(/\n+/g, ' ; ').substring(0, 150);
+          parts.push(`ARCHITECTURE:[${archClean}]`);
+        }
+      } catch {}
+    }
+
     // Active task context if requested
     if (options?.task) {
       const taskStmt = db.prepare('SELECT id, skill, status, started_at FROM agent_tasks WHERE id = ?');
@@ -44,21 +58,32 @@ export class ContextEngine {
       }
     }
 
-    // Recent 3 completed tasks
-    let recentTasks: any[] = [];
-    try {
-      recentTasks = JSON.parse(snapshot.recent_completions || '[]');
-    } catch {
-      recentTasks = [];
-    }
-
-    if (recentTasks.length > 0) {
-      const taskSummaries = recentTasks
-        .map((t) => `${t.skill}:${t.status}${t.summary ? `(${t.summary.substring(0, 40)})` : ''}`)
-        .join(';');
-      parts.push(`RECENT_TASKS:[${taskSummaries}]`);
+    // Recent activities from Operational Journal or Snapshot
+    if (options?.recent) {
+      const recentJournal = operationalJournal.getHistory(project, { limit: 5 });
+      if (recentJournal.length > 0) {
+        const journalSummaries = recentJournal
+          .map((j) => `${j.operation_type}:${j.status}("${j.summary.substring(0, 30)}")`)
+          .join(';');
+        parts.push(`RECENT_EVENTS:[${journalSummaries}]`);
+      }
     } else {
-      parts.push('RECENT_TASKS:none');
+      // Recent 3 completed tasks default
+      let recentTasks: any[] = [];
+      try {
+        recentTasks = JSON.parse(snapshot.recent_completions || '[]');
+      } catch {
+        recentTasks = [];
+      }
+
+      if (recentTasks.length > 0) {
+        const taskSummaries = recentTasks
+          .map((t) => `${t.skill}:${t.status}${t.summary ? `(${t.summary.substring(0, 40)})` : ''}`)
+          .join(';');
+        parts.push(`RECENT_TASKS:[${taskSummaries}]`);
+      } else {
+        parts.push('RECENT_TASKS:none');
+      }
     }
 
     // Recent 2 git commits
@@ -83,3 +108,4 @@ export class ContextEngine {
 }
 
 export const contextEngine = ContextEngine.getInstance();
+

@@ -98,12 +98,26 @@ flowchart TD
 * Allows a lightweight laptop to run 24/7 with minimal power draw while delegating heavy LLM token generation to a LAN PC with a dedicated GPU.
 * Configurable under **Settings -> Local Server -> Compute Node (LAN)**.
 
-### 6. Fault Tolerance, Migrations & Retention
-* **Schema Migrations (`schema_migrations`)**: Incremental SQLite migrations.
-* **Database Backups**: Automatic daily backups (`veronica_backup_YYYY-MM-DD.db`) with 30-day retention and WAL checkpoints.
-* **Log Rotation**: Size-based rotated logs (`10 MB x 5 archives`) in `~/.0xagent/veronica/logs/`.
-* **Process Watchdog**: Heartbeat tracking with automatic recursive Tree-Kill on timeout (>180s).
-* **Startup Reconciliation**: Detects dead PIDs on server reboot and clears dangling locks.
+### 6. Antigravity Ecosystem Integration & Model Selector
+* **Antigravity CLI Engine (`agy`)**: Seamless execution of autonomous agents using specialized models and reasoning efforts.
+* **Dynamic Model Catalogue**:
+  - `gemini-3.7-flash-high` / `gemini-3.7-flash-medium`
+  - `gemini-3.6-flash-high` / `gemini-3.6-flash-medium`
+  - `gemini-3.1-pro-high`
+  - `claude-sonnet-4-6`
+  - Local GGUF models (`llama.cpp`)
+* **Specialized Subagents**: Support for `--agent` selection (`critic`, `research`, `layout-qa-accessibility`, `ux-psychology-designer`, `multi-agent-orchestrator`).
+* **Categorized UI Model Selector**: Structured dropdowns in the Web UI dashboard with reasoning effort pills and timeout bounds.
+
+### 7. Real-Time SSE & WebSocket Streaming Console
+* **Server-Sent Events (SSE)**: `GET /api/veronica/tasks/:id/stream` streams live chunk stdout/stderr output directly into the client.
+* **WebSocket Fallback**: Broadcasts `veronica-stream-chunk` and `veronica-task-status` across all connected clients.
+* **Live Terminal Viewer**: Interactive UI console with auto-scroll toggle, clear buffer, and instant copy-to-clipboard.
+
+### 8. Isolated Architecture & Graceful Hot-Reload
+* **Modular Zero-Downtime Invariant**: The Veronica engine operates on an isolated SQLite WAL database (`~/.0xagent/veronica/veronica.db`) with an asynchronous write queue.
+* **Graceful Hot-Reload (`POST /api/veronica/reload`)**: Flushes in-flight writes, restarts watchdogs, schedulers, and Telegram polling without killing parent 0xAgent processes or aborting local LLM inference.
+* **Fault Tolerance & Watchdog**: Automatic PID liveness tracking, recursive tree-kill on timeouts, and startup state reconciliation.
 
 ---
 

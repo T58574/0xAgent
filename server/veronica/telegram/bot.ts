@@ -185,6 +185,72 @@ export function initTelegramBot(): Bot | null {
       }
     });
 
+    // /new, /reset, /clear
+    bot.command(['new', 'reset', 'clear'], async (ctx) => {
+      const userId = ctx.from?.id;
+      if (userId) {
+        veronicaOrchestrator.resetSession(userId);
+      }
+      await ctx.reply('🔄 <b>Контекст сессии сброшен.</b> Начнем с чистого листа, сэр. Чем могу помочь?', {
+        parse_mode: 'HTML',
+        reply_markup: MessageBuilder.getMainReplyKeyboard(),
+      });
+    });
+
+    // /tasks
+    bot.command('tasks', async (ctx) => {
+      const activeTasks = taskRegistry.getActiveTasks();
+      if (activeTasks.length === 0) {
+        await ctx.reply('📋 <b>Активные задачи:</b> Нет запущенных фоновых процессов.', {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.getMainReplyKeyboard(),
+        });
+        return;
+      }
+
+      const lines = [
+        `📋 <b>Активные фоновые задачи (${activeTasks.length}):</b>`,
+        `━━━━━━━━━━━━━━━━━━━━━━`,
+      ];
+      for (const t of activeTasks) {
+        const pingSec = Math.round((Date.now() - (t.last_heartbeat || t.started_at)) / 1000);
+        lines.push(
+          `• <code>${t.id.substring(0, 8)}</code> | <b>${escapeHtml(t.project)}</b> | skill: <code>${escapeHtml(
+            t.skill
+          )}</code> | ${pingSec}с назад`
+        );
+      }
+      await ctx.reply(lines.join('\n'), {
+        parse_mode: 'HTML',
+        reply_markup: MessageBuilder.getMainReplyKeyboard(),
+      });
+    });
+
+    // /history <project>
+    bot.command('history', async (ctx) => {
+      const text = ctx.message?.text || '';
+      const parts = text.split(/\s+/).slice(1);
+      const targetProject = parts[0] || veronicaOrchestrator.getUserSession(ctx.from?.id || 0).activeProject;
+
+      if (!targetProject) {
+        await ctx.reply('⚠️ Укажите проект: <code>/history &lt;project&gt;</code> или выберите проект кнопкой «📁 Проекты».', {
+          parse_mode: 'HTML',
+        });
+        return;
+      }
+
+      const changelog = await projectDocManager.getChangelog(targetProject, 20);
+      await ctx.reply(
+        `📊 <b>История активности <code>${escapeHtml(targetProject)}</code>:</b>\n\n<pre>${escapeHtml(
+          changelog.substring(0, 3500)
+        )}</pre>`,
+        {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.buildProjectActionsKeyboard(targetProject),
+        }
+      );
+    });
+
     // Callback queries navigation
     bot.callbackQuery('veronica:projects_menu', async (ctx) => {
       await sendProjectsMenu(ctx, true);

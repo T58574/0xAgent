@@ -59,6 +59,15 @@ export class VeronicaWriteQueue {
   }
 
   /**
+   * Wait for all pending writes in the queue to be completed
+   */
+  public async drain(): Promise<void> {
+    while (this.isProcessing || this.queue.length > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+  }
+
+  /**
    * Helper to run an inline transaction via write queue
    */
   public async runTransaction<T>(fn: () => T): Promise<T> {

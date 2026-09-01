@@ -344,20 +344,24 @@ async function cmdVeronica(veronicaArgs) {
   const subCmd = veronicaArgs[0];
   if (!subCmd || subCmd === '--help' || subCmd === '-h') {
     console.log(`
-${c.cyan}${c.bold}Veronica CLI Protocol & Assistant Interface${c.reset}
+${c.cyan}${c.bold}Veronica CLI Protocol & Orchestrator Interface${c.reset}
 Usage: 0xagent veronica <command> [options]
 
 Commands:
-  doc <project> [get|set|append <text>]  Read or update project passport, metrics & changelog
-  project [list|info <project>]          List auto-discovered projects & view project cards
-  task <project> <skill|prompt>          Launch an autonomous background task via Antigravity
-  context <project> [--task <id>]        Fetch dense token-efficient project context
-  heartbeat --task <id> [--action <a>]   Update agent alive status & progress
-  report --task <id> [--status <s>]      Submit final report & task summary
-  error --task <id> --message <m>        Log error or mark task failed
-  git commit --task <id> -m <msg>        Safe unified git commit (L3+ autonomy)
-  git rollback --task <id>               Rollback commit created by task
-  agents                                 List all active background agents
+  context <project> [--task <id>] [--recent] [--architecture]  Fetch dense token-efficient project context
+  report --task <id> [--status <s>] [--summary <m>] [--changes <c>] [--important] Submit final report & audit event
+  history <project> [--limit <N>] [--important]                Query operational journal history
+  task create <project> <skill|prompt>                         Launch autonomous task via Antigravity (agy)
+  task get <task_id>                                           Inspect agent task status and logs
+  task update --task <id> [--status <s>] [--summary <m>]       Update live task state
+  project [list|status <project>|info <project>]               Inspect project status, metrics & overview
+  state update <project> [--summary <m>] [--changes <c>]       Record state modification to journal
+  doc <project> [get|set|append <text>]                        Read or update project passport & metrics
+  heartbeat --task <id> [--action <a>] [--progress <p>]        Update agent heartbeat & progress
+  error --task <id> --message <m> [--fatal]                    Log error or record incident
+  git commit --task <id> -m <msg>                              Safe unified git commit (L3+ autonomy)
+  git rollback --task <id>                                     Rollback commit created by task
+  agents                                                       List active background agents
 `);
     return;
   }
@@ -388,26 +392,72 @@ Commands:
     const action = veronicaArgs[1] || 'list';
     if (action === 'list') {
       payload.command = 'projects_list';
+    } else if (action === 'status' || action === 'info') {
+      payload.command = 'project_status';
+      payload.project = veronicaArgs[2];
     } else {
-      payload.command = 'doc_get';
+      payload.command = 'project_status';
       payload.project = action;
     }
-  } else if (subCmd === 'task' || subCmd === 'run') {
-    const project = veronicaArgs[1];
-    const taskPrompt = veronicaArgs.slice(2).join(' ');
-    if (!project || !taskPrompt) {
-      console.error(`${c.red}[ERR] Usage: 0xagent veronica task <project> <skill_or_prompt>${c.reset}`);
-      return;
+  } else if (subCmd === 'history') {
+    payload.command = 'history';
+    payload.project = veronicaArgs[1];
+    const limitIdx = veronicaArgs.indexOf('--limit');
+    if (limitIdx !== -1 && veronicaArgs[limitIdx + 1]) {
+      payload.limit = parseInt(veronicaArgs[limitIdx + 1], 10);
     }
-    payload.command = 'task_create';
-    payload.project = project;
-    payload.custom_prompt = taskPrompt;
+    payload.important = veronicaArgs.includes('--important');
+  } else if (subCmd === 'state') {
+    const action = veronicaArgs[1] || 'update';
+    if (action === 'update') {
+      payload.command = 'state_update';
+      payload.project = veronicaArgs[2];
+      const sumIdx = veronicaArgs.indexOf('--summary');
+      if (sumIdx !== -1) payload.summary = veronicaArgs.slice(sumIdx + 1).join(' ');
+      const chgIdx = veronicaArgs.indexOf('--changes');
+      if (chgIdx !== -1) {
+        try {
+          payload.changes = JSON.parse(veronicaArgs[chgIdx + 1]);
+        } catch {
+          payload.changes = [veronicaArgs[chgIdx + 1]];
+        }
+      }
+      payload.important = veronicaArgs.includes('--important');
+    }
+  } else if (subCmd === 'task' || subCmd === 'run') {
+    const action = veronicaArgs[1];
+    if (action === 'get') {
+      payload.command = 'task_get';
+      payload.task_id = veronicaArgs[2];
+    } else if (action === 'update') {
+      payload.command = 'task_update';
+      const taskIdx = veronicaArgs.indexOf('--task');
+      payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
+      const statusIdx = veronicaArgs.indexOf('--status');
+      if (statusIdx !== -1) payload.status = veronicaArgs[statusIdx + 1];
+      const sumIdx = veronicaArgs.indexOf('--summary');
+      if (sumIdx !== -1) payload.summary = veronicaArgs.slice(sumIdx + 1).join(' ');
+    } else if (action === 'create' || !['list', 'get', 'update'].includes(action)) {
+      const project = action === 'create' ? veronicaArgs[2] : veronicaArgs[1];
+      const taskPrompt = action === 'create' ? veronicaArgs.slice(3).join(' ') : veronicaArgs.slice(2).join(' ');
+      if (!project || !taskPrompt) {
+        console.error(`${c.red}[ERR] Usage: 0xagent veronica task create <project> <skill_or_prompt>${c.reset}`);
+        return;
+      }
+      payload.command = 'task_create';
+      payload.project = project;
+      payload.custom_prompt = taskPrompt;
+    } else if (action === 'list') {
+      payload.command = 'agents_list';
+    }
   } else if (subCmd === 'context') {
     payload.project = veronicaArgs[1];
     const taskIdx = veronicaArgs.indexOf('--task');
     if (taskIdx !== -1 && veronicaArgs[taskIdx + 1]) {
       payload.task_id = veronicaArgs[taskIdx + 1];
     }
+    payload.recent = veronicaArgs.includes('--recent');
+    payload.architecture = veronicaArgs.includes('--architecture');
   } else if (subCmd === 'heartbeat') {
     const taskIdx = veronicaArgs.indexOf('--task');
     payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
@@ -418,10 +468,23 @@ Commands:
   } else if (subCmd === 'report') {
     const taskIdx = veronicaArgs.indexOf('--task');
     payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
+    const projIdx = veronicaArgs.indexOf('--project');
+    if (projIdx !== -1) payload.project = veronicaArgs[projIdx + 1];
     const statusIdx = veronicaArgs.indexOf('--status');
     if (statusIdx !== -1) payload.status = veronicaArgs[statusIdx + 1];
     const sumIdx = veronicaArgs.indexOf('--summary');
     if (sumIdx !== -1) payload.summary = veronicaArgs.slice(sumIdx + 1).join(' ');
+    const chgIdx = veronicaArgs.indexOf('--changes');
+    if (chgIdx !== -1) {
+      try {
+        payload.changes = JSON.parse(veronicaArgs[chgIdx + 1]);
+      } catch {
+        payload.changes = [veronicaArgs[chgIdx + 1]];
+      }
+    }
+    payload.important = veronicaArgs.includes('--important');
+    const commitIdx = veronicaArgs.indexOf('--commit');
+    if (commitIdx !== -1) payload.commit_hash = veronicaArgs[commitIdx + 1];
   } else if (subCmd === 'error') {
     const taskIdx = veronicaArgs.indexOf('--task');
     payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
@@ -539,7 +602,7 @@ if (isVeronicaBinary) {
   const command = args[0] || 'start';
 
   // Support direct subcommands without explicit 'veronica' prefix
-  const directVeronicaCmds = ['doc', 'project', 'projects', 'task', 'context', 'heartbeat', 'report', 'agents'];
+  const directVeronicaCmds = ['doc', 'project', 'projects', 'task', 'context', 'heartbeat', 'report', 'agents', 'history', 'state'];
   if (directVeronicaCmds.includes(command.toLowerCase())) {
     cmdVeronica(args);
   } else {

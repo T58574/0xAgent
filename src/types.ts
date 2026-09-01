@@ -148,6 +148,40 @@ export interface VeronicaConfig {
   print_timeout?: string | null;
 }
 
+export interface VeronicaModelInfo {
+  slug: string;
+  name: string;
+  description?: string;
+  effort?: string;
+}
+
+export interface VeronicaAgentInfo {
+  slug: string;
+  name: string;
+  description?: string;
+}
+
+export interface VeronicaStreamEvent {
+  taskId: string;
+  type: 'stdout' | 'stderr' | 'status' | 'heartbeat' | 'end' | 'open' | 'error';
+  chunk?: string;
+  status?: string;
+  timestamp: number;
+  summary?: string;
+  metadata?: any;
+}
+
+export interface VeronicaModuleStatus {
+  enabled: boolean;
+  db_healthy: boolean;
+  active_tasks: number;
+  queued_tasks: number;
+  today_completed: number;
+  today_failed: number;
+  telegram_connected: boolean;
+  remote_gpu_online: boolean;
+}
+
 export interface AppConfig {
   api_url: string;
   model_name: string;

@@ -5,7 +5,8 @@ import { taskRegistry } from '../core/taskRegistry';
 import { loadConfig } from '../../config';
 import { VeronicaLogger } from '../core/logger';
 import { projectDiscovery } from '../core/projectDiscovery';
-import { projectDocManager } from '../core/projectDocManager';
+import { taskPromptBuilder } from '../core/taskPromptBuilder';
+import { operationalJournal } from '../core/operationalJournal';
 import { notificationService } from '../telegram/notificationService';
 
 export interface AntigravityModelInfo {
@@ -21,9 +22,24 @@ export interface AntigravityAgentInfo {
   description?: string;
 }
 
+export interface VeronicaStreamEvent {
+  taskId: string;
+  type: 'stdout' | 'stderr' | 'status' | 'heartbeat' | 'end';
+  chunk?: string;
+  status?: TaskStatus;
+  timestamp: number;
+  summary?: string;
+  metadata?: any;
+}
+
+export type VeronicaStreamListener = (event: VeronicaStreamEvent) => void;
+
 export class AntigravityAdapter implements RuntimeAdapter {
   private static instance: AntigravityAdapter;
   private activeProcesses: Map<string, ChildProcess> = new Map();
+  private taskStreamBuffers: Map<string, VeronicaStreamEvent[]> = new Map();
+  private streamListeners: Set<VeronicaStreamListener> = new Set();
+  private broadcaster: ((event: string, payload: any) => void) | null = null;
 
   private constructor() {}
 
@@ -32,6 +48,59 @@ export class AntigravityAdapter implements RuntimeAdapter {
       AntigravityAdapter.instance = new AntigravityAdapter();
     }
     return AntigravityAdapter.instance;
+  }
+
+  public setBroadcaster(broadcast: (event: string, payload: any) => void): void {
+    this.broadcaster = broadcast;
+  }
+
+  public subscribeTaskStream(taskId: string, listener: VeronicaStreamListener): () => void {
+    const wrappedListener: VeronicaStreamListener = (event) => {
+      if (event.taskId === taskId) {
+        listener(event);
+      }
+    };
+    this.streamListeners.add(wrappedListener);
+    return () => {
+      this.streamListeners.delete(wrappedListener);
+    };
+  }
+
+  public getTaskStreamBuffer(taskId: string): VeronicaStreamEvent[] {
+    return this.taskStreamBuffers.get(taskId) || [];
+  }
+
+  public emitStreamEvent(event: VeronicaStreamEvent): void {
+    const buffer = this.taskStreamBuffers.get(event.taskId) || [];
+    buffer.push(event);
+    if (buffer.length > 500) {
+      buffer.shift();
+    }
+    this.taskStreamBuffers.set(event.taskId, buffer);
+
+    for (const listener of this.streamListeners) {
+      try {
+        listener(event);
+      } catch (lErr) {
+        console.warn('[Veronica Stream Listener Error]', lErr);
+      }
+    }
+
+    if (this.broadcaster) {
+      try {
+        this.broadcaster('veronica-stream-chunk', event);
+        if (event.type === 'status' || event.type === 'end') {
+          this.broadcaster('veronica-task-status', {
+            taskId: event.taskId,
+            status: event.status,
+            summary: event.summary,
+            timestamp: event.timestamp,
+          });
+        }
+      } catch (bErr) {
+        console.warn('[Veronica Broadcaster Error]', bErr);
+      }
+    }
   }
 
   public async isAvailable(): Promise<boolean> {
@@ -102,11 +171,15 @@ export class AntigravityAdapter implements RuntimeAdapter {
       VERONICA_API_URL: 'http://127.0.0.1:3001/api/veronica/cli',
     };
 
-    // Construct prompt
-    let prompt = options.custom_prompt;
-    if (!prompt) {
-      prompt = `Perform skill '${options.skill}' on project '${options.project}'. Context: call '0xagent veronica context ${options.project} --task ${task.id}' to receive current status and rules. When done, call '0xagent veronica report --task ${task.id} --status completed --summary "<summary>"'`;
-    }
+    // Construct structured autonomous prompt using TaskPromptBuilder
+    const prompt = await taskPromptBuilder.buildAutonomousTaskPrompt({
+      project: options.project,
+      skill: options.skill,
+      custom_prompt: options.custom_prompt,
+      task_id: task.id,
+      autonomy_level: options.autonomy_level,
+      project_path: resolvedProjectPath,
+    });
 
     const selectedModel = options.model || config.veronica?.model;
     const selectedEffort = options.effort || config.veronica?.effort;
@@ -156,6 +229,14 @@ export class AntigravityAdapter implements RuntimeAdapter {
         this.activeProcesses.set(task.id, child);
         await taskRegistry.updateTaskStatus(task.id, 'running', { pid: child.pid });
 
+        this.emitStreamEvent({
+          taskId: task.id,
+          type: 'status',
+          status: 'running',
+          chunk: `[Veronica] Process spawned (PID: ${child.pid}). Executing skill '${options.skill}' on '${options.project}'...`,
+          timestamp: Date.now(),
+        });
+
         // Stream prompt to stdin to avoid Windows CLI quoting and length issues
         if (prompt) {
           child.stdin?.write(prompt);
@@ -172,6 +253,13 @@ export class AntigravityAdapter implements RuntimeAdapter {
             lastOutputSnippet = text.substring(0, 200);
             VeronicaLogger.log('TASK', text, task.id);
             taskRegistry.recordHeartbeat(task.id, text.substring(0, 100)).catch(() => {});
+
+            this.emitStreamEvent({
+              taskId: task.id,
+              type: 'stdout',
+              chunk: text,
+              timestamp: Date.now(),
+            });
           }
         });
 
@@ -187,6 +275,13 @@ export class AntigravityAdapter implements RuntimeAdapter {
                 message: text.substring(0, 300),
               })
               .catch(() => {});
+
+            this.emitStreamEvent({
+              taskId: task.id,
+              type: 'stderr',
+              chunk: text,
+              timestamp: Date.now(),
+            });
           }
         });
 
@@ -233,12 +328,23 @@ export class AntigravityAdapter implements RuntimeAdapter {
               result_json: stdoutAccumulator.length > 0 ? stdoutAccumulator.substring(0, 10000) : undefined,
             });
 
-            // Log to project changelog
-            await projectDocManager.appendChangelog(options.project, {
-              author: 'Veronica Antigravity Agent',
+            this.emitStreamEvent({
               taskId: task.id,
-              action: `Task [${options.skill}] ${finalStatus}`,
-              details: cleanSummary,
+              type: 'end',
+              status: finalStatus,
+              summary: cleanSummary,
+              chunk: `[Veronica] Task finished with status: ${finalStatus}`,
+              timestamp: Date.now(),
+            });
+
+            // Log to Operational Journal
+            await operationalJournal.logEntry({
+              project: options.project,
+              task_id: task.id,
+              agent: 'Antigravity Agent',
+              operation_type: options.skill,
+              status: finalStatus,
+              summary: cleanSummary,
             });
 
             // Trigger notification
@@ -259,6 +365,23 @@ export class AntigravityAdapter implements RuntimeAdapter {
       VeronicaLogger.log('ERROR', `Failed to spawn agy process: ${err?.message || err}`, task.id);
       await taskRegistry.updateTaskStatus(task.id, 'failed', {
         error_message: `Failed to spawn process: ${err?.message || err}`,
+      });
+      await operationalJournal.logEntry({
+        project: options.project,
+        task_id: task.id,
+        agent: 'Antigravity Agent',
+        operation_type: options.skill,
+        status: 'failed',
+        summary: `Failed to spawn process: ${err?.message || err}`,
+        important: true,
+      });
+      this.emitStreamEvent({
+        taskId: task.id,
+        type: 'end',
+        status: 'failed',
+        summary: `Failed to spawn process: ${err?.message || err}`,
+        chunk: `[Veronica] Error: Failed to spawn process: ${err?.message || err}`,
+        timestamp: Date.now(),
       });
       const failedTask = taskRegistry.getTask(task.id);
       if (failedTask) {
@@ -290,6 +413,14 @@ export class AntigravityAdapter implements RuntimeAdapter {
     }
     await taskRegistry.updateTaskStatus(taskId, 'cancelled', {
       summary: 'Task cancelled by user / watchdog',
+    });
+    this.emitStreamEvent({
+      taskId,
+      type: 'end',
+      status: 'cancelled',
+      summary: 'Task cancelled by user / watchdog',
+      chunk: '[Veronica] Task cancelled by user / watchdog.',
+      timestamp: Date.now(),
     });
     return true;
   }

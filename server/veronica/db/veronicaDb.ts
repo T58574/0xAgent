@@ -45,6 +45,11 @@ export function initVeronicaDatabase(customPath?: string): DatabaseSync {
   const targetPath = customPath || getVeronicaDbPath();
   dbFilePath = targetPath;
 
+  const dir = path.dirname(targetPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
   const db = new DatabaseSync(targetPath);
   dbInstance = db;
 

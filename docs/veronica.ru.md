@@ -98,12 +98,26 @@ flowchart TD
 * Позволяет ноутбуку работать 24/7 с минимальным энергопотреблением, делегируя генерацию токенов на основной ПК с мощной видеокартой.
 * Настраивается в **Настройки -> Local Server -> Compute Node (LAN)**.
 
-### 6. Отказоустойчивость, Миграции и Бэкапы
-* **Миграции БД (`schema_migrations`)**: Инкрементальные патчи структуры SQLite.
-* **Суточные бэкапы**: Автоматическое создание копий (`veronica_backup_YYYY-MM-DD.db`) с retention 30 дней и WAL-чекпоинтами.
-* **Ротация логов**: Ротация по размеру (`10 MB x 5 архивов`) в `~/.0xagent/veronica/logs/`.
-* **Process Watchdog**: Отслеживание heartbeat и рекурсивный Tree-Kill процессов при таймауте (>180с).
-* **Восстановление при рестарте**: Очистка мертвых PID и сброс зависших блокировок при перезапуске сервера.
+### 6. Интеграция с Экосистемой Antigravity & Селектор Моделей
+* **Движок Antigravity CLI (`agy`)**: Запуск автономных фоновых агентов с явным контролем моделей, reasoning effort и субагентов.
+* **Каталог Моделей**:
+  - `gemini-3.7-flash-high` / `gemini-3.7-flash-medium`
+  - `gemini-3.6-flash-high` / `gemini-3.6-flash-medium`
+  - `gemini-3.1-pro-high`
+  - `claude-sonnet-4-6`
+  - Локальные GGUF модели (`llama.cpp`)
+* **Специализированные Субагенты**: Поддержка флага `--agent` (`critic`, `research`, `layout-qa-accessibility`, `ux-psychology-designer`, `multi-agent-orchestrator`).
+* **Категоризированный UI Селектор**: Структурированные выпадающие списки в веб-интерфейсе с бейджами и настройкой reasoning effort.
+
+### 7. Потоковый SSE & WebSocket Стриминг Ответов
+* **Server-Sent Events (SSE)**: Эндпоинт `GET /api/veronica/tasks/:id/stream` передает live stdout/stderr чанки в реальном времени.
+* **WebSocket Fallback**: Рассылка событий `veronica-stream-chunk` и `veronica-task-status` всем подключенным клиентам.
+* **Интерактивная Консоль**: Просмотр логов в реальном времени с auto-scroll, очисткой и копированием в буфер.
+
+### 8. Изолированная Архитектура & Graceful Hot-Reload
+* **Модульная Изоляция**: База данных SQLite в режиме WAL (`~/.0xagent/veronica/veronica.db`) с асинхронной очередью записи `writeQueue`.
+* **Graceful Hot-Reload (`POST /api/veronica/reload`)**: Бесшовная горячая перезагрузка БД, watchdog и планировщика без прерывания работы родительского сервера 0xAgent и локальных LLM сессий.
+* **Отказоустойчивость & Watchdog**: Проверка PID в таблице процессов ОС, рекурсивный tree-kill и авто-восстановление после сбоев.
 
 ---
 

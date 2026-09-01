@@ -30,7 +30,7 @@ import { cleanupOrphanWorkspaces } from './session';
 import { reconcileInterruptedSessions } from './agent/selfPatchEngine';
 import { ensureEnvironmentHealth } from './envSanitizer';
 import { startMemoryDecayScheduler } from './agent/memoryDecayWorker';
-import { veronicaRouter } from './routes/veronicaRoutes';
+import { createVeronicaRouter } from './routes/veronicaRoutes';
 import { initVeronicaModule, shutdownVeronicaModule } from './veronica';
 import { remoteNodeService } from './remoteNodeService';
 import { loadConfig } from './config';
@@ -161,7 +161,7 @@ app.use('/api', createAgentRouter(broadcast));
 app.use('/api', contextRouter);
 app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
-app.use('/api/veronica', veronicaRouter);
+app.use('/api/veronica', createVeronicaRouter(broadcast));
 app.use('/api', systemRouter);
 
 

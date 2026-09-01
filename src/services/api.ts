@@ -23,6 +23,8 @@ import {
   SystemVersionInfo,
   UpdateCheckResult,
   UpdateApplyResult,
+  VeronicaStreamEvent,
+  VeronicaModuleStatus,
 } from '../types';
 
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
@@ -262,6 +264,48 @@ export const spawn_veronica_task = (params: {
 }) => post<{ success: boolean; task: any }>('/veronica/tasks/spawn', params);
 export const kill_veronica_task = (taskId: string) =>
   post<{ success: boolean }>(`/veronica/tasks/${encodeURIComponent(taskId)}/kill`, {});
+export const reload_veronica_module = () =>
+  post<{ success: boolean; status: VeronicaModuleStatus; timestamp: number }>('/veronica/reload', {});
+export const get_veronica_task_stream_url = (taskId: string) =>
+  `${API_BASE}/veronica/tasks/${encodeURIComponent(taskId)}/stream`;
+
+export function stream_veronica_task(
+  taskId: string,
+  onEvent: (event: VeronicaStreamEvent) => void,
+  onError?: (err: any) => void
+): () => void {
+  const token = getStoredToken();
+  const url = `${get_veronica_task_stream_url(taskId)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  const eventSource = new EventSource(url);
+
+  const handleMessage = (e: MessageEvent) => {
+    try {
+      const parsed: VeronicaStreamEvent = JSON.parse(e.data);
+      onEvent(parsed);
+      if (parsed.type === 'end') {
+        eventSource.close();
+      }
+    } catch (parseErr) {
+      console.warn('[Veronica Stream Parse Error]', parseErr);
+    }
+  };
+
+  eventSource.addEventListener('open', handleMessage as any);
+  eventSource.addEventListener('stdout', handleMessage as any);
+  eventSource.addEventListener('stderr', handleMessage as any);
+  eventSource.addEventListener('heartbeat', handleMessage as any);
+  eventSource.addEventListener('status', handleMessage as any);
+  eventSource.addEventListener('end', handleMessage as any);
+
+  eventSource.onerror = (err) => {
+    if (onError) onError(err);
+    eventSource.close();
+  };
+
+  return () => {
+    eventSource.close();
+  };
+}
 
 // Memories & Skills
 export const get_memories = (query?: string) =>

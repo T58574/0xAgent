@@ -150,16 +150,40 @@ describe('Veronica Orchestrator & Project Management Architecture', () => {
   describe('5. Veronica Orchestrator Intent Handling', () => {
     it('should handle report shortcuts directly without error', async () => {
       const replyYesterday = await veronicaOrchestrator.handleUserMessage(12345, 'что сделано за вчера?');
-      assert.ok(replyYesterday.includes('Отчет'), 'Should return period report');
+      assert.ok(replyYesterday.includes('Сводка') || replyYesterday.includes('Отчет'), 'Should return period report');
 
       const replyToday = await veronicaOrchestrator.handleUserMessage(12345, 'что сделано за сегодня');
-      assert.ok(replyToday.includes('Отчет'), 'Should return today report');
+      assert.ok(replyToday.includes('Сводка') || replyToday.includes('Отчет'), 'Should return today report');
     });
 
     it('should set and clear user session project context', () => {
       veronicaOrchestrator.setActiveProject(12345, 'LogisticsApp');
       const session = veronicaOrchestrator.getUserSession(12345);
       assert.strictEqual(session.activeProject, 'LogisticsApp');
+    });
+
+    it('should maintain multi-turn message history in session and reset on /reset command', async () => {
+      const userId = 998877;
+      await veronicaOrchestrator.handleUserMessage(userId, 'Привет');
+      let session = veronicaOrchestrator.getUserSession(userId);
+      assert.ok(session.messages.length >= 2, 'Session should record user and assistant turns');
+
+      const resetReply = await veronicaOrchestrator.handleUserMessage(userId, '/reset');
+      assert.ok(resetReply.includes('сброшен'));
+
+      session = veronicaOrchestrator.getUserSession(userId);
+      assert.strictEqual(session.messages.length, 1, 'Only assistant reset confirmation should remain');
+    });
+
+    it('should resolve project targets fuzzily or via substring match', async () => {
+      const exact = await veronicaOrchestrator.resolveTargetProject('LogisticsApp');
+      assert.strictEqual(exact, 'LogisticsApp');
+
+      const fuzzy = await veronicaOrchestrator.resolveTargetProject('logistics');
+      assert.strictEqual(fuzzy, 'LogisticsApp');
+
+      const queryMatch = await veronicaOrchestrator.resolveTargetProject(undefined, 'Добавь кнопку в LogisticsApp');
+      assert.strictEqual(queryMatch, 'LogisticsApp');
     });
   });
 });

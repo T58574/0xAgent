@@ -16,6 +16,11 @@ import { RecoveryService } from '../server/veronica/watchdog/recoveryService';
 import { remoteNodeService } from '../server/remoteNodeService';
 import { veronicaScheduler } from '../server/veronica/core/scheduler';
 import { initPersonas, listPersonas, getPersonaDetail } from '../server/personas';
+import { antigravityAdapter, VeronicaStreamEvent } from '../server/veronica/adapters/antigravityAdapter';
+import { reloadVeronicaModule, getVeronicaStatus, shutdownVeronicaModule } from '../server/veronica';
+import { createVeronicaRouter } from '../server/routes/veronicaRoutes';
+import { operationalJournal } from '../server/veronica/core/operationalJournal';
+import { taskPromptBuilder } from '../server/veronica/core/taskPromptBuilder';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -27,6 +32,7 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   });
 
   after(() => {
+    shutdownVeronicaModule();
     closeVeronicaDatabase();
     try {
       fs.rmSync(testDbDir, { recursive: true, force: true });
@@ -37,7 +43,7 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
     it('should initialize all required Veronica tables in WAL mode', () => {
       const db = getVeronicaDb();
       const tablesStmt = db.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('agent_tasks', 'agent_events', 'git_commits', 'projects', 'cron_jobs', 'project_snapshots', 'schema_version')"
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('agent_tasks', 'agent_events', 'git_commits', 'projects', 'cron_jobs', 'project_snapshots', 'operational_journal', 'telegram_conversations', 'schema_version')"
       );
       const rows = tablesStmt.all() as any[];
       const names = rows.map((r) => r.name);
@@ -47,6 +53,8 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       assert.ok(names.includes('git_commits'), 'git_commits table missing');
       assert.ok(names.includes('projects'), 'projects table missing');
       assert.ok(names.includes('project_snapshots'), 'project_snapshots table missing');
+      assert.ok(names.includes('operational_journal'), 'operational_journal table missing');
+      assert.ok(names.includes('telegram_conversations'), 'telegram_conversations table missing');
     });
 
     it('should handle high-concurrency writes sequentially via writeQueue without SQLITE_BUSY', async () => {
@@ -168,15 +176,18 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
     });
   });
 
-  describe('5. Veronica CLI Handler', () => {
-    it('should process context CLI request', async () => {
+  describe('5. Veronica CLI Handler & Operational Journal', () => {
+    it('should process context CLI request with specialized flags', async () => {
       const res = await CliHandler.handleRequest({
         command: 'context',
         project: 'ProjectAlpha',
+        recent: true,
+        architecture: true,
       });
       assert.equal(res.success, true);
       assert.ok(typeof res.data === 'string');
       assert.ok(res.data.includes('PROJECT:ProjectAlpha'));
+      assert.ok(res.data.includes('AUTONOMY:L2'));
     });
 
     it('should process heartbeat CLI request', async () => {
@@ -193,6 +204,75 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       });
 
       assert.equal(res.success, true);
+    });
+
+    it('should process report CLI request and write to operational_journal', async () => {
+      const task = await taskRegistry.createTask({
+        project: 'CliTestProj',
+        skill: 'refactor_skill',
+      });
+
+      const res = await CliHandler.handleRequest({
+        command: 'report',
+        task_id: task.id,
+        project: 'CliTestProj',
+        status: 'completed',
+        summary: 'Refactored auth routes cleanly',
+        changes: ['src/routes/auth.ts', 'tests/auth.test.ts'],
+        important: true,
+      });
+
+      assert.equal(res.success, true);
+      assert.equal(res.data.status, 'completed');
+      assert.ok(res.data.journal_id);
+
+      // Verify journal entry
+      const history = operationalJournal.getHistory('CliTestProj', { limit: 5 });
+      assert.ok(history.length >= 1);
+      const entry = history.find((h) => h.summary.includes('Refactored auth routes'));
+      assert.ok(entry);
+      assert.equal(entry.status, 'completed');
+      assert.equal(entry.important, true);
+      assert.ok(Array.isArray(entry.changes));
+      assert.equal(entry.changes?.[0], 'src/routes/auth.ts');
+    });
+
+    it('should record state updates via CLI state_update command', async () => {
+      const res = await CliHandler.handleRequest({
+        command: 'state_update',
+        project: 'CliTestProj',
+        summary: 'Updated project conversion indicator',
+        metrics: { conversion: '15.4%' },
+        important: true,
+      });
+
+      assert.equal(res.success, true);
+      assert.ok(res.data.id);
+    });
+
+    it('should compute executive period digests via operationalJournal', () => {
+      const digestToday = operationalJournal.getPeriodDigest('today');
+      assert.ok(digestToday);
+      assert.ok(typeof digestToday.completedCount === 'number');
+      assert.ok(Array.isArray(digestToday.entries));
+      assert.ok(Array.isArray(digestToday.importantHighlights));
+    });
+
+    it('should build rich autonomous task prompt via taskPromptBuilder', async () => {
+      const prompt = await taskPromptBuilder.buildAutonomousTaskPrompt({
+        project: 'ProjectAlpha',
+        skill: 'feature_impl',
+        custom_prompt: 'Add biometric login toggle',
+        task_id: 'test-task-12345',
+        autonomy_level: 'L3',
+      });
+
+      assert.ok(prompt.includes('Project: ProjectAlpha'));
+      assert.ok(prompt.includes('Task ID: test-task-12345'));
+      assert.ok(prompt.includes('Add biometric login toggle'));
+      assert.ok(prompt.includes('0xagent veronica context'));
+      assert.ok(prompt.includes('0xagent veronica report'));
+      assert.ok(prompt.includes('[ORCHESTRATOR CLI PROTOCOL & INVARIANTS]'));
     });
 
     it('should list active background agents', async () => {
@@ -236,9 +316,10 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
     it('should record applied migrations in schema_migrations table', () => {
       const db = getVeronicaDb();
       const rows = db.prepare('SELECT * FROM schema_migrations ORDER BY version ASC').all() as any[];
-      assert.ok(rows.length >= 2, 'Expected at least 2 migrations');
+      assert.ok(rows.length >= 3, `Expected at least 3 migrations, got ${rows.length}`);
       assert.equal(rows[0].version, 1);
       assert.equal(rows[1].version, 2);
+      assert.equal(rows[2].version, 3);
     });
   });
 
@@ -351,6 +432,101 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       assert.ok(detail);
       assert.ok(detail.soul.includes('Вероника'));
       assert.ok(detail.soul.includes('L0-L5'));
+    });
+  });
+
+  describe('13. Antigravity Adapter & SSE / WebSocket Streaming Events', () => {
+    it('should list available Antigravity models and specialized agents', () => {
+      const models = antigravityAdapter.getAvailableAntigravityModels();
+      assert.ok(models.length >= 7, 'Should have multiple Antigravity models');
+      assert.ok(models.some((m) => m.slug === 'gemini-3.7-flash-high'));
+      assert.ok(models.some((m) => m.slug === 'gemini-3.7-flash-medium'));
+      assert.ok(models.some((m) => m.slug === 'claude-sonnet-4-6'));
+
+      const agents = antigravityAdapter.getAvailableAntigravityAgents();
+      assert.ok(agents.length >= 6, 'Should list default and specialized agents');
+      assert.ok(agents.some((a) => a.slug === 'critic'));
+      assert.ok(agents.some((a) => a.slug === 'research'));
+    });
+
+    it('should buffer stream events and allow subscribers to receive live chunks', () => {
+      const testTaskId = 'stream_test_' + Date.now();
+      const receivedEvents: VeronicaStreamEvent[] = [];
+
+      const unsubscribe = antigravityAdapter.subscribeTaskStream(testTaskId, (ev) => {
+        receivedEvents.push(ev);
+      });
+
+      // Emit simulated chunks
+      antigravityAdapter.emitStreamEvent({
+        taskId: testTaskId,
+        type: 'stdout',
+        chunk: 'Analyzing files...',
+        timestamp: Date.now(),
+      });
+
+      antigravityAdapter.emitStreamEvent({
+        taskId: testTaskId,
+        type: 'stdout',
+        chunk: 'Generating patch...',
+        timestamp: Date.now(),
+      });
+
+      antigravityAdapter.emitStreamEvent({
+        taskId: testTaskId,
+        type: 'end',
+        status: 'completed',
+        summary: 'All tasks completed successfully',
+        timestamp: Date.now(),
+      });
+
+      unsubscribe();
+
+      assert.equal(receivedEvents.length, 3);
+      assert.equal(receivedEvents[0].chunk, 'Analyzing files...');
+      assert.equal(receivedEvents[2].status, 'completed');
+
+      // Verify buffer replay
+      const buffer = antigravityAdapter.getTaskStreamBuffer(testTaskId);
+      assert.equal(buffer.length, 3);
+    });
+
+    it('should broadcast events through setBroadcaster if registered', () => {
+      const broadcastEvents: { event: string; payload: any }[] = [];
+      antigravityAdapter.setBroadcaster((event, payload) => {
+        broadcastEvents.push({ event, payload });
+      });
+
+      const testTaskId = 'broadcast_test_' + Date.now();
+      antigravityAdapter.emitStreamEvent({
+        taskId: testTaskId,
+        type: 'status',
+        status: 'running',
+        chunk: 'Starting process',
+        timestamp: Date.now(),
+      });
+
+      assert.ok(broadcastEvents.some((b) => b.event === 'veronica-stream-chunk'));
+      assert.ok(broadcastEvents.some((b) => b.event === 'veronica-task-status'));
+    });
+  });
+
+  describe('14. Graceful Hot-Reload Invariant', () => {
+    it('should reload Veronica module gracefully without throwing or breaking status', async () => {
+      const reloadRes = await reloadVeronicaModule();
+      assert.equal(reloadRes.success, true);
+      assert.ok(reloadRes.status.db_healthy, 'DB should remain healthy after hot-reload');
+      assert.equal(typeof reloadRes.timestamp, 'number');
+
+      const status = getVeronicaStatus();
+      assert.equal(status.enabled, true);
+      assert.equal(status.db_healthy, true);
+    });
+
+    it('should create valid router with createVeronicaRouter', () => {
+      const router = createVeronicaRouter(() => {});
+      assert.ok(router);
+      assert.equal(typeof router.use, 'function');
     });
   });
 });

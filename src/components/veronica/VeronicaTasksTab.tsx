@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Play,
   RefreshCw,
@@ -11,10 +11,15 @@ import {
   PauseCircle,
   AlertOctagon,
   Hourglass,
+  Terminal,
+  Copy,
+  Trash2,
+  Radio,
 } from 'lucide-react';
 import { Button, Card, Badge, Input, Select, Modal } from '../ui';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { VeronicaStreamEvent } from '../../types';
 
 interface VeronicaTasksTabProps {
   onRefresh?: () => void;
@@ -32,9 +37,15 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
   const [selectedEffort, setSelectedEffort] = useState<'auto' | 'low' | 'medium' | 'high'>('auto');
   const [selectedAgent, setSelectedAgent] = useState('default');
   const [selectedTimeout, setSelectedTimeout] = useState('15m');
-  const [availableModels, setAvailableModels] = useState<{ local: string[]; antigravity: { slug: string; name: string }[] }>({ local: [], antigravity: [] });
+  const [availableModels, setAvailableModels] = useState<{ local: string[]; antigravity: { slug: string; name: string; effort?: string }[] }>({ local: [], antigravity: [] });
   const [availableAgents, setAvailableAgents] = useState<{ slug: string; name: string; description?: string }[]>([]);
   const [spawning, setSpawning] = useState(false);
+
+  // Live Stream Console State
+  const [streamActiveTaskId, setStreamActiveTaskId] = useState<string | null>(null);
+  const [streamLogs, setStreamLogs] = useState<VeronicaStreamEvent[]>([]);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
 
   const fetchTasksAndMeta = async () => {
     try {
@@ -71,6 +82,49 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
     return () => clearInterval(interval);
   }, []);
 
+  // Subscribe to SSE / WS stream when a task console is opened
+  useEffect(() => {
+    if (!streamActiveTaskId) {
+      setStreamLogs([]);
+      return;
+    }
+
+    // Subscribe via SSE
+    const unsubscribe = api.stream_veronica_task(
+      streamActiveTaskId,
+      (ev) => {
+        setStreamLogs((prev) => [...prev, ev]);
+      },
+      (err) => {
+        console.warn('[SSE Task Stream Error]', err);
+      }
+    );
+
+    // Fallback WS listener
+    const unlistenWs = api.listen('veronica-stream-chunk', (data: any) => {
+      if (data?.taskId === streamActiveTaskId) {
+        setStreamLogs((prev) => {
+          if (prev.some((p) => p.timestamp === data.timestamp && p.chunk === data.chunk)) {
+            return prev;
+          }
+          return [...prev, data];
+        });
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      unlistenWs();
+    };
+  }, [streamActiveTaskId]);
+
+  // Auto-scroll terminal
+  useEffect(() => {
+    if (autoScroll && terminalEndRef.current) {
+      terminalEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [streamLogs, autoScroll]);
+
   const handleSpawnTask = async () => {
     if (!newProject.trim() || !newSkill.trim()) {
       showToast('Укажите имя проекта и навык (skill)', 'error');
@@ -95,6 +149,7 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
         setNewProject('');
         setNewSkill('');
         setNewPrompt('');
+        setStreamActiveTaskId(res.task.id);
         fetchTasksAndMeta();
         onRefresh?.();
       }
@@ -115,6 +170,12 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
     } catch (err: any) {
       showToast(`Ошибка остановки: ${err?.message || err}`, 'error');
     }
+  };
+
+  const copyLogsToClipboard = () => {
+    const text = streamLogs.map((l) => `[${new Date(l.timestamp).toLocaleTimeString()}] ${l.type.toUpperCase()}: ${l.chunk || l.summary || ''}`).join('\n');
+    navigator.clipboard.writeText(text);
+    showToast('Логи скопированы в буфер обмена', 'info');
   };
 
   const getStatusBadge = (status: string) => {
@@ -156,7 +217,7 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
     { value: 'inherit', label: 'Default / Auto (Inherit Host Model)' },
     ...availableModels.antigravity.map((m) => ({
       value: m.slug,
-      label: `⚡ ${m.name}`,
+      label: `⚡ Antigravity: ${m.name}`,
     })),
     ...availableModels.local.map((m) => ({
       value: m,
@@ -183,7 +244,7 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
           </div>
           <div>
             <h3 className="text-sm font-bold text-[var(--theme-text)]">Операционный Журнал & Live Задачи</h3>
-            <p className="text-xs text-[var(--theme-text-muted)]">Управление фоновыми агентами, контроль статусов (SUCCESS, WAITING, INTERRUPTED)</p>
+            <p className="text-xs text-[var(--theme-text-muted)]">Управление фоновыми агентами, контроль статусов и live SSE/WS стриминг</p>
           </div>
         </div>
 
@@ -229,14 +290,112 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
                 </div>
               </div>
 
-              {task.status === 'running' && (
-                <Button variant="danger" size="sm" onClick={() => handleKillTask(task.id)}>
-                  Остановить
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setStreamActiveTaskId(task.id)}
+                  icon={<Terminal size={13} />}
+                >
+                  Live Стрим
                 </Button>
-              )}
+                {task.status === 'running' && (
+                  <Button variant="danger" size="sm" onClick={() => handleKillTask(task.id)}>
+                    Остановить
+                  </Button>
+                )}
+              </div>
             </Card>
           ))}
         </div>
+      )}
+
+      {/* Live Stream Terminal Drawer Modal */}
+      {streamActiveTaskId && (
+        <Modal
+          isOpen={!!streamActiveTaskId}
+          onClose={() => setStreamActiveTaskId(null)}
+          title={`Live SSE/WS Console :: Task ${streamActiveTaskId.substring(0, 8)}`}
+        >
+          <div className="space-y-3">
+            <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-[var(--theme-border)] text-xs">
+              <div className="flex items-center gap-2">
+                <Radio size={14} className="text-emerald-400 animate-pulse" />
+                <span className="font-mono text-emerald-400 font-bold">SSE / WebSocket Stream Active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAutoScroll(!autoScroll)}
+                  className={`px-2 py-1 rounded text-[10px] font-mono cursor-pointer border ${
+                    autoScroll ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-white/5 text-[var(--theme-text-muted)] border-transparent'
+                  }`}
+                >
+                  Auto-Scroll: {autoScroll ? 'ON' : 'OFF'}
+                </button>
+                <button
+                  type="button"
+                  onClick={copyLogsToClipboard}
+                  className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
+                  title="Копировать логи"
+                >
+                  <Copy size={13} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStreamLogs([])}
+                  className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
+                  title="Очистить"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+
+            {/* Terminal Log Viewport */}
+            <div className="bg-[#0c0d12] border border-[var(--theme-border)] rounded-2xl p-4 font-mono text-xs text-zinc-300 h-96 overflow-y-auto space-y-1 scrollbar-thin">
+              {streamLogs.length === 0 ? (
+                <div className="text-zinc-500 italic flex items-center justify-center h-full">
+                  Ожидание потока данных от процесса Antigravity...
+                </div>
+              ) : (
+                streamLogs.map((log, idx) => (
+                  <div key={idx} className="flex items-start gap-2 leading-relaxed">
+                    <span className="text-zinc-600 select-none text-[10px] shrink-0 pt-0.5">
+                      {new Date(log.timestamp).toLocaleTimeString()}
+                    </span>
+                    <span
+                      className={`font-semibold shrink-0 text-[10px] uppercase px-1 rounded ${
+                        log.type === 'stderr' || log.status === 'failed'
+                          ? 'bg-rose-500/20 text-rose-400'
+                          : log.type === 'stdout'
+                          ? 'bg-sky-500/10 text-sky-300'
+                          : log.type === 'heartbeat'
+                          ? 'bg-amber-500/20 text-amber-300'
+                          : 'bg-emerald-500/20 text-emerald-300'
+                      }`}
+                    >
+                      {log.type}
+                    </span>
+                    <span className={`break-all whitespace-pre-wrap ${log.type === 'stderr' ? 'text-rose-300' : 'text-zinc-200'}`}>
+                      {log.chunk || log.summary || JSON.stringify(log.metadata || '')}
+                    </span>
+                  </div>
+                ))
+              )}
+              <div ref={terminalEndRef} />
+            </div>
+
+            <div className="flex justify-between items-center pt-2">
+              <span className="text-[11px] text-[var(--theme-text-muted)] font-mono">
+                Всего событий: {streamLogs.length}
+              </span>
+              <Button variant="ghost" size="sm" onClick={() => setStreamActiveTaskId(null)}>
+                Закрыть
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {/* Spawn Task Modal with Model, Effort, Timeout & Agent Selector */}

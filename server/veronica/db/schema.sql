@@ -88,7 +88,44 @@ CREATE TABLE IF NOT EXISTS project_snapshots (
   dense_context_summary TEXT
 );
 
+CREATE TABLE IF NOT EXISTS operational_journal (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  timestamp INTEGER NOT NULL,
+  project TEXT NOT NULL,
+  task_id TEXT,
+  agent TEXT NOT NULL DEFAULT 'agent',
+  operation_type TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'completed',
+  summary TEXT NOT NULL,
+  changes_json TEXT,
+  important INTEGER NOT NULL DEFAULT 0,
+  commit_hash TEXT,
+  metadata_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_journal_project_timestamp 
+  ON operational_journal (project, timestamp DESC);
+
+CREATE INDEX IF NOT EXISTS idx_journal_task_id 
+  ON operational_journal (task_id);
+
+CREATE INDEX IF NOT EXISTS idx_journal_timestamp 
+  ON operational_journal (timestamp DESC);
+
+CREATE TABLE IF NOT EXISTS telegram_conversations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  role TEXT NOT NULL,
+  content TEXT NOT NULL,
+  timestamp INTEGER NOT NULL,
+  metadata_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_telegram_conv_user_timestamp 
+  ON telegram_conversations (user_id, timestamp ASC);
+
 CREATE TABLE IF NOT EXISTS schema_version (
   version INTEGER PRIMARY KEY,
   applied_at INTEGER NOT NULL
 );
+

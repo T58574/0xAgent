@@ -66,7 +66,7 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
             </div>
           </div>
 
-          {/* Quick Telemetry Badges */}
+          {/* Quick Telemetry Badges & Hot Reload */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs">
               <span className="text-[var(--theme-text-muted)]">Telegram:</span>
