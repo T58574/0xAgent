@@ -12,6 +12,28 @@ export interface ServerStatusData {
   modelName?: string | null;
 }
 
+// 24-hour localStorage + memory cache for models list
+const MODELS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const STORAGE_KEY = '0xagent_models_cache_v1';
+
+function getInitialCachedModels(): { data: AvailableModelsResponse | null; timestamp: number } {
+  if (typeof window === 'undefined') return { data: null, timestamp: 0 };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.data && typeof parsed.timestamp === 'number') {
+        if (Date.now() - parsed.timestamp < MODELS_CACHE_TTL_MS) {
+          return parsed;
+        }
+      }
+    }
+  } catch {}
+  return { data: null, timestamp: 0 };
+}
+
+let cachedModelsEntry = getInitialCachedModels();
+
 export function useModelManager(
   config?: AppConfig | null,
   onModelChanged?: (newModelId: string) => void,
@@ -28,31 +50,47 @@ export function useModelManager(
     modelName: null,
   });
 
-  const [modelsData, setModelsData] = useState<AvailableModelsResponse>({
-    cloud: [],
-    local: [],
-    activeModelId: config?.model_name || 'local:qwen2.5-coder-32b.gguf',
+  const [modelsData, setModelsData] = useState<AvailableModelsResponse>(() => {
+    return (
+      cachedModelsEntry.data || {
+        cloud: [],
+        local: [],
+        activeModelId: config?.model_name || 'local:qwen2.5-coder-32b.gguf',
+      }
+    );
   });
 
   const activeModelId = config?.model_name || modelsData.activeModelId || 'local:qwen2.5-coder-32b.gguf';
   const isLocalActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
 
-  const fetchModelsAndStatus = useCallback(async () => {
+  const fetchModelsAndStatus = useCallback(async (force = false) => {
+    const now = Date.now();
+    const shouldFetchModels = force || !cachedModelsEntry.data || now - cachedModelsEntry.timestamp >= MODELS_CACHE_TTL_MS;
+
     try {
-      const [data, status] = await Promise.all([
-        api.get_available_models(),
-        api.get_server_status(),
-      ]);
-      setModelsData(data);
-      setServerStatus(status as ServerStatusData);
+      if (shouldFetchModels) {
+        const [data, status] = await Promise.all([
+          api.get_available_models(),
+          api.get_server_status(),
+        ]);
+        cachedModelsEntry = { data, timestamp: Date.now() };
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cachedModelsEntry));
+        } catch {}
+        setModelsData(data);
+        setServerStatus(status as ServerStatusData);
+      } else {
+        const status = await api.get_server_status();
+        setServerStatus(status as ServerStatusData);
+      }
     } catch (err) {
       console.error('Failed to fetch models/status:', err);
     }
   }, []);
 
   useEffect(() => {
-    fetchModelsAndStatus();
-    const interval = setInterval(fetchModelsAndStatus, 4000);
+    fetchModelsAndStatus(false);
+    const interval = setInterval(() => fetchModelsAndStatus(false), 15000);
     return () => clearInterval(interval);
   }, [fetchModelsAndStatus]);
 

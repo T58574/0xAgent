@@ -54,6 +54,94 @@ async function fetchWithHeaderTimeout(
   }
 }
 
+import { spawn } from 'node:child_process';
+
+async function spawnAgyStreamResponse(
+  config: AppConfig,
+  messages: { role: string; content: string | any[] }[],
+  selectedModel: string,
+  configuredEffort: string
+): Promise<Response> {
+  const cliPath = config.veronica?.antigravity_cli_path || 'agy';
+  const args = ['--dangerously-skip-permissions', '--output-format', 'text'];
+
+  if (selectedModel && selectedModel !== 'inherit' && selectedModel !== 'agy' && selectedModel !== 'antigravity') {
+    args.push('--model', selectedModel);
+  }
+  if (configuredEffort && configuredEffort !== 'auto' && configuredEffort !== 'off') {
+    args.push('--effort', configuredEffort);
+  }
+  const agent = config.veronica?.agent;
+  if (agent && agent !== 'default' && agent !== 'none') {
+    args.push('--agent', agent);
+  }
+
+  // Format messages into clean multi-turn prompt payload
+  let promptText = '';
+  for (const m of messages) {
+    if (m.role === 'system') {
+      promptText += `[SYSTEM INSTRUCTIONS]\n${m.content}\n\n`;
+    } else if (m.role === 'user') {
+      promptText += `[USER]\n${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}\n\n`;
+    } else if (m.role === 'assistant') {
+      promptText += `[ASSISTANT]\n${m.content}\n\n`;
+    }
+  }
+
+  const child = spawn(cliPath, args, {
+    shell: true,
+    stdio: ['pipe', 'pipe', 'pipe'],
+  });
+
+  child.stdin?.write(promptText);
+  child.stdin?.end();
+
+  const stream = new ReadableStream({
+    start(controller) {
+      const encoder = new TextEncoder();
+
+      child.stdout?.on('data', (chunk) => {
+        const text = chunk.toString();
+        if (text) {
+          const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`;
+          controller.enqueue(encoder.encode(sseLine));
+        }
+      });
+
+      child.stderr?.on('data', (errChunk) => {
+        const errText = errChunk.toString().trim();
+        if (errText && !errText.includes('Debugger attached')) {
+          console.warn('[agy stream stderr]', errText);
+        }
+      });
+
+      child.on('close', (_code) => {
+        const finishLine = `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`;
+        controller.enqueue(encoder.encode(finishLine));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      });
+
+      child.on('error', (err) => {
+        controller.error(err);
+      });
+    },
+    cancel() {
+      try {
+        child.kill();
+      } catch {}
+    },
+  });
+
+  return new Response(stream, {
+    status: 200,
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+    },
+  });
+}
+
 export async function fetchLlmResponse(
   config: AppConfig,
   messages: { role: string; content: string | any[] }[],
@@ -63,12 +151,21 @@ export async function fetchLlmResponse(
   broadcast: (event: string, payload: any) => void
 ): Promise<{ response: Response; activeModelName: string } | null> {
   const selectedModel = config.model_name || PRIMARY_TEXT_MODEL;
+  const isAntigravity =
+    !selectedModel.startsWith('local:') &&
+    !selectedModel.endsWith('.gguf') &&
+    (selectedModel.startsWith('gemini-') ||
+      selectedModel.startsWith('claude-') ||
+      selectedModel === 'inherit' ||
+      selectedModel === 'antigravity' ||
+      selectedModel === 'agy' ||
+      config.active_persona_id === 'veronica');
+
   const isLocalModel =
-    selectedModel.startsWith('local:') ||
-    selectedModel.endsWith('.gguf') ||
-    !config.api_url ||
-    config.api_url.includes('127.0.0.1') ||
-    config.api_url.includes('localhost');
+    !isAntigravity &&
+    (selectedModel.startsWith('local:') ||
+      selectedModel.endsWith('.gguf') ||
+      (!config.api_url && !selectedModel.includes('/')));
 
   let response: Response | null = null;
   let activeModelName = selectedModel;
@@ -77,6 +174,18 @@ export async function fetchLlmResponse(
 
   const configuredEffort = config.reasoning_effort || config.local_server?.reasoning_effort || 'auto';
   const isReasoningOff = config.reasoning_enabled === false || configuredEffort === 'off';
+
+  // 1. Antigravity Headless CLI Stream
+  if (isAntigravity) {
+    try {
+      response = await spawnAgyStreamResponse(config, messages, selectedModel, configuredEffort);
+      return { response, activeModelName };
+    } catch (agyErr: any) {
+      const errMsg = `[!] **Antigravity Engine Error:**\n\`\`\`\n${agyErr.message || agyErr}\n\`\`\``;
+      handleAgentError(session, sessionId, broadcast, errMsg);
+      return null;
+    }
+  }
 
   // For large models (27B/32B GGUF) on local/LAN servers, allocate 300s-600s
   const baseTimeoutSec = config.api_timeout_sec || (isLocalModel ? 300 : 90);
