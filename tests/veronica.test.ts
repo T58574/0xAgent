@@ -15,6 +15,7 @@ import { GitExecutor } from '../server/veronica/cli/gitExecutor';
 import { RecoveryService } from '../server/veronica/watchdog/recoveryService';
 import { remoteNodeService } from '../server/remoteNodeService';
 import { veronicaScheduler } from '../server/veronica/core/scheduler';
+import { initPersonas, listPersonas, getPersonaDetail } from '../server/personas';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -295,13 +296,26 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   });
 
   describe('11. Scheduler Skills Discovery & Cron Jobs', () => {
-    it('should discover default markdown skill files', () => {
+    it('should discover all default markdown skill files', () => {
       const skills = veronicaScheduler.listSkills();
-      assert.ok(skills.length >= 3, 'Expected at least 3 default skills');
+      assert.ok(skills.length >= 10, `Expected at least 10 skills, got ${skills.length}`);
       const names = skills.map((s: any) => s.name);
       assert.ok(names.includes('code_review'));
       assert.ok(names.includes('security_audit'));
       assert.ok(names.includes('health_check'));
+      assert.ok(names.includes('git_sync'));
+      assert.ok(names.includes('architecture_audit'));
+      assert.ok(names.includes('refactoring'));
+      assert.ok(names.includes('test_generator'));
+      assert.ok(names.includes('doc_sync'));
+      assert.ok(names.includes('dependency_updater'));
+      assert.ok(names.includes('incident_responder'));
+    });
+
+    it('should retrieve skill content correctly', () => {
+      const content = veronicaScheduler.getSkillContent('code_review');
+      assert.ok(content);
+      assert.ok(content.includes('Skill: Automated Code Review'));
     });
 
     it('should register and schedule cron jobs in SQLite', async () => {
@@ -322,6 +336,21 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       await veronicaScheduler.deleteCronJob('job_daily_audit');
       const jobsAfter = veronicaScheduler.listCronJobs();
       assert.equal(jobsAfter.some((j: any) => j.id === 'job_daily_audit'), false);
+    });
+  });
+
+  describe('12. Veronica Persona Integration', () => {
+    it('should seed Veronica persona with valid SOUL.md directives', () => {
+      initPersonas();
+      const personas = listPersonas();
+      const veronica = personas.find((p: any) => p.id === 'veronica');
+      assert.ok(veronica, 'Veronica persona should exist');
+      assert.equal(veronica.name, 'Вероника (Veronica AI)');
+
+      const detail = getPersonaDetail('veronica');
+      assert.ok(detail);
+      assert.ok(detail.soul.includes('Вероника'));
+      assert.ok(detail.soul.includes('L0-L5'));
     });
   });
 });

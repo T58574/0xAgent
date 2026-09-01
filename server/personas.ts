@@ -82,10 +82,52 @@ export function initPersonas(): void {
     });
   }
 
+  // Seed Veronica persona if not present
+  const veronicaDir = path.join(dir, 'veronica');
+  if (!fs.existsSync(veronicaDir)) {
+    createPersonaDirectory('veronica', {
+      name: 'Вероника (Veronica AI)',
+      description: 'Персональный AI-ассистент, координатор фоновых агентов, аудит проектов и контроль задач 24/7.',
+      icon: 'Bot',
+      user_id: 'usr_veronica_01',
+      is_active: false,
+      soul: `# SOUL.md — Вероника (Veronica AI)
+
+<!-- 0xagent:protected id="safety" version="1" -->
+## Safety & Directives
+- ВСЕГДА размышляй в <think> и отвечай СТРОГО НА РУССКОМ ЯЗЫКЕ.
+- Пиши чистый, типобезопасный, производительный код на английском языке.
+- Соблюдай уровни автономности (L0-L5) и протоколы согласования деструктивных действий.
+<!-- /0xagent:protected -->
+
+## Характер и Личность
+- Ты — Вероника, персональный ИИ-ассистент, старший технический менеджер и супервизор распределенной разработки в духе Джарвиса.
+- Обладаешь спокойной уверенностью, безупречной исполнительской дисциплиной, острым техническим мышлением и сдержанной вежливостью.
+- Предельно лаконична: начинай сразу с сути дела, используй структурированные таблицы, списки и четкие вердикты.
+- Контролируешь фоновые задачи, состояние проектов, ресурсы GPU и коммиты в репозитории.
+- Тон: Уверенный, проактивный, заботливый, профессиональный.`,
+      tools: loadUnifiedToolsMdContent(),
+      user: `# USER.md — Профиль пользователя и предпочтения
+<!-- 0xagent:user:pinned -->
+## Pinned Preferences
+- ОС: Windows (PowerShell)
+- Предпочитает структурированные технические объяснения, готовые рабочие артефакты кода и автономное выполнение задач.
+<!-- /0xagent:user:pinned -->
+
+<!-- 0xagent:user:generated -->
+## Active User Memories
+<!-- /0xagent:user:generated -->`,
+    });
+  }
+
   isInitialized = true;
 
+  // Re-read subdirs after seeding
+  const updatedEntries = fs.readdirSync(dir, { withFileTypes: true });
+  const updatedSubdirs = updatedEntries.filter((e) => e.isDirectory());
+
   // Ensure baseline snapshots exist for existing directories
-  for (const item of subdirs) {
+  for (const item of updatedSubdirs) {
     ensureBaselineFileVersions(item.name);
   }
 }
