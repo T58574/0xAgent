@@ -322,13 +322,16 @@ ${c.cyan}${c.bold}Veronica CLI Protocol & Assistant Interface${c.reset}
 Usage: 0xagent veronica <command> [options]
 
 Commands:
-  context <project> [--task <id>]      Fetch dense token-efficient project context
-  heartbeat --task <id> [--action <a>] Update agent alive status & progress
-  report --task <id> [--status <s>]    Submit final report & task summary
-  error --task <id> --message <m>      Log error or mark task failed
-  git commit --task <id> -m <msg>      Safe unified git commit (L3+ autonomy)
-  git rollback --task <id>             Rollback commit created by task
-  agents                               List all active background agents
+  doc <project> [get|set|append <text>]  Read or update project passport, metrics & changelog
+  project [list|info <project>]          List auto-discovered projects & view project cards
+  task <project> <skill|prompt>          Launch an autonomous background task via Antigravity
+  context <project> [--task <id>]        Fetch dense token-efficient project context
+  heartbeat --task <id> [--action <a>]   Update agent alive status & progress
+  report --task <id> [--status <s>]      Submit final report & task summary
+  error --task <id> --message <m>        Log error or mark task failed
+  git commit --task <id> -m <msg>        Safe unified git commit (L3+ autonomy)
+  git rollback --task <id>               Rollback commit created by task
+  agents                                 List all active background agents
 `);
     return;
   }
@@ -336,7 +339,44 @@ Commands:
   // Parse arguments into CLI payload
   let payload = { command: subCmd };
 
-  if (subCmd === 'context') {
+  if (subCmd === 'doc') {
+    const project = veronicaArgs[1];
+    const action = veronicaArgs[2] || 'get';
+    if (!project) {
+      console.error(`${c.red}[ERR] Project name is required. Usage: 0xagent veronica doc <project> [get|set|append <text>]${c.reset}`);
+      return;
+    }
+    if (action === 'get') {
+      payload.command = 'doc_get';
+      payload.project = project;
+    } else if (action === 'append') {
+      payload.command = 'doc_append';
+      payload.project = project;
+      payload.message = veronicaArgs.slice(3).join(' ');
+    } else if (action === 'set') {
+      payload.command = 'doc_update';
+      payload.project = project;
+      payload.content = veronicaArgs.slice(3).join(' ');
+    }
+  } else if (subCmd === 'project' || subCmd === 'projects') {
+    const action = veronicaArgs[1] || 'list';
+    if (action === 'list') {
+      payload.command = 'projects_list';
+    } else {
+      payload.command = 'doc_get';
+      payload.project = action;
+    }
+  } else if (subCmd === 'task' || subCmd === 'run') {
+    const project = veronicaArgs[1];
+    const taskPrompt = veronicaArgs.slice(2).join(' ');
+    if (!project || !taskPrompt) {
+      console.error(`${c.red}[ERR] Usage: 0xagent veronica task <project> <skill_or_prompt>${c.reset}`);
+      return;
+    }
+    payload.command = 'task_create';
+    payload.project = project;
+    payload.custom_prompt = taskPrompt;
+  } else if (subCmd === 'context') {
     payload.project = veronicaArgs[1];
     const taskIdx = veronicaArgs.indexOf('--task');
     if (taskIdx !== -1 && veronicaArgs[taskIdx + 1]) {
@@ -464,45 +504,59 @@ async function cmdNode(nodeArgs) {
 // -------------------------------------------------------------
 
 const args = process.argv.slice(2);
-const command = args[0] || 'start';
+const invokedAs = path.basename(process.argv[1] || '').toLowerCase();
+const isVeronicaBinary = invokedAs.includes('veronica');
 
-switch (command.toLowerCase()) {
-  case 'start':
-    cmdStart({ foreground: args.includes('--foreground') || args.includes('-f') });
-    break;
-  case 'stop':
-    cmdStop();
-    break;
-  case 'status':
-    cmdStatus();
-    break;
-  case 'veronica':
-    cmdVeronica(args.slice(1));
-    break;
-  case 'node':
-    cmdNode(args.slice(1));
-    break;
-  case 'config':
-    cmdConfig();
-    break;
-  case 'update':
-  case 'upgrade':
-    cmdUpdate();
-    break;
-  case 'purge-vram':
-  case 'purge':
-    cmdPurgeVram();
-    break;
-  case '--help':
-  case '-h':
-  case 'help':
-    banner();
-    console.log(`${c.bold}Usage:${c.reset} 0xagent [command] [options]
+if (isVeronicaBinary) {
+  cmdVeronica(args);
+} else {
+  const command = args[0] || 'start';
+
+  // Support direct subcommands without explicit 'veronica' prefix
+  const directVeronicaCmds = ['doc', 'project', 'projects', 'task', 'context', 'heartbeat', 'report', 'agents'];
+  if (directVeronicaCmds.includes(command.toLowerCase())) {
+    cmdVeronica(args);
+  } else {
+    switch (command.toLowerCase()) {
+      case 'start':
+        cmdStart({ foreground: args.includes('--foreground') || args.includes('-f') });
+        break;
+      case 'stop':
+        cmdStop();
+        break;
+      case 'status':
+        cmdStatus();
+        break;
+      case 'veronica':
+        cmdVeronica(args.slice(1));
+        break;
+      case 'node':
+        cmdNode(args.slice(1));
+        break;
+      case 'config':
+        cmdConfig();
+        break;
+      case 'update':
+      case 'upgrade':
+        cmdUpdate();
+        break;
+      case 'purge-vram':
+      case 'purge':
+        cmdPurgeVram();
+        break;
+      case '--help':
+      case '-h':
+      case 'help':
+        banner();
+        console.log(`${c.bold}Usage:${c.reset} 0xagent [command] [options]
 
 ${c.bold}Commands:${c.reset}
   0xagent                      Start 0xAgent in background system tray (default)
   0xagent start -f             Start in foreground console mode
-  0xagent veronica <cmd>       Veronica assistant CLI (context, heartbeat, report, git)
+  0xagent veronica <cmd>       Veronica assistant CLI (doc, project, task, context)
+  0xagent doc <project> ...    Direct project documentation manager
+  0xagent project list         List auto-discovered projects
+  0xagent task <project> <p>   Launch autonomous task via Antigravity (agy)
   0xagent node probe [host]    Probe remote GPU Compute Node in LAN
   0xagent config               Interactive settings & models manager
   0xagent status               Show backend health, telemetry & active model
@@ -511,9 +565,11 @@ ${c.bold}Commands:${c.reset}
   0xagent purge-vram           Force purge GPU VRAM and terminate inference servers
   0xagent help                 Show this help manual
 `);
-    break;
-  default:
-    console.log(`${c.red}[!] Unknown command: ${command}${c.reset}. Run '0xagent help' for usage.`);
-    break;
+        break;
+      default:
+        console.log(`${c.red}[!] Unknown command: ${command}${c.reset}. Run '0xagent help' for usage.`);
+        break;
+    }
+  }
 }
 

@@ -7,6 +7,7 @@ import { loadConfig } from '../config';
 import { VeronicaModuleStatus } from './types';
 import { taskRegistry } from './core/taskRegistry';
 import { remoteNodeService } from '../remoteNodeService';
+import { snapshotCache } from './core/snapshotCache';
 
 let isModuleInitialized = false;
 
@@ -28,17 +29,24 @@ export async function initVeronicaModule(): Promise<boolean> {
     // 2. Run startup reconciliation for crashed/orphan tasks
     await RecoveryService.reconcileOnStartup();
 
-    // 3. Start Process Watchdog
+    // 3. Pre-sync discovered projects and build snapshots
+    try {
+      await snapshotCache.syncAllDiscovered();
+    } catch (sErr) {
+      console.warn('[Veronica] [WARN] Initial project sync error:', sErr);
+    }
+
+    // 4. Start Process Watchdog
     const watchdogInterval = config.veronica?.watchdog_interval_sec || 15;
     processWatchdog.start(watchdogInterval);
 
-    // 4. Start internal Scheduler
+    // 5. Start internal Scheduler
     veronicaScheduler.start(10000);
 
-    // 5. Initialize Telegram Bot (if token configured)
+    // 6. Initialize Telegram Bot (if token configured)
     initTelegramBot();
 
-    // 6. Schedule daily backups & retention cleaner (every 24h)
+    // 7. Schedule daily backups & retention cleaner (every 24h)
     setInterval(() => {
       createDatabaseBackup();
       runRetentionCleanup();
@@ -97,5 +105,9 @@ export function getVeronicaStatus(): VeronicaModuleStatus {
 export * from './types';
 export * from './core/taskRegistry';
 export * from './core/contextEngine';
+export * from './core/snapshotCache';
+export * from './core/projectDiscovery';
+export * from './core/projectDocManager';
 export * from './cli/cliHandler';
 export * from './adapters/antigravityAdapter';
+export * from './telegram/veronicaOrchestrator';

@@ -4,6 +4,10 @@ import { MessageBuilder } from './messageBuilder';
 import { notificationService } from './notificationService';
 import { antigravityAdapter } from '../adapters/antigravityAdapter';
 import { taskRegistry } from '../core/taskRegistry';
+import { projectDiscovery } from '../core/projectDiscovery';
+import { projectDocManager } from '../core/projectDocManager';
+import { veronicaScheduler } from '../core/scheduler';
+import { veronicaOrchestrator } from './veronicaOrchestrator';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -43,7 +47,7 @@ export function initTelegramBot(): Bot | null {
       const userId = ctx.from?.id;
       if (whitelist.length > 0 && userId && !whitelist.includes(userId)) {
         await ctx.reply(
-          `⛔ <b>Доступ ограничен.</b> Ваш Telegram ID: <code>${userId}</code>\nДобавьте этот ID в белый список Veronica в интерфейсе 0xAgent.`,
+          `⛔ <b>Доступ ограничен.</b> Ваш Telegram ID: <code>${userId}</code>\nДобавьте этот ID в белый список Veronica в настройках 0xAgent.`,
           { parse_mode: 'HTML' }
         );
         return;
@@ -51,46 +55,70 @@ export function initTelegramBot(): Bot | null {
       await next();
     });
 
+    // Helper to send projects menu
+    const sendProjectsMenu = async (ctx: any, edit: boolean = false) => {
+      const projects = await projectDiscovery.discoverAllProjects();
+      const text = await MessageBuilder.buildProjectsSummary();
+      const keyboard = MessageBuilder.buildProjectListKeyboard(projects, 0);
+
+      if (edit && ctx.callbackQuery) {
+        try {
+          await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
+          await ctx.answerCallbackQuery();
+          return;
+        } catch {}
+      }
+      await ctx.reply(text, {
+        parse_mode: 'HTML',
+        reply_markup: keyboard,
+      });
+    };
+
     // /start & /help
     bot.command(['start', 'help'], async (ctx) => {
       const userId = ctx.from?.id;
       const helpText = [
-        `👋 <b>Здравствуйте! Я Вероника — ваш персональный ассистент.</b>`,
-        userId ? `👤 Ваш Telegram ID: <code>${userId}</code>` : '',
+        `👋 <b>Здравствуйте, сэр! Я Вероника — ваш персональный ИИ-ассистент и оркестратор разработки.</b>`,
+        userId ? `👤 <i>Telegram ID:</i> <code>${userId}</code>` : '',
         ``,
-        `📌 <b>Доступные команды:</b>`,
-        `• /status — текущий статус системы, активные задачи и GPU узел`,
-        `• /projects — список проектов и сводка`,
-        `• /today — что сделано за сегодня`,
-        `• /yesterday — что сделано за вчера`,
-        `• /run <i>&lt;skill&gt;</i> <i>&lt;project&gt;</i> — запустить задачу агенту`,
-        `• /kill <i>&lt;task_id&gt;</i> — остановить зависшую задачу`,
+        `Я синхронизирую ваши проекты, запускаю фоновые задачи через Antigravity (<code>agy</code> CLI), веду документацию и предоставляю отчеты.`,
+        ``,
+        `💡 <i>Вы можете писать мне сообщения обычным языком, выбирать проекты кнопками или ставить задачи напрямую.</i>`,
       ].filter(Boolean).join('\n');
-      await ctx.reply(helpText, { parse_mode: 'HTML' });
+
+      await ctx.reply(helpText, {
+        parse_mode: 'HTML',
+        reply_markup: MessageBuilder.getMainReplyKeyboard(),
+      });
     });
 
     // /status
     bot.command('status', async (ctx) => {
       const msg = MessageBuilder.buildStatusMessage();
-      await ctx.reply(msg, { parse_mode: 'HTML' });
+      await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
     });
 
     // /projects
     bot.command('projects', async (ctx) => {
-      const msg = MessageBuilder.buildProjectsSummary();
-      await ctx.reply(msg, { parse_mode: 'HTML' });
+      await sendProjectsMenu(ctx);
     });
 
     // /today
     bot.command('today', async (ctx) => {
       const msg = MessageBuilder.buildPeriodReport('today');
-      await ctx.reply(msg, { parse_mode: 'HTML' });
+      await ctx.reply(msg, {
+        parse_mode: 'HTML',
+        reply_markup: MessageBuilder.buildPeriodSelectKeyboard(),
+      });
     });
 
     // /yesterday
     bot.command('yesterday', async (ctx) => {
       const msg = MessageBuilder.buildPeriodReport('yesterday');
-      await ctx.reply(msg, { parse_mode: 'HTML' });
+      await ctx.reply(msg, {
+        parse_mode: 'HTML',
+        reply_markup: MessageBuilder.buildPeriodSelectKeyboard(),
+      });
     });
 
     // /run <skill> <project>
@@ -99,7 +127,7 @@ export function initTelegramBot(): Bot | null {
       const parts = text.split(/\s+/).slice(1);
       if (parts.length < 2) {
         await ctx.reply(
-          '⚠️ Использование: <code>/run &lt;skill&gt; &lt;project&gt;</code> (например: <code>/run security_audit WebApp</code>)',
+          '⚠️ Использование: <code>/run &lt;skill&gt; &lt;project&gt;</code> (например: <code>/run security_audit 0xAgent</code>)',
           { parse_mode: 'HTML' }
         );
         return;
@@ -113,7 +141,7 @@ export function initTelegramBot(): Bot | null {
         await ctx.reply(
           `🚀 <b>Задача создана!</b>\nID: <code>${task.id.substring(0, 8)}</code>\nПроект: <b>${escapeHtml(
             project
-          )}</b>\nСтатус: <code>${task.status}</code>`,
+          )}</b>\nSkill: <code>${escapeHtml(skill)}</code>\nСтатус: <code>${task.status}</code>`,
           { parse_mode: 'HTML' }
         );
       } catch (err: any) {
@@ -141,7 +169,139 @@ export function initTelegramBot(): Bot | null {
       }
     });
 
-    // Callback query handlers for awaiting_approval inline buttons
+    // Callback queries navigation
+    bot.callbackQuery('veronica:projects_menu', async (ctx) => {
+      await sendProjectsMenu(ctx, true);
+    });
+
+    bot.callbackQuery(/^veronica:proj_page:(\d+)$/, async (ctx) => {
+      const page = parseInt(ctx.match[1], 10) || 0;
+      const projects = await projectDiscovery.discoverAllProjects();
+      const text = await MessageBuilder.buildProjectsSummary();
+      const keyboard = MessageBuilder.buildProjectListKeyboard(projects, page);
+      try {
+        await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
+      } catch {}
+      await ctx.answerCallbackQuery();
+    });
+
+    bot.callbackQuery(/^veronica:proj:(.+)$/, async (ctx) => {
+      const projectName = ctx.match[1];
+      const userId = ctx.from?.id;
+      if (userId) {
+        veronicaOrchestrator.setActiveProject(userId, projectName);
+      }
+
+      const text = await MessageBuilder.buildProjectDetails(projectName);
+      const keyboard = MessageBuilder.buildProjectActionsKeyboard(projectName);
+
+      try {
+        await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
+      } catch {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard });
+      }
+      await ctx.answerCallbackQuery();
+    });
+
+    bot.callbackQuery(/^veronica:skills:(.+)$/, async (ctx) => {
+      const projectName = ctx.match[1];
+      const skills = veronicaScheduler.listSkills();
+      const text = `⚡ <b>Выберите навык (Skill) для запуска в проекте ${escapeHtml(projectName)}:</b>`;
+      const keyboard = MessageBuilder.buildSkillsKeyboard(projectName, skills);
+
+      try {
+        await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
+      } catch {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard });
+      }
+      await ctx.answerCallbackQuery();
+    });
+
+    bot.callbackQuery(/^veronica:run_skill:([^:]+):(.+)$/, async (ctx) => {
+      const projectName = ctx.match[1];
+      const skillName = ctx.match[2];
+
+      try {
+        const task = await antigravityAdapter.spawnTask({
+          project: projectName,
+          skill: skillName,
+        });
+
+        await ctx.answerCallbackQuery({ text: `Задача ${skillName} запущена!` });
+        await ctx.reply(
+          `🚀 <b>Задача создана!</b>\n🆔 ID: <code>${task.id.substring(0, 8)}</code>\n📦 Проект: <b>${escapeHtml(
+            projectName
+          )}</b>\n⚡ Skill: <code>${escapeHtml(skillName)}</code>\n\n<i>Агент Antigravity приступил к выполнению.</i>`,
+          { parse_mode: 'HTML' }
+        );
+      } catch (err: any) {
+        await ctx.answerCallbackQuery({ text: 'Ошибка запуска' });
+        await ctx.reply(`❌ Ошибка запуска: ${escapeHtml(err?.message || err)}`);
+      }
+    });
+
+    bot.callbackQuery(/^veronica:prompt:(.+)$/, async (ctx) => {
+      const projectName = ctx.match[1];
+      const userId = ctx.from?.id;
+      if (userId) {
+        veronicaOrchestrator.setAwaitingPrompt(userId, projectName);
+      }
+
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        `✍️ <b>Постановка задачи для проекта <code>${escapeHtml(projectName)}</code>:</b>\n\n` +
+        `Отправьте мне текстовое сообщение с описанием того, что нужно сделать.\n` +
+        `<i>Например: «добавь кнопку переключения темы в шапку» или «проведи рефакторинг роутов».</i>`,
+        { parse_mode: 'HTML' }
+      );
+    });
+
+    bot.callbackQuery(/^veronica:doc:(.+)$/, async (ctx) => {
+      const projectName = ctx.match[1];
+      const passport = await projectDocManager.getPassport(projectName);
+      const keyboard = MessageBuilder.buildProjectActionsKeyboard(projectName);
+
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        `📄 <b>Паспорт проекта <code>${escapeHtml(projectName)}</code>:</b>\n\n<pre>${escapeHtml(
+          passport.substring(0, 3500)
+        )}</pre>`,
+        { parse_mode: 'HTML', reply_markup: keyboard }
+      );
+    });
+
+    bot.callbackQuery(/^veronica:history:(.+)$/, async (ctx) => {
+      const projectName = ctx.match[1];
+      const changelog = await projectDocManager.getChangelog(projectName, 25);
+      const keyboard = MessageBuilder.buildProjectActionsKeyboard(projectName);
+
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        `📊 <b>История активности <code>${escapeHtml(projectName)}</code>:</b>\n\n<pre>${escapeHtml(
+          changelog.substring(0, 3500)
+        )}</pre>`,
+        { parse_mode: 'HTML', reply_markup: keyboard }
+      );
+    });
+
+    bot.callbackQuery(/^veronica:report:(today|yesterday|all)$/, async (ctx) => {
+      const period = ctx.match[1] as 'today' | 'yesterday' | 'all';
+      const msg = MessageBuilder.buildPeriodReport(period);
+      await ctx.answerCallbackQuery();
+      try {
+        await ctx.editMessageText(msg, {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.buildPeriodSelectKeyboard(),
+        });
+      } catch {
+        await ctx.reply(msg, {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.buildPeriodSelectKeyboard(),
+        });
+      }
+    });
+
+    // Approvals
     bot.callbackQuery(/^veronica:approve:(.+)$/, async (ctx) => {
       const match = ctx.match;
       const taskId = match ? match[1] : '';
@@ -173,6 +333,80 @@ export function initTelegramBot(): Bot | null {
           )}</code> отменена.`,
           { parse_mode: 'HTML' }
         );
+      }
+    });
+
+    // -------------------------------------------------------------
+    // Main Text Message Handler (Conversational & Reply Buttons)
+    // -------------------------------------------------------------
+    bot.on('message:text', async (ctx) => {
+      const text = ctx.message.text.trim();
+      const userId = ctx.from.id;
+
+      // Handle Main Keyboard Buttons
+      if (text === '📁 Проекты') {
+        await sendProjectsMenu(ctx);
+        return;
+      }
+      if (text === '📊 Что сделано') {
+        const msg = MessageBuilder.buildPeriodReport('today');
+        await ctx.reply(msg, {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.buildPeriodSelectKeyboard(),
+        });
+        return;
+      }
+      if (text === '⚡ Быстрый запуск') {
+        await sendProjectsMenu(ctx);
+        return;
+      }
+      if (text === '⏱ Автоматизации') {
+        const jobs = veronicaScheduler.listCronJobs();
+        const msg =
+          jobs.length > 0
+            ? `⏱ <b>Запланированные автоматизации (${jobs.length}):</b>\n\n` +
+              jobs
+                .map(
+                  (j) =>
+                    `• <b>${escapeHtml(j.project)}</b> | <code>${escapeHtml(j.skill)}</code> | график: <i>${escapeHtml(
+                      j.schedule
+                    )}</i> [${j.enabled ? '🟢 Активен' : '⏸ Выключен'}]`
+                )
+                .join('\n')
+            : `⏱ <b>Автоматизации:</b> Нет активных расписаний.\n<i>Вы можете настроить запуск через меню проекта или CLI.</i>`;
+
+        await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
+        return;
+      }
+      if (text === '⚙️ Статус') {
+        const msg = MessageBuilder.buildStatusMessage();
+        await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
+        return;
+      }
+      if (text === '❓ Помощь') {
+        const helpText = [
+          `👋 <b>Справка по работе с Вероникой:</b>`,
+          ``,
+          `1️⃣ <b>Управление проектами:</b> Нажмите «📁 Проекты» для перехода к интерактивному списку.`,
+          `2️⃣ <b>Постановка задач:</b> Напишите в чат «Поставь задачу на проект X: ...» или нажмите «📝 Поставить задачу» в карточке проекта.`,
+          `3️⃣ <b>Сводки:</b> Спросите «Вероника, что сделано за вчера?» или нажмите «📊 Что сделано».`,
+          `4️⃣ <b>CLI для агентов:</b> Любой агент может читать и обновлять проект через <code>0xagent veronica doc</code>.`,
+        ].join('\n');
+        await ctx.reply(helpText, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
+        return;
+      }
+
+      // Delegate all natural language conversation to Veronica Orchestrator
+      try {
+        await ctx.replyWithChatAction('typing');
+        const replyText = await veronicaOrchestrator.handleUserMessage(userId, text);
+        await ctx.reply(replyText, {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.getMainReplyKeyboard(),
+        });
+      } catch (err: any) {
+        console.error('[Veronica Telegram] Error handling user message:', err);
+        await ctx.reply(`⚠️ Произошла ошибка при обработке запроса: ${escapeHtml(err?.message || err)}`);
       }
     });
 

@@ -4,6 +4,9 @@ import { AgentTask } from '../types';
 import { taskRegistry } from '../core/taskRegistry';
 import { loadConfig } from '../../config';
 import { VeronicaLogger } from '../core/logger';
+import { projectDiscovery } from '../core/projectDiscovery';
+import { projectDocManager } from '../core/projectDocManager';
+import { notificationService } from '../telegram/notificationService';
 
 export class AntigravityAdapter implements RuntimeAdapter {
   private static instance: AntigravityAdapter;
@@ -49,29 +52,41 @@ export class AntigravityAdapter implements RuntimeAdapter {
     const config = loadConfig();
     const cliPath = config.veronica?.antigravity_cli_path || 'agy';
 
+    // Resolve target project directory
+    const resolvedProjectPath = (await projectDiscovery.resolveProjectPath(options.project)) || process.cwd();
+
     // Environment variables injected for agent
     const env = {
       ...process.env,
       VERONICA_TASK_ID: task.id,
       VERONICA_TASK_TOKEN: task.task_token,
       VERONICA_PROJECT: task.project,
+      VERONICA_PROJECT_PATH: resolvedProjectPath,
       VERONICA_API_URL: 'http://127.0.0.1:3001/api/veronica/cli',
     };
 
-    // Prompt instructions with initial context instruction
-    const prompt = options.custom_prompt || `Perform skill '${options.skill}' on project '${options.project}'. Start by calling '0xagent veronica context ${options.project} --task ${task.id}' to receive current status and rules.`;
+    // Construct prompt
+    let prompt = options.custom_prompt;
+    if (!prompt) {
+      prompt = `Perform skill '${options.skill}' on project '${options.project}'. Context: call '0xagent veronica context ${options.project} --task ${task.id}' to receive current status and rules. When done, call '0xagent veronica report --task ${task.id} --status completed --summary "<summary>"'`;
+    }
 
     const args = [
       '--print', prompt,
       '--dangerously-skip-permissions',
-      '--output-format', 'json',
-      '--project', options.project,
+      '--output-format', 'text',
+      '--add-dir', resolvedProjectPath,
     ];
 
-    VeronicaLogger.log('TASK', `Spawning agy task with skill '${options.skill}' on project '${options.project}'`, task.id);
+    VeronicaLogger.log(
+      'TASK',
+      `Spawning agy task for project '${options.project}' in '${resolvedProjectPath}' with skill '${options.skill}'`,
+      task.id
+    );
 
     try {
       const child = spawn(cliPath, args, {
+        cwd: resolvedProjectPath,
         env,
         shell: true,
         detached: process.platform !== 'win32',
@@ -82,9 +97,14 @@ export class AntigravityAdapter implements RuntimeAdapter {
         this.activeProcesses.set(task.id, child);
         await taskRegistry.updateTaskStatus(task.id, 'running', { pid: child.pid });
 
+        let stdoutAccumulator = '';
+        let lastOutputSnippet = '';
+
         child.stdout?.on('data', (data) => {
           const text = data.toString().trim();
           if (text) {
+            stdoutAccumulator += '\n' + text;
+            lastOutputSnippet = text.substring(0, 150);
             VeronicaLogger.log('TASK', text, task.id);
             taskRegistry.recordHeartbeat(task.id, text.substring(0, 100)).catch(() => {});
           }
@@ -94,12 +114,14 @@ export class AntigravityAdapter implements RuntimeAdapter {
           const text = data.toString().trim();
           if (text) {
             VeronicaLogger.log('WARN', text, task.id);
-            taskRegistry.logEvent({
-              task_id: task.id,
-              event_type: 'warning',
-              timestamp: Date.now(),
-              message: text.substring(0, 300),
-            }).catch(() => {});
+            taskRegistry
+              .logEvent({
+                task_id: task.id,
+                event_type: 'warning',
+                timestamp: Date.now(),
+                message: text.substring(0, 300),
+              })
+              .catch(() => {});
           }
         });
 
@@ -108,10 +130,34 @@ export class AntigravityAdapter implements RuntimeAdapter {
           const currentTask = taskRegistry.getTask(task.id);
           if (currentTask && currentTask.status === 'running') {
             const finalStatus = code === 0 ? 'completed' : 'failed';
+            const cleanSummary =
+              code === 0
+                ? lastOutputSnippet || 'Agent execution finished successfully.'
+                : `Agent process exited with code ${code}`;
+
             VeronicaLogger.log(code === 0 ? 'INFO' : 'ERROR', `Task finished with exit code ${code}`, task.id);
+
             await taskRegistry.updateTaskStatus(task.id, finalStatus, {
-              summary: code === 0 ? 'Agent finished execution cleanly' : `Agent process exited with code ${code}`,
+              summary: cleanSummary,
             });
+
+            // Log to project changelog
+            await projectDocManager.appendChangelog(options.project, {
+              author: 'Veronica Antigravity Agent',
+              taskId: task.id,
+              action: `Task [${options.skill}] ${finalStatus}`,
+              details: cleanSummary,
+            });
+
+            // Trigger notification
+            const updatedTask = taskRegistry.getTask(task.id);
+            if (updatedTask) {
+              if (finalStatus === 'completed') {
+                await notificationService.notifyTaskCompleted(updatedTask);
+              } else {
+                await notificationService.notifyTaskCrashed(updatedTask, `Exited with code ${code}`);
+              }
+            }
           }
         });
       }
@@ -120,6 +166,10 @@ export class AntigravityAdapter implements RuntimeAdapter {
       await taskRegistry.updateTaskStatus(task.id, 'failed', {
         error_message: `Failed to spawn process: ${err?.message || err}`,
       });
+      const failedTask = taskRegistry.getTask(task.id);
+      if (failedTask) {
+        await notificationService.notifyTaskCrashed(failedTask, err?.message || 'Failed to spawn');
+      }
     }
 
     return task;

@@ -1,6 +1,8 @@
 import { getVeronicaDb } from '../db/veronicaDb';
 import { writeQueue } from '../db/writeQueue';
 import { ProjectSnapshot } from '../types';
+import { projectDiscovery } from './projectDiscovery';
+import { projectDocManager } from './projectDocManager';
 
 export class SnapshotCache {
   private static instance: SnapshotCache;
@@ -18,6 +20,8 @@ export class SnapshotCache {
    * Recompute and save snapshot for a project
    */
   public async refreshSnapshot(projectName: string): Promise<ProjectSnapshot> {
+    const docSummary = await projectDocManager.getConsolidatedOverview(projectName);
+
     return writeQueue.enqueue(() => {
       const db = getVeronicaDb();
       const now = Date.now();
@@ -55,9 +59,10 @@ export class SnapshotCache {
         `PROJECT:${projectName}`,
         `ACTIVE_TASKS:${activeCount}`,
         `PENDING_APPROVALS:${pendingCount}`,
+        docSummary ? `DOCS:${docSummary}` : '',
         lastTask ? `LAST_TASK:${lastTask.skill}(${lastTask.status}: ${lastTask.summary || 'ok'})` : 'LAST_TASK:none',
         lastCommit ? `LAST_COMMIT:[${lastCommit.commit_hash.substring(0, 7)}] ${lastCommit.message}` : 'LAST_COMMIT:none',
-      ].join(' | ');
+      ].filter(Boolean).join(' | ');
 
       const snapshot: ProjectSnapshot = {
         project: projectName,
@@ -96,6 +101,19 @@ export class SnapshotCache {
 
       return snapshot;
     });
+  }
+
+  /**
+   * Sync all discovered projects and build their snapshots
+   */
+  public async syncAllDiscovered(): Promise<ProjectSnapshot[]> {
+    const discovered = await projectDiscovery.discoverAllProjects();
+    const snapshots: ProjectSnapshot[] = [];
+    for (const p of discovered) {
+      const snap = await this.refreshSnapshot(p.name);
+      snapshots.push(snap);
+    }
+    return snapshots;
   }
 
   /**

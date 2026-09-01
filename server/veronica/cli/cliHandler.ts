@@ -2,6 +2,9 @@ import { taskRegistry } from '../core/taskRegistry';
 import { contextEngine } from '../core/contextEngine';
 import { GitExecutor } from './gitExecutor';
 import { notificationService } from '../telegram/notificationService';
+import { projectDiscovery } from '../core/projectDiscovery';
+import { projectDocManager } from '../core/projectDocManager';
+import { antigravityAdapter } from '../adapters/antigravityAdapter';
 import { TaskStatus } from '../types';
 
 export interface CliRequest {
@@ -17,6 +20,10 @@ export interface CliRequest {
   fatal?: boolean;
   files?: string[];
   project_path?: string;
+  content?: string;
+  skill?: string;
+  custom_prompt?: string;
+  metrics?: Record<string, any>;
 }
 
 export class CliHandler {
@@ -56,6 +63,14 @@ export class CliHandler {
         });
         const task = taskRegistry.getTask(req.task_id);
         if (task) {
+          if (task.project) {
+            await projectDocManager.appendChangelog(task.project, {
+              author: 'CLI Report',
+              taskId: task.id,
+              action: `Task finished [${finalStatus}]`,
+              details: req.summary || '',
+            });
+          }
           await notificationService.notifyTaskCompleted(task);
         }
         return { success: true, data: { status: finalStatus } };
@@ -82,6 +97,63 @@ export class CliHandler {
           }
         }
         return { success: true, data: { logged: true } };
+      }
+
+      case 'doc_get': {
+        if (!req.project) {
+          return { success: false, error: 'Project name is required' };
+        }
+        const passport = await projectDocManager.getPassport(req.project);
+        const metrics = projectDocManager.getMetrics(req.project);
+        const changelog = await projectDocManager.getChangelog(req.project, 20);
+        return {
+          success: true,
+          data: {
+            project: req.project,
+            passport,
+            metrics,
+            changelog,
+          },
+        };
+      }
+
+      case 'doc_update':
+      case 'doc_append': {
+        if (!req.project) {
+          return { success: false, error: 'Project name is required' };
+        }
+        if (req.content) {
+          await projectDocManager.savePassport(req.project, req.content);
+        }
+        if (req.message || req.action) {
+          await projectDocManager.appendChangelog(req.project, {
+            author: req.task_id ? `Task ${req.task_id.substring(0, 8)}` : 'Agent CLI',
+            taskId: req.task_id,
+            action: req.action || 'Documentation Update',
+            details: req.message || req.summary || '',
+          });
+        }
+        if (req.metrics) {
+          projectDocManager.updateMetrics(req.project, req.metrics);
+        }
+        return { success: true, data: { updated: true } };
+      }
+
+      case 'projects_list': {
+        const projects = await projectDiscovery.discoverAllProjects();
+        return { success: true, data: projects };
+      }
+
+      case 'task_create': {
+        if (!req.project) {
+          return { success: false, error: 'Project name is required' };
+        }
+        const task = await antigravityAdapter.spawnTask({
+          project: req.project,
+          skill: req.skill || 'custom_task',
+          custom_prompt: req.custom_prompt || req.message,
+        });
+        return { success: true, data: task };
       }
 
       case 'task_get': {

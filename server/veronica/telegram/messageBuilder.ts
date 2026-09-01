@@ -1,7 +1,10 @@
+import { InlineKeyboard, Keyboard } from 'grammy';
 import { getVeronicaDb } from '../db/veronicaDb';
 import { snapshotCache } from '../core/snapshotCache';
 import { taskRegistry } from '../core/taskRegistry';
 import { remoteNodeService } from '../../remoteNodeService';
+import { projectDiscovery, DiscoveredProject } from '../core/projectDiscovery';
+import { projectDocManager } from '../core/projectDocManager';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -12,6 +15,22 @@ function escapeHtml(text: string): string {
 }
 
 export class MessageBuilder {
+  /**
+   * Persistent Main Reply Keyboard (Fixed at bottom of screen)
+   */
+  public static getMainReplyKeyboard(): Keyboard {
+    return new Keyboard()
+      .text('📁 Проекты')
+      .text('📊 Что сделано')
+      .row()
+      .text('⚡ Быстрый запуск')
+      .text('⏱ Автоматизации')
+      .row()
+      .text('⚙️ Статус')
+      .text('❓ Помощь')
+      .resized();
+  }
+
   public static buildStatusMessage(): string {
     const activeTasks = taskRegistry.getActiveTasks();
     const remoteStatus = remoteNodeService.getStatus();
@@ -32,35 +51,120 @@ export class MessageBuilder {
       for (const t of activeTasks) {
         const pingSec = Math.round((Date.now() - (t.last_heartbeat || t.started_at)) / 1000);
         lines.push(
-          `• <code>${t.id.substring(0, 8)}</code> | <b>${escapeHtml(t.project)}</b> | skill: <i>${escapeHtml(t.skill)}</i> | last ping: ${pingSec}s ago`
+          `• <code>${t.id.substring(0, 8)}</code> | <b>${escapeHtml(t.project)}</b> | skill: <i>${escapeHtml(
+            t.skill
+          )}</i> | ping: ${pingSec}с назад`
         );
       }
     } else {
-      lines.push(`\n<i>Все агенты в режиме ожидания.</i>`);
+      lines.push(`\n<i>Все фоновые агенты в режиме ожидания.</i>`);
     }
 
     return lines.join('\n');
   }
 
-  public static buildProjectsSummary(): string {
-    const snapshots = snapshotCache.getAllSnapshots();
-    if (snapshots.length === 0) {
-      return `📁 <b>Проекты:</b> Нет зарегистрированных проектов.`;
+  public static async buildProjectsSummary(): Promise<string> {
+    const projects = await projectDiscovery.discoverAllProjects();
+    if (projects.length === 0) {
+      return `📁 <b>Проекты:</b> Не найдено активных проектов в dev-каталогах.`;
     }
 
-    const lines: string[] = [`📁 <b>Сводка по проектам:</b>`, `━━━━━━━━━━━━━━━━━━━━━━`];
-    for (const s of snapshots) {
-      lines.push(
-        `🔸 <b>${escapeHtml(s.project)}</b> (активных: ${s.active_tasks_count}, ожидает: ${s.pending_attention_count})`
-      );
-      if (s.dense_context_summary) {
-        lines.push(`   <i>${escapeHtml(s.dense_context_summary)}</i>`);
+    const lines: string[] = [
+      `📁 <b>Доступные проекты (${projects.length}):</b>`,
+      `<i>Выберите проект ниже для просмотра деталей и постановки задач:</i>`,
+    ];
+
+    return lines.join('\n');
+  }
+
+  public static buildProjectListKeyboard(projects: DiscoveredProject[], page: number = 0, perPage: number = 6): InlineKeyboard {
+    const keyboard = new InlineKeyboard();
+    const start = page * perPage;
+    const currentSlice = projects.slice(start, start + perPage);
+
+    for (let i = 0; i < currentSlice.length; i += 2) {
+      const p1 = currentSlice[i];
+      const p2 = currentSlice[i + 1];
+
+      if (p2) {
+        keyboard.text(`📦 ${p1.name}`, `veronica:proj:${p1.name}`).text(`📦 ${p2.name}`, `veronica:proj:${p2.name}`).row();
+      } else {
+        keyboard.text(`📦 ${p1.name}`, `veronica:proj:${p1.name}`).row();
       }
     }
+
+    // Pagination row
+    const paginationRow: { text: string; data: string }[] = [];
+    if (page > 0) {
+      paginationRow.push({ text: '⬅️ Назад', data: `veronica:proj_page:${page - 1}` });
+    }
+    if (start + perPage < projects.length) {
+      paginationRow.push({ text: 'Вперед ➡️', data: `veronica:proj_page:${page + 1}` });
+    }
+
+    if (paginationRow.length > 0) {
+      const row = new InlineKeyboard();
+      for (const btn of paginationRow) {
+        row.text(btn.text, btn.data);
+      }
+      keyboard.row();
+    }
+
+    return keyboard;
+  }
+
+  public static async buildProjectDetails(projectName: string): Promise<string> {
+    const snapshot = snapshotCache.getSnapshot(projectName) || (await snapshotCache.refreshSnapshot(projectName));
+    const resolvedPath = (await projectDiscovery.resolveProjectPath(projectName)) || 'unknown';
+    const metrics = projectDocManager.getMetrics(projectName);
+
+    const lines: string[] = [
+      `📦 <b>Проект:</b> <code>${escapeHtml(projectName)}</code>`,
+      `📁 <b>Путь:</b> <code>${escapeHtml(resolvedPath)}</code>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `⚡ <b>Активных задач:</b> ${snapshot.active_tasks_count}`,
+      metrics.version ? `🏷 <b>Версия:</b> ${escapeHtml(metrics.version)}` : '',
+      metrics.conversion ? `📈 <b>Конверсия:</b> ${escapeHtml(String(metrics.conversion))}` : '',
+    ].filter(Boolean);
+
+    // Recent completions
+    let recentTasks: any[] = [];
+    try {
+      recentTasks = JSON.parse(snapshot.recent_completions || '[]');
+    } catch {}
+
+    if (recentTasks.length > 0) {
+      lines.push(`\n📋 <b>Последние задачи:</b>`);
+      for (const t of recentTasks.slice(0, 3)) {
+        const icon = t.status === 'completed' ? '✅' : '❌';
+        lines.push(`• ${icon} <i>${escapeHtml(t.skill)}</i>: ${escapeHtml(t.summary || 'выполнено')}`);
+      }
+    }
+
     return lines.join('\n');
   }
 
-  public static buildPeriodReport(period: 'today' | 'yesterday'): string {
+  public static buildProjectActionsKeyboard(projectName: string): InlineKeyboard {
+    return new InlineKeyboard()
+      .text('⚡ Запустить Skill', `veronica:skills:${projectName}`)
+      .text('📝 Поставить задачу', `veronica:prompt:${projectName}`)
+      .row()
+      .text('📄 Паспорт и Доки', `veronica:doc:${projectName}`)
+      .text('📊 История задач', `veronica:history:${projectName}`)
+      .row()
+      .text('🔙 Все проекты', 'veronica:projects_menu');
+  }
+
+  public static buildSkillsKeyboard(projectName: string, skills: { name: string; description?: string }[]): InlineKeyboard {
+    const keyboard = new InlineKeyboard();
+    for (const s of skills.slice(0, 8)) {
+      keyboard.text(`⚡ ${s.name}`, `veronica:run_skill:${projectName}:${s.name}`).row();
+    }
+    keyboard.text('🔙 Назад к проекту', `veronica:proj:${projectName}`);
+    return keyboard;
+  }
+
+  public static buildPeriodReport(period: 'today' | 'yesterday' | 'all'): string {
     const db = getVeronicaDb();
     const now = new Date();
     let startOfDay: number;
@@ -70,10 +174,13 @@ export class MessageBuilder {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       startOfDay = today.getTime();
       endOfDay = Date.now();
-    } else {
+    } else if (period === 'yesterday') {
       const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
       startOfDay = yesterday.getTime();
       endOfDay = startOfDay + 24 * 60 * 60 * 1000;
+    } else {
+      startOfDay = 0;
+      endOfDay = Date.now();
     }
 
     const stmt = db.prepare(`
@@ -84,7 +191,7 @@ export class MessageBuilder {
     `);
     const tasks: any[] = stmt.all(startOfDay, endOfDay) as any[];
 
-    const periodLabel = period === 'today' ? 'сегодня' : 'вчера';
+    const periodLabel = period === 'today' ? 'сегодня' : period === 'yesterday' ? 'вчера' : 'все время';
 
     if (tasks.length === 0) {
       return `📊 <b>Отчет за ${periodLabel}:</b> Задач не выполнялось.`;
@@ -106,10 +213,17 @@ export class MessageBuilder {
       for (const t of pTasks) {
         const icon = t.status === 'completed' ? '✅' : t.status === 'running' ? '⏳' : '❌';
         const summary = escapeHtml(t.summary || 'без описания');
-        lines.push(`  ${icon} <i>${escapeHtml(t.skill)}</i> [${t.status}]: ${summary}`);
+        lines.push(`  ${icon} <i>${escapeHtml(t.skill)}</i>: ${summary}`);
       }
     }
 
     return lines.join('\n');
+  }
+
+  public static buildPeriodSelectKeyboard(): InlineKeyboard {
+    return new InlineKeyboard()
+      .text('Сегодня', 'veronica:report:today')
+      .text('Вчера', 'veronica:report:yesterday')
+      .text('Все время', 'veronica:report:all');
   }
 }
