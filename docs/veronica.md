@@ -99,22 +99,35 @@ flowchart TD
 * Configurable under **Settings -> Local Server -> Compute Node (LAN)**.
 
 ### 6. Antigravity Ecosystem Integration & Model Selector
-* **Antigravity CLI Engine (`agy`)**: Seamless execution of autonomous agents using specialized models and reasoning efforts.
-* **Dynamic Model Catalogue**:
-  - `gemini-3.7-flash-high` / `gemini-3.7-flash-medium`
-  - `gemini-3.6-flash-high` / `gemini-3.6-flash-medium`
-  - `gemini-3.1-pro-high`
-  - `claude-sonnet-4-6`
-  - Local GGUF models (`llama.cpp`)
-* **Specialized Subagents**: Support for `--agent` selection (`critic`, `research`, `layout-qa-accessibility`, `ux-psychology-designer`, `multi-agent-orchestrator`).
-* **Categorized UI Model Selector**: Structured dropdowns in the Web UI dashboard with reasoning effort pills and timeout bounds.
+* **Antigravity CLI Engine (`agy`)**: Seamless execution of autonomous agents and multi-turn chat sessions with automated parameter validation.
+* **Intelligent Effort & Model Resolver (`resolveAntigravityModelAndEffort`)**:
+  - `gemini-3.7-flash` & `gemini-3.6-flash`: Configurable effort (`low` [default], `medium`, `high`).
+  - `gemini-3.1-pro`: Configurable effort (`low` [default], `high`).
+  - `claude-sonnet-4-6` & `claude-opus-4-6-thinking`: Automatic `--effort` stripping (native integrated thinking).
+  - `gpt-oss-120b-medium`: Fixed medium reasoning (no `--effort` flag).
+  - Local GGUF models (`llama.cpp`): Inline reasoning effort (`off`, `low`, `medium`, `high`).
+* **Direct Process Spawning**: Safe binary execution using `getSafeCliPath` and `shell: false` (eliminates Node.js `DEP0190` security warnings).
+* **Specialized Subagents**: Native support for specialized background personas (`critic`, `research`, `layout-qa-accessibility`, `ux-psychology-designer`, `multi-agent-orchestrator`).
 
-### 7. Real-Time SSE & WebSocket Streaming Console
+### 7. Real-Time Operational Journal & Telegram Multi-Turn Dialogue
+* **Operational Journal (SQLite WAL Migration v3)**: Persistent ledger storing all project milestones, task summaries, and operational actions for instant executive auditing.
+* **Daily Digest Shortcodes**: Query real-time summaries via Telegram or Web-IDE shortcuts:
+  - `/today` / `Alt+2` — Executive summary of actions performed today.
+  - `/yesterday` / `Alt+3` — Detailed summary of yesterday's completed work.
+  - `/tasks` / `Alt+4` — Live registry of active and recent tasks.
+* **Multi-Turn Session Memory**: Conversational context is maintained across turns in Telegram and Web-IDE with project auto-binding and instant reset (`/reset`).
+* **Structured 4-Phase Task Prompting (`taskPromptBuilder`)**: Autonomous tasks automatically receive the project passport, coding guidelines, verified CLI protocols, and security guardrails.
+
+### 8. Web-IDE Integration (`VeronicaActionStrip` & `VeronicaTaskModal`)
+* **Unified UI Action Strip**: Sleek Graphite-themed keyboard-navigable shortcut bar (`Alt+1..5`) rendered directly above the command input.
+* **Interactive Task Modal**: Modal for launching background tasks with project picker, skill selector, autonomy level slider (L0–L5), and custom task instructions.
+
+### 9. Real-Time SSE & WebSocket Streaming Console
 * **Server-Sent Events (SSE)**: `GET /api/veronica/tasks/:id/stream` streams live chunk stdout/stderr output directly into the client.
 * **WebSocket Fallback**: Broadcasts `veronica-stream-chunk` and `veronica-task-status` across all connected clients.
 * **Live Terminal Viewer**: Interactive UI console with auto-scroll toggle, clear buffer, and instant copy-to-clipboard.
 
-### 8. Isolated Architecture & Graceful Hot-Reload
+### 10. Isolated Architecture & Graceful Hot-Reload
 * **Modular Zero-Downtime Invariant**: The Veronica engine operates on an isolated SQLite WAL database (`~/.0xagent/veronica/veronica.db`) with an asynchronous write queue.
 * **Graceful Hot-Reload (`POST /api/veronica/reload`)**: Flushes in-flight writes, restarts watchdogs, schedulers, and Telegram polling without killing parent 0xAgent processes or aborting local LLM inference.
 * **Fault Tolerance & Watchdog**: Automatic PID liveness tracking, recursive tree-kill on timeouts, and startup state reconciliation.

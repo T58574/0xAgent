@@ -41,6 +41,14 @@
 - `searxngService.ts` / `webReaderService.ts` — Privacy-first web search and HTML-to-Markdown reader.
 - `ttsService.ts` — Text-to-speech audio synthesis.
 
+### Module Veronica Subsystem (`server/veronica/`)
+- `telegram/` — Telegram bot gateway (`bot.ts`), multi-turn session orchestrator (`veronicaOrchestrator.ts`), and HTML card builder (`messageBuilder.ts`).
+- `core/` — Task registry (`taskRegistry.ts`), project discovery (`projectDiscovery.ts`), project passport documentation manager (`projectDocManager.ts`), 4-phase structured task prompt builder (`taskPromptBuilder.ts`), context engine (`contextEngine.ts`), operational journal (`operationalJournal.ts`), and project mutex lock manager (`projectLockManager.ts`).
+- `cli/` — CLI handler (`cliHandler.ts`) and safe git executor (`gitExecutor.ts`).
+- `adapters/` — Antigravity Headless CLI adapter (`antigravityAdapter.ts`), safe CLI path resolution (`getSafeCliPath`), and model/effort parameter validator (`resolveAntigravityModelAndEffort`).
+- `db/` — SQLite WAL connection (`veronicaDb.ts`), schema migrations (`migrations.ts`), and single-writer queue (`writeQueue.ts`).
+- `watchdog/` — Task recovery watchdog (`recoveryService.ts`) and process supervisor.
+
 ### Frontend (`src/`)
 - `App.tsx` — Root component, split-screen layout, and WebSocket subscriptions.
 - `types.ts` — **Single Source of Truth** for all shared data types across frontend and backend.
@@ -50,7 +58,8 @@
   - `Sidebar.tsx` — Session history, active workspaces, and file explorer.
   - `ChatArea.tsx` — Chat stream, tool cards, reasoning viewer (`<think>`), and live plan progress HUD.
   - `CodeEditor.tsx` — Multi-tab Monaco-style code viewer and editor.
-  - `chat/` — Chat components (`ReasoningViewer.tsx`, `FloatingCommandBar.tsx`, `PlanProgressStrip.tsx`).
+  - `chat/` — Chat components (`ReasoningViewer.tsx`, `FloatingCommandBar.tsx`, `PlanProgressStrip.tsx`, `VeronicaActionStrip.tsx`).
+  - `veronica/` — Veronica Web-IDE integration (`VeronicaTaskModal.tsx`, `VeronicaPage.tsx`).
   - `settings/` — Settings tabs (General, LLM Server, Personas, Themes, Security, Customizations).
   - `settings/personas/` — Modular persona & memory subcomponents (`MemoryManagerSection.tsx`, `PersonaEditorSection.tsx`, `TokenTelemetrySection.tsx`).
   - `settings/common/` — Settings molecules (`SettingsHeader.tsx`, `SettingsSection.tsx`, `SettingToggleCard.tsx`, `SettingItemRow.tsx`, `SettingStatCard.tsx`).
@@ -65,6 +74,7 @@
 
 ### Data Directory (`~/.0xagent/`)
 - `memory.db` — SQLite canonical database (WAL mode: canonical memories, episodes, relationships, audit log, FTS5).
+- `veronica/` — Veronica SQLite audit journal (`veronica.db`), backups & task history.
 - `config.json` — Persistent configuration.
 - `bin/` — Global CLI executables (`0xagent.cmd`, `0xagent.ps1`, `0xagent`).
 - `app/` — Codebase installation directory.
@@ -107,8 +117,11 @@
     - Type definitions in `src/types.ts`
     - System prompt instructions in `server/agent/promptBuilder.ts`
     - Corresponding unit test in `tests/`
-12. **Mandatory Automated Test Pass**: Before concluding any task or committing changes, run `npm test`. All 100+ tests must pass with 0 failures.
+12. **Mandatory Automated Test Pass**: Before concluding any task or committing changes, run `npm test`. All 190+ tests must pass with 0 failures.
 13. **I18n Strict Parity**: When adding or modifying UI labels, placeholders, or settings keys, always synchronously update BOTH `src/i18n/translations/en.ts` AND `src/i18n/translations/ru.ts`. Never hardcode raw untranslated text strings directly into JSX templates.
+14. **Safe Process Spawning & Model Effort Resolution**:
+    - Never execute CLI processes with `{ shell: true }` when passing arguments (eliminates `DEP0190`). Always resolve full paths via `getSafeCliPath` and spawn with `{ shell: false }`.
+    - Always pass Antigravity models through `resolveAntigravityModelAndEffort`. Claude and GPT-OSS models must never receive `--effort` flags, while Gemini models default to `low` with optional `medium` and `high` levels.
 
 ---
 

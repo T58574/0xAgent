@@ -86,12 +86,15 @@ Unlike conventional wrappers requiring external servers (like Ollama or vLLM), *
 *See full guide: [docs/veronica.md](docs/veronica.md)*
 - **Deterministic SQLite Audit Journal**: All background tasks, heartbeats, git commits, and project states are stored in an isolated `veronica.db` (WAL mode) with an In-Memory Single-Writer FIFO queue.
 - **Telegram Bot Gateway (`grammy`)**: Control tasks, query project progress, and receive instant proactive notifications on completion, crashes, or timeouts (`/status`, `/projects`, `/today`, `/yesterday`, `/run`, `/kill`).
-- **Token-Dense Context Engine**: Generates ultra-compact project summaries (~150-250 tokens) via `0xagent veronica context <project>` so background agents get up to speed instantly without consuming context windows.
+- **Unified Web-IDE Action Strip & Task Modal**: Launch background tasks with custom prompts, autonomy levels (L0–L5), and project binding directly from the Web-IDE interface.
+- **Token-Dense Context Engine & 4-Phase Prompting**: Generates ultra-compact project summaries (~150-250 tokens) via `0xagent veronica context <project>` and injects project passports into headless tasks.
 - **Watchdog & Process Supervisor**: Automatic PID verification, inactivity timeout tracking (300s), Tree-Kill of hanging subprocesses, and crash state self-healing on boot.
 - **Single-Agent Project Mutex**: Exclusive project locks preventing race conditions and git corruption.
 - **Autonomy Levels (L0–L5)**: Hardware-enforced privilege boundaries restricting automated git commits to L3+.
 
-### 🧠 Distributed LAN Compute Node & Local Llama Engine
+### 🧠 Dual Inference & Unified Model Selector
+- **Unified Multi-Engine Model Selector**: Seamlessly switch between Antigravity Cloud models (Gemini 3.7/3.6/3.1 Pro, Claude Sonnet 4.6 & Opus Thinking, GPT-OSS 120B) and Local GGUF weights with inline reasoning effort toggles (`off`, `low`, `medium`, `high`).
+- **24-Hour Persistent Model Caching**: High-performance `localStorage` cache with auto-invalidation and 1-click manual refresh.
 - **24/7 Low-Power Laptop Mode**: Run 0xAgent and Veronica on a low-spec laptop 24/7 (~150 MB RAM) while offloading heavy LLM inference to a powerful GPU workstation over LAN (`0xagent node probe`).
 - **Native `llama-server` Supervisor**: 1-click binary downloader and automatic GPU layer offloading (`-ngl`), Flash Attention (`-fa on`), quantized KV cache (`-ctk q8_0 -ctv q8_0`), and automated VRAM reclamation.
 - **Local GGUF Model Hub**: Direct support for Qwen 2.5 Coder, Gemma 4, DeepSeek, and Llama 3.3.
