@@ -56,18 +56,24 @@ export class MessageBuilder {
     return modelNames;
   }
 
+  public static isAntigravityModel(model?: string | null): boolean {
+    if (!model) return true;
+    const m = model.toLowerCase();
+    if (m.endsWith('.gguf') || m.startsWith('local:')) return false;
+    return true;
+  }
+
   public static buildModelSelectMessage(currentModel: string): string {
-    const isAgy = currentModel === 'agy' || currentModel === 'antigravity';
-    const isLocal = currentModel.startsWith('local:') || currentModel.endsWith('.gguf');
+    const isAgy = MessageBuilder.isAntigravityModel(currentModel);
     const cleanModelName = currentModel.replace(/^local:/, '');
 
     const lines: string[] = [
       `🧠 <b>Выбор активной модели и движка для Вероники:</b>`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
       `🔹 <b>Текущая модель:</b> <code>${escapeHtml(cleanModelName)}</code>`,
-      `🔹 <b>Движок:</b> ${isAgy ? '⚡ Antigravity CLI Headless (agy)' : isLocal ? '🖥️ Local llama-server (GGUF)' : '🖥️ Local LLM Engine'}`,
+      `🔹 <b>Движок:</b> ${isAgy ? '⚡ Antigravity CLI Headless (agy)' : '🖥️ Local llama-server (GGUF)'}`,
       ``,
-      `<i>Выберите модель или движок из списка ниже для переключения:</i>`,
+      `<i>Выберите модель из списка ниже для переключения:</i>`,
     ];
     return lines.join('\n');
   }
@@ -76,26 +82,28 @@ export class MessageBuilder {
     const keyboard = new InlineKeyboard();
     const cleanCurrent = currentModel.replace(/^local:/, '');
 
-    // Local Models
+    // 1. Antigravity Official CLI Models
+    const agyModels = [
+      { slug: 'gemini-3.7-flash-high', label: '⚡ Gemini 3.7 Flash (High)' },
+      { slug: 'gemini-3.7-flash-medium', label: '⚡ Gemini 3.7 Flash (Med)' },
+      { slug: 'gemini-3.6-flash-high', label: '⚡ Gemini 3.6 Flash (High)' },
+      { slug: 'gemini-3.5-flash-medium', label: '⚡ Gemini 3.5 Flash' },
+      { slug: 'gemini-3.1-pro-high', label: '⚡ Gemini 3.1 Pro (High)' },
+      { slug: 'claude-sonnet-4-6', label: '⚡ Claude Sonnet 4.6 (Thinking)' },
+      { slug: 'inherit', label: '⚡ Auto (Inherit Antigravity)' },
+    ];
+
+    for (const am of agyModels) {
+      const isSelected = cleanCurrent === am.slug || (am.slug === 'inherit' && (cleanCurrent === 'agy' || cleanCurrent === 'antigravity'));
+      const label = `${isSelected ? '🔘' : '⚪'} ${am.label}`;
+      keyboard.text(label, `veronica:set_model:${am.slug}`).row();
+    }
+
+    // 2. Local llama-server GGUF Models (if any available)
     for (const m of models) {
       const isSelected = cleanCurrent === m;
       const label = `${isSelected ? '🔘' : '⚪'} 🖥️ ${m.length > 25 ? m.substring(0, 22) + '...' : m}`;
       keyboard.text(label, `veronica:set_model:${m}`).row();
-    }
-
-    // Antigravity Cloud Slugs
-    const agyModels = [
-      { slug: 'gemini-3.7-flash-high', label: '⚡ Gemini 3.7 Flash (High)' },
-      { slug: 'gemini-3.6-flash-high', label: '⚡ Gemini 3.6 Flash (High)' },
-      { slug: 'gemini-3.5-flash-medium', label: '⚡ Gemini 3.5 Flash' },
-      { slug: 'claude-sonnet-4-6', label: '⚡ Claude Sonnet 4.6' },
-      { slug: 'agy', label: '⚡ Antigravity (Default/Auto)' },
-    ];
-
-    for (const am of agyModels) {
-      const isSelected = cleanCurrent === am.slug || (am.slug === 'agy' && (cleanCurrent === 'agy' || cleanCurrent === 'antigravity'));
-      const label = `${isSelected ? '🔘' : '⚪'} ${am.label}`;
-      keyboard.text(label, `veronica:set_model:${am.slug}`).row();
     }
 
     return keyboard;

@@ -247,8 +247,8 @@ CAPABILITIES:
 
   /**
    * 2 Strict Execution Engines for Veronica:
-   * 1. Local LLM (llama-server.exe / local GGUF model via 127.0.0.1:11434)
-   * 2. Antigravity Headless CLI (agy -p)
+   * 1. Antigravity Headless CLI (agy -p --model <model> --effort <effort>)
+   * 2. Local LLM (llama-server.exe / local GGUF model via 127.0.0.1:11434)
    */
   private async callLlm(
     config: any,
@@ -256,10 +256,75 @@ CAPABILITIES:
     systemPrompt: string,
     userText: string
   ): Promise<string> {
-    const timeoutMs = 4000;
-    const errors: string[] = [];
+    const activeModel = config.veronica?.model || config.model_name || 'gemini-3.7-flash-high';
+    const isAgy = MessageBuilder.isAntigravityModel(activeModel);
 
-    // Backend 1: Local llama-server
+    // Engine 1: Antigravity Headless CLI
+    if (isAgy) {
+      try {
+        const cliPath = config.veronica?.antigravity_cli_path || 'agy';
+        const promptPayload = `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
+        const args = ['--dangerously-skip-permissions', '--output-format', 'text'];
+
+        if (activeModel && activeModel !== 'inherit' && activeModel !== 'agy' && activeModel !== 'antigravity') {
+          args.push('--model', activeModel);
+        }
+        const effort = config.veronica?.effort;
+        if (effort && effort !== 'auto') {
+          args.push('--effort', effort);
+        }
+        const agent = config.veronica?.agent;
+        if (agent && agent !== 'default' && agent !== 'none') {
+          args.push('--agent', agent);
+        }
+
+        const agyOutput = await new Promise<string>((resolve, reject) => {
+          const child = spawn(cliPath, args, {
+            shell: true,
+            stdio: ['pipe', 'pipe', 'pipe'],
+          });
+
+          let out = '';
+          let errOut = '';
+
+          // Stream prompt over stdin to avoid cmd.exe quoting and newline issues
+          child.stdin?.write(promptPayload);
+          child.stdin?.end();
+
+          child.stdout?.on('data', (d) => (out += d.toString()));
+          child.stderr?.on('data', (d) => (errOut += d.toString()));
+
+          const timer = setTimeout(() => {
+            try {
+              child.kill();
+            } catch {}
+            reject(new Error('Antigravity CLI timed out after 30s'));
+          }, 30000);
+
+          child.on('close', (code) => {
+            clearTimeout(timer);
+            if (code === 0 && out.trim()) {
+              resolve(out.trim());
+            } else {
+              reject(new Error(`agy exited with code ${code}: ${errOut || out || 'no output'}`));
+            }
+          });
+
+          child.on('error', (err) => {
+            clearTimeout(timer);
+            reject(err);
+          });
+        });
+
+        if (agyOutput) return agyOutput;
+      } catch (agyErr: any) {
+        console.warn(`[Veronica Orchestrator] [Antigravity CLI Failed]:`, agyErr?.message || agyErr);
+        throw agyErr;
+      }
+    }
+
+    // Engine 2: Local llama-server
+    const timeoutMs = 6000;
     const localHost = config.local_server?.host || '127.0.0.1';
     const localPort = config.local_server?.port || 11434;
 
@@ -268,7 +333,7 @@ CAPABILITIES:
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: config.model_name || 'local',
+          model: activeModel.replace(/^local:/, '') || 'local',
           messages,
           temperature: 0.4,
           max_tokens: 2048,
@@ -280,62 +345,13 @@ CAPABILITIES:
         const localJson: any = await localRes.json();
         const text = localJson.choices?.[0]?.message?.content;
         if (text) return text;
-      } else {
-        errors.push(`Local LLM HTTP ${localRes.status}`);
       }
+      throw new Error(`Local LLM HTTP ${localRes.status}`);
     } catch (localErr: any) {
       const detail = localErr?.cause?.code || localErr?.cause?.message || localErr?.message;
-      errors.push(`Local LLM (${localHost}:${localPort}): ${detail}`);
       console.warn(`[Veronica Orchestrator] [Local LLM Offline]:`, detail);
+      throw localErr;
     }
-
-    // Backend 3: Antigravity Headless CLI (agy)
-    try {
-      const cliPath = config.veronica?.antigravity_cli_path || 'agy';
-      const promptPayload = `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
-
-      const agyOutput = await new Promise<string>((resolve, reject) => {
-        const child = spawn(cliPath, ['-p', promptPayload, '--dangerously-skip-permissions', '--output-format', 'text'], {
-          shell: true,
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
-
-        let out = '';
-        let errOut = '';
-        child.stdout?.on('data', (d) => (out += d.toString()));
-        child.stderr?.on('data', (d) => (errOut += d.toString()));
-
-        const timer = setTimeout(() => {
-          try {
-            child.kill();
-          } catch {}
-          reject(new Error('Antigravity CLI timed out after 12s'));
-        }, 12000);
-
-        child.on('close', (code) => {
-          clearTimeout(timer);
-          if (code === 0 && out.trim()) {
-            resolve(out.trim());
-          } else {
-            reject(new Error(`agy exited with code ${code}: ${errOut || 'no output'}`));
-          }
-        });
-
-        child.on('error', (err) => {
-          clearTimeout(timer);
-          reject(err);
-        });
-      });
-
-      if (agyOutput) {
-        return agyOutput;
-      }
-    } catch (agyErr: any) {
-      errors.push(`Antigravity CLI: ${agyErr?.message || agyErr}`);
-      console.warn(`[Veronica Orchestrator] [Antigravity CLI Fallback Error]:`, agyErr?.message || agyErr);
-    }
-
-    throw new Error(errors.join(' | '));
   }
 
   private escapeHtml(text: string): string {

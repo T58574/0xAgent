@@ -115,7 +115,6 @@ export class AntigravityAdapter implements RuntimeAdapter {
     const outputFormat = options.output_format || 'text';
 
     const args = [
-      '--print', prompt,
       '--dangerously-skip-permissions',
       '--output-format', outputFormat,
       '--print-timeout', selectedTimeout,
@@ -150,12 +149,18 @@ export class AntigravityAdapter implements RuntimeAdapter {
         env,
         shell: true,
         detached: process.platform !== 'win32',
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
 
       if (child.pid) {
         this.activeProcesses.set(task.id, child);
         await taskRegistry.updateTaskStatus(task.id, 'running', { pid: child.pid });
+
+        // Stream prompt to stdin to avoid Windows CLI quoting and length issues
+        if (prompt) {
+          child.stdin?.write(prompt);
+          child.stdin?.end();
+        }
 
         let stdoutAccumulator = '';
         let lastOutputSnippet = '';

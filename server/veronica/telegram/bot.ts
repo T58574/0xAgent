@@ -355,13 +355,26 @@ export function initTelegramBot(): Bot | null {
     bot.callbackQuery(/^veronica:set_model:(.+)$/, async (ctx) => {
       const chosen = ctx.match[1];
       const config = loadConfig();
-      config.model_name = chosen === 'agy' ? 'agy' : (chosen.startsWith('local:') ? chosen : `local:${chosen}`);
-      if (chosen !== 'agy' && config.local_server) {
-        const localPath = path.join(process.cwd(), 'models', chosen);
-        if (fs.existsSync(localPath)) {
-          config.local_server.model_path = localPath;
+      const isLocalGguf = chosen.endsWith('.gguf') || chosen.startsWith('local:');
+
+      if (isLocalGguf) {
+        const cleanName = chosen.replace(/^local:/, '');
+        config.model_name = `local:${cleanName}`;
+        if (config.local_server) {
+          const localPath = path.join(process.cwd(), 'models', cleanName);
+          if (fs.existsSync(localPath)) {
+            config.local_server.model_path = localPath;
+          }
         }
+        if (!config.veronica) config.veronica = {};
+        config.veronica.model = `local:${cleanName}`;
+      } else {
+        // Antigravity official model slug (gemini-3.7-flash-high, claude-sonnet-4-6, etc.)
+        config.model_name = chosen;
+        if (!config.veronica) config.veronica = {};
+        config.veronica.model = chosen;
       }
+
       saveConfig(config);
       await ctx.answerCallbackQuery({ text: `Выбрана модель: ${chosen}` });
 
