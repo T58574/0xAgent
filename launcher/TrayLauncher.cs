@@ -20,8 +20,10 @@ namespace OxAgent.Launcher
         private ToolStripMenuItem _statusMenuItem;
         private ToolStripMenuItem _veronicaMenuItem;
         private ToolStripMenuItem _purgeVramMenuItem;
+        private ToolStripMenuItem _updateMenuItem;
         private ToolStripMenuItem _logsMenuItem;
         private ToolStripMenuItem _restartMenuItem;
+
         private ToolStripMenuItem _exitMenuItem;
         private Process _devProcess;
         private System.Windows.Forms.Timer _healthTimer;
@@ -254,7 +256,14 @@ namespace OxAgent.Launcher
                         ? "⚡  Purge GPU VRAM (llama-server)"
                         : "⚡  Очистить GPU VRAM (llama-server)";
                 }
+                if (_updateMenuItem != null)
+                {
+                    _updateMenuItem.Text = isEn
+                        ? "🔄  Check for Updates..."
+                        : "🔄  Проверить обновления...";
+                }
                 if (_logsMenuItem != null)
+
                 {
                     _logsMenuItem.Text = isEn
                         ? "📜  Show Logs"
@@ -384,9 +393,14 @@ namespace OxAgent.Launcher
             _purgeVramMenuItem = new ToolStripMenuItem(isEn ? "⚡  Purge GPU VRAM (llama-server)" : "⚡  Очистить GPU VRAM (llama-server)", null, (s, e) => PurgeGpuVram());
             _contextMenu.Items.Add(_purgeVramMenuItem);
 
+            // 3.1 Check for Updates
+            _updateMenuItem = new ToolStripMenuItem(isEn ? "🔄  Check for Updates..." : "🔄  Проверить обновления...", null, (s, e) => CheckForUpdates());
+            _contextMenu.Items.Add(_updateMenuItem);
+
             // 4. Show Logs
             _logsMenuItem = new ToolStripMenuItem(isEn ? "📜  Show Logs" : "📜  Показать логи", null, (s, e) => OpenLogs());
             _contextMenu.Items.Add(_logsMenuItem);
+
 
             _contextMenu.Items.Add(new ToolStripSeparator());
 
@@ -643,6 +657,28 @@ namespace OxAgent.Launcher
                 MessageBox.Show("Ошибка открытия логов: " + ex.Message, "0xAgent Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        private void CheckForUpdates()
+        {
+            try
+            {
+                Log("[0xAgent Launcher] Checking updates via CLI...");
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c node bin\\0xagent.js update",
+                    WorkingDirectory = _projectDir,
+                    CreateNoWindow = false,
+                    UseShellExecute = true
+                };
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Не удалось запустить проверку обновлений: " + ex.Message, "0xAgent Updates", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
 
         private void RestartServices()
         {

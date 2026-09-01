@@ -202,21 +202,48 @@ async function cmdUpdate() {
 
   try {
     process.chdir(PROJECT_ROOT);
+
+    // Read current version
+    let currentVersion = '0.1.0';
+    try {
+      const pkg = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf8'));
+      if (pkg.version) currentVersion = pkg.version;
+    } catch {}
+
+    console.log(`${c.gray}    Current version: v${currentVersion}${c.reset}`);
+
+    // Pre-update memory backup
+    const dbPath = path.join(CONFIG_DIR, 'memory.db');
+    if (fs.existsSync(dbPath)) {
+      const backupPath = path.join(CONFIG_DIR, `memory.db.bak_${Date.now()}`);
+      fs.copyFileSync(dbPath, backupPath);
+      console.log(`${c.gray}    Memory database backed up to: ${backupPath}${c.reset}`);
+    }
+
+    // Auto-stash local changes
+    try {
+      execSync('git stash save "Auto-stash before 0xagent update"', { stdio: 'ignore' });
+    } catch {}
+
     execSync('git fetch origin main', { stdio: 'inherit' });
 
     const localHash = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
     const remoteHash = execSync('git rev-parse origin/main', { encoding: 'utf8' }).trim();
 
     if (localHash === remoteHash) {
-      console.log(`${c.green}[OK] 0xAgent is already up-to-date (${localHash.substring(0, 7)}).${c.reset}\n`);
+      console.log(`${c.green}[OK] 0xAgent is already up-to-date (v${currentVersion} - ${localHash.substring(0, 7)}).${c.reset}\n`);
       return;
     }
 
-    console.log(`${c.cyan}[+] Updates available! Pulling latest changes...${c.reset}`);
-    execSync('git pull --rebase origin main', { stdio: 'inherit' });
+    console.log(`${c.cyan}[+] Updates available! Pulling latest release...${c.reset}`);
+    try {
+      execSync('git pull --rebase origin main', { stdio: 'inherit' });
+    } catch {
+      execSync('git pull origin main', { stdio: 'inherit' });
+    }
 
-    console.log(`${c.yellow}[+] Updating dependencies (npm install)...${c.reset}`);
-    execSync('npm install', { stdio: 'inherit' });
+    console.log(`${c.yellow}[+] Installing dependencies (npm install)...${c.reset}`);
+    execSync('npm install --no-audit --no-fund', { stdio: 'inherit' });
 
     console.log(`${c.yellow}[+] Rebuilding frontend client...${c.reset}`);
     execSync('npm run build', { stdio: 'inherit' });
@@ -229,11 +256,18 @@ async function cmdUpdate() {
       }
     }
 
-    console.log(`\n${c.green}${c.bold}[SUCCESS] 0xAgent successfully updated to latest version!${c.reset}\n`);
+    let newVersion = currentVersion;
+    try {
+      const newPkg = JSON.parse(fs.readFileSync(path.join(PROJECT_ROOT, 'package.json'), 'utf8'));
+      if (newPkg.version) newVersion = newPkg.version;
+    } catch {}
+
+    console.log(`\n${c.green}${c.bold}[SUCCESS] 0xAgent successfully updated to v${newVersion}!${c.reset}\n`);
   } catch (err) {
     console.error(`\n${c.red}[ERR] Update failed:${c.reset}`, err.message);
   }
 }
+
 
 async function cmdConfig() {
   banner();

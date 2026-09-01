@@ -20,7 +20,11 @@ import {
   WebSearchProvider,
   ApprovalResult,
   SystemPromptItem,
+  SystemVersionInfo,
+  UpdateCheckResult,
+  UpdateApplyResult,
 } from '../types';
+
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
 
 export { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen };
@@ -397,3 +401,9 @@ export const verify_proposal = (id: string, workspaceDir?: string) =>
   post<{ success: boolean; proposal: StagedProposal }>(`/staging/proposals/${encodeURIComponent(id)}/verify`, { workspaceDir });
 export const apply_proposal = (id: string, workspaceDir?: string) =>
   post<{ success: boolean; appliedFiles: string[]; message: string }>(`/staging/proposals/${encodeURIComponent(id)}/apply`, { workspaceDir });
+
+// System Version & Updates API
+export const get_system_version = () => get<SystemVersionInfo>('/system/version');
+export const check_for_updates = (force = false) => get<UpdateCheckResult>(`/system/check-update${force ? '?force=true' : ''}`);
+export const apply_system_update = () => post<UpdateApplyResult>('/system/apply-update');
+

@@ -17,6 +17,8 @@ import { hardwareRouter } from './routes/hardwareRoutes';
 import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes';
 import { createAgentRouter } from './routes/agentRoutes';
 import { contextRouter } from './routes/contextRoutes';
+import { systemRouter } from './routes/systemRoutes';
+
 
 import path from 'node:path';
 import fs from 'node:fs';
@@ -160,6 +162,8 @@ app.use('/api', contextRouter);
 app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/veronica', veronicaRouter);
+app.use('/api', systemRouter);
+
 
 // Serve static production build (dist/) if present (PWA shell, assets, icons)
 const DIST_DIR = path.resolve(process.cwd(), 'dist');

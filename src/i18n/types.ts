@@ -32,7 +32,11 @@ export interface Translations {
     logsCopied: string;
     exportSessionJson: string;
     exportSessionText: string;
+    version: string;
+    updateAvailable: string;
+    checkUpdates: string;
   };
+
 
   // Sidebar
   sidebar: {
@@ -872,7 +876,33 @@ export interface Translations {
     fileSaved: string;
   };
 
+  // System Version & Updates
+  systemUpdate: {
+    modalTitle: string;
+    updateAvailableTitle: string;
+    upToDateTitle: string;
+    currentVersion: string;
+    latestVersion: string;
+    releaseNotes: string;
+    updateNow: string;
+    updating: string;
+    remindLater: string;
+    checkAgain: string;
+    updateSuccess: string;
+    updateFailed: string;
+    backupNotice: string;
+    reloadApp: string;
+    restartPrompt: string;
+    stepBackup: string;
+    stepStash: string;
+    stepPull: string;
+    stepInstall: string;
+    stepBuild: string;
+    stepDone: string;
+  };
+
   // Common
+
   common: {
     ok: string;
     cancel: string;

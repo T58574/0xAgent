@@ -33,7 +33,11 @@ export const ru: Translations = {
     logsCopied: 'Лог скопирован',
     exportSessionJson: 'Экспорт в JSON',
     exportSessionText: 'Экспорт в Markdown/Текст',
+    version: 'Версия',
+    updateAvailable: 'Доступно обновление',
+    checkUpdates: 'Проверить обновления',
   },
+
 
   sidebar: {
     sessions: 'История диалогов',
@@ -862,7 +866,32 @@ export const ru: Translations = {
     fileSaved: 'Файл сохранен',
   },
 
+  systemUpdate: {
+    modalTitle: 'Обновление платформы 0xAgent',
+    updateAvailableTitle: 'Доступна новая версия',
+    upToDateTitle: 'У вас установлена актуальная версия',
+    currentVersion: 'Текущая версия',
+    latestVersion: 'Новая версия',
+    releaseNotes: 'Список изменений и нововведений',
+    updateNow: 'Обновить сейчас',
+    updating: 'Обновление 0xAgent...',
+    remindLater: 'Напомнить позже',
+    checkAgain: 'Проверить снова',
+    updateSuccess: '0xAgent успешно обновлен до актуальной версии! Перезапустите приложение для применения всех изменений.',
+    updateFailed: 'Во время процесса обновления произошла ошибка.',
+    backupNotice: 'Перед применением обновления база данных памяти будет автоматически сохранена в резервную копию.',
+    reloadApp: 'Перезагрузить интерфейс',
+    restartPrompt: 'Перезапустите бэкенд или трей-лаунчер для перехода на новую версию.',
+    stepBackup: 'Резервное копирование базы памяти...',
+    stepStash: 'Сохранение локальных изменений...',
+    stepPull: 'Загрузка обновлений с GitHub...',
+    stepInstall: 'Установка зависимостей...',
+    stepBuild: 'Компиляция клиентской части...',
+    stepDone: 'Обновление завершено!',
+  },
+
   common: {
+
     ok: 'ОК',
     cancel: 'Отмена',
     save: 'Сохранить',

@@ -948,3 +948,42 @@ export interface StagedProposal {
     durationMs?: number;
   };
 }
+
+export interface SystemVersionInfo {
+  version: string;
+  gitCommit?: string;
+  gitBranch?: string;
+  nodeVersion: string;
+  platform: string;
+  arch: string;
+}
+
+export interface UpdateCheckResult {
+  currentVersion: string;
+  latestVersion: string;
+  hasUpdate: boolean;
+  releaseName?: string;
+  releaseNotes?: string;
+  releaseUrl?: string;
+  publishedAt?: string;
+  channel?: 'stable' | 'beta';
+  commitsBehind?: number;
+  lastChecked: number;
+}
+
+export interface UpdateApplyProgress {
+  stage: 'idle' | 'backup' | 'stash' | 'pull' | 'install' | 'build' | 'done' | 'error';
+  message: string;
+  progressPercent: number;
+  error?: string;
+}
+
+export interface UpdateApplyResult {
+  success: boolean;
+  message: string;
+  previousVersion: string;
+  newVersion: string;
+  backupPath?: string;
+  restarted?: boolean;
+}
+

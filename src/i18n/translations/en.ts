@@ -33,7 +33,11 @@ export const en: Translations = {
     logsCopied: 'Logs Copied',
     exportSessionJson: 'Export as JSON',
     exportSessionText: 'Export as Markdown/Text',
+    version: 'Version',
+    updateAvailable: 'Update Available',
+    checkUpdates: 'Check for Updates',
   },
+
 
   sidebar: {
     sessions: 'Chat Sessions',
@@ -862,7 +866,32 @@ export const en: Translations = {
     fileSaved: 'File saved',
   },
 
+  systemUpdate: {
+    modalTitle: '0xAgent Platform Updates',
+    updateAvailableTitle: 'New Version Available',
+    upToDateTitle: 'You are on the Latest Version',
+    currentVersion: 'Current Version',
+    latestVersion: 'Latest Version',
+    releaseNotes: 'Release Notes & Changelog',
+    updateNow: 'Update Now',
+    updating: 'Updating 0xAgent...',
+    remindLater: 'Remind Me Later',
+    checkAgain: 'Check Again',
+    updateSuccess: '0xAgent successfully updated to latest version! Please restart to apply all changes.',
+    updateFailed: 'Update process encountered an error.',
+    backupNotice: 'Your memory database will be backed up automatically before applying updates.',
+    reloadApp: 'Reload Interface',
+    restartPrompt: 'Restart the backend or tray launcher to run on the new version.',
+    stepBackup: 'Backing up memory database...',
+    stepStash: 'Stashing local changes...',
+    stepPull: 'Pulling updates from GitHub...',
+    stepInstall: 'Installing dependencies...',
+    stepBuild: 'Compiling production client...',
+    stepDone: 'Update complete!',
+  },
+
   common: {
+
     ok: 'OK',
     cancel: 'Cancel',
     save: 'Save',
