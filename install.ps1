@@ -103,7 +103,7 @@ try {
         if (-not (Test-Path (Join-Path $oxAgentDir "models"))) { New-Item -ItemType Directory -Path (Join-Path $oxAgentDir "models") -Force | Out-Null }
         if (-not (Test-Path (Join-Path $oxAgentDir "llama"))) { New-Item -ItemType Directory -Path (Join-Path $oxAgentDir "llama") -Force | Out-Null }
     } catch {
-        Safe-Exit -Message "Failed to create installation directories in $oxAgentDir: $_" -Category "FILESYSTEM ERROR" -Recommendation "Check folder write permissions or antivirus locks."
+        Safe-Exit -Message "Failed to create installation directories in $($oxAgentDir): $_" -Category "FILESYSTEM ERROR" -Recommendation "Check folder write permissions or antivirus locks."
     }
 
     # 2. Check Windows Long Paths
