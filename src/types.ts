@@ -249,10 +249,12 @@ export interface JarvisSparkProposal {
 export interface CloudModelItem {
   id: string;
   name: string;
-  badge: 'Medium' | 'Fast' | 'Ultra Fast' | string;
-  speed: string;
+  badge?: 'Medium' | 'Fast' | 'Ultra Fast' | string;
+  speed?: string;
   provider: string;
   isAudio?: boolean;
+  supportedEfforts?: ('low' | 'medium' | 'high')[];
+  defaultEffort?: 'low' | 'medium' | 'high';
 }
 
 export interface LocalModelItem {

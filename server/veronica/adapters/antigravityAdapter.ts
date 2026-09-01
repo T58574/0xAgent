@@ -1,3 +1,6 @@
+import path from 'node:path';
+import os from 'node:os';
+import fs from 'node:fs';
 import { spawn, ChildProcess } from 'node:child_process';
 import { RuntimeAdapter, SpawnTaskOptions } from './runtimeAdapter';
 import { AgentTask, TaskStatus } from '../types';
@@ -14,6 +17,78 @@ export interface AntigravityModelInfo {
   name: string;
   description?: string;
   effort?: string;
+  supportedEfforts?: ('low' | 'medium' | 'high')[];
+  defaultEffort?: 'low' | 'medium' | 'high';
+}
+
+export function getSafeCliPath(customPath?: string | null): string {
+  if (customPath && customPath !== 'agy') return customPath;
+  if (process.platform === 'win32') {
+    const localAgy = path.join(os.homedir(), 'AppData', 'Local', 'agy', 'bin', 'agy.exe');
+    if (fs.existsSync(localAgy)) return localAgy;
+  }
+  return 'agy';
+}
+
+export function resolveAntigravityModelAndEffort(rawModel?: string | null, rawEffort?: string | null): {
+  model?: string;
+  effort?: string;
+} {
+  if (!rawModel || rawModel === 'inherit' || rawModel === 'auto' || rawModel === 'agy' || rawModel === 'antigravity') {
+    return { model: undefined, effort: undefined };
+  }
+
+  const clean = rawModel.toLowerCase().trim().replace(/^antigravity:/, '');
+
+  // 1. Claude and GPT-OSS models NEVER support --effort flag
+  if (
+    clean.startsWith('claude-') ||
+    clean.includes('claude') ||
+    clean.startsWith('gpt-oss') ||
+    clean.includes('gpt-oss')
+  ) {
+    if (clean.includes('opus')) {
+      return { model: 'claude-opus-4-6-thinking', effort: undefined };
+    }
+    if (clean.includes('sonnet')) {
+      return { model: 'claude-sonnet-4-6', effort: undefined };
+    }
+    if (clean.includes('gpt-oss')) {
+      return { model: 'gpt-oss-120b-medium', effort: undefined };
+    }
+    return { model: clean, effort: undefined };
+  }
+
+  // 2. Direct slug format with effort encoded
+  if (['gemini-3.7-flash-high', 'gemini-3.7-flash-medium', 'gemini-3.7-flash-low'].includes(clean)) {
+    return { model: clean, effort: undefined };
+  }
+  if (['gemini-3.6-flash-high', 'gemini-3.6-flash-medium', 'gemini-3.6-flash-low'].includes(clean)) {
+    return { model: clean, effort: undefined };
+  }
+  if (['gemini-3.1-pro-high', 'gemini-3.1-pro-low'].includes(clean)) {
+    return { model: clean, effort: undefined };
+  }
+
+  // 3. Base model with effort parameter
+  let effort = rawEffort && rawEffort !== 'auto' && rawEffort !== 'off' ? rawEffort.toLowerCase() : 'low';
+
+  if (clean.includes('3.7') && clean.includes('flash')) {
+    if (!['low', 'medium', 'high'].includes(effort)) effort = 'low';
+    return { model: `gemini-3.7-flash-${effort}`, effort: undefined };
+  }
+
+  if (clean.includes('3.6') && clean.includes('flash')) {
+    if (!['low', 'medium', 'high'].includes(effort)) effort = 'low';
+    return { model: `gemini-3.6-flash-${effort}`, effort: undefined };
+  }
+
+  if (clean.includes('3.1') && clean.includes('pro')) {
+    if (effort === 'medium' || !['low', 'high'].includes(effort)) effort = 'low';
+    return { model: `gemini-3.1-pro-${effort}`, effort: undefined };
+  }
+
+  return { model: clean, effort: undefined };
 }
 
 export interface AntigravityAgentInfo {
@@ -39,7 +114,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
   private activeProcesses: Map<string, ChildProcess> = new Map();
   private taskStreamBuffers: Map<string, VeronicaStreamEvent[]> = new Map();
   private streamListeners: Set<VeronicaStreamListener> = new Set();
-  private broadcaster: ((event: string, payload: any) => void) | null = null;
+  private externalBroadcaster: ((event: string, payload: any) => void) | null = null;
 
   private constructor() {}
 
@@ -50,8 +125,8 @@ export class AntigravityAdapter implements RuntimeAdapter {
     return AntigravityAdapter.instance;
   }
 
-  public setBroadcaster(broadcast: (event: string, payload: any) => void): void {
-    this.broadcaster = broadcast;
+  public setBroadcaster(broadcaster: (event: string, payload: any) => void): void {
+    this.externalBroadcaster = broadcaster;
   }
 
   public subscribeTaskStream(taskId: string, listener: VeronicaStreamListener): () => void {
@@ -86,11 +161,11 @@ export class AntigravityAdapter implements RuntimeAdapter {
       }
     }
 
-    if (this.broadcaster) {
+    if (this.externalBroadcaster) {
       try {
-        this.broadcaster('veronica-stream-chunk', event);
+        this.externalBroadcaster('veronica-stream-chunk', event);
         if (event.type === 'status' || event.type === 'end') {
-          this.broadcaster('veronica-task-status', {
+          this.externalBroadcaster('veronica-task-status', {
             taskId: event.taskId,
             status: event.status,
             summary: event.summary,
@@ -103,12 +178,12 @@ export class AntigravityAdapter implements RuntimeAdapter {
     }
   }
 
-  public async isAvailable(): Promise<boolean> {
+  public async testCliAvailability(): Promise<boolean> {
     return new Promise((resolve) => {
       try {
         const config = loadConfig();
-        const cliPath = config.veronica?.antigravity_cli_path || 'agy';
-        const proc = spawn(cliPath, ['--version'], { shell: true });
+        const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
+        const proc = spawn(cliPath, ['--version'], { shell: false });
         proc.on('error', () => resolve(false));
         proc.on('close', (code) => resolve(code === 0));
       } catch {
@@ -117,16 +192,57 @@ export class AntigravityAdapter implements RuntimeAdapter {
     });
   }
 
+  public async isAvailable(): Promise<boolean> {
+    return this.testCliAvailability();
+  }
+
   public getAvailableAntigravityModels(): AntigravityModelInfo[] {
     return [
-      { slug: 'gemini-3.7-flash-high', name: 'Gemini 3.7 Flash (High Reasoning)', effort: 'high' },
-      { slug: 'gemini-3.7-flash-medium', name: 'Gemini 3.7 Flash (Medium Reasoning)', effort: 'medium' },
-      { slug: 'gemini-3.6-flash-high', name: 'Gemini 3.6 Flash (High Reasoning)', effort: 'high' },
-      { slug: 'gemini-3.6-flash-medium', name: 'Gemini 3.6 Flash (Medium Reasoning)', effort: 'medium' },
-      { slug: 'gemini-3.5-flash-medium', name: 'Gemini 3.5 Flash (Medium Reasoning)', effort: 'medium' },
-      { slug: 'gemini-3.1-pro-high', name: 'Gemini 3.1 Pro (High Reasoning)', effort: 'high' },
-      { slug: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', effort: 'high' },
-      { slug: 'inherit', name: 'Default Antigravity Inherited Model', effort: 'auto' },
+      {
+        slug: 'gemini-3.7-flash',
+        name: 'Gemini 3.7 Flash',
+        effort: 'low',
+        supportedEfforts: ['low', 'medium', 'high'],
+        defaultEffort: 'low',
+      },
+      {
+        slug: 'gemini-3.6-flash',
+        name: 'Gemini 3.6 Flash',
+        effort: 'low',
+        supportedEfforts: ['low', 'medium', 'high'],
+        defaultEffort: 'low',
+      },
+      {
+        slug: 'gemini-3.1-pro',
+        name: 'Gemini 3.1 Pro',
+        effort: 'low',
+        supportedEfforts: ['low', 'high'],
+        defaultEffort: 'low',
+      },
+      {
+        slug: 'claude-sonnet-4-6',
+        name: 'Claude Sonnet 4.6 (Thinking)',
+        effort: undefined,
+        supportedEfforts: [],
+      },
+      {
+        slug: 'claude-opus-4-6-thinking',
+        name: 'Claude Opus 4.6 (Thinking)',
+        effort: undefined,
+        supportedEfforts: [],
+      },
+      {
+        slug: 'gpt-oss-120b-medium',
+        name: 'GPT-OSS 120B (Medium)',
+        effort: undefined,
+        supportedEfforts: [],
+      },
+      {
+        slug: 'inherit',
+        name: 'Default Antigravity Inherited Model',
+        effort: undefined,
+        supportedEfforts: [],
+      },
     ];
   }
 
@@ -156,7 +272,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
     }
 
     const config = loadConfig();
-    const cliPath = config.veronica?.antigravity_cli_path || 'agy';
+    const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
 
     // Resolve target project directory
     const resolvedProjectPath = (await projectDiscovery.resolveProjectPath(options.project)) || process.cwd();
@@ -181,8 +297,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
       project_path: resolvedProjectPath,
     });
 
-    const selectedModel = options.model || config.veronica?.model;
-    const selectedEffort = options.effort || config.veronica?.effort;
+    const resolved = resolveAntigravityModelAndEffort(options.model || config.veronica?.model, options.effort || config.veronica?.effort);
     const selectedAgent = options.agent || config.veronica?.agent;
     const selectedTimeout = options.print_timeout || config.veronica?.print_timeout || '15m';
     const outputFormat = options.output_format || 'text';
@@ -194,11 +309,11 @@ export class AntigravityAdapter implements RuntimeAdapter {
       '--add-dir', resolvedProjectPath,
     ];
 
-    if (selectedModel && selectedModel !== 'auto' && selectedModel !== 'inherit' && selectedModel !== 'local') {
-      args.push('--model', selectedModel);
+    if (resolved.model) {
+      args.push('--model', resolved.model);
     }
-    if (selectedEffort && selectedEffort !== 'auto') {
-      args.push('--effort', selectedEffort);
+    if (resolved.effort) {
+      args.push('--effort', resolved.effort);
     }
     if (selectedAgent && selectedAgent !== 'default' && selectedAgent !== 'none') {
       args.push('--agent', selectedAgent);
@@ -212,7 +327,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
 
     VeronicaLogger.log(
       'TASK',
-      `Spawning agy task for project '${options.project}' [model: ${selectedModel || 'default'}, effort: ${selectedEffort || 'default'}, agent: ${selectedAgent || 'default'}, timeout: ${selectedTimeout}]`,
+      `Spawning agy task for project '${options.project}' [model: ${resolved.model || 'default'}, agent: ${selectedAgent || 'default'}, timeout: ${selectedTimeout}]`,
       task.id
     );
 
@@ -220,7 +335,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
       const child = spawn(cliPath, args, {
         cwd: resolvedProjectPath,
         env,
-        shell: true,
+        shell: false,
         detached: process.platform !== 'win32',
         stdio: ['pipe', 'pipe', 'pipe'],
       });

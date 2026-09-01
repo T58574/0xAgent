@@ -3,7 +3,7 @@ import { loadConfig } from '../../config';
 import { taskRegistry } from '../core/taskRegistry';
 import { projectDiscovery } from '../core/projectDiscovery';
 import { projectDocManager } from '../core/projectDocManager';
-import { antigravityAdapter } from '../adapters/antigravityAdapter';
+import { antigravityAdapter, resolveAntigravityModelAndEffort, getSafeCliPath } from '../adapters/antigravityAdapter';
 import { getVeronicaDb } from '../db/veronicaDb';
 import { writeQueue } from '../db/writeQueue';
 import { MessageBuilder } from './messageBuilder';
@@ -496,16 +496,16 @@ ORCHESTRATION INSTRUCTIONS:
     // Engine 1: Antigravity Headless CLI
     if (isAgy) {
       try {
-        const cliPath = config.veronica?.antigravity_cli_path || 'agy';
+        const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
         const promptPayload = `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
         const args = ['--dangerously-skip-permissions', '--output-format', 'text'];
 
-        if (activeModel && activeModel !== 'inherit' && activeModel !== 'agy' && activeModel !== 'antigravity') {
-          args.push('--model', activeModel);
+        const resolved = resolveAntigravityModelAndEffort(activeModel, config.veronica?.effort);
+        if (resolved.model) {
+          args.push('--model', resolved.model);
         }
-        const effort = config.veronica?.effort;
-        if (effort && effort !== 'auto') {
-          args.push('--effort', effort);
+        if (resolved.effort) {
+          args.push('--effort', resolved.effort);
         }
         const agent = config.veronica?.agent;
         if (agent && agent !== 'default' && agent !== 'none') {
@@ -514,7 +514,7 @@ ORCHESTRATION INSTRUCTIONS:
 
         const agyOutput = await new Promise<string>((resolve, reject) => {
           const child = spawn(cliPath, args, {
-            shell: true,
+            shell: false,
             stdio: ['pipe', 'pipe', 'pipe'],
           });
 

@@ -55,13 +55,51 @@ configRouter.get('/models', (_req, res) => {
   try {
     const cfg = loadConfig();
     const cloudModels: any[] = [
-      { id: 'gemini-3.7-flash-high', name: 'Gemini 3.7 Flash (High Reasoning)', isAudio: false, provider: 'antigravity' },
-      { id: 'gemini-3.7-flash-medium', name: 'Gemini 3.7 Flash (Med Reasoning)', isAudio: false, provider: 'antigravity' },
-      { id: 'gemini-3.6-flash-high', name: 'Gemini 3.6 Flash (High Reasoning)', isAudio: false, provider: 'antigravity' },
-      { id: 'gemini-3.5-flash-medium', name: 'Gemini 3.5 Flash', isAudio: false, provider: 'antigravity' },
-      { id: 'gemini-3.1-pro-high', name: 'Gemini 3.1 Pro (High Reasoning)', isAudio: false, provider: 'antigravity' },
-      { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6 (Thinking)', isAudio: false, provider: 'antigravity' },
-      { id: 'inherit', name: 'Antigravity Auto (Inherit)', isAudio: false, provider: 'antigravity' },
+      {
+        id: 'gemini-3.7-flash',
+        name: 'Gemini 3.7 Flash',
+        provider: 'antigravity',
+        supportedEfforts: ['low', 'medium', 'high'],
+        defaultEffort: 'low',
+      },
+      {
+        id: 'gemini-3.6-flash',
+        name: 'Gemini 3.6 Flash',
+        provider: 'antigravity',
+        supportedEfforts: ['low', 'medium', 'high'],
+        defaultEffort: 'low',
+      },
+      {
+        id: 'gemini-3.1-pro',
+        name: 'Gemini 3.1 Pro',
+        provider: 'antigravity',
+        supportedEfforts: ['low', 'high'],
+        defaultEffort: 'low',
+      },
+      {
+        id: 'claude-sonnet-4-6',
+        name: 'Claude Sonnet 4.6 (Thinking)',
+        provider: 'antigravity',
+        supportedEfforts: [],
+      },
+      {
+        id: 'claude-opus-4-6-thinking',
+        name: 'Claude Opus 4.6 (Thinking)',
+        provider: 'antigravity',
+        supportedEfforts: [],
+      },
+      {
+        id: 'gpt-oss-120b-medium',
+        name: 'GPT-OSS 120B (Medium)',
+        provider: 'antigravity',
+        supportedEfforts: [],
+      },
+      {
+        id: 'inherit',
+        name: 'Antigravity Auto (Inherit)',
+        provider: 'antigravity',
+        supportedEfforts: [],
+      },
     ];
 
     const dirsToScan: string[] = [

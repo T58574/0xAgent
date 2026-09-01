@@ -55,6 +55,7 @@ async function fetchWithHeaderTimeout(
 }
 
 import { spawn } from 'node:child_process';
+import { resolveAntigravityModelAndEffort, getSafeCliPath } from '../veronica/adapters/antigravityAdapter';
 
 async function spawnAgyStreamResponse(
   config: AppConfig,
@@ -62,14 +63,15 @@ async function spawnAgyStreamResponse(
   selectedModel: string,
   configuredEffort: string
 ): Promise<Response> {
-  const cliPath = config.veronica?.antigravity_cli_path || 'agy';
+  const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
   const args = ['--dangerously-skip-permissions', '--output-format', 'text'];
 
-  if (selectedModel && selectedModel !== 'inherit' && selectedModel !== 'agy' && selectedModel !== 'antigravity') {
-    args.push('--model', selectedModel);
+  const resolved = resolveAntigravityModelAndEffort(selectedModel, configuredEffort);
+  if (resolved.model) {
+    args.push('--model', resolved.model);
   }
-  if (configuredEffort && configuredEffort !== 'auto' && configuredEffort !== 'off') {
-    args.push('--effort', configuredEffort);
+  if (resolved.effort) {
+    args.push('--effort', resolved.effort);
   }
   const agent = config.veronica?.agent;
   if (agent && agent !== 'default' && agent !== 'none') {
@@ -89,7 +91,7 @@ async function spawnAgyStreamResponse(
   }
 
   const child = spawn(cliPath, args, {
-    shell: true,
+    shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 

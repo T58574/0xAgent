@@ -62,37 +62,94 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
         </div>
         <div className="space-y-1 mb-2">
           {modelsData.cloud.map((m) => {
-            const isActive = activeModelId === m.id;
+            const getBaseModelId = (id: string): string => {
+              if (id.startsWith('gemini-3.7-flash')) return 'gemini-3.7-flash';
+              if (id.startsWith('gemini-3.6-flash')) return 'gemini-3.6-flash';
+              if (id.startsWith('gemini-3.1-pro')) return 'gemini-3.1-pro';
+              return id;
+            };
+
+            const getModelEffort = (id: string, defEff: string = 'low'): string => {
+              if (id.endsWith('-high')) return 'high';
+              if (id.endsWith('-medium')) return 'medium';
+              if (id.endsWith('-low')) return 'low';
+              return defEff;
+            };
+
+            const baseActive = getBaseModelId(activeModelId);
+            const isActive = baseActive === m.id || activeModelId === m.id;
+            const supportedEfforts = m.supportedEfforts || [];
+            const currentEffort = getModelEffort(activeModelId, m.defaultEffort || 'low');
+
             return (
-              <button
+              <div
                 key={m.id}
-                type="button"
-                onClick={() => {
-                  onSelectCloudModel(m.id);
-                  onClose();
-                }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                className={`rounded-xl transition-all border ${
                   isActive
-                    ? 'session-item-active text-[var(--theme-text)] font-semibold border border-[var(--theme-border)] shadow-xs'
-                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border border-transparent'
+                    ? 'session-item-active text-[var(--theme-text)] font-semibold border-[var(--theme-border)] shadow-xs bg-[var(--theme-card-bg)]'
+                    : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] border-transparent'
                 }`}
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  {m.isAudio ? (
-                    <Volume2
-                      size={14}
-                      className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
-                    />
-                  ) : (
-                    <Cloud
-                      size={14}
-                      className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
-                    />
-                  )}
-                  <span className="truncate font-semibold">{m.name}</span>
-                </div>
-                {isActive && <Check size={13} className="text-[var(--theme-text)] shrink-0" />}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (supportedEfforts.length > 0) {
+                      onSelectCloudModel(`${m.id}-${currentEffort}`);
+                    } else {
+                      onSelectCloudModel(m.id);
+                      onClose();
+                    }
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2 text-left text-xs cursor-pointer"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    {m.isAudio ? (
+                      <Volume2
+                        size={14}
+                        className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
+                      />
+                    ) : (
+                      <Cloud
+                        size={14}
+                        className={isActive ? 'text-[var(--theme-text)] shrink-0' : 'text-[var(--theme-text-muted)] shrink-0'}
+                      />
+                    )}
+                    <span className="truncate font-semibold">{m.name}</span>
+                  </div>
+                  {isActive && <Check size={13} className="text-[var(--theme-text)] shrink-0" />}
+                </button>
+
+                {/* Inline Effort Selector for Gemini models when active */}
+                {isActive && supportedEfforts.length > 0 && (
+                  <div className="px-3 pb-2 pt-1 flex items-center justify-between gap-2 border-t border-[var(--theme-border)]/40">
+                    <span className="text-[9px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider">
+                      {language === 'ru' ? 'Effort (Рассуждения):' : 'Reasoning Effort:'}
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {supportedEfforts.map((eff) => {
+                        const isEffActive = currentEffort === eff;
+                        return (
+                          <button
+                            key={eff}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onSelectCloudModel(`${m.id}-${eff}`);
+                            }}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-mono transition-colors cursor-pointer border ${
+                              isEffActive
+                                ? 'bg-[var(--theme-panel)] text-[var(--theme-text)] font-bold border-[var(--theme-border)] shadow-xs'
+                                : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent hover:bg-[var(--theme-border-subtle)]'
+                            }`}
+                          >
+                            {eff}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>

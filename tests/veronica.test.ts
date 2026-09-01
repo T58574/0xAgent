@@ -16,7 +16,7 @@ import { RecoveryService } from '../server/veronica/watchdog/recoveryService';
 import { remoteNodeService } from '../server/remoteNodeService';
 import { veronicaScheduler } from '../server/veronica/core/scheduler';
 import { initPersonas, listPersonas, getPersonaDetail } from '../server/personas';
-import { antigravityAdapter, VeronicaStreamEvent } from '../server/veronica/adapters/antigravityAdapter';
+import { antigravityAdapter, resolveAntigravityModelAndEffort, VeronicaStreamEvent } from '../server/veronica/adapters/antigravityAdapter';
 import { reloadVeronicaModule, getVeronicaStatus, shutdownVeronicaModule } from '../server/veronica';
 import { createVeronicaRouter } from '../server/routes/veronicaRoutes';
 import { operationalJournal } from '../server/veronica/core/operationalJournal';
@@ -439,8 +439,9 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
     it('should list available Antigravity models and specialized agents', () => {
       const models = antigravityAdapter.getAvailableAntigravityModels();
       assert.ok(models.length >= 7, 'Should have multiple Antigravity models');
-      assert.ok(models.some((m) => m.slug === 'gemini-3.7-flash-high'));
-      assert.ok(models.some((m) => m.slug === 'gemini-3.7-flash-medium'));
+      assert.ok(models.some((m) => m.slug === 'gemini-3.7-flash'));
+      assert.ok(models.some((m) => m.slug === 'gemini-3.6-flash'));
+      assert.ok(models.some((m) => m.slug === 'gemini-3.1-pro'));
       assert.ok(models.some((m) => m.slug === 'claude-sonnet-4-6'));
 
       const agents = antigravityAdapter.getAvailableAntigravityAgents();
@@ -508,6 +509,36 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
 
       assert.ok(broadcastEvents.some((b) => b.event === 'veronica-stream-chunk'));
       assert.ok(broadcastEvents.some((b) => b.event === 'veronica-task-status'));
+    });
+
+    it('should resolve Antigravity model and effort cleanly without illegal effort flags', () => {
+      // Claude & GPT-OSS never have effort
+      const claudeSonnet = resolveAntigravityModelAndEffort('claude-sonnet-4-6', 'high');
+      assert.equal(claudeSonnet.model, 'claude-sonnet-4-6');
+      assert.equal(claudeSonnet.effort, undefined);
+
+      const claudeOpus = resolveAntigravityModelAndEffort('claude-opus-4-6-thinking', 'medium');
+      assert.equal(claudeOpus.model, 'claude-opus-4-6-thinking');
+      assert.equal(claudeOpus.effort, undefined);
+
+      const gptOss = resolveAntigravityModelAndEffort('gpt-oss-120b-medium', 'high');
+      assert.equal(gptOss.model, 'gpt-oss-120b-medium');
+      assert.equal(gptOss.effort, undefined);
+
+      // Gemini 3.7 default is low
+      const geminiDefault = resolveAntigravityModelAndEffort('gemini-3.7-flash');
+      assert.equal(geminiDefault.model, 'gemini-3.7-flash-low');
+      assert.equal(geminiDefault.effort, undefined);
+
+      // Gemini 3.7 with high
+      const geminiHigh = resolveAntigravityModelAndEffort('gemini-3.7-flash', 'high');
+      assert.equal(geminiHigh.model, 'gemini-3.7-flash-high');
+      assert.equal(geminiHigh.effort, undefined);
+
+      // Gemini 3.1 Pro clamps medium to low
+      const geminiProMedium = resolveAntigravityModelAndEffort('gemini-3.1-pro', 'medium');
+      assert.equal(geminiProMedium.model, 'gemini-3.1-pro-low');
+      assert.equal(geminiProMedium.effort, undefined);
     });
   });
 

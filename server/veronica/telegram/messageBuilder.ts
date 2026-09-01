@@ -84,12 +84,17 @@ export class MessageBuilder {
 
     // 1. Antigravity Official CLI Models
     const agyModels = [
-      { slug: 'gemini-3.7-flash-high', label: '⚡ Gemini 3.7 Flash (High)' },
+      { slug: 'gemini-3.7-flash-low', label: '⚡ Gemini 3.7 Flash (Low)' },
       { slug: 'gemini-3.7-flash-medium', label: '⚡ Gemini 3.7 Flash (Med)' },
+      { slug: 'gemini-3.7-flash-high', label: '⚡ Gemini 3.7 Flash (High)' },
+      { slug: 'gemini-3.6-flash-low', label: '⚡ Gemini 3.6 Flash (Low)' },
+      { slug: 'gemini-3.6-flash-medium', label: '⚡ Gemini 3.6 Flash (Med)' },
       { slug: 'gemini-3.6-flash-high', label: '⚡ Gemini 3.6 Flash (High)' },
-      { slug: 'gemini-3.5-flash-medium', label: '⚡ Gemini 3.5 Flash' },
+      { slug: 'gemini-3.1-pro-low', label: '⚡ Gemini 3.1 Pro (Low)' },
       { slug: 'gemini-3.1-pro-high', label: '⚡ Gemini 3.1 Pro (High)' },
       { slug: 'claude-sonnet-4-6', label: '⚡ Claude Sonnet 4.6 (Thinking)' },
+      { slug: 'claude-opus-4-6-thinking', label: '⚡ Claude Opus 4.6 (Thinking)' },
+      { slug: 'gpt-oss-120b-medium', label: '⚡ GPT-OSS 120B (Medium)' },
       { slug: 'inherit', label: '⚡ Auto (Inherit Antigravity)' },
     ];
 
