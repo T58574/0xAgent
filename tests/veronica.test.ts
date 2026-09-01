@@ -561,10 +561,11 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       };
       const agyPrompt = buildFullSystemPrompt(agyConfig);
 
-      // Antigravity prompt should contain persona & environment, but NOT 23 XML tool specifications or approval gates
+      // Antigravity prompt should contain persona & environment, Veronica CLI protocol, but NOT 23 XML tool specifications or approval gates
       assert.ok(agyPrompt.includes('# CONVERSATION & LANGUAGE STANDARD:'));
       assert.ok(agyPrompt.includes('# AGENT PERSONA:'));
       assert.ok(agyPrompt.includes('# SYSTEM ENVIRONMENT'));
+      assert.ok(agyPrompt.includes('# 0XAGENT & VERONICA CLI PROTOCOL'));
       assert.ok(!agyPrompt.includes('TOOL REGISTRY & XML SPECIFICATION'), 'Should not contain XML tool registry for Antigravity');
       assert.ok(!agyPrompt.includes('TWO-TIER APPROVAL & INTERACTION PROTOCOL'), 'Should not contain Two-Tier approval gate for Antigravity');
       assert.ok(!agyPrompt.includes('<patch_file'), 'Should not contain <patch_file> specs for Antigravity');
