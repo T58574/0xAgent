@@ -11,7 +11,8 @@ try {
 $ErrorActionPreference = "Stop"
 
 # User profile and destination folders
-$userHome = [Environment]::GetFolderPath([Environment]::SpecialFolder.UserProfile)
+$userHome = $env:USERPROFILE
+if (-not $userHome) { $userHome = [Environment]::GetFolderPath('UserProfile') }
 $oxAgentDir = Join-Path $userHome ".0xagent"
 $appDir = Join-Path $oxAgentDir "app"
 $binDir = Join-Path $oxAgentDir "bin"
@@ -75,7 +76,7 @@ function Print-Banner {
     Clear-Host
     Write-Host ""
     Write-Host "  ================================================================" -ForegroundColor Cyan
-    Write-Host "  |   0xAgent — Autonomous AI Developer & Web-IDE Platform       |" -ForegroundColor Cyan
+    Write-Host "  |   0xAgent - Autonomous AI Developer & Web-IDE Platform       |" -ForegroundColor Cyan
     Write-Host "  |   1-Click Interactive Setup & Native Tray Launcher Engine    |" -ForegroundColor DarkCyan
     Write-Host "  ================================================================" -ForegroundColor Cyan
     Write-Host ""
@@ -238,8 +239,8 @@ try {
         Write-Host "  [+] Cloning repository into: $appDir" -ForegroundColor Cyan
         Write-InstallLog "Cloning $repoUrl into $appDir" "INFO"
         
-        $cloneProc = Start-Process git -ArgumentList "clone $repoUrl `"$appDir`"" -NoNewWindow -PassThru -Wait
-        if ($cloneProc.ExitCode -ne 0 -or -not (Test-Path (Join-Path $appDir "package.json"))) {
+        & git clone $repoUrl "$appDir"
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $appDir "package.json"))) {
             Safe-Exit -Message "Failed to clone 0xAgent repository from GitHub. Check your internet connection or proxy." `
                       -Category "GIT CLONE ERROR" `
                       -Recommendation "Check if https://github.com/T58574/0xAgent is accessible from your network." `
@@ -264,11 +265,11 @@ try {
     Push-Location $appDir
     Write-InstallLog "Running npm install in $appDir" "INFO"
 
-    $npmProc = Start-Process npm -ArgumentList "install --no-audit --no-fund" -WorkingDirectory $appDir -NoNewWindow -PassThru -Wait
-    if ($npmProc.ExitCode -ne 0) {
+    & cmd.exe /c "npm install --no-audit --no-fund"
+    if ($LASTEXITCODE -ne 0) {
         Write-Host "  [*] Retrying npm install with standard flags..." -ForegroundColor Yellow
-        $npmRetry = Start-Process npm -ArgumentList "install" -WorkingDirectory $appDir -NoNewWindow -PassThru -Wait
-        if ($npmRetry.ExitCode -ne 0) {
+        & cmd.exe /c "npm install"
+        if ($LASTEXITCODE -ne 0) {
             Pop-Location
             Safe-Exit -Message "NPM dependencies failed to install." `
                       -Category "NPM INSTALL ERROR" `
@@ -284,8 +285,8 @@ try {
     Push-Location $appDir
     try {
         & node ./scripts/ensure-ssl.cjs
-        $buildProc = Start-Process npm -ArgumentList "run build" -WorkingDirectory $appDir -NoNewWindow -PassThru -Wait
-        if ($buildProc.ExitCode -eq 0) {
+        & cmd.exe /c "npm run build"
+        if ($LASTEXITCODE -eq 0) {
             Write-Host "  [OK] Production web client compiled successfully." -ForegroundColor Green
         } else {
             Write-Host "  [WARN] Production build had a non-zero exit code. Live dev server will run on launch." -ForegroundColor Yellow
@@ -314,28 +315,31 @@ try {
     Write-Host "  [6/6] Configuring Global '0xagent' CLI & Desktop Shortcuts..." -ForegroundColor Yellow
 
     try {
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+
         # Create 0xagent.cmd wrapper with UTF-8 encoding (no BOM) to prevent Cyrillic path corruption
         $cliCmdContent = "@echo off`r`nnode `"$appDir\bin\0xagent.js`" %*"
         $cliCmdPath = Join-Path $binDir "0xagent.cmd"
-        [System.IO.File]::WriteAllText($cliCmdPath, $cliCmdContent, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($cliCmdPath, $cliCmdContent, $utf8NoBom)
 
         # Create 0xagent.ps1 wrapper
         $cliPs1Content = "param([Parameter(ValueFromRemainingArguments=`$true)] `$args)`r`n& node `"$appDir\bin\0xagent.js`" @args"
         $cliPs1Path = Join-Path $binDir "0xagent.ps1"
-        [System.IO.File]::WriteAllText($cliPs1Path, $cliPs1Content, [System.Text.UTF8Encoding]::new($false))
+        [System.IO.File]::WriteAllText($cliPs1Path, $cliPs1Content, $utf8NoBom)
 
         # Add to User PATH if not present
-        $userPath = [Environment]::GetEnvironmentVariable("Path", [EnvironmentVariableTarget]::User)
+        $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
         if ($userPath -notlike "*$binDir*") {
             $newPath = "$userPath;$binDir"
-            [Environment]::SetEnvironmentVariable("Path", $newPath, [EnvironmentVariableTarget]::User)
+            [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
             $env:Path = "$env:Path;$binDir"
             Write-Host "  [+] Added '$binDir' to User PATH." -ForegroundColor Green
         }
 
         # Create Desktop Shortcut
         $wscript = New-Object -ComObject WScript.Shell
-        $desktopPath = [Environment]::GetFolderPath([Environment]::SpecialFolder.DesktopDirectory)
+        $desktopPath = [Environment]::GetFolderPath('Desktop')
+        if (-not $desktopPath) { $desktopPath = Join-Path $userHome "Desktop" }
         $shortcutPath = Join-Path $desktopPath "0xAgent.lnk"
         $shortcut = $wscript.CreateShortcut($shortcutPath)
         $exePath = Join-Path $appDir "0xAgent.exe"
