@@ -29,6 +29,7 @@ export class RecoveryService {
         if (!isAlive) {
           await taskRegistry.updateTaskStatus(t.id, 'crashed', {
             summary: 'Reconciled on server restart: process was dead',
+            skip_retry: true,
           });
           projectLockManager.releaseLock(t.project, t.id);
           recoveredCount++;

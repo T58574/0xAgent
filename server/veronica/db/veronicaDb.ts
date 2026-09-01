@@ -7,6 +7,8 @@ import { DatabaseSync } from 'node:sqlite';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+import { runMigrations } from './migrations';
+
 let dbInstance: DatabaseSync | null = null;
 let dbFilePath: string = '';
 
@@ -59,11 +61,11 @@ export function initVeronicaDatabase(customPath?: string): DatabaseSync {
     db.exec(schemaSql);
   }
 
-  // Record initial schema version if not set
-  const stmt = db.prepare('SELECT version FROM schema_version WHERE version = 1');
-  const res = stmt.get();
-  if (!res) {
-    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (1, ?)').run(Date.now());
+  // Run incremental migrations
+  try {
+    runMigrations(db);
+  } catch (mErr) {
+    console.error('[Veronica DB] Error running migrations:', mErr);
   }
 
   return db;

@@ -1,6 +1,13 @@
-import { getVeronicaDb } from '../db/veronicaDb';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { getVeronicaDb, getVeronicaDataDir } from '../db/veronicaDb';
 import { writeQueue } from '../db/writeQueue';
 import { antigravityAdapter } from '../adapters/antigravityAdapter';
+import { CronJobRecord } from '../types';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export class VeronicaScheduler {
   private static instance: VeronicaScheduler;
@@ -50,7 +57,7 @@ export class VeronicaScheduler {
     }
   }
 
-  private async executeJob(job: any, now: number): Promise<void> {
+  public async executeJob(job: any, now: number): Promise<void> {
     const nextIntervalMs = this.parseSimpleSchedule(job.schedule);
     const nextRun = now + nextIntervalMs;
 
@@ -59,21 +66,101 @@ export class VeronicaScheduler {
       db.prepare('UPDATE cron_jobs SET last_run = ?, next_run = ? WHERE id = ?').run(now, nextRun, job.id);
     });
 
+    // Load prompt from skill file if available
+    let skillPrompt = job.custom_prompt || '';
+    if (!skillPrompt) {
+      skillPrompt = this.getSkillContent(job.skill) || '';
+    }
+
     // Launch task via Antigravity Adapter
     try {
       await antigravityAdapter.spawnTask({
         project: job.project,
         skill: job.skill,
+        custom_prompt: skillPrompt || undefined,
       });
     } catch (err) {
       console.error(`[Veronica Scheduler] Failed to spawn task for job ${job.id}:`, err);
     }
   }
 
-  /**
-   * Simple schedule parser (e.g. '@hourly', '@daily', 'every_15m', or number of minutes)
-   */
-  private parseSimpleSchedule(schedule: string): number {
+  public listSkills(): { name: string; path: string; description?: string }[] {
+    const skillsDir = path.join(__dirname, '..', 'skills');
+    const userSkillsDir = path.join(getVeronicaDataDir(), 'skills');
+    const results: { name: string; path: string; description?: string }[] = [];
+
+    const scanDir = (dir: string) => {
+      if (!fs.existsSync(dir)) return;
+      const files = fs.readdirSync(dir);
+      for (const f of files) {
+        if (f.endsWith('.md')) {
+          const name = f.replace('.md', '');
+          const fullPath = path.join(dir, f);
+          const content = fs.readFileSync(fullPath, 'utf-8');
+          const firstLine = content.split('\n')[0].replace(/^#+\s*/, '') || name;
+          results.push({ name, path: fullPath, description: firstLine });
+        }
+      }
+    };
+
+    scanDir(skillsDir);
+    scanDir(userSkillsDir);
+    return results;
+  }
+
+  public getSkillContent(skillName: string): string | null {
+    const fileName = skillName.endsWith('.md') ? skillName : `${skillName}.md`;
+    const userPath = path.join(getVeronicaDataDir(), 'skills', fileName);
+    if (fs.existsSync(userPath)) {
+      return fs.readFileSync(userPath, 'utf-8');
+    }
+
+    const defaultPath = path.join(__dirname, '..', 'skills', fileName);
+    if (fs.existsSync(defaultPath)) {
+      return fs.readFileSync(defaultPath, 'utf-8');
+    }
+
+    return null;
+  }
+
+  public listCronJobs(): CronJobRecord[] {
+    const db = getVeronicaDb();
+    const rows = db.prepare('SELECT * FROM cron_jobs ORDER BY id ASC').all() as any[];
+    return rows.map((r) => ({
+      ...r,
+      enabled: Boolean(r.enabled),
+    }));
+  }
+
+  public async addCronJob(job: CronJobRecord): Promise<void> {
+    await writeQueue.enqueue(() => {
+      const db = getVeronicaDb();
+      const stmt = db.prepare(`
+        INSERT OR REPLACE INTO cron_jobs (id, project, skill, schedule, enabled, skill_file, custom_prompt, next_run)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      const nextRun = Date.now() + this.parseSimpleSchedule(job.schedule);
+      stmt.run(
+        job.id,
+        job.project,
+        job.skill,
+        job.schedule,
+        job.enabled ? 1 : 0,
+        job.skill_file || null,
+        job.custom_prompt || null,
+        nextRun
+      );
+    });
+  }
+
+  public async deleteCronJob(id: string): Promise<void> {
+    await writeQueue.enqueue(() => {
+      const db = getVeronicaDb();
+      db.prepare('DELETE FROM cron_jobs WHERE id = ?').run(id);
+    });
+  }
+
+  public parseSimpleSchedule(schedule: string): number {
     if (schedule === '@hourly' || schedule === 'hourly') return 60 * 60 * 1000;
     if (schedule === '@daily' || schedule === 'daily') return 24 * 60 * 60 * 1000;
     if (schedule.startsWith('every_')) {

@@ -18,6 +18,7 @@ namespace OxAgent.Launcher
         private ContextMenuStrip _contextMenu;
         private ToolStripMenuItem _openMenuItem;
         private ToolStripMenuItem _statusMenuItem;
+        private ToolStripMenuItem _veronicaMenuItem;
         private ToolStripMenuItem _purgeVramMenuItem;
         private ToolStripMenuItem _logsMenuItem;
         private ToolStripMenuItem _restartMenuItem;
@@ -372,6 +373,13 @@ namespace OxAgent.Launcher
             };
             _contextMenu.Items.Add(_statusMenuItem);
 
+            // 2.1 Veronica Status item
+            _veronicaMenuItem = new ToolStripMenuItem(isEn ? "🤖  Veronica: Assistant Active" : "🤖  Вероника: Ассистент Активен")
+            {
+                Enabled = false
+            };
+            _contextMenu.Items.Add(_veronicaMenuItem);
+
             // 3. Purge GPU VRAM
             _purgeVramMenuItem = new ToolStripMenuItem(isEn ? "⚡  Purge GPU VRAM (llama-server)" : "⚡  Очистить GPU VRAM (llama-server)", null, (s, e) => PurgeGpuVram());
             _contextMenu.Items.Add(_purgeVramMenuItem);
@@ -579,6 +587,18 @@ namespace OxAgent.Launcher
                                 {
                                     _statusMenuItem.Text = isEn ? "📊  Status: Starting services..." : "📊  Статус: Запуск сервисов...";
                                     _notifyIcon.Text = isEn ? "0xAgent — Starting..." : "0xAgent — Запуск...";
+                                }
+
+                                if (_veronicaMenuItem != null)
+                                {
+                                    if (isServerUp)
+                                    {
+                                        _veronicaMenuItem.Text = isEn ? "🤖  Veronica: Online & Ready" : "🤖  Вероника: Онлайн и Готова";
+                                    }
+                                    else
+                                    {
+                                        _veronicaMenuItem.Text = isEn ? "🤖  Veronica: Standby" : "🤖  Вероника: Ожидание";
+                                    }
                                 }
                             }));
                         }

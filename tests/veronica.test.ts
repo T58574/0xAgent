@@ -14,6 +14,7 @@ import { CliHandler } from '../server/veronica/cli/cliHandler';
 import { GitExecutor } from '../server/veronica/cli/gitExecutor';
 import { RecoveryService } from '../server/veronica/watchdog/recoveryService';
 import { remoteNodeService } from '../server/remoteNodeService';
+import { veronicaScheduler } from '../server/veronica/core/scheduler';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -229,4 +230,99 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       assert.ok(status.error);
     });
   });
+
+  describe('8. Database Migrations & Version Tracking', () => {
+    it('should record applied migrations in schema_migrations table', () => {
+      const db = getVeronicaDb();
+      const rows = db.prepare('SELECT * FROM schema_migrations ORDER BY version ASC').all() as any[];
+      assert.ok(rows.length >= 2, 'Expected at least 2 migrations');
+      assert.equal(rows[0].version, 1);
+      assert.equal(rows[1].version, 2);
+    });
+  });
+
+  describe('9. Task Retry Mechanism & Max Retries', () => {
+    it('should increment retry_count when retrying a task', async () => {
+      const task = await taskRegistry.createTask({
+        project: 'RetryTestProj',
+        skill: 'flaky_operation',
+        max_retries: 2,
+      });
+
+      assert.equal(task.retry_count, 0);
+
+      const retried = await taskRegistry.retryTask(task.id);
+      assert.equal(retried, true);
+
+      const updated = taskRegistry.getTask(task.id);
+      assert.equal(updated?.retry_count, 1);
+      assert.equal(updated?.status, 'running');
+
+      const retried2 = await taskRegistry.retryTask(task.id);
+      assert.equal(retried2, true);
+
+      const updated2 = taskRegistry.getTask(task.id);
+      assert.equal(updated2?.retry_count, 2);
+
+      // Exceeded max_retries
+      const retried3 = await taskRegistry.retryTask(task.id);
+      assert.equal(retried3, false);
+    });
+  });
+
+  describe('10. Awaiting Approval & Resolution Protocol', () => {
+    it('should place task in awaiting_approval and resolve cleanly upon user input', async () => {
+      const task = await taskRegistry.createTask({
+        project: 'ApprovalProj',
+        skill: 'deploy_prod',
+      });
+
+      await taskRegistry.requestApproval(task.id, {
+        action: 'Deploy to Production',
+        details: 'Release v1.2.0 with database migrations',
+      });
+
+      const awaitingTask = taskRegistry.getTask(task.id);
+      assert.equal(awaitingTask?.status, 'awaiting_approval');
+      assert.ok(awaitingTask?.approval_payload?.includes('Deploy to Production'));
+
+      // Approve task
+      await taskRegistry.resolveApproval(task.id, true, 'Alice Admin');
+      const approvedTask = taskRegistry.getTask(task.id);
+      assert.equal(approvedTask?.status, 'running');
+      assert.ok(approvedTask?.summary?.includes('Alice Admin'));
+    });
+  });
+
+  describe('11. Scheduler Skills Discovery & Cron Jobs', () => {
+    it('should discover default markdown skill files', () => {
+      const skills = veronicaScheduler.listSkills();
+      assert.ok(skills.length >= 3, 'Expected at least 3 default skills');
+      const names = skills.map((s: any) => s.name);
+      assert.ok(names.includes('code_review'));
+      assert.ok(names.includes('security_audit'));
+      assert.ok(names.includes('health_check'));
+    });
+
+    it('should register and schedule cron jobs in SQLite', async () => {
+      await veronicaScheduler.addCronJob({
+        id: 'job_daily_audit',
+        project: 'CronTestProj',
+        skill: 'security_audit',
+        schedule: '@daily',
+        enabled: true,
+      });
+
+      const jobs = veronicaScheduler.listCronJobs();
+      const auditJob = jobs.find((j: any) => j.id === 'job_daily_audit');
+      assert.ok(auditJob);
+      assert.equal(auditJob.project, 'CronTestProj');
+      assert.equal(auditJob.enabled, true);
+
+      await veronicaScheduler.deleteCronJob('job_daily_audit');
+      const jobsAfter = veronicaScheduler.listCronJobs();
+      assert.equal(jobsAfter.some((j: any) => j.id === 'job_daily_audit'), false);
+    });
+  });
 });
+

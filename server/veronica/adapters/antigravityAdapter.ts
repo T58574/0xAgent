@@ -3,6 +3,7 @@ import { RuntimeAdapter, SpawnTaskOptions } from './runtimeAdapter';
 import { AgentTask } from '../types';
 import { taskRegistry } from '../core/taskRegistry';
 import { loadConfig } from '../../config';
+import { VeronicaLogger } from '../core/logger';
 
 export class AntigravityAdapter implements RuntimeAdapter {
   private static instance: AntigravityAdapter;
@@ -37,9 +38,11 @@ export class AntigravityAdapter implements RuntimeAdapter {
       skill: options.skill,
       runtime_profile: options.runtime_profile,
       autonomy_level: options.autonomy_level,
+      custom_prompt: options.custom_prompt,
     });
 
     if (task.status === 'queued') {
+      VeronicaLogger.log('INFO', `Task queued for project ${options.project} (locked by another task)`, task.id);
       return task;
     }
 
@@ -59,9 +62,13 @@ export class AntigravityAdapter implements RuntimeAdapter {
     const prompt = options.custom_prompt || `Perform skill '${options.skill}' on project '${options.project}'. Start by calling '0xagent veronica context ${options.project} --task ${task.id}' to receive current status and rules.`;
 
     const args = [
-      '--headless',
-      '--prompt', prompt,
+      '--print', prompt,
+      '--dangerously-skip-permissions',
+      '--output-format', 'json',
+      '--project', options.project,
     ];
+
+    VeronicaLogger.log('TASK', `Spawning agy task with skill '${options.skill}' on project '${options.project}'`, task.id);
 
     try {
       const child = spawn(cliPath, args, {
@@ -78,6 +85,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
         child.stdout?.on('data', (data) => {
           const text = data.toString().trim();
           if (text) {
+            VeronicaLogger.log('TASK', text, task.id);
             taskRegistry.recordHeartbeat(task.id, text.substring(0, 100)).catch(() => {});
           }
         });
@@ -85,6 +93,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
         child.stderr?.on('data', (data) => {
           const text = data.toString().trim();
           if (text) {
+            VeronicaLogger.log('WARN', text, task.id);
             taskRegistry.logEvent({
               task_id: task.id,
               event_type: 'warning',
@@ -99,6 +108,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
           const currentTask = taskRegistry.getTask(task.id);
           if (currentTask && currentTask.status === 'running') {
             const finalStatus = code === 0 ? 'completed' : 'failed';
+            VeronicaLogger.log(code === 0 ? 'INFO' : 'ERROR', `Task finished with exit code ${code}`, task.id);
             await taskRegistry.updateTaskStatus(task.id, finalStatus, {
               summary: code === 0 ? 'Agent finished execution cleanly' : `Agent process exited with code ${code}`,
             });
@@ -106,6 +116,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
         });
       }
     } catch (err: any) {
+      VeronicaLogger.log('ERROR', `Failed to spawn agy process: ${err?.message || err}`, task.id);
       await taskRegistry.updateTaskStatus(task.id, 'failed', {
         error_message: `Failed to spawn process: ${err?.message || err}`,
       });
@@ -115,6 +126,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
   }
 
   public async killTask(taskId: string): Promise<boolean> {
+    VeronicaLogger.log('WARN', `Killing task ${taskId}`, taskId);
     const child = this.activeProcesses.get(taskId);
     if (child && child.pid) {
       try {

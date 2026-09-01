@@ -3,6 +3,7 @@ import { loadConfig } from '../../config';
 import { MessageBuilder } from './messageBuilder';
 import { notificationService } from './notificationService';
 import { antigravityAdapter } from '../adapters/antigravityAdapter';
+import { taskRegistry } from '../core/taskRegistry';
 
 let botInstance: Bot | null = null;
 
@@ -112,6 +113,29 @@ export function initTelegramBot(): Bot | null {
       await ctx.reply(`🛑 Задача \`${taskId}\` остановлена.`);
     } else {
       await ctx.reply(`❌ Не удалось остановить задачу \`${taskId}\`.`);
+    }
+  });
+
+  // Callback query handlers for awaiting_approval inline buttons
+  bot.callbackQuery(/^veronica:approve:(.+)$/, async (ctx) => {
+    const match = ctx.match;
+    const taskId = match ? match[1] : '';
+    const user = ctx.from?.first_name || 'Telegram User';
+    if (taskId) {
+      await taskRegistry.resolveApproval(taskId, true, user);
+      await ctx.answerCallbackQuery({ text: 'Действие одобрено!' });
+      await ctx.editMessageText(`✅ *Действие одобрено* пользователем ${user}.\nЗадача \`${taskId.substring(0, 8)}\` продолжена.`, { parse_mode: 'Markdown' });
+    }
+  });
+
+  bot.callbackQuery(/^veronica:reject:(.+)$/, async (ctx) => {
+    const match = ctx.match;
+    const taskId = match ? match[1] : '';
+    const user = ctx.from?.first_name || 'Telegram User';
+    if (taskId) {
+      await taskRegistry.resolveApproval(taskId, false, user);
+      await ctx.answerCallbackQuery({ text: 'Действие отклонено!' });
+      await ctx.editMessageText(`❌ *Действие отклонено* пользователем ${user}.\nЗадача \`${taskId.substring(0, 8)}\` отменена.`, { parse_mode: 'Markdown' });
     }
   });
 

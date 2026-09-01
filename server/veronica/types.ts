@@ -36,6 +36,10 @@ export interface AgentTask {
   pid?: number | null;
   last_heartbeat?: number | null;
   task_token: string;
+  retry_count?: number;
+  max_retries?: number;
+  approval_payload?: string | null;
+  custom_prompt?: string | null;
 }
 
 export interface AgentEvent {
@@ -71,6 +75,8 @@ export interface CronJobRecord {
   skill: string;
   schedule: string;
   enabled: boolean;
+  skill_file?: string | null;
+  custom_prompt?: string | null;
   last_run?: number | null;
   next_run?: number | null;
 }

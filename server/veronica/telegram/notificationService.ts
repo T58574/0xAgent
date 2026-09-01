@@ -1,4 +1,4 @@
-import { Bot } from 'grammy';
+import { Bot, InlineKeyboard } from 'grammy';
 import { AgentTask } from '../types';
 import { loadConfig } from '../../config';
 
@@ -60,10 +60,39 @@ export class NotificationService {
       `⏱️ *WATCHDOG TIMEOUT:* \`${task.id.substring(0, 8)}\``,
       `📁 *Проект:* ${task.project}`,
       `⚡ *Skill:* _${task.skill}_`,
-      `⚠️ *Причина:* Отсутствие heartbeat более ${timeoutSec}с. Процесс принудительно остановлен.`,
+      `⚠️ *Причина:* Нет активности более ${timeoutSec}с. Процесс принудительно остановлен.`,
     ].join('\n');
 
     await this.broadcastToWhitelist(msg);
+  }
+
+  public async notifyApprovalRequired(task: AgentTask, payload: { action: string; details?: string }): Promise<void> {
+    if (!this.botInstance) return;
+    const config = loadConfig();
+    const whitelist = config.veronica?.telegram_whitelist || [];
+
+    const keyboard = new InlineKeyboard()
+      .text('✅ Одобрить', `veronica:approve:${task.id}`)
+      .text('❌ Отклонить', `veronica:reject:${task.id}`);
+
+    const msg = [
+      `⚠️ *ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ:* \`${task.id.substring(0, 8)}\``,
+      `📁 *Проект:* ${task.project}`,
+      `⚡ *Skill:* _${task.skill}_`,
+      `🎯 *Действие:* ${payload.action}`,
+      payload.details ? `📝 *Детали:* ${payload.details}` : '',
+    ].filter(Boolean).join('\n');
+
+    for (const chatId of whitelist) {
+      try {
+        await this.botInstance.api.sendMessage(chatId, msg, {
+          parse_mode: 'Markdown',
+          reply_markup: keyboard,
+        });
+      } catch (err) {
+        console.error(`[Veronica Telegram] Failed to send approval request to ${chatId}:`, err);
+      }
+    }
   }
 }
 
