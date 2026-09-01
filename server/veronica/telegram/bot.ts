@@ -5,6 +5,14 @@ import { notificationService } from './notificationService';
 import { antigravityAdapter } from '../adapters/antigravityAdapter';
 import { taskRegistry } from '../core/taskRegistry';
 
+function escapeHtml(text: string): string {
+  return (text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 let botInstance: Bot | null = null;
 
 export function initTelegramBot(): Bot | null {
@@ -34,9 +42,10 @@ export function initTelegramBot(): Bot | null {
     bot.use(async (ctx, next) => {
       const userId = ctx.from?.id;
       if (whitelist.length > 0 && userId && !whitelist.includes(userId)) {
-        await ctx.reply(`⛔ Доступ ограничен. Ваш Telegram ID: \`${userId}\`.\nДобавьте этот ID в белый список Veronica в интерфейсе 0xAgent.`, {
-          parse_mode: 'Markdown',
-        });
+        await ctx.reply(
+          `⛔ <b>Доступ ограничен.</b> Ваш Telegram ID: <code>${userId}</code>\nДобавьте этот ID в белый список Veronica в интерфейсе 0xAgent.`,
+          { parse_mode: 'HTML' }
+        );
         return;
       }
       await next();
@@ -46,42 +55,42 @@ export function initTelegramBot(): Bot | null {
     bot.command(['start', 'help'], async (ctx) => {
       const userId = ctx.from?.id;
       const helpText = [
-        `👋 *Здравствуйте! Я Вероника — ваш персональный ассистент.*`,
-        userId ? `👤 Ваш Telegram ID: \`${userId}\`` : '',
+        `👋 <b>Здравствуйте! Я Вероника — ваш персональный ассистент.</b>`,
+        userId ? `👤 Ваш Telegram ID: <code>${userId}</code>` : '',
         ``,
-        `📌 *Доступные команды:*`,
+        `📌 <b>Доступные команды:</b>`,
         `• /status — текущий статус системы, активные задачи и GPU узел`,
         `• /projects — список проектов и сводка`,
         `• /today — что сделано за сегодня`,
         `• /yesterday — что сделано за вчера`,
-        `• /run <skill> <project> — запустить задачу агенту`,
-        `• /kill <task_id> — остановить зависшую задачу`,
+        `• /run <i>&lt;skill&gt;</i> <i>&lt;project&gt;</i> — запустить задачу агенту`,
+        `• /kill <i>&lt;task_id&gt;</i> — остановить зависшую задачу`,
       ].filter(Boolean).join('\n');
-      await ctx.reply(helpText, { parse_mode: 'Markdown' });
+      await ctx.reply(helpText, { parse_mode: 'HTML' });
     });
 
     // /status
     bot.command('status', async (ctx) => {
       const msg = MessageBuilder.buildStatusMessage();
-      await ctx.reply(msg, { parse_mode: 'Markdown' });
+      await ctx.reply(msg, { parse_mode: 'HTML' });
     });
 
     // /projects
     bot.command('projects', async (ctx) => {
       const msg = MessageBuilder.buildProjectsSummary();
-      await ctx.reply(msg, { parse_mode: 'Markdown' });
+      await ctx.reply(msg, { parse_mode: 'HTML' });
     });
 
     // /today
     bot.command('today', async (ctx) => {
       const msg = MessageBuilder.buildPeriodReport('today');
-      await ctx.reply(msg, { parse_mode: 'Markdown' });
+      await ctx.reply(msg, { parse_mode: 'HTML' });
     });
 
     // /yesterday
     bot.command('yesterday', async (ctx) => {
       const msg = MessageBuilder.buildPeriodReport('yesterday');
-      await ctx.reply(msg, { parse_mode: 'Markdown' });
+      await ctx.reply(msg, { parse_mode: 'HTML' });
     });
 
     // /run <skill> <project>
@@ -89,9 +98,10 @@ export function initTelegramBot(): Bot | null {
       const text = ctx.message?.text || '';
       const parts = text.split(/\s+/).slice(1);
       if (parts.length < 2) {
-        await ctx.reply('⚠️ Использование: `/run <skill> <project>` (например: `/run security_audit WebApp`)', {
-          parse_mode: 'Markdown',
-        });
+        await ctx.reply(
+          '⚠️ Использование: <code>/run &lt;skill&gt; &lt;project&gt;</code> (например: <code>/run security_audit WebApp</code>)',
+          { parse_mode: 'HTML' }
+        );
         return;
       }
 
@@ -101,11 +111,13 @@ export function initTelegramBot(): Bot | null {
       try {
         const task = await antigravityAdapter.spawnTask({ project, skill });
         await ctx.reply(
-          `🚀 *Задача создана!* \nID: \`${task.id.substring(0, 8)}\`\nПроект: *${project}*\nСтатус: \`${task.status}\``,
-          { parse_mode: 'Markdown' }
+          `🚀 <b>Задача создана!</b>\nID: <code>${task.id.substring(0, 8)}</code>\nПроект: <b>${escapeHtml(
+            project
+          )}</b>\nСтатус: <code>${task.status}</code>`,
+          { parse_mode: 'HTML' }
         );
       } catch (err: any) {
-        await ctx.reply(`❌ Ошибка запуска задачи: ${err?.message || err}`);
+        await ctx.reply(`❌ Ошибка запуска задачи: ${escapeHtml(err?.message || err)}`);
       }
     });
 
@@ -114,16 +126,18 @@ export function initTelegramBot(): Bot | null {
       const text = ctx.message?.text || '';
       const parts = text.split(/\s+/).slice(1);
       if (parts.length < 1) {
-        await ctx.reply('⚠️ Использование: `/kill <task_id>`');
+        await ctx.reply('⚠️ Использование: <code>/kill &lt;task_id&gt;</code>', { parse_mode: 'HTML' });
         return;
       }
 
       const taskId = parts[0];
       const killed = await antigravityAdapter.killTask(taskId);
       if (killed) {
-        await ctx.reply(`🛑 Задача \`${taskId}\` остановлена.`);
+        await ctx.reply(`🛑 Задача <code>${escapeHtml(taskId)}</code> остановлена.`, { parse_mode: 'HTML' });
       } else {
-        await ctx.reply(`❌ Не удалось остановить задачу \`${taskId}\`.`);
+        await ctx.reply(`❌ Не удалось остановить задачу <code>${escapeHtml(taskId)}</code>.`, {
+          parse_mode: 'HTML',
+        });
       }
     });
 
@@ -135,7 +149,13 @@ export function initTelegramBot(): Bot | null {
       if (taskId) {
         await taskRegistry.resolveApproval(taskId, true, user);
         await ctx.answerCallbackQuery({ text: 'Действие одобрено!' });
-        await ctx.editMessageText(`✅ *Действие одобрено* пользователем ${user}.\nЗадача \`${taskId.substring(0, 8)}\` продолжена.`, { parse_mode: 'Markdown' });
+        await ctx.editMessageText(
+          `✅ <b>Действие одобрено</b> пользователем ${escapeHtml(user)}.\nЗадача <code>${taskId.substring(
+            0,
+            8
+          )}</code> продолжена.`,
+          { parse_mode: 'HTML' }
+        );
       }
     });
 
@@ -146,7 +166,13 @@ export function initTelegramBot(): Bot | null {
       if (taskId) {
         await taskRegistry.resolveApproval(taskId, false, user);
         await ctx.answerCallbackQuery({ text: 'Действие отклонено!' });
-        await ctx.editMessageText(`❌ *Действие отклонено* пользователем ${user}.\nЗадача \`${taskId.substring(0, 8)}\` отменена.`, { parse_mode: 'Markdown' });
+        await ctx.editMessageText(
+          `❌ <b>Действие отклонено</b> пользователем ${escapeHtml(user)}.\nЗадача <code>${taskId.substring(
+            0,
+            8
+          )}</code> отменена.`,
+          { parse_mode: 'HTML' }
+        );
       }
     });
 

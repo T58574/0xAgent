@@ -2,6 +2,14 @@ import { Bot, InlineKeyboard } from 'grammy';
 import { AgentTask } from '../types';
 import { loadConfig } from '../../config';
 
+function escapeHtml(text: string): string {
+  return (text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 export class NotificationService {
   private static instance: NotificationService;
   private botInstance: Bot | null = null;
@@ -26,7 +34,7 @@ export class NotificationService {
 
     for (const chatId of whitelist) {
       try {
-        await this.botInstance.api.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+        await this.botInstance.api.sendMessage(chatId, message, { parse_mode: 'HTML' });
       } catch (err) {
         console.error(`[Veronica Telegram] Failed to send message to ${chatId}:`, err);
       }
@@ -35,10 +43,10 @@ export class NotificationService {
 
   public async notifyTaskCompleted(task: AgentTask): Promise<void> {
     const msg = [
-      `✅ *Задача завершена:* \`${task.id.substring(0, 8)}\``,
-      `📁 *Проект:* ${task.project}`,
-      `⚡ *Skill:* _${task.skill}_`,
-      task.summary ? `📝 *Итог:* ${task.summary}` : '',
+      `✅ <b>Задача завершена:</b> <code>${task.id.substring(0, 8)}</code>`,
+      `📁 <b>Проект:</b> ${escapeHtml(task.project)}`,
+      `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
+      task.summary ? `📝 <b>Итог:</b> ${escapeHtml(task.summary)}` : '',
     ].filter(Boolean).join('\n');
 
     await this.broadcastToWhitelist(msg);
@@ -46,10 +54,10 @@ export class NotificationService {
 
   public async notifyTaskCrashed(task: AgentTask, reason: string): Promise<void> {
     const msg = [
-      `🚨 *АВАРИЯ АГЕНТА:* \`${task.id.substring(0, 8)}\``,
-      `📁 *Проект:* ${task.project}`,
-      `⚡ *Skill:* _${task.skill}_`,
-      `💥 *Причина:* ${reason}`,
+      `🚨 <b>АВАРИЯ АГЕНТА:</b> <code>${task.id.substring(0, 8)}</code>`,
+      `📁 <b>Проект:</b> ${escapeHtml(task.project)}`,
+      `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
+      `💥 <b>Причина:</b> ${escapeHtml(reason)}`,
     ].join('\n');
 
     await this.broadcastToWhitelist(msg);
@@ -57,10 +65,10 @@ export class NotificationService {
 
   public async notifyTaskTimeout(task: AgentTask, timeoutSec: number): Promise<void> {
     const msg = [
-      `⏱️ *WATCHDOG TIMEOUT:* \`${task.id.substring(0, 8)}\``,
-      `📁 *Проект:* ${task.project}`,
-      `⚡ *Skill:* _${task.skill}_`,
-      `⚠️ *Причина:* Нет активности более ${timeoutSec}с. Процесс принудительно остановлен.`,
+      `⏱️ <b>WATCHDOG TIMEOUT:</b> <code>${task.id.substring(0, 8)}</code>`,
+      `📁 <b>Проект:</b> ${escapeHtml(task.project)}`,
+      `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
+      `⚠️ <b>Причина:</b> Нет активности более ${timeoutSec}с. Процесс принудительно остановлен.`,
     ].join('\n');
 
     await this.broadcastToWhitelist(msg);
@@ -76,17 +84,17 @@ export class NotificationService {
       .text('❌ Отклонить', `veronica:reject:${task.id}`);
 
     const msg = [
-      `⚠️ *ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ:* \`${task.id.substring(0, 8)}\``,
-      `📁 *Проект:* ${task.project}`,
-      `⚡ *Skill:* _${task.skill}_`,
-      `🎯 *Действие:* ${payload.action}`,
-      payload.details ? `📝 *Детали:* ${payload.details}` : '',
+      `⚠️ <b>ТРЕБУЕТСЯ ПОДТВЕРЖДЕНИЕ:</b> <code>${task.id.substring(0, 8)}</code>`,
+      `📁 <b>Проект:</b> ${escapeHtml(task.project)}`,
+      `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
+      `🎯 <b>Действие:</b> ${escapeHtml(payload.action)}`,
+      payload.details ? `📝 <b>Детали:</b> ${escapeHtml(payload.details)}` : '',
     ].filter(Boolean).join('\n');
 
     for (const chatId of whitelist) {
       try {
         await this.botInstance.api.sendMessage(chatId, msg, {
-          parse_mode: 'Markdown',
+          parse_mode: 'HTML',
           reply_markup: keyboard,
         });
       } catch (err) {
