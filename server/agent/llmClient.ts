@@ -55,7 +55,7 @@ async function fetchWithHeaderTimeout(
 }
 
 import { spawn } from 'node:child_process';
-import { resolveAntigravityModelAndEffort, getSafeCliPath } from '../veronica/adapters/antigravityAdapter';
+import { resolveAntigravityModelAndEffort, getSafeCliPath, isAntigravityModel } from '../veronica/adapters/antigravityAdapter';
 
 async function spawnAgyStreamResponse(
   config: AppConfig,
@@ -77,6 +77,9 @@ async function spawnAgyStreamResponse(
   if (agent && agent !== 'default' && agent !== 'none') {
     args.push('--agent', agent);
   }
+  if (config.workspace_dir) {
+    args.push('--add-dir', config.workspace_dir);
+  }
 
   // Format messages into clean multi-turn prompt payload
   let promptText = '';
@@ -91,6 +94,7 @@ async function spawnAgyStreamResponse(
   }
 
   const child = spawn(cliPath, args, {
+    cwd: config.workspace_dir || process.cwd(),
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
@@ -153,15 +157,7 @@ export async function fetchLlmResponse(
   broadcast: (event: string, payload: any) => void
 ): Promise<{ response: Response; activeModelName: string } | null> {
   const selectedModel = config.model_name || PRIMARY_TEXT_MODEL;
-  const isAntigravity =
-    !selectedModel.startsWith('local:') &&
-    !selectedModel.endsWith('.gguf') &&
-    (selectedModel.startsWith('gemini-') ||
-      selectedModel.startsWith('claude-') ||
-      selectedModel === 'inherit' ||
-      selectedModel === 'antigravity' ||
-      selectedModel === 'agy' ||
-      config.active_persona_id === 'veronica');
+  const isAntigravity = isAntigravityModel(selectedModel, config.active_persona_id);
 
   const isLocalModel =
     !isAntigravity &&

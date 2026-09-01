@@ -30,6 +30,25 @@ export function getSafeCliPath(customPath?: string | null): string {
   return 'agy';
 }
 
+export function isAntigravityModel(rawModel?: string | null, activePersonaId?: string | null): boolean {
+  if (activePersonaId === 'veronica') return true;
+  if (!rawModel) return false;
+  const selectedModel = rawModel.toLowerCase().trim();
+  if (selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf')) {
+    return false;
+  }
+  return (
+    selectedModel.startsWith('gemini-') ||
+    selectedModel.startsWith('claude-') ||
+    selectedModel.startsWith('gpt-') ||
+    selectedModel.startsWith('deepseek-') ||
+    selectedModel.startsWith('antigravity') ||
+    selectedModel === 'inherit' ||
+    selectedModel === 'auto' ||
+    selectedModel === 'agy'
+  );
+}
+
 export function resolveAntigravityModelAndEffort(rawModel?: string | null, rawEffort?: string | null): {
   model?: string;
   effort?: string;

@@ -16,11 +16,12 @@ import { RecoveryService } from '../server/veronica/watchdog/recoveryService';
 import { remoteNodeService } from '../server/remoteNodeService';
 import { veronicaScheduler } from '../server/veronica/core/scheduler';
 import { initPersonas, listPersonas, getPersonaDetail } from '../server/personas';
-import { antigravityAdapter, resolveAntigravityModelAndEffort, VeronicaStreamEvent } from '../server/veronica/adapters/antigravityAdapter';
+import { antigravityAdapter, resolveAntigravityModelAndEffort, isAntigravityModel, VeronicaStreamEvent } from '../server/veronica/adapters/antigravityAdapter';
 import { reloadVeronicaModule, getVeronicaStatus, shutdownVeronicaModule } from '../server/veronica';
 import { createVeronicaRouter } from '../server/routes/veronicaRoutes';
 import { operationalJournal } from '../server/veronica/core/operationalJournal';
 import { taskPromptBuilder } from '../server/veronica/core/taskPromptBuilder';
+import { buildFullSystemPrompt } from '../server/agent/promptBuilder';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -539,6 +540,45 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       const geminiProMedium = resolveAntigravityModelAndEffort('gemini-3.1-pro', 'medium');
       assert.equal(geminiProMedium.model, 'gemini-3.1-pro-low');
       assert.equal(geminiProMedium.effort, undefined);
+    });
+
+    it('should correctly classify Antigravity models vs local GGUF models', () => {
+      assert.equal(isAntigravityModel('gemini-3.7-flash'), true);
+      assert.equal(isAntigravityModel('claude-sonnet-4-6'), true);
+      assert.equal(isAntigravityModel('antigravity:inherit'), true);
+      assert.equal(isAntigravityModel('inherit'), true);
+      assert.equal(isAntigravityModel('agy'), true);
+      assert.equal(isAntigravityModel(null, 'veronica'), true);
+
+      assert.equal(isAntigravityModel('local:qwen2.5-coder-32b.gguf'), false);
+      assert.equal(isAntigravityModel('my-model.gguf'), false);
+    });
+
+    it('should build clean system prompt without 23 XML tools when Antigravity model is selected', () => {
+      const agyConfig: any = {
+        model_name: 'gemini-3.7-flash',
+        workspace_dir: 'C:\\test\\workspace',
+      };
+      const agyPrompt = buildFullSystemPrompt(agyConfig);
+
+      // Antigravity prompt should contain persona & environment, but NOT 23 XML tool specifications or approval gates
+      assert.ok(agyPrompt.includes('# CONVERSATION & LANGUAGE STANDARD:'));
+      assert.ok(agyPrompt.includes('# AGENT PERSONA:'));
+      assert.ok(agyPrompt.includes('# SYSTEM ENVIRONMENT'));
+      assert.ok(!agyPrompt.includes('TOOL REGISTRY & XML SPECIFICATION'), 'Should not contain XML tool registry for Antigravity');
+      assert.ok(!agyPrompt.includes('TWO-TIER APPROVAL & INTERACTION PROTOCOL'), 'Should not contain Two-Tier approval gate for Antigravity');
+      assert.ok(!agyPrompt.includes('<patch_file'), 'Should not contain <patch_file> specs for Antigravity');
+      assert.ok(!agyPrompt.includes('<read_file'), 'Should not contain <read_file> specs for Antigravity');
+
+      // Local GGUF prompt MUST retain full tool registry
+      const localConfig: any = {
+        model_name: 'local:qwen2.5-coder-32b.gguf',
+        workspace_dir: 'C:\\test\\workspace',
+      };
+      const localPrompt = buildFullSystemPrompt(localConfig);
+      assert.ok(localPrompt.includes('TOOL REGISTRY & XML SPECIFICATION'), 'Should contain XML tool registry for local GGUF');
+      assert.ok(localPrompt.includes('TWO-TIER APPROVAL & INTERACTION PROTOCOL'), 'Should contain Two-Tier approval gate for local GGUF');
+      assert.ok(localPrompt.includes('<patch_file'), 'Should contain <patch_file> for local GGUF');
     });
   });
 

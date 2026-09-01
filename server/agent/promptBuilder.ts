@@ -2,16 +2,19 @@ import { AppConfig, ChatMessage } from '../../src/types';
 import { getSystemPromptMemoryContext } from '../memory';
 import { getActivePersona, getUnifiedToolsContext } from '../personas';
 import { getWorkspace0xAgentMdContext } from '../tools';
+import { isAntigravityModel } from '../veronica/adapters/antigravityAdapter';
+import { PRIMARY_TEXT_MODEL } from './llmClient';
 
 export function buildFullSystemPrompt(config: AppConfig, userQuery?: string): string {
   const modelNameLower = (config.model_name || '').toLowerCase();
   const modelPathLower = (config.local_server?.model_path || '').toLowerCase();
   const isGemmaModel = modelNameLower.includes('gemma') || modelPathLower.includes('gemma');
+  const isAntigravity = isAntigravityModel(config.model_name || PRIMARY_TEXT_MODEL, config.active_persona_id);
 
-  // Google DeepMind Gemma 4 Trigger Token:
+  // Google DeepMind Gemma 4 Trigger Token (local GGUF only):
   // Thinking is enabled by including the <|think|> token strictly for Gemma 4 models.
   const isReasoningExplicitlyOff = config.reasoning_enabled === false || config.reasoning_effort === 'off';
-  const thinkTrigger = isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
+  const thinkTrigger = !isAntigravity && isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
 
   const activePersona = getActivePersona();
   const memoryContext = getSystemPromptMemoryContext(activePersona.metadata.id, userQuery, config.workspace_dir || undefined);
@@ -20,15 +23,23 @@ export function buildFullSystemPrompt(config: AppConfig, userQuery?: string): st
 - Shell: PowerShell
 - Active Workspace: ${config.workspace_dir || process.cwd()}
 - Execution: Commands run directly in PowerShell in workspace root. Do NOT wrap in 'powershell -Command' or 'cd'. Do NOT launch blocking background dev servers (e.g. 'npm run dev', 'vite').
-- Paths: ALWAYS use compact relative paths (e.g. 'src/App.tsx', 'server/agent.ts', '.') in tool calls and commands.`;
+- Paths: ALWAYS use compact relative paths (e.g. 'src/App.tsx', 'server/agent.ts', '.') in commands.`;
 
   const isPlanningMode = config.planning_mode !== false;
   const planningContext = isPlanningMode
     ? `\n\n# PLANNING & EXPLORATION
-Before modifying files, inspect the codebase first (<read_file>, <list_dir>, <grep_search>), formulate a concise plan, and verify changes after editing.`
+Before modifying files, inspect the codebase first, formulate a concise plan, and verify changes after editing.`
     : '';
 
-  const personaContext = `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
+  const personaContext = isAntigravity
+    ? `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
+
+## SOUL.md
+${activePersona.soul}
+
+## USER.md (Global User Profile)
+${activePersona.user}`
+    : `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
 
 ## SOUL.md
 ${activePersona.soul}
@@ -55,11 +66,11 @@ ${activePersona.user}
 5. STOP GENERATION immediately after the closing XML tag of a tool. The environment will execute it in the real OS and return output in <tool_response name="...">...</tool_response>.
 6. NEVER fabricate, simulate, or mock tool outputs yourself.`;
 
-  const gemmaToolDirective = isGemmaModel
+  const gemmaToolDirective = !isAntigravity && isGemmaModel
     ? `\n\n# JSON TOOL FORMAT (Gemma 4)\nYou may also invoke tools in JSON format inside <tool_call> tags.`
     : '';
 
-  const reasoningDirective = !isReasoningExplicitlyOff && !isGemmaModel
+  const reasoningDirective = !isAntigravity && !isReasoningExplicitlyOff && !isGemmaModel
     ? `\n\n# INSTRUCTIONS FOR REASONING BLOCK <THINK>
 1. REASON CONCISELY & ACT IMMEDIATELY: Reason step-by-step about what needs to be inspected, created, or fixed. Keep thoughts compact, direct, and focused on strategy, logic, and tool selection.
 2. STRICTLY NO CODE OR DRAFTS IN THINKING: Never write actual code blocks, functions, scripts, patches, or mock file contents inside <think>. Identify the file and change conceptually in 1-2 lines, then output the real code directly inside tool tags (<write_file>, <patch_file>) or the final response.
@@ -102,14 +113,15 @@ The runtime validates cryptographic nonces and hashes before execution.`;
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
 
   // Cacheable Stable Prefix
-  const stablePrefix =
-    languageProtocolDirective +
-    twoTierProtocolDirective +
-    toolExecutionDirective +
-    unifiedToolsContext +
-    gemmaToolDirective +
-    envContext +
-    personaContext;
+  const stablePrefix = isAntigravity
+    ? languageProtocolDirective + envContext + personaContext
+    : languageProtocolDirective +
+      twoTierProtocolDirective +
+      toolExecutionDirective +
+      unifiedToolsContext +
+      gemmaToolDirective +
+      envContext +
+      personaContext;
 
   // Dynamic Context
   const dynamicContext =
