@@ -125,6 +125,23 @@ export interface SystemPromptItem {
   editable?: boolean;
 }
 
+export interface RemoteNodeConfig {
+  enabled?: boolean;
+  host: string;
+  port: number;
+  auto_probe?: boolean;
+}
+
+export interface VeronicaConfig {
+  enabled?: boolean;
+  telegram_token?: string | null;
+  telegram_whitelist?: number[] | null;
+  antigravity_cli_path?: string | null;
+  default_autonomy_level?: 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
+  watchdog_interval_sec?: number;
+  default_heartbeat_timeout_sec?: number;
+}
+
 export interface AppConfig {
   api_url: string;
   model_name: string;
@@ -134,7 +151,6 @@ export interface AppConfig {
   workspace_dir?: string | null;
   language?: AppLanguage | null;
   groq_api_key?: string | null;
-  gemini_api_key?: string | null;
   active_theme?: AppTheme | string | null;
   theme_colors?: ThemeColors | null;
   models_path?: string | null;
@@ -148,6 +164,8 @@ export interface AppConfig {
   sound_notifications?: boolean | null;
   compact_chat?: boolean | null;
   local_server?: LocalServerConfig | null;
+  remote_node?: RemoteNodeConfig | null;
+  veronica?: VeronicaConfig | null;
   fallback_models?: string[] | null;
   jarvis_model?: string | null;
   tts_config?: TtsConfig | null;

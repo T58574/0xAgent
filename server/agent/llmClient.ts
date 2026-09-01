@@ -9,16 +9,15 @@ import { strip_ai_reasoning_fluff } from './fluffSanitizer';
 import { filterCloudPayload } from './cloudPrivacyFilter';
 import { estimatePromptTokens } from '../summarizer';
 
-export const PRIMARY_TEXT_MODEL = 'gemini-3.6-flash';
-export const GEMMA_MODEL = 'gemma-4-31b-it';
-export const FAST_LITE_MODEL = 'gemini-3.5-flash-lite';
-export const NATIVE_AUDIO_MODEL = 'gemini-2.5-flash-preview-tts';
+export const PRIMARY_TEXT_MODEL = 'local:qwen2.5-coder-32b.gguf';
+export const GEMMA_MODEL = 'local:gemma-4-31b-it.gguf';
+export const FAST_LITE_MODEL = 'local:qwen2.5-coder-7b.gguf';
+export const NATIVE_AUDIO_MODEL = 'local:tts-voice';
 
 export const DEFAULT_FALLBACK_CHAIN: string[] = [
-  'gemini-3.6-flash',
-  'gemma-4-31b-it',
-  'gemini-3.5-flash',
-  'gemini-3.5-flash-lite',
+  'local:qwen2.5-coder-32b.gguf',
+  'local:gemma-4-31b-it.gguf',
+  'local:qwen2.5-coder-7b.gguf',
 ];
 
 export interface LlmStreamResult {
@@ -67,6 +66,7 @@ export async function fetchLlmResponse(
   const isLocalModel =
     selectedModel.startsWith('local:') ||
     selectedModel.endsWith('.gguf') ||
+    !config.api_url ||
     config.api_url.includes('127.0.0.1') ||
     config.api_url.includes('localhost');
 
@@ -78,12 +78,11 @@ export async function fetchLlmResponse(
   const configuredEffort = config.reasoning_effort || config.local_server?.reasoning_effort || 'auto';
   const isReasoningOff = config.reasoning_enabled === false || configuredEffort === 'off';
 
-  // For local models (27B/31B GGUF), prefill on large prompts can take 2-4 minutes.
-  // We allocate at least 300s (5 min) for the initial connection/prefill response.
+  // For large models (27B/32B GGUF) on local/LAN servers, allocate 300s-600s
   const baseTimeoutSec = config.api_timeout_sec || (isLocalModel ? 300 : 90);
   const requestTimeoutMs = Math.max(isLocalModel ? 180 : 30, baseTimeoutSec) * 1000;
 
-  if (isLocalModel && (selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf'))) {
+  if (isLocalModel) {
     const localHost = config.local_server?.host || '127.0.0.1';
     const localPort = config.local_server?.port || 11434;
     const apiEndpoint = `http://${localHost}:${localPort}/v1/chat/completions`;
@@ -149,133 +148,50 @@ export async function fetchLlmResponse(
         }
         const isTimeout = err?.name === 'TimeoutError' || String(err?.message).includes('timed out') || String(err?.message).includes('aborted');
         const errMsg = isTimeout
-          ? `[!] **Превышен таймаут ожидания локального LLM сервера (${Math.round(requestTimeoutMs / 1000)}с)!**\nЛокальная модель не ответила за отведенное время (длинная фаза prefill или зависание llama-server).\n\n[›] **Решение:**\n1. В **Настройках -> Сервер LLM** убедитесь, что включен Flash Attention (\`-fa on\`) и квантованный KV-кэш (\`-ctk q8_0 -ctv q8_0\`).\n2. Увеличьте параметр **API Timeout** в основных настройках.`
-          : `[!] **Локальный LLM Сервер не запущен или недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n[›] **Решение:** Нажмите кнопку **[Запустить LLM Сервер]** прямо над чатом или перейдите во вкладку **Настройки -> Сервер LLM**.`;
+          ? `[!] **Превышен таймаут ожидания LLM сервера (${Math.round(requestTimeoutMs / 1000)}с)!**\nМодель не ответила за отведенное время (длинная фаза prefill или сетевая задержка).\n\n[›] **Решение:**\n1. В **Настройках -> Сервер LLM** убедитесь, что включен Flash Attention (\`-fa on\`) и квантованный KV-кэш (\`-ctk q8_0 -ctv q8_0\`).\n2. Увеличьте параметр **API Timeout** в настройках.`
+          : `[!] **LLM Сервер (${localHost}:${localPort}) недоступен!**\nНе удалось подключиться к \`${apiEndpoint}\` (${err.message}).\n\n[›] **Решение:** Убедитесь, что сервер llama.cpp запущен локально или на рабочей станции в LAN.`;
         handleAgentError(session, sessionId, broadcast, errMsg);
         return null;
       }
     }
   } else {
-    const apiKey =
-      config.gemini_api_key ||
-      process.env.GEMINI_API_KEY ||
-      process.env.GOOGLE_API_KEY ||
-      config.groq_api_key ||
-      '';
-
-    if (!apiKey && !selectedModel.includes('localhost') && !selectedModel.includes('127.0.0.1')) {
-      const errMsg = `[!] **Google AI Studio API Key не задан!**\nДля использования облачной модели \`${selectedModel}\` требуется API ключ Google AI Studio.\n\n[›] **Решение:** Укажите Ваш **GEMINI_API_KEY** в **Настройках (Сервер LLM / Облачные модели)** или в переменной окружения.`;
-      handleAgentError(session, sessionId, broadcast, errMsg);
-      return null;
-    }
-
-    const modelCandidates = [selectedModel];
-    const fallbackList =
-      config.fallback_models && config.fallback_models.length > 0
-        ? config.fallback_models
-        : DEFAULT_FALLBACK_CHAIN;
-    for (const m of fallbackList) {
-      if (!modelCandidates.includes(m)) modelCandidates.push(m);
-    }
-
-    const cloudEndpoint = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    // Custom OpenAI-compatible endpoint (e.g. Groq / Ollama / Custom API)
+    const customEndpoint = config.api_url || 'http://127.0.0.1:11434/v1/chat/completions';
+    const apiKey = config.groq_api_key || '';
     const { sanitizedMessages } = filterCloudPayload(messages);
 
-    for (const candidateModel of modelCandidates) {
-      activeModelName = candidateModel;
-      const baseMaxTokens = config.max_tokens ?? 16384;
-      const effectiveMaxTokens = !isReasoningOff && baseMaxTokens < 16384 ? 16384 : baseMaxTokens;
+    const requestBody: any = {
+      model: selectedModel,
+      messages: sanitizedMessages,
+      stream: true,
+      temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
+      max_tokens: config.max_tokens || 8192,
+    };
 
-      const requestBody: any = {
-        model: candidateModel,
-        messages: sanitizedMessages,
-        stream: true,
-        temperature: loopRetryCount > 0 ? 0.7 : (config.temperature ?? 0.2),
-        max_tokens: effectiveMaxTokens,
-      };
-
-      if (configuredEffort && configuredEffort !== 'auto' && !isReasoningOff) {
-        const cloudEffort = configuredEffort === 'xhigh' ? 'high' : configuredEffort;
-        requestBody.reasoning_effort = cloudEffort;
-      }
-
-      let rateLimitAttempts = 0;
-      const maxRateLimitRetries = 2;
-
-      while (rateLimitAttempts <= maxRateLimitRetries) {
-        try {
-          let res = await fetchWithHeaderTimeout(
-            cloudEndpoint,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${apiKey}`,
-              },
-              body: JSON.stringify(requestBody),
-            },
-            requestTimeoutMs
-          );
-
-          if (res.status === 429 && rateLimitAttempts < maxRateLimitRetries) {
-            rateLimitAttempts++;
-            console.warn(`[agent] Cloud model ${candidateModel} hit 429. Attempt ${rateLimitAttempts}/${maxRateLimitRetries}. Retrying in 2.5s...`);
-            await new Promise((r) => setTimeout(r, 2500 * rateLimitAttempts));
-            continue;
-          }
-
-          if (res.status === 400) {
-            console.warn(`[agent] Model ${candidateModel} returned 400. Retrying without reasoning_effort/systemInstruction...`);
-            const strippedMessages = messages.filter((m) => m.role !== 'system');
-            const fallbackBody = { ...requestBody, messages: strippedMessages };
-            delete fallbackBody.reasoning_effort;
-            delete fallbackBody.chat_template_kwargs;
-            const retryRes = await fetchWithHeaderTimeout(
-              cloudEndpoint,
-              {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${apiKey}`,
-                },
-                body: JSON.stringify(fallbackBody),
-              },
-              requestTimeoutMs
-            );
-            if (retryRes.ok) {
-              res = retryRes;
-            }
-          }
-
-          if (res.ok) {
-            response = res;
-            break;
-          } else {
-            lastStatusCode = res.status;
-            lastErrorText = await res.text().catch(() => '');
-            console.warn(`[agent] Cloud model ${candidateModel} failed (${res.status}): ${lastErrorText.substring(0, 200)}`);
-            break;
-          }
-        } catch (fetchErr: any) {
-          lastErrorText = fetchErr.message;
-          console.warn(`[agent] Cloud model ${candidateModel} network error: ${fetchErr.message}`);
-          break;
-        }
-      }
-
-      if (response && response.ok) break;
+    try {
+      response = await fetchWithHeaderTimeout(
+        customEndpoint,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+          },
+          body: JSON.stringify(requestBody),
+        },
+        requestTimeoutMs
+      );
+    } catch (err: any) {
+      lastErrorText = err.message;
     }
   }
 
   if (!response || !response.ok) {
-    let errMsg = `[!] **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server / all fallback models exhausted'}\n\`\`\``;
-
-    if (lastStatusCode === 401 || lastStatusCode === 403) {
-      errMsg = `[KEY] **Ошибка авторизации Google API (HTTP ${lastStatusCode})!**\n\nПроверьте **GEMINI_API_KEY** в Настройках.\n\n\`\`\`json\n${lastErrorText.substring(0, 400)}\n\`\`\``;
-    } else if (lastStatusCode === 429) {
-      errMsg = `[TIME] **Превышен лимит запросов Google AI Studio (HTTP 429)!**\n\nПодождите 15-30 секунд или переключитесь на локальную модель.\n\n\`\`\`json\n${lastErrorText.substring(0, 400)}\n\`\`\``;
+    lastStatusCode = response?.status || 500;
+    if (!lastErrorText && response) {
+      lastErrorText = await response.text().catch(() => '');
     }
-
+    const errMsg = `[!] **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server'}\n\`\`\``;
     handleAgentError(session, sessionId, broadcast, errMsg);
     return null;
   }
@@ -427,7 +343,7 @@ export async function readLlmStream(
         console.warn(`[agent] Stream chunk inactivity timeout (${CHUNK_INACTIVITY_TIMEOUT_MS / 1000}s) reached.`);
         await reader.cancel().catch(() => {});
         if (tokenCount === 0) {
-          const errMsg = `[!] **Таймаут стриминга ответа LLM сервера!**\nСервер не прислал ни одного чанка в течение ${CHUNK_INACTIVITY_TIMEOUT_MS / 1000} секунд.\n\n[›] **Решение:** Проверьте доступность локального сервера и загрузку VRAM.`;
+          const errMsg = `[!] **Таймаут стриминга ответа LLM сервера!**\nСервер не прислал ни одного чанка в течение ${CHUNK_INACTIVITY_TIMEOUT_MS / 1000} секунд.\n\n[›] **Решение:** Проверьте доступность локального/удаленного сервера и загрузку VRAM.`;
           handleAgentError(session, sessionId, broadcast, errMsg);
           return null;
         }
@@ -478,7 +394,6 @@ export async function readLlmStream(
 
     if (isTimeout && tokenCount > 0) {
       console.warn(`[agent] Stream interrupted by timeout after ${tokenCount} tokens generated.`);
-      // If we already generated partial tokens, salvage what we have
     } else {
       const errMsg = isTimeout
         ? `[!] **Таймаут стриминга ответа LLM сервера!**\nГенерация была прервана из-за превышения времени ожидания чанков.\n\n[›] **Решение:** Увеличьте **API Timeout** в Настройках или используйте меньший размер контекста.`

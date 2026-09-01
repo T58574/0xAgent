@@ -60,6 +60,15 @@ Manage the entire platform from any terminal via the unified `0xagent` CLI:
 # Inspect live backend health, port bindings & telemetry
 0xagent status
 
+# Veronica Personal AI Assistant CLI protocol
+0xagent veronica context <project>    # Fetch dense token-efficient project context
+0xagent veronica heartbeat --task <id> # Send alive signal & progress
+0xagent veronica report --task <id>   # Finalize task and send Telegram alert
+0xagent veronica git commit -m <msg>  # Safe unified git commit (L3+ autonomy)
+
+# Probe remote GPU Compute Node on LAN workstation
+0xagent node probe 192.168.1.100 11434
+
 # Force purge GPU VRAM and terminate background inference workers
 0xagent purge-vram
 
@@ -71,11 +80,19 @@ Manage the entire platform from any terminal via the unified `0xagent` CLI:
 
 ## 🚀 Key Features & Agent Harness
 
-Unlike conventional wrappers requiring external servers (like Ollama or vLLM), **0xAgent is the first all-in-one platform featuring a native, built-in inference supervisor** and a production-grade autonomous agent harness out of the box with zero complex setup.
+Unlike conventional wrappers requiring external servers (like Ollama or vLLM), **0xAgent is the first all-in-one platform featuring a native, built-in inference supervisor**, a 24/7 personal assistant module (**Veronica**), and a production-grade autonomous agent harness out of the box with zero complex setup.
 
-### 🧠 First-of-its-Kind Built-In Local Engine
-- **Native `llama-server` Supervisor**: 1-click binary downloader and automatic GPU layer offloading (`-ngl`), Flash Attention (`-fa on`), quantized KV cache (`-ctk q8_0 -ctv q8_0`), and automated VRAM reclamation when switching models.
-- **Hybrid Cloud Fallback**: Zero-latency switching to Google AI Studio (Gemini 3.6 Flash / Flash Lite) and Groq when local compute is constrained.
+### 🤖 Module «Veronica» — Personal AI Assistant & Telegram Supervisor
+- **Deterministic SQLite Audit Journal**: All background tasks, heartbeats, git commits, and project states are stored in an isolated `veronica.db` (WAL mode) with an In-Memory Single-Writer FIFO queue.
+- **Telegram Bot Gateway (`grammy`)**: Control tasks, query project progress, and receive instant proactive notifications on completion, crashes, or timeouts (`/status`, `/projects`, `/today`, `/yesterday`, `/run`, `/kill`).
+- **Token-Dense Context Engine**: Generates ultra-compact project summaries (~150-250 tokens) via `0xagent veronica context <project>` so background agents get up to speed instantly without consuming context windows.
+- **Watchdog & Process Supervisor**: Automatic PID verification, inactivity timeout tracking (300s), Tree-Kill of hanging subprocesses, and crash state self-healing on boot.
+- **Single-Agent Project Mutex**: Exclusive project locks preventing race conditions and git corruption.
+- **Autonomy Levels (L0–L5)**: Hardware-enforced privilege boundaries restricting automated git commits to L3+.
+
+### 🧠 Distributed LAN Compute Node & Local Llama Engine
+- **24/7 Low-Power Laptop Mode**: Run 0xAgent and Veronica on a low-spec laptop 24/7 (~150 MB RAM) while offloading heavy LLM inference to a powerful GPU workstation over LAN (`0xagent node probe`).
+- **Native `llama-server` Supervisor**: 1-click binary downloader and automatic GPU layer offloading (`-ngl`), Flash Attention (`-fa on`), quantized KV cache (`-ctk q8_0 -ctv q8_0`), and automated VRAM reclamation.
 - **Local GGUF Model Hub**: Direct support for Qwen 2.5 Coder, Gemma 4, DeepSeek, and Llama 3.3.
 
 ### 🛠 Complete Zero-Config Agent Harness
@@ -183,6 +200,7 @@ All runtime configurations, model weights, personas, and memory are stored in `~
 | Directory / File | Description |
 |---|---|
 | `~/.0xagent/config.json` | Global settings, API keys, active models, and security permissions |
+| `~/.0xagent/veronica/` | Veronica SQLite audit journal (`veronica.db`), backups & task history |
 | `~/.0xagent/models/` | Local GGUF model files repository |
 | `~/.0xagent/llama/` | Managed `llama-server.exe` binary builds |
 | `~/.0xagent/personas/` | System personas & memory (`SOUL.md`, `USER.md`, `TOOLS.md`) |

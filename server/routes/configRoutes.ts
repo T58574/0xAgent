@@ -49,44 +49,7 @@ configRouter.post('/config', (req, res) => {
 configRouter.get('/models', (_req, res) => {
   try {
     const cfg = loadConfig();
-    const cloudModels = [
-      {
-        id: 'gemini-3.6-flash',
-        name: 'Gemini 3.6 Flash',
-        badge: 'Fast',
-        speed: 'Fast >',
-        provider: 'Google AI Studio',
-      },
-      {
-        id: 'gemini-3.5-flash',
-        name: 'Gemini 3.5 Flash',
-        badge: 'Fast',
-        speed: 'Fast >',
-        provider: 'Google AI Studio',
-      },
-      {
-        id: 'gemini-3.5-flash-lite',
-        name: 'Gemini 3.5 Flash Lite',
-        badge: 'Ultra Fast',
-        speed: 'Ultra Fast >',
-        provider: 'Google AI Studio',
-      },
-      {
-        id: 'gemma-4-31b-it',
-        name: 'Gemma 4 31B IT',
-        badge: 'Medium',
-        speed: 'Medium >',
-        provider: 'Google AI Studio',
-      },
-      {
-        id: 'gemini-2.5-flash-preview-tts',
-        name: 'Gemini 2.5 Flash Preview TTS',
-        badge: 'Fast',
-        speed: 'Fast >',
-        provider: 'Google AI Studio',
-        isAudio: true,
-      },
-    ];
+    const cloudModels: any[] = [];
 
     const dirsToScan: string[] = [
       path.join(process.cwd(), 'models'),
@@ -137,7 +100,7 @@ configRouter.get('/models', (_req, res) => {
     res.json({
       cloud: cloudModels,
       local: scannedLocalModels,
-      activeModelId: cfg.model_name || 'gemini-3.6-flash',
+      activeModelId: cfg.model_name || 'local:qwen2.5-coder-32b.gguf',
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

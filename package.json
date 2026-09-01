@@ -47,6 +47,7 @@
     "@types/marked": "^5.0.2",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "grammy": "^1.46.0",
     "lucide-react": "^1.25.0",
     "marked": "^18.0.6",
     "react": "^19.1.0",

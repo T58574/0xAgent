@@ -32,8 +32,6 @@ interface GeneralTabProps {
   setApiUrl: (val: string) => void;
   groqApiKey: string;
   setGroqApiKey: (val: string) => void;
-  geminiApiKey?: string;
-  setGeminiApiKey?: (val: string) => void;
   reasoningEnabled: boolean;
   setReasoningEnabled: (val: boolean) => void;
   autoSaveHistory: boolean;

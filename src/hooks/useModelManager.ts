@@ -29,17 +29,12 @@ export function useModelManager(
   });
 
   const [modelsData, setModelsData] = useState<AvailableModelsResponse>({
-    cloud: [
-      { id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash', badge: 'Medium', speed: 'Medium', provider: 'Google AI Studio' },
-      { id: 'gemma-4-31b-it', name: 'Gemma 4 31B IT', badge: 'Fast', speed: 'Fast', provider: 'Google AI Studio' },
-      { id: 'gemini-3.5-flash-lite', name: 'Gemini 3.5 Flash Lite', badge: 'Ultra Fast', speed: 'Ultra Fast', provider: 'Google AI Studio' },
-      { id: 'gemini-2.5-flash-preview-tts', name: 'Gemini 2.5 Flash Preview TTS', badge: 'Fast', speed: 'TTS Audio', provider: 'Google AI Studio', isAudio: true },
-    ],
+    cloud: [],
     local: [],
-    activeModelId: config?.model_name || 'gemini-3.6-flash',
+    activeModelId: config?.model_name || 'local:qwen2.5-coder-32b.gguf',
   });
 
-  const activeModelId = config?.model_name || modelsData.activeModelId || 'gemini-3.6-flash';
+  const activeModelId = config?.model_name || modelsData.activeModelId || 'local:qwen2.5-coder-32b.gguf';
   const isLocalActive = activeModelId.startsWith('local:') || activeModelId.endsWith('.gguf');
 
   const fetchModelsAndStatus = useCallback(async () => {

@@ -28,6 +28,10 @@ import { cleanupOrphanWorkspaces } from './session';
 import { reconcileInterruptedSessions } from './agent/selfPatchEngine';
 import { ensureEnvironmentHealth } from './envSanitizer';
 import { startMemoryDecayScheduler } from './agent/memoryDecayWorker';
+import { veronicaRouter } from './routes/veronicaRoutes';
+import { initVeronicaModule, shutdownVeronicaModule } from './veronica';
+import { remoteNodeService } from './remoteNodeService';
+import { loadConfig } from './config';
 
 // 1. Run Self-Healing Environment diagnostics and path repair on boot
 const envHealth = ensureEnvironmentHealth();
@@ -56,6 +60,8 @@ app.use((req, res, next) => {
     '/api/jarvis/voice-wake',
     '/api/jarvis/voice-input',
     '/api/jarvis/voice-state',
+    '/api/veronica/cli',
+    '/api/veronica/status',
   ];
 
   if (!req.path.startsWith('/api/') || publicAuthPaths.includes(req.path) || req.path.startsWith('/api/jarvis/voice-')) {
@@ -153,6 +159,7 @@ app.use('/api', createAgentRouter(broadcast));
 app.use('/api', contextRouter);
 app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
+app.use('/api/veronica', veronicaRouter);
 
 // Serve static production build (dist/) if present (PWA shell, assets, icons)
 const DIST_DIR = path.resolve(process.cwd(), 'dist');
@@ -180,6 +187,8 @@ const cleanupOnExit = () => {
   voiceDaemonManager.stop();
   jarvisSupervisor.stopLoop();
   stopLlamaServerProcess(broadcast);
+  remoteNodeService.stopProbe();
+  shutdownVeronicaModule();
 };
 
 server.on('error', (err: any) => {
@@ -232,4 +241,15 @@ server.listen(Number(PORT), HOST, () => {
 
   // Start continuous memory decay & conflict hygiene scheduler
   startMemoryDecayScheduler();
+
+  // Start Remote Node probe if configured
+  const cfg = loadConfig();
+  if (cfg.remote_node?.host) {
+    remoteNodeService.startProbe(cfg.remote_node.host, cfg.remote_node.port || 11434);
+  }
+
+  // Initialize Veronica Module
+  initVeronicaModule().catch((err) => {
+    console.error('[Veronica] Startup initialization error:', err);
+  });
 });

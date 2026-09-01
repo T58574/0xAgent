@@ -264,7 +264,7 @@ export async function calculateContextBreakdown(
     systemPromptTokens,
     chatMessagesTokens: chatTokens,
     categories,
-    modelName: config.model_name || 'gemini-3.6-flash',
+    modelName: config.model_name || 'local:qwen2.5-coder-32b.gguf',
     sessionId: sessionId || null,
   };
 }

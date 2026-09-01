@@ -160,7 +160,7 @@ export async function summarizeContext(
       : conversationExcerpt;
 
   try {
-    const apiKey = config.gemini_api_key || process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || config.groq_api_key || '';
+    const apiKey = config.groq_api_key || process.env.GROQ_API_KEY || '';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) {
       headers['Authorization'] = `Bearer ${apiKey}`;

@@ -314,6 +314,151 @@ async function cmdConfig() {
   }
 }
 
+async function cmdVeronica(veronicaArgs) {
+  const subCmd = veronicaArgs[0];
+  if (!subCmd || subCmd === '--help' || subCmd === '-h') {
+    console.log(`
+${c.cyan}${c.bold}Veronica CLI Protocol & Assistant Interface${c.reset}
+Usage: 0xagent veronica <command> [options]
+
+Commands:
+  context <project> [--task <id>]      Fetch dense token-efficient project context
+  heartbeat --task <id> [--action <a>] Update agent alive status & progress
+  report --task <id> [--status <s>]    Submit final report & task summary
+  error --task <id> --message <m>      Log error or mark task failed
+  git commit --task <id> -m <msg>      Safe unified git commit (L3+ autonomy)
+  git rollback --task <id>             Rollback commit created by task
+  agents                               List all active background agents
+`);
+    return;
+  }
+
+  // Parse arguments into CLI payload
+  let payload = { command: subCmd };
+
+  if (subCmd === 'context') {
+    payload.project = veronicaArgs[1];
+    const taskIdx = veronicaArgs.indexOf('--task');
+    if (taskIdx !== -1 && veronicaArgs[taskIdx + 1]) {
+      payload.task_id = veronicaArgs[taskIdx + 1];
+    }
+  } else if (subCmd === 'heartbeat') {
+    const taskIdx = veronicaArgs.indexOf('--task');
+    payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
+    const actionIdx = veronicaArgs.indexOf('--action');
+    if (actionIdx !== -1) payload.action = veronicaArgs[actionIdx + 1];
+    const progIdx = veronicaArgs.indexOf('--progress');
+    if (progIdx !== -1) payload.progress = veronicaArgs[progIdx + 1];
+  } else if (subCmd === 'report') {
+    const taskIdx = veronicaArgs.indexOf('--task');
+    payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
+    const statusIdx = veronicaArgs.indexOf('--status');
+    if (statusIdx !== -1) payload.status = veronicaArgs[statusIdx + 1];
+    const sumIdx = veronicaArgs.indexOf('--summary');
+    if (sumIdx !== -1) payload.summary = veronicaArgs.slice(sumIdx + 1).join(' ');
+  } else if (subCmd === 'error') {
+    const taskIdx = veronicaArgs.indexOf('--task');
+    payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
+    const msgIdx = veronicaArgs.indexOf('--message');
+    if (msgIdx !== -1) payload.message = veronicaArgs.slice(msgIdx + 1).join(' ');
+    payload.fatal = veronicaArgs.includes('--fatal');
+  } else if (subCmd === 'git') {
+    const gitAction = veronicaArgs[1];
+    if (gitAction === 'commit') {
+      payload.command = 'git_commit';
+      const taskIdx = veronicaArgs.indexOf('--task');
+      payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
+      const mIdx = veronicaArgs.indexOf('-m');
+      if (mIdx !== -1) payload.message = veronicaArgs.slice(mIdx + 1).join(' ');
+    } else if (gitAction === 'rollback') {
+      payload.command = 'git_rollback';
+      const taskIdx = veronicaArgs.indexOf('--task');
+      payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
+    }
+  } else if (subCmd === 'agents' || subCmd === 'list') {
+    payload.command = 'agents_list';
+  }
+
+  // Send HTTP request to local 0xAgent server
+  const port = process.env.PORT || 3001;
+  const postData = JSON.stringify(payload);
+
+  const req = http.request(
+    {
+      hostname: '127.0.0.1',
+      port,
+      path: '/api/veronica/cli',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(postData),
+      },
+      timeout: 5000,
+    },
+    (res) => {
+      let body = '';
+      res.on('data', (chunk) => (body += chunk));
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(body);
+          if (json.success) {
+            if (typeof json.data === 'string') {
+              console.log(json.data);
+            } else {
+              console.log(JSON.stringify(json.data, null, 2));
+            }
+          } else {
+            console.error(`${c.red}[Veronica CLI Error]${c.reset} ${json.error || 'Command failed'}`);
+            process.exit(1);
+          }
+        } catch {
+          console.log(body);
+        }
+      });
+    }
+  );
+
+  req.on('error', (err) => {
+    console.error(`${c.red}[Veronica CLI Error]${c.reset} Cannot connect to 0xAgent server on port ${port}: ${err.message}`);
+    process.exit(1);
+  });
+
+  req.write(postData);
+  req.end();
+}
+
+async function cmdNode(nodeArgs) {
+  const subCmd = nodeArgs[0] || 'status';
+  if (subCmd === 'probe' || subCmd === 'status') {
+    const host = nodeArgs[1] || '127.0.0.1';
+    const port = parseInt(nodeArgs[2], 10) || 11434;
+    console.log(`${c.cyan}[*] Probing Compute Node at http://${host}:${port}/health...${c.reset}`);
+    const start = Date.now();
+    const req = http.get({ hostname: host, port, path: '/health', timeout: 3000 }, (res) => {
+      let data = '';
+      res.on('data', (d) => (data += d));
+      res.on('end', () => {
+        const ms = Date.now() - start;
+        if (res.statusCode === 200) {
+          console.log(`${c.green}[OK] Compute Node is ONLINE (${ms}ms)${c.reset}`);
+          try {
+            console.log(JSON.stringify(JSON.parse(data), null, 2));
+          } catch {
+            console.log(data);
+          }
+        } else {
+          console.log(`${c.yellow}[!] Node responded with HTTP ${res.statusCode} (${ms}ms)${c.reset}`);
+        }
+      });
+    });
+    req.on('error', (err) => {
+      console.log(`${c.red}[FAIL] Compute Node is OFFLINE: ${err.message}${c.reset}`);
+    });
+  } else {
+    console.log(`Usage: 0xagent node probe [host] [port]`);
+  }
+}
+
 // -------------------------------------------------------------
 // CLI Routing
 // -------------------------------------------------------------
@@ -330,6 +475,12 @@ switch (command.toLowerCase()) {
     break;
   case 'status':
     cmdStatus();
+    break;
+  case 'veronica':
+    cmdVeronica(args.slice(1));
+    break;
+  case 'node':
+    cmdNode(args.slice(1));
     break;
   case 'config':
     cmdConfig();
@@ -349,17 +500,20 @@ switch (command.toLowerCase()) {
     console.log(`${c.bold}Usage:${c.reset} 0xagent [command] [options]
 
 ${c.bold}Commands:${c.reset}
-  0xagent              Start 0xAgent in background system tray (default)
-  0xagent start -f     Start in foreground console mode
-  0xagent config       Interactive settings & models manager
-  0xagent status       Show backend health, telemetry & active model
-  0xagent update       Pull latest releases from GitHub & rebuild
-  0xagent stop         Terminate all running processes & free ports
-  0xagent purge-vram   Force purge GPU VRAM and terminate inference servers
-  0xagent help         Show this help manual
+  0xagent                      Start 0xAgent in background system tray (default)
+  0xagent start -f             Start in foreground console mode
+  0xagent veronica <cmd>       Veronica assistant CLI (context, heartbeat, report, git)
+  0xagent node probe [host]    Probe remote GPU Compute Node in LAN
+  0xagent config               Interactive settings & models manager
+  0xagent status               Show backend health, telemetry & active model
+  0xagent update               Pull latest releases from GitHub & rebuild
+  0xagent stop                 Terminate all running processes & free ports
+  0xagent purge-vram           Force purge GPU VRAM and terminate inference servers
+  0xagent help                 Show this help manual
 `);
     break;
   default:
     console.log(`${c.red}[!] Unknown command: ${command}${c.reset}. Run '0xagent help' for usage.`);
     break;
 }
+
