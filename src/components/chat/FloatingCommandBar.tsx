@@ -174,12 +174,12 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
 
   const supportsReasoning = Boolean(
     currentLocalMeta?.supportsReasoning ||
-    ['qwen3', 'gemma-4', 'deepseek-r1', 'r1-distill', 'phi-4', 'thinking', 'gemini-3.6'].some((k) => activeModelLower.includes(k))
+    ['qwen3', 'gemma-4', 'deepseek-r1', 'r1-distill', 'phi-4', 'thinking'].some((k) => activeModelLower.includes(k))
   );
 
   const recommendedEffort: ReasoningEffortLevel =
     currentLocalMeta?.recommendedReasoningEffort ||
-    (activeModelLower.includes('qwen3') ? 'xhigh' : activeModelLower.includes('deepseek') ? 'high' : activeModelLower.includes('gemma') || activeModelLower.includes('gemini') || activeModelLower.includes('phi') ? 'medium' : 'off');
+    (activeModelLower.includes('qwen3') ? 'xhigh' : activeModelLower.includes('deepseek') ? 'high' : activeModelLower.includes('gemma') || activeModelLower.includes('phi') ? 'medium' : 'off');
 
   const isListeningForWake = Boolean(config?.tts_config?.wake_word_enabled);
 

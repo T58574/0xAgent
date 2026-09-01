@@ -279,7 +279,6 @@ export const en: Translations = {
       voiceTestPhrase: 'Jarvis systems fully operational, sir.',
       connectionTitle: 'API Connection Parameters',
       apiUrl: 'API Endpoint URL',
-      geminiApiKey: 'Google Gemini API Key (AI Studio)',
       groqApiKey: 'Groq API Key (Whisper)',
       behaviorTitle: 'UI Behavior & Preferences',
       reasoningTitle: 'Chain of Thought (<think>)',

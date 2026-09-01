@@ -64,7 +64,7 @@ export class VeronicaOrchestrator {
     const cleanText = userText.trim();
     if (!cleanText) return 'Сэр, вы отправили пустое сообщение.';
 
-    // 1. Check if user was typing a direct task prompt for a project
+    // 1. Check if user was typing a direct task prompt for an active project
     if (session.awaitingPromptForProject) {
       const targetProj = session.awaitingPromptForProject;
       session.awaitingPromptForProject = undefined;
@@ -88,22 +88,63 @@ export class VeronicaOrchestrator {
       }
     }
 
-    // 2. Direct fast heuristics for common Russian queries
+    // 2. High-speed local heuristic matching (Zero Latency & Zero LLM dependency)
     const lower = cleanText.toLowerCase();
+
+    // Greetings
+    if (/^(привет|здравствуй|здравствуйте|добрый день|доброе утро|добрый вечер|ку|хай|салют|hello|hi)[!.]*$/i.test(lower)) {
+      const projects = await projectDiscovery.discoverAllProjects();
+      const activeTasks = taskRegistry.getActiveTasks();
+      return (
+        `👋 <b>Здравствуйте, сэр!</b>\n\n` +
+        `Все системы на связи. В каталоге доступно проектов: <b>${projects.length}</b>, активных задач в работе: <b>${activeTasks.length}</b>.\n\n` +
+        `💡 <i>Нажмите «📁 Проекты» для перехода к проектам или напишите мне, какую задачу поставить.</i>`
+      );
+    }
+
+    // Period reports
     if (lower === 'что сделано за вчера?' || lower === 'что сделано за вчера' || lower.includes('за вчера')) {
       return MessageBuilder.buildPeriodReport('yesterday');
     }
     if (lower === 'что сделано за сегодня?' || lower === 'что сделано за сегодня' || lower.includes('за сегодня') || lower === 'сводка за день') {
       return MessageBuilder.buildPeriodReport('today');
     }
-    if (lower === 'проекты' || lower === 'список проектов') {
-      return MessageBuilder.buildProjectsSummary();
+    if (lower === 'проекты' || lower === 'список проектов' || lower === 'покажи проекты') {
+      return await MessageBuilder.buildProjectsSummary();
     }
-    if (lower === 'статус' || lower === 'статус системы') {
+    if (lower === 'статус' || lower === 'статус системы' || lower === 'как дела') {
       return MessageBuilder.buildStatusMessage();
     }
 
-    // 3. Fallback to LLM Orchestrator Reasoning
+    // Task placement heuristic: "поставь задачу на проект X: ..." or "добавь в проект X ..."
+    const taskMatch = lower.match(/(?:поставь задачу|запусти задачу|сделай задачу|выполни задачу|добавь|создай)\s+(?:на|в|для)?\s*(?:проект|проекте)?\s*([a-zA-Z0-9_\-]+)[:\s]+(.+)/i);
+    if (taskMatch) {
+      const candidateProj = taskMatch[1].trim();
+      const taskPrompt = taskMatch[2].trim();
+      const resolved = await projectDiscovery.resolveProjectPath(candidateProj);
+
+      if (resolved) {
+        try {
+          const task = await antigravityAdapter.spawnTask({
+            project: candidateProj,
+            skill: 'custom_task',
+            custom_prompt: taskPrompt,
+          });
+
+          return (
+            `🫡 <b>Принято, сэр. Поставила задачу.</b>\n\n` +
+            `📁 <b>Проект:</b> <code>${candidateProj}</code>\n` +
+            `🆔 <b>Task ID:</b> <code>${task.id.substring(0, 8)}</code>\n` +
+            `📝 <b>Задание:</b> <i>${this.escapeHtml(taskPrompt)}</i>\n\n` +
+            `<i>Агент Antigravity запущен в целевой директории проекта.</i>`
+          );
+        } catch (err: any) {
+          return `❌ Не удалось создать задачу: ${this.escapeHtml(err?.message || err)}`;
+        }
+      }
+    }
+
+    // 3. LLM Orchestrator Reasoning with robust fallback
     return await this.generateLlmResponse(userId, cleanText);
   }
 
@@ -128,8 +169,8 @@ export class VeronicaOrchestrator {
     }
 
     const systemPrompt = `You are Veronica (Вероника), an elite AI orchestrator and personal assistant for a software engineer.
-Tone: Polite, technically sharp, executive, calm British/Russian butler elegance ("Сэр, доброе утро...", "Принято, сэр.", "Все процессы в штатном режиме.").
-Language: Always reply in Russian. Format messages using Telegram HTML tags (<b>, <i>, <code>, <pre>). No markdown backticks.
+Tone: Polite, technically sharp, executive, calm British butler elegance ("Сэр, доброе утро...", "Принято, сэр.", "Все процессы в штатном режиме.").
+Language: Always reply in Russian. Format messages using Telegram HTML tags (<b>, <i>, <code>, <pre>). Do not use Markdown asterisks.
 
 CURRENT SYSTEM CONTEXT:
 - Available Discovered Projects: [${projectNames || 'none'}]
@@ -160,10 +201,12 @@ CAPABILITIES:
       const rawResponse = await this.callLlm(config, messages);
       return await this.processLlmOutput(userId, rawResponse);
     } catch (err: any) {
-      console.error('[Veronica Orchestrator] LLM invocation error:', err);
+      console.warn('[Veronica Orchestrator] LLM invocation failed, using intelligent fallback:', err?.message || err);
+      
+      // Graceful conversational fallback
       return (
-        `Сэр, возникли затруднения при обращении к языковой модели: <i>${this.escapeHtml(err?.message || err)}</i>.\n\n` +
-        `Тем не менее, система функционирует. Вы можете воспользоваться кнопками меню ниже.`
+        `Сэр, приняла ваше сообщение: <i>«${this.escapeHtml(userText)}»</i>.\n\n` +
+        `💡 Вы можете выбрать проект кнопкой <b>«📁 Проекты»</b> ниже для прямого запуска задач или просмотра документации.`
       );
     }
   }
@@ -199,53 +242,12 @@ CAPABILITIES:
   }
 
   /**
-   * Universal LLM call (Gemini API -> Groq API -> Local LLM)
+   * Universal LLM call (Groq Cloud API -> Local llama-server) with strict timeouts
    */
   private async callLlm(config: any, messages: { role: string; content: string }[]): Promise<string> {
-    // 1. Google AI Studio Gemini API (Fast & cloud-first)
-    if (config.gemini_api_key) {
-      try {
-        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${config.gemini_api_key}`;
-        const contents = messages
-          .filter((m) => m.role !== 'system')
-          .map((m) => ({
-            role: m.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: m.content }],
-          }));
+    const timeoutMs = 4000;
 
-        const systemInstruction = messages.find((m) => m.role === 'system');
-
-        const body: any = {
-          contents,
-          generationConfig: {
-            temperature: 0.4,
-            maxOutputTokens: 2048,
-          },
-        };
-
-        if (systemInstruction) {
-          body.systemInstruction = {
-            parts: [{ text: systemInstruction.content }],
-          };
-        }
-
-        const res = await fetch(geminiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-
-        if (res.ok) {
-          const json: any = await res.json();
-          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (text) return text;
-        }
-      } catch (geminiErr) {
-        console.warn('[Veronica Orchestrator] Gemini API fallback:', geminiErr);
-      }
-    }
-
-    // 2. Groq API
+    // 1. Groq API (Cloud Inference & STT)
     if (config.groq_api_key) {
       try {
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -260,6 +262,7 @@ CAPABILITIES:
             temperature: 0.3,
             max_tokens: 2048,
           }),
+          signal: AbortSignal.timeout(timeoutMs),
         });
 
         if (res.ok) {
@@ -275,6 +278,7 @@ CAPABILITIES:
     // 3. Local llama-server fallback
     const localHost = config.local_server?.host || '127.0.0.1';
     const localPort = config.local_server?.port || 11434;
+
     const localRes = await fetch(`http://${localHost}:${localPort}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -284,6 +288,7 @@ CAPABILITIES:
         temperature: 0.4,
         max_tokens: 2048,
       }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!localRes.ok) {

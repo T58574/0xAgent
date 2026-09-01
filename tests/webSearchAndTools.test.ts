@@ -8,7 +8,7 @@ import { AppConfig } from '../src/types';
 test('Web Search Multi-Engine & Tools Architecture Test Suite', async (t) => {
   const baseMockConfig: AppConfig = {
     api_url: 'http://127.0.0.1:11434/v1',
-    model_name: 'gemini-3.6-flash',
+    model_name: 'local:qwen2.5-coder-32b.gguf',
     system_prompt: '',
     web_search_provider: 'auto',
     firecrawl_api_key: null,

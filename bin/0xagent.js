@@ -242,14 +242,13 @@ async function cmdConfig() {
   console.log(`${c.bold}0xAgent Interactive Configuration Manager${c.reset}\n`);
   console.log(`  1. Set Interface Language [current: ${cfg.language || 'ru'}]`);
   console.log(`  2. Set Security Permission Preset [current: ${cfg.permissionPreset || 'prompt'}]`);
-  console.log(`  3. Set Google AI Studio (Gemini) API Key [current: ${cfg.geminiApiKey ? '***' + cfg.geminiApiKey.slice(-4) : 'none'}]`);
-  console.log(`  4. Set Groq API Key [current: ${cfg.groqApiKey ? '***' + cfg.groqApiKey.slice(-4) : 'none'}]`);
-  console.log(`  5. Open Models Folder in File Explorer`);
-  console.log(`  6. Purge GPU VRAM & Reset Services`);
-  console.log(`  7. Check for Updates (GitHub)`);
+  console.log(`  3. Set Groq API Key (Whisper STT) [current: ${cfg.groqApiKey ? '***' + cfg.groqApiKey.slice(-4) : 'none'}]`);
+  console.log(`  4. Open Models Folder in File Explorer`);
+  console.log(`  5. Purge GPU VRAM & Reset Services`);
+  console.log(`  6. Check for Updates (GitHub)`);
   console.log(`  0. Exit\n`);
 
-  const choice = await promptQuestion(`${c.cyan}Select option (0-7): ${c.reset}`);
+  const choice = await promptQuestion(`${c.cyan}Select option (0-6): ${c.reset}`);
 
   switch (choice) {
     case '1': {
@@ -276,20 +275,13 @@ async function cmdConfig() {
       break;
     }
     case '3': {
-      const key = await promptQuestion(`${c.yellow}Enter Gemini API Key (or empty to clear): ${c.reset}`);
-      cfg.geminiApiKey = key.trim();
-      saveConfig(cfg);
-      console.log(`${c.green}[OK] Gemini API key updated.${c.reset}`);
-      break;
-    }
-    case '4': {
       const key = await promptQuestion(`${c.yellow}Enter Groq API Key (or empty to clear): ${c.reset}`);
       cfg.groqApiKey = key.trim();
       saveConfig(cfg);
       console.log(`${c.green}[OK] Groq API key updated.${c.reset}`);
       break;
     }
-    case '5': {
+    case '4': {
       const modelsDir = path.join(CONFIG_DIR, 'models');
       if (!fs.existsSync(modelsDir)) fs.mkdirSync(modelsDir, { recursive: true });
       if (process.platform === 'win32') {
@@ -299,11 +291,11 @@ async function cmdConfig() {
       }
       break;
     }
-    case '6': {
+    case '5': {
       await cmdPurgeVram();
       break;
     }
-    case '7': {
+    case '6': {
       await cmdUpdate();
       break;
     }
