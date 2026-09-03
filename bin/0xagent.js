@@ -473,13 +473,32 @@ Commands:
     const statusIdx = veronicaArgs.indexOf('--status');
     if (statusIdx !== -1) payload.status = veronicaArgs[statusIdx + 1];
     const sumIdx = veronicaArgs.indexOf('--summary');
-    if (sumIdx !== -1) payload.summary = veronicaArgs.slice(sumIdx + 1).join(' ');
+    if (sumIdx !== -1) {
+      let endIdx = veronicaArgs.length;
+      for (let i = sumIdx + 1; i < veronicaArgs.length; i++) {
+        if (veronicaArgs[i].startsWith('--')) {
+          endIdx = i;
+          break;
+        }
+      }
+      payload.summary = veronicaArgs.slice(sumIdx + 1, endIdx).join(' ').replace(/^["']|["']$/g, '').trim();
+    }
     const chgIdx = veronicaArgs.indexOf('--changes');
     if (chgIdx !== -1) {
+      let endIdx = veronicaArgs.length;
+      for (let i = chgIdx + 1; i < veronicaArgs.length; i++) {
+        if (veronicaArgs[i].startsWith('--')) {
+          endIdx = i;
+          break;
+        }
+      }
+      const rawChg = veronicaArgs.slice(chgIdx + 1, endIdx).join(' ').replace(/^["']|["']$/g, '').trim();
       try {
-        payload.changes = JSON.parse(veronicaArgs[chgIdx + 1]);
+        payload.changes = JSON.parse(rawChg);
       } catch {
-        payload.changes = [veronicaArgs[chgIdx + 1]];
+        // Fallback: clean list syntax like "[item 1, item 2]"
+        const cleaned = rawChg.replace(/^\[|\]$/g, '').split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+        payload.changes = cleaned.length > 0 ? cleaned : [rawChg];
       }
     }
     payload.important = veronicaArgs.includes('--important');
@@ -508,52 +527,62 @@ Commands:
     payload.command = 'agents_list';
   }
 
-  // Send HTTP request to local 0xAgent server
+  // Send HTTPS/HTTP request to local 0xAgent server
   const port = process.env.PORT || 3001;
   const postData = JSON.stringify(payload);
 
-  const req = http.request(
-    {
-      hostname: '127.0.0.1',
-      port,
-      path: '/api/veronica/cli',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(postData),
+  function executeRequest(protocolMod, isHttps) {
+    const req = protocolMod.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path: '/api/veronica/cli',
+        method: 'POST',
+        rejectUnauthorized: false,
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+        timeout: 10000,
       },
-      timeout: 5000,
-    },
-    (res) => {
-      let body = '';
-      res.on('data', (chunk) => (body += chunk));
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(body);
-          if (json.success) {
-            if (typeof json.data === 'string') {
-              console.log(json.data);
+      (res) => {
+        let body = '';
+        res.on('data', (chunk) => (body += chunk));
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(body);
+            if (json.success) {
+              if (typeof json.data === 'string') {
+                console.log(json.data);
+              } else {
+                console.log(JSON.stringify(json.data, null, 2));
+              }
             } else {
-              console.log(JSON.stringify(json.data, null, 2));
+              console.error(`${c.red}[Veronica CLI Error]${c.reset} ${json.error || 'Command failed'}`);
+              process.exit(1);
             }
-          } else {
-            console.error(`${c.red}[Veronica CLI Error]${c.reset} ${json.error || 'Command failed'}`);
-            process.exit(1);
+          } catch {
+            console.log(body);
           }
-        } catch {
-          console.log(body);
-        }
-      });
-    }
-  );
+        });
+      }
+    );
 
-  req.on('error', (err) => {
-    console.error(`${c.red}[Veronica CLI Error]${c.reset} Cannot connect to 0xAgent server on port ${port}: ${err.message}`);
-    process.exit(1);
-  });
+    req.on('error', (err) => {
+      if (isHttps) {
+        // Fallback to HTTP
+        executeRequest(http, false);
+      } else {
+        console.error(`${c.red}[Veronica CLI Error]${c.reset} Cannot connect to 0xAgent server on port ${port}: ${err.message}`);
+        process.exit(1);
+      }
+    });
 
-  req.write(postData);
-  req.end();
+    req.write(postData);
+    req.end();
+  }
+
+  executeRequest(https, true);
 }
 
 async function cmdNode(nodeArgs) {
@@ -616,6 +645,12 @@ if (isVeronicaBinary) {
       case 'status':
         cmdStatus();
         break;
+      case 'mcp': {
+        const mcpScript = path.join(__dirname, 'veronica-mcp.js');
+        const mcpProc = spawn(process.execPath, [mcpScript, ...args.slice(1)], { stdio: 'inherit' });
+        mcpProc.on('close', (code) => process.exit(code || 0));
+        break;
+      }
       case 'veronica':
         cmdVeronica(args.slice(1));
         break;

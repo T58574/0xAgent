@@ -482,6 +482,69 @@ ORCHESTRATION INSTRUCTIONS:
   }
 
   /**
+   * Structure voice thought dump transcript into structured JSON (title, summary, action_points, tags, project)
+   */
+  public async structureVoiceThought(transcript: string): Promise<{
+    title: string;
+    summary: string;
+    action_points: string[];
+    tags: string[];
+    project?: string | null;
+  } | null> {
+    const config = loadConfig();
+    const allProjects = await projectDiscovery.discoverAllProjects();
+    const projectNames = allProjects.map((p) => p.name).join(', ');
+
+    const systemPrompt = `You are Veronica (Вероника), an elite executive assistant and software architect.
+A user recorded a voice message (thought dump / голосовой сброс мыслей).
+Your task is to analyze the raw speech transcript, extract key insights, formulate concrete action points, and detect relevant project tags.
+
+KNOWN PROJECTS: [${projectNames || 'none'}]
+
+Instructions:
+1. Title: Short, punchy, informative headline in Russian (max 60 chars).
+2. Summary: Clear 1-3 sentence explanation of the idea or problem in Russian.
+3. Action Points: Array of concrete, actionable tasks/steps in Russian.
+4. Tags: Array of relevant hashtags (e.g. ["#0xAgent", "#voice", "#telegram"]).
+5. Project: Name of the exact matched project from KNOWN PROJECTS or null if not project-specific.
+
+CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown code fences, no extra commentary:
+{
+  "title": "string",
+  "summary": "string",
+  "action_points": ["string"],
+  "tags": ["string"],
+  "project": "string or null"
+}`;
+
+    const promptPayload = `TRANSCRIPT TO STRUCTURE:\n"${transcript}"\n\nReturn strictly valid JSON:`;
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: promptPayload },
+    ];
+
+    try {
+      const rawRes = await this.callLlm(config, messages, systemPrompt, promptPayload);
+      const cleanJson = rawRes
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+      const parsed = JSON.parse(cleanJson);
+      return {
+        title: parsed.title || transcript.slice(0, 50),
+        summary: parsed.summary || transcript,
+        action_points: Array.isArray(parsed.action_points) ? parsed.action_points : [],
+        tags: Array.isArray(parsed.tags) ? parsed.tags : [],
+        project: parsed.project || null,
+      };
+    } catch (err) {
+      console.warn('[Veronica Orchestrator] Failed to structure thought dump via LLM:', err);
+      return null;
+    }
+  }
+
+  /**
    * 2 Strict Execution Engines for Veronica:
    * 1. Antigravity Headless CLI (agy -p --model <model> --effort <effort>)
    * 2. Local LLM (llama-server.exe / local GGUF model via 127.0.0.1:11434)

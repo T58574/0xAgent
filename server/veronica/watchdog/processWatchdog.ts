@@ -42,6 +42,11 @@ export class ProcessWatchdog {
       const activeTasks = taskRegistry.getActiveTasks();
 
       for (const task of activeTasks) {
+        // Skip queued or waiting tasks (they do not emit heartbeats while waiting)
+        if (task.status !== 'running') {
+          continue;
+        }
+
         // 1. Check PID liveness
         if (task.pid) {
           const isAlive = this.isPidAlive(task.pid);

@@ -41,14 +41,31 @@ export class NotificationService {
     }
   }
 
-  public async notifyTaskCompleted(task: AgentTask): Promise<void> {
-    const msg = [
-      `✅ <b>Задача завершена:</b> <code>${task.id.substring(0, 8)}</code>`,
-      `📁 <b>Проект:</b> ${escapeHtml(task.project)}`,
-      `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
-      task.summary ? `📝 <b>Итог:</b> ${escapeHtml(task.summary)}` : '',
-    ].filter(Boolean).join('\n');
+  public async notifyTaskCompleted(task: AgentTask, rawChanges?: string[] | string): Promise<void> {
+    const changes = Array.isArray(rawChanges) ? rawChanges : rawChanges ? [rawChanges] : [];
 
+    const lines: string[] = [
+      `✅ <b>Задача завершена:</b> <code>${task.id.substring(0, 8)}</code>`,
+      `📁 <b>Проект:</b> <code>${escapeHtml(task.project)}</code>`,
+      `⚡ <b>Навык:</b> <i>${escapeHtml(task.skill)}</i>`,
+      '',
+    ];
+
+    if (task.summary) {
+      lines.push(`📝 <b>Что сделано:</b>`);
+      lines.push(`${escapeHtml(task.summary)}`);
+      lines.push('');
+    }
+
+    if (changes.length > 0) {
+      lines.push(`🛠 <b>Внесённые изменения:</b>`);
+      for (const ch of changes) {
+        lines.push(`• ${escapeHtml(ch)}`);
+      }
+      lines.push('');
+    }
+
+    const msg = lines.join('\n').trim();
     await this.broadcastToWhitelist(msg);
   }
 

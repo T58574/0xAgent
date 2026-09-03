@@ -83,7 +83,7 @@ export class CliHandler {
             targetProject = targetProject || task.project;
             skillName = task.skill;
             if (finalStatus === 'completed') {
-              await notificationService.notifyTaskCompleted(task);
+              await notificationService.notifyTaskCompleted(task, req.changes);
             }
           }
         }
