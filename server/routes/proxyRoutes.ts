@@ -104,5 +104,27 @@ export function createProxyRouter(broadcast?: (event: string, payload: any) => v
     }
   });
 
+  // GET /api/proxies/routing — Get routing matrix configuration & active gateway
+  router.get('/proxies/routing', (_req: Request, res: Response) => {
+    try {
+      const routing = proxyService.getRoutingConfig();
+      const bestProxy = proxyService.getBestProxy();
+      res.json({ routing, bestProxy });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST /api/proxies/routing — Update routing matrix configuration
+  router.post('/proxies/routing', (req: Request, res: Response) => {
+    try {
+      const updated = proxyService.setRoutingConfig(req.body);
+      const bestProxy = proxyService.getBestProxy();
+      res.json({ routing: updated, bestProxy });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   return router;
 }

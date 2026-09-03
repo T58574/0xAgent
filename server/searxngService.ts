@@ -5,6 +5,8 @@ export interface SearchResultItem {
   engine?: string;
 }
 
+import { proxyService } from './proxyService';
+
 function decodeHtmlEntities(str: string): string {
   if (!str) return '';
   return str
@@ -118,14 +120,19 @@ export class SearxngService {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
-    const res = await fetch(ddgUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+    const res = await proxyService.fetchWithProxy(
+      ddgUrl,
+      {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7',
+        },
+        signal: controller.signal,
       },
-      signal: controller.signal,
-    });
+      'web_search'
+    );
     clearTimeout(timeoutId);
 
     if (!res.ok) throw new Error(`DDG returned status ${res.status}`);

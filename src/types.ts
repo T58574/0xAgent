@@ -1080,4 +1080,14 @@ export interface ProxyExportConfig {
   }[];
 }
 
+export type ProxyRoutingCategory = 'cloud_ai' | 'web_search' | 'media_download';
+
+export interface ProxyRoutingConfig {
+  enabled: boolean;
+  route_cloud_ai: boolean;
+  route_web_search: boolean;
+  route_media_download: boolean;
+}
+
+
 

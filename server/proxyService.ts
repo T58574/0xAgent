@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { getProxyDb } from './proxyDb';
 import { parseProxyLine, detectProtocol, testSocks5Handshake, testHttpProxy } from './proxyParser';
-import { ProxyItem, ProxyProtocol, ProxyStatus, ProxyExportConfig, ProxyHealthCheckResult } from '../src/types';
+import { ProxyItem, ProxyProtocol, ProxyStatus, ProxyExportConfig, ProxyHealthCheckResult, ProxyRoutingConfig, ProxyRoutingCategory } from '../src/types';
+import { ProxyAgent } from 'undici';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 
 export class ProxyService {
   private static instance: ProxyService;
@@ -390,6 +392,111 @@ export class ProxyService {
     // Pick lowest latency
     online.sort((a, b) => (a.latency_ms ?? 9999) - (b.latency_ms ?? 9999));
     return online[0];
+  }
+
+  /**
+   * Retrieve current routing matrix configuration
+   */
+  public getRoutingConfig(): ProxyRoutingConfig {
+    try {
+      const db = getProxyDb();
+      const row = db.prepare("SELECT value FROM proxy_settings WHERE key = 'routing_config'").get() as any;
+      if (row && row.value) {
+        return JSON.parse(row.value);
+      }
+    } catch {}
+
+    return {
+      enabled: true,
+      route_cloud_ai: true,
+      route_web_search: true,
+      route_media_download: true,
+    };
+  }
+
+  /**
+   * Update and persist routing matrix configuration
+   */
+  public setRoutingConfig(partial: Partial<ProxyRoutingConfig>): ProxyRoutingConfig {
+    const current = this.getRoutingConfig();
+    const updated: ProxyRoutingConfig = {
+      ...current,
+      ...partial,
+    };
+
+    const db = getProxyDb();
+    db.prepare(`
+      INSERT INTO proxy_settings (key, value)
+      VALUES ('routing_config', ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(JSON.stringify(updated));
+
+    if (this.wsBroadcaster) {
+      this.wsBroadcaster('proxy-routing-updated', { routing: updated });
+    }
+
+    return updated;
+  }
+
+  /**
+   * Returns proxy URL formatted for category if routing is enabled
+   */
+  public getProxyUrlFor(category: ProxyRoutingCategory): string | null {
+    const config = this.getRoutingConfig();
+    if (!config.enabled) return null;
+
+    if (category === 'cloud_ai' && !config.route_cloud_ai) return null;
+    if (category === 'web_search' && !config.route_web_search) return null;
+    if (category === 'media_download' && !config.route_media_download) return null;
+
+    const proxy = this.getBestProxy();
+    if (!proxy) return null;
+
+    let authStr = '';
+    if (proxy.auth?.username) {
+      authStr = `${encodeURIComponent(proxy.auth.username)}:${encodeURIComponent(proxy.auth.password || '')}@`;
+    }
+    return `${proxy.protocol}://${authStr}${proxy.host}:${proxy.port}`;
+  }
+
+  /**
+   * Create an appropriate HTTP/SOCKS dispatcher for native fetch
+   */
+  public getDispatcherFor(category: ProxyRoutingCategory): any {
+    const proxyUrl = this.getProxyUrlFor(category);
+    if (!proxyUrl) return undefined;
+
+    try {
+      if (proxyUrl.startsWith('socks5://') || proxyUrl.startsWith('socks4://')) {
+        return new SocksProxyAgent(proxyUrl);
+      }
+      return new ProxyAgent(proxyUrl);
+    } catch (err) {
+      console.warn(`[ProxyService] Failed to create dispatcher for ${proxyUrl}:`, err);
+      return undefined;
+    }
+  }
+
+  /**
+   * High-level fetch wrapper with automatic category routing
+   */
+  public async fetchWithProxy(
+    url: string,
+    init?: RequestInit,
+    category: ProxyRoutingCategory = 'cloud_ai'
+  ): Promise<Response> {
+    const dispatcher = this.getDispatcherFor(category);
+    if (!dispatcher) {
+      return fetch(url, init);
+    }
+
+    const requestOptions: any = {
+      ...init,
+      dispatcher,
+      agent: dispatcher,
+    };
+
+    return fetch(url, requestOptions);
   }
 
   private updateProxyStatus(

@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { loadConfig } from '../../config';
+import { proxyService } from '../../proxyService';
 import { veronicaOrchestrator } from './veronicaOrchestrator';
 
 export interface StructuredThought {
@@ -149,14 +150,18 @@ export class VoiceThoughtService {
         formData.append('model', 'whisper-large-v3-turbo');
         formData.append('language', 'ru');
 
-        const groqRes = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${groqKey}`,
+        const groqRes = await proxyService.fetchWithProxy(
+          'https://api.groq.com/openai/v1/audio/transcriptions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${groqKey}`,
+            },
+            body: formData,
+            signal: AbortSignal.timeout(30000),
           },
-          body: formData,
-          signal: AbortSignal.timeout(30000),
-        });
+          'cloud_ai'
+        );
 
         if (groqRes.ok) {
           const groqJson: any = await groqRes.json();

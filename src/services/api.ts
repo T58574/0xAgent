@@ -29,6 +29,7 @@ import {
   ProxyProtocol,
   ProxyHealthCheckResult,
   ProxyExportConfig,
+  ProxyRoutingConfig,
 } from '../types';
 
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
@@ -480,5 +481,11 @@ export const delete_proxy = (id: string) =>
 
 export const export_proxies = () =>
   get<ProxyExportConfig>('/proxies/export');
+
+export const get_proxy_routing = () =>
+  get<{ routing: ProxyRoutingConfig; bestProxy: ProxyItem | null }>('/proxies/routing');
+
+export const update_proxy_routing = (config: Partial<ProxyRoutingConfig>) =>
+  post<{ routing: ProxyRoutingConfig; bestProxy: ProxyItem | null }>('/proxies/routing', config);
 
 

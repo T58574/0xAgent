@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { spawn } from 'node:child_process';
+import { proxyService } from '../../proxyService';
 
 export interface VideoMetadata {
   title?: string;
@@ -124,8 +125,14 @@ export class VideoIngestionService {
       '--no-warnings',
       '--output',
       outputTemplate,
-      url,
     ];
+
+    const proxyUrl = proxyService.getProxyUrlFor('media_download');
+    if (proxyUrl) {
+      args.push('--proxy', proxyUrl);
+    }
+
+    args.push(url);
 
     try {
       await this.runProcess(ytDlpBin, args, 25000);
@@ -239,6 +246,11 @@ export class VideoIngestionService {
 
     if (ffmpegBin !== 'ffmpeg' && fs.existsSync(ffmpegBin)) {
       ytDlpArgs.push('--ffmpeg-location', ffmpegDir);
+    }
+
+    const proxyUrl = proxyService.getProxyUrlFor('media_download');
+    if (proxyUrl) {
+      ytDlpArgs.push('--proxy', proxyUrl);
     }
 
     ytDlpArgs.push(url);

@@ -81,5 +81,10 @@ function initProxySchema(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_proxies_is_active ON proxies(is_active);
     CREATE INDEX IF NOT EXISTS idx_proxies_expires_at ON proxies(expires_at);
     CREATE INDEX IF NOT EXISTS idx_proxies_host_port ON proxies(host, port);
+
+    CREATE TABLE IF NOT EXISTS proxy_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 }
