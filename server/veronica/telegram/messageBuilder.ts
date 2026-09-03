@@ -8,6 +8,7 @@ import { taskRegistry } from '../core/taskRegistry';
 import { remoteNodeService } from '../../remoteNodeService';
 import { projectDiscovery, DiscoveredProject } from '../core/projectDiscovery';
 import { projectDocManager } from '../core/projectDocManager';
+import { antigravityAdapter } from '../adapters/antigravityAdapter';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -82,25 +83,12 @@ export class MessageBuilder {
     const keyboard = new InlineKeyboard();
     const cleanCurrent = currentModel.replace(/^local:/, '');
 
-    // 1. Antigravity Official CLI Models
-    const agyModels = [
-      { slug: 'gemini-3.7-flash-low', label: '⚡ Gemini 3.7 Flash (Low)' },
-      { slug: 'gemini-3.7-flash-medium', label: '⚡ Gemini 3.7 Flash (Med)' },
-      { slug: 'gemini-3.7-flash-high', label: '⚡ Gemini 3.7 Flash (High)' },
-      { slug: 'gemini-3.6-flash-low', label: '⚡ Gemini 3.6 Flash (Low)' },
-      { slug: 'gemini-3.6-flash-medium', label: '⚡ Gemini 3.6 Flash (Med)' },
-      { slug: 'gemini-3.6-flash-high', label: '⚡ Gemini 3.6 Flash (High)' },
-      { slug: 'gemini-3.1-pro-low', label: '⚡ Gemini 3.1 Pro (Low)' },
-      { slug: 'gemini-3.1-pro-high', label: '⚡ Gemini 3.1 Pro (High)' },
-      { slug: 'claude-sonnet-4-6', label: '⚡ Claude Sonnet 4.6 (Thinking)' },
-      { slug: 'claude-opus-4-6-thinking', label: '⚡ Claude Opus 4.6 (Thinking)' },
-      { slug: 'gpt-oss-120b-medium', label: '⚡ GPT-OSS 120B (Medium)' },
-      { slug: 'inherit', label: '⚡ Auto (Inherit Antigravity)' },
-    ];
+    // 1. Antigravity Official CLI Models (dynamically fetched from cache/CLI)
+    const rawAgyModels = antigravityAdapter.getAvailableRawAntigravityModels();
 
-    for (const am of agyModels) {
+    for (const am of rawAgyModels) {
       const isSelected = cleanCurrent === am.slug || (am.slug === 'inherit' && (cleanCurrent === 'agy' || cleanCurrent === 'antigravity'));
-      const label = `${isSelected ? '🔘' : '⚪'} ${am.label}`;
+      const label = `${isSelected ? '🔘' : '⚪'} ⚡ ${am.name}`;
       keyboard.text(label, `veronica:set_model:${am.slug}`).row();
     }
 

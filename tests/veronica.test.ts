@@ -16,7 +16,7 @@ import { RecoveryService } from '../server/veronica/watchdog/recoveryService';
 import { remoteNodeService } from '../server/remoteNodeService';
 import { veronicaScheduler } from '../server/veronica/core/scheduler';
 import { initPersonas, listPersonas, getPersonaDetail } from '../server/personas';
-import { antigravityAdapter, resolveAntigravityModelAndEffort, isAntigravityModel, VeronicaStreamEvent } from '../server/veronica/adapters/antigravityAdapter';
+import { antigravityAdapter, resolveAntigravityModelAndEffort, isAntigravityModel, VeronicaStreamEvent, parseAgyModelsOutput, DEFAULT_ANTIGRAVITY_MODELS } from '../server/veronica/adapters/antigravityAdapter';
 import { reloadVeronicaModule, getVeronicaStatus, shutdownVeronicaModule } from '../server/veronica';
 import { createVeronicaRouter } from '../server/routes/veronicaRoutes';
 import { operationalJournal } from '../server/veronica/core/operationalJournal';
@@ -597,6 +597,57 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       // Resetting session should clear antigravityConversationId
       orchestrator.resetSession(testUserId);
       assert.equal(orchestrator.getUserSession(testUserId).antigravityConversationId, undefined);
+    });
+
+    it('should parse agy models output into grouped families and raw models list', () => {
+      const mockCliOutput = `
+Fetching available models...
+gemini-3.8-flash-high\tGemini 3.8 Flash (High)
+gemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)
+gemini-3.8-flash-low\tGemini 3.8 Flash (Low)
+gemini-3.7-flash-high\tGemini 3.7 Flash (High)
+gemini-3.7-flash-low\tGemini 3.7 Flash (Low)
+claude-sonnet-4-6\tClaude Sonnet 4.6 (Thinking)
+gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
+`;
+      const parsed = parseAgyModelsOutput(mockCliOutput);
+
+      assert.ok(parsed.models.length >= 4);
+      assert.ok(parsed.rawModels.length >= 7);
+
+      // Check Gemini 3.8 Flash family
+      const g38 = parsed.models.find((m) => m.slug === 'gemini-3.8-flash');
+      assert.ok(g38, 'Should extract gemini-3.8-flash family');
+      assert.deepEqual(g38.supportedEfforts, ['low', 'medium', 'high']);
+      assert.equal(g38.name, 'Gemini 3.8 Flash');
+
+      // Check Claude Sonnet standalone
+      const claude = parsed.models.find((m) => m.slug === 'claude-sonnet-4-6');
+      assert.ok(claude, 'Should extract claude-sonnet-4-6');
+      assert.deepEqual(claude.supportedEfforts, []);
+
+      // Check inherit model presence
+      assert.ok(parsed.models.some((m) => m.slug === 'inherit'));
+      assert.ok(parsed.rawModels.some((m) => m.slug === 'inherit'));
+    });
+
+    it('should resolve Gemini 3.8 Flash models with effort or encoded slug', () => {
+      const g38High = resolveAntigravityModelAndEffort('gemini-3.8-flash', 'high');
+      assert.equal(g38High.model, 'gemini-3.8-flash-high');
+      assert.equal(g38High.effort, undefined);
+
+      const g38Direct = resolveAntigravityModelAndEffort('gemini-3.8-flash-medium');
+      assert.equal(g38Direct.model, 'gemini-3.8-flash-medium');
+      assert.equal(g38Direct.effort, undefined);
+    });
+
+    it('should provide fallback default models and raw models list', () => {
+      const models = antigravityAdapter.getAvailableAntigravityModels();
+      assert.ok(models.some((m) => m.slug === 'gemini-3.8-flash'));
+
+      const rawModels = antigravityAdapter.getAvailableRawAntigravityModels();
+      assert.ok(rawModels.length >= 7);
+      assert.ok(rawModels.some((m) => m.slug.includes('3.8') || m.slug.includes('3.7')));
     });
   });
 

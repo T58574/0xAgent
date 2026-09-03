@@ -67,6 +67,21 @@ export function createVeronicaRouter(broadcast?: BroadcastFn): Router {
     }
   });
 
+  // Force refresh Antigravity models cache from CLI
+  router.post('/models/refresh', async (_req, res) => {
+    try {
+      const agyModels = await antigravityAdapter.fetchAvailableModels(true);
+      const localModels = MessageBuilder.listAvailableModels();
+      res.json({
+        success: true,
+        local: localModels,
+        antigravity: agyModels,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Available subagents
   router.get('/agents', (_req, res) => {
     try {

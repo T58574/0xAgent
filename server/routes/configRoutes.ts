@@ -7,6 +7,7 @@ import { parseGgufMetadata } from '../ggufParser';
 import { voiceDaemonManager } from '../agent/voiceDaemonManager';
 import { stopLlamaServerProcess } from './llamaRoutes';
 import { restartTelegramBot } from '../veronica/telegram/bot';
+import { antigravityAdapter } from '../veronica/adapters/antigravityAdapter';
 
 export const configRouter = Router();
 
@@ -54,53 +55,14 @@ configRouter.post('/config', (req, res) => {
 configRouter.get('/models', (_req, res) => {
   try {
     const cfg = loadConfig();
-    const cloudModels: any[] = [
-      {
-        id: 'gemini-3.7-flash',
-        name: 'Gemini 3.7 Flash',
-        provider: 'antigravity',
-        supportedEfforts: ['low', 'medium', 'high'],
-        defaultEffort: 'low',
-      },
-      {
-        id: 'gemini-3.6-flash',
-        name: 'Gemini 3.6 Flash',
-        provider: 'antigravity',
-        supportedEfforts: ['low', 'medium', 'high'],
-        defaultEffort: 'low',
-      },
-      {
-        id: 'gemini-3.1-pro',
-        name: 'Gemini 3.1 Pro',
-        provider: 'antigravity',
-        supportedEfforts: ['low', 'high'],
-        defaultEffort: 'low',
-      },
-      {
-        id: 'claude-sonnet-4-6',
-        name: 'Claude Sonnet 4.6 (Thinking)',
-        provider: 'antigravity',
-        supportedEfforts: [],
-      },
-      {
-        id: 'claude-opus-4-6-thinking',
-        name: 'Claude Opus 4.6 (Thinking)',
-        provider: 'antigravity',
-        supportedEfforts: [],
-      },
-      {
-        id: 'gpt-oss-120b-medium',
-        name: 'GPT-OSS 120B (Medium)',
-        provider: 'antigravity',
-        supportedEfforts: [],
-      },
-      {
-        id: 'inherit',
-        name: 'Antigravity Auto (Inherit)',
-        provider: 'antigravity',
-        supportedEfforts: [],
-      },
-    ];
+    const agyModels = antigravityAdapter.getAvailableAntigravityModels();
+    const cloudModels: any[] = agyModels.map((m) => ({
+      id: m.slug,
+      name: m.name,
+      provider: 'antigravity',
+      supportedEfforts: m.supportedEfforts || [],
+      defaultEffort: m.defaultEffort || 'low',
+    }));
 
     const dirsToScan: string[] = [
       path.join(process.cwd(), 'models'),

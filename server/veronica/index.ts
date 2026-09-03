@@ -8,6 +8,7 @@ import { VeronicaModuleStatus } from './types';
 import { taskRegistry } from './core/taskRegistry';
 import { remoteNodeService } from '../remoteNodeService';
 import { snapshotCache } from './core/snapshotCache';
+import { antigravityAdapter } from './adapters/antigravityAdapter';
 
 import { writeQueue } from './db/writeQueue';
 
@@ -56,6 +57,11 @@ export async function initVeronicaModule(): Promise<boolean> {
       runRetentionCleanup();
     }, 24 * 60 * 60 * 1000);
     backupIntervalTimer.unref?.();
+
+    // 8. Refresh available Antigravity models cache on boot
+    antigravityAdapter.fetchAvailableModels(true).catch((mErr) => {
+      console.warn('[Veronica] [WARN] Startup Antigravity models probe error:', mErr?.message || mErr);
+    });
 
     isModuleInitialized = true;
     console.log('[Veronica] [OK] Veronica Engine successfully initialized.');
