@@ -7,6 +7,7 @@ import { antigravityAdapter, resolveAntigravityModelAndEffort, getSafeCliPath } 
 import { getVeronicaDb } from '../db/veronicaDb';
 import { writeQueue } from '../db/writeQueue';
 import { MessageBuilder } from './messageBuilder';
+import { getUserMemories } from '../../memory';
 
 export interface DialogMessage {
   role: 'user' | 'assistant' | 'system';
@@ -38,6 +39,23 @@ export class VeronicaOrchestrator {
       VeronicaOrchestrator.instance = new VeronicaOrchestrator();
     }
     return VeronicaOrchestrator.instance;
+  }
+
+  public getUserProfileContext(): { userName: string; memoryContext: string } {
+    try {
+      const memories = getUserMemories();
+      const preferredNameMem = memories.find((m) => m.key === 'preferred_name');
+      const userName = (preferredNameMem?.value || '').trim();
+
+      const contextLines = memories
+        .filter((m) => m.value && m.key !== 'preferred_name')
+        .map((m) => `- [${m.category || 'memory'}] ${m.key}: ${m.value}`);
+
+      const memoryContext = contextLines.length > 0 ? contextLines.join('\n') : '';
+      return { userName, memoryContext };
+    } catch {
+      return { userName: '', memoryContext: '' };
+    }
   }
 
   public getUserSession(userId: number): UserSessionState {
@@ -189,6 +207,9 @@ export class VeronicaOrchestrator {
     // Record user message into session history
     this.persistMessage(userId, 'user', cleanText);
 
+    const { userName } = this.getUserProfileContext();
+    const nameSuffix = userName ? `, ${userName}` : '';
+
     // 1. Check if user was typing a direct task prompt for an active project
     if (session.awaitingPromptForProject) {
       const targetProj = session.awaitingPromptForProject;
@@ -206,11 +227,11 @@ export class VeronicaOrchestrator {
         session.lastTaskSummary = cleanText;
 
         const reply =
-          `🫡 <b>Принято, сэр. Поставила задачу.</b>\n\n` +
+          `🫡 <b>Принято${nameSuffix}. Поставила задачу.</b>\n\n` +
           `📁 <b>Проект:</b> <code>${targetProj}</code>\n` +
           `🆔 <b>Task ID:</b> <code>${task.id.substring(0, 8)}</code>\n` +
           `📝 <b>Задание:</b> <i>${this.escapeHtml(cleanText)}</i>\n\n` +
-          `<i>Агент Antigravity запущен с паспортом проекта и регламентом CLI. По завершению я пришлю вам подробный отчет.</i>`;
+          `<i>Агент Antigravity запущен с паспортом проекта и регламентом CLI. По завершению я пришлю подробный отчет.</i>`;
 
         this.persistMessage(userId, 'assistant', reply);
         return reply;
@@ -231,7 +252,7 @@ export class VeronicaOrchestrator {
     // Session reset shortcuts
     if (lower === '/reset' || lower === '/new' || lower === '/clear' || lower === 'новая сессия' || lower === 'сброс') {
       this.resetSession(userId);
-      const reply = '🔄 <b>Контекст диалога сброшен.</b> Начнем с чистого листа, сэр. Чем могу помочь?';
+      const reply = `🔄 <b>Контекст диалога сброшен.</b> Начнем с чистого листа${nameSuffix}. Чем могу помочь?`;
       this.persistMessage(userId, 'assistant', reply);
       return reply;
     }
@@ -241,9 +262,9 @@ export class VeronicaOrchestrator {
       const projects = await projectDiscovery.discoverAllProjects();
       const activeTasks = taskRegistry.getActiveTasks();
       const reply =
-        `👋 <b>Здравствуйте, сэр!</b>\n\n` +
-        `Все системы на связи. В каталоге доступно проектов: <b>${projects.length}</b>, активных задач в работе: <b>${activeTasks.length}</b>.\n\n` +
-        `💡 <i>Нажмите «📁 Проекты» для перехода к проектам или напишите мне, какую задачу поставить.</i>`;
+        `👋 <b>Привет${nameSuffix}!</b>\n\n` +
+        `Все системы на связи. В каталоге проектов: <b>${projects.length}</b>, активных задач в работе: <b>${activeTasks.length}</b>.\n\n` +
+        `💡 <i>Нажмите «📁 Проекты» для списка или скажите мне, что нужно сделать.</i>`;
       this.persistMessage(userId, 'assistant', reply);
       return reply;
     }
@@ -292,7 +313,7 @@ export class VeronicaOrchestrator {
           session.lastTaskSummary = taskPrompt;
 
           const reply =
-            `🫡 <b>Принято, сэр. Поставила задачу.</b>\n\n` +
+            `🫡 <b>Принято${nameSuffix}. Поставила задачу.</b>\n\n` +
             `📁 <b>Проект:</b> <code>${targetProject}</code>\n` +
             `🆔 <b>Task ID:</b> <code>${task.id.substring(0, 8)}</code>\n` +
             `📝 <b>Задание:</b> <i>${this.escapeHtml(taskPrompt)}</i>\n\n` +
@@ -338,8 +359,20 @@ export class VeronicaOrchestrator {
       ? `\nLAST_SPAWNED_TASK: id=${session.lastTaskId.substring(0, 8)} project=${session.lastTaskProject || 'unknown'} summary="${session.lastTaskSummary || 'none'}"`
       : '';
 
-    const systemPrompt = `You are Veronica (Вероника), an elite AI orchestrator, executive assistant, and engineering supervisor for a software architect.
-Tone: Polite, technically sharp, executive, calm British butler elegance ("Сэр, доброе утро...", "Принято, сэр.", "Все процессы в штатном режиме.").
+    const { userName, memoryContext } = this.getUserProfileContext();
+
+    const identityBlock = userName
+      ? `USER IDENTITY (FROM MEMORY ENGINE): The user's preferred name is "${userName}". Address the user naturally by this preferred name.`
+      : `USER IDENTITY: Preferred name is not set in memory. Address the user naturally without assumptions.`;
+
+    const memoryBlock = memoryContext
+      ? `\nUSER KNOWLEDGE & PREFERENCES (FROM MEMORY ENGINE):\n${memoryContext}\n`
+      : '';
+
+    const systemPrompt = `You are Veronica (Вероника), an alive, highly intelligent, warm, technically sharp personal AI companion and engineering supervisor.
+${identityBlock}
+${memoryBlock}
+Tone: Direct, warm, concise, witty, highly competent. Never use robotic bureaucratic boilerplate, stiffness, or canned templates. Speak naturally like a close trusted partner in engineering and life.
 Language: Always reply in Russian. Format messages using Telegram HTML tags (<b>, <i>, <code>, <pre>). Do not use Markdown asterisks.
 
 CURRENT SYSTEM CONTEXT:
@@ -368,7 +401,7 @@ ORCHESTRATION INSTRUCTIONS:
      <action type="run_task" project="<ProjectName>" skill="<SkillOrCustom>" prompt="<EnrichedDetailedTaskPrompt>" />
    - If the user is asking to refine or continue the previous task:
      <action type="continue_task" task_id="${session.lastTaskId || ''}" prompt="<RefinementInstructions>" />
-   - Accompany action tags with a polite executive response ("Принято, сэр. Запустила задачу для проекта X...").
+   - Accompany action tags with a natural concise response ("Принято${userName ? `, ${userName}` : ''}. Запустила задачу для проекта X...").
 3. Ambiguous Project Names:
    - If the user mentions a project informally (e.g. "логистика"), match it against discovered projects.
    - If completely ambiguous and multiple projects exist, ask the user to specify which project.

@@ -557,40 +557,74 @@ export function initTelegramBot(): Bot | null {
           throw new Error('Не удалось получить файл голосового сообщения из Telegram.');
         }
 
-        const result = await voiceThoughtService.processVoiceMessage(cleanToken, file.file_path, userId);
-        const thought = result.thought;
-
-        const lines: string[] = [
-          `💡 <b>Голосовая мысль поймана!</b>`,
-          ``,
-          `📌 <b>Суть:</b> ${escapeHtml(thought.summary || thought.title)}`,
-        ];
-
-        if (thought.detectedProject) {
-          lines.push(`📁 <b>Проект:</b> <code>${escapeHtml(thought.detectedProject)}</code>`);
-        }
-
-        if (thought.actionPoints && thought.actionPoints.length > 0) {
-          lines.push(``);
-          lines.push(`🎯 <b>Что сделать:</b>`);
-          for (const pt of thought.actionPoints) {
-            lines.push(`• ${escapeHtml(pt)}`);
+        // 1. Transcribe audio
+        const tempAudioPath = await voiceThoughtService.downloadTelegramAudio(cleanToken, file.file_path);
+        let rawText = '';
+        try {
+          const transcriptionResult = await voiceThoughtService.transcribeAudio(tempAudioPath);
+          rawText = (transcriptionResult.text || '').trim();
+        } finally {
+          if (fs.existsSync(tempAudioPath)) {
+            try { await fs.promises.unlink(tempAudioPath); } catch {}
           }
         }
 
-        if (thought.tags && thought.tags.length > 0) {
-          lines.push(``);
-          lines.push(`🏷 <i>${thought.tags.map((t) => `#${t.replace(/^#/, '')}`).join(' ')}</i>`);
+        if (!rawText) {
+          try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+          await ctx.reply('⚠️ <i>Запись слишком тихая или не содержит чёткой речи. Попробуйте сказать чуть громче или ближе к микрофону.</i>', { parse_mode: 'HTML' });
+          return;
         }
 
-        lines.push(``);
-        lines.push(`💾 <i>Сохранено в заметки: <code>brain/inbox.md</code></i>`);
+        // 2. Check if user is explicitly dictating a note / thought dump
+        const isNoteIntent = /^(?:запиши\s+(?:мысль|заметку|идею)|в\s+инбокс|сохрани\s+(?:мысль|заметку|в\s+инбокс)|зафиксируй\s+(?:мысль|идею)|заметка[:\s]|мысль[:\s])/i.test(rawText);
 
-        try {
-          await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
-        } catch {}
+        if (isNoteIntent) {
+          const thought = await voiceThoughtService.structureThought(rawText);
+          await voiceThoughtService.appendThoughtToInbox(thought);
 
-        await ctx.reply(lines.join('\n'), {
+          const lines: string[] = [
+            `🎙 <i>«${escapeHtml(rawText)}»</i>`,
+            ``,
+            `💡 <b>Записала в инбокс!</b>`,
+            `📌 <b>Суть:</b> ${escapeHtml(thought.summary || thought.title)}`,
+          ];
+
+          if (thought.detectedProject) {
+            lines.push(`📁 <b>Проект:</b> <code>${escapeHtml(thought.detectedProject)}</code>`);
+          }
+
+          if (thought.actionPoints && thought.actionPoints.length > 0) {
+            lines.push(``);
+            lines.push(`🎯 <b>Что сделать:</b>`);
+            for (const pt of thought.actionPoints) {
+              lines.push(`• ${escapeHtml(pt)}`);
+            }
+          }
+
+          if (thought.tags && thought.tags.length > 0) {
+            lines.push(``);
+            lines.push(`🏷 <i>${thought.tags.map((t) => `#${t.replace(/^#/, '')}`).join(' ')}</i>`);
+          }
+
+          lines.push(``);
+          lines.push(`💾 <i>Сохранено в <code>brain/inbox.md</code></i>`);
+
+          try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+          await ctx.reply(lines.join('\n'), {
+            parse_mode: 'HTML',
+            reply_markup: MessageBuilder.getMainReplyKeyboard(),
+          });
+          return;
+        }
+
+        // 3. Conversational message, question, command or status request directly to Veronica
+        await ctx.replyWithChatAction('typing');
+        const veronicaReply = await veronicaOrchestrator.handleUserMessage(userId, rawText);
+
+        try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+
+        const finalReply = `🎙 <i>«${escapeHtml(rawText)}»</i>\n\n${veronicaReply}`;
+        await ctx.reply(finalReply, {
           parse_mode: 'HTML',
           reply_markup: MessageBuilder.getMainReplyKeyboard(),
         });
