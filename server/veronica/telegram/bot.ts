@@ -260,6 +260,30 @@ export function initTelegramBot(): Bot | null {
       await sendProjectsMenu(ctx, true);
     });
 
+    bot.callbackQuery(/^veronica:continue:(.+)$/, async (ctx) => {
+      const taskId = ctx.match[1];
+      const task = taskRegistry.getTask(taskId);
+      const userId = ctx.from?.id;
+      if (userId && task) {
+        veronicaOrchestrator.setActiveProject(userId, task.project);
+        const session = veronicaOrchestrator.getUserSession(userId);
+        session.lastTaskId = task.id;
+        session.lastTaskProject = task.project;
+        session.lastTaskSummary = task.summary || undefined;
+        veronicaOrchestrator.persistSessionMeta(session);
+        veronicaOrchestrator.setAwaitingPrompt(userId, task.project);
+      }
+      await ctx.answerCallbackQuery();
+      await ctx.reply(
+        `✍️ <b>Продолжение задачи <code>${escapeHtml(taskId.substring(0, 8))}</code> (проект <code>${escapeHtml(
+          task?.project || ''
+        )}</code>):</b>\n\n` +
+          `Отправьте мне сообщение с описанием того, что нужно доработать, расширить или проверить дальше.\n` +
+          `<i>Агент подхватит контекст предыдущей работы без повторного сканирования.</i>`,
+        { parse_mode: 'HTML' }
+      );
+    });
+
     bot.callbackQuery(/^veronica:proj_page:(\d+)$/, async (ctx) => {
       const page = parseInt(ctx.match[1], 10) || 0;
       const projects = await projectDiscovery.discoverAllProjects();

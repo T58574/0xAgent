@@ -1,6 +1,7 @@
 import { Bot, InlineKeyboard } from 'grammy';
 import { AgentTask } from '../types';
 import { loadConfig } from '../../config';
+import { veronicaOrchestrator } from './veronicaOrchestrator';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -27,14 +28,17 @@ export class NotificationService {
     this.botInstance = bot;
   }
 
-  public async broadcastToWhitelist(message: string): Promise<void> {
+  public async broadcastToWhitelist(message: string, replyMarkup?: InlineKeyboard): Promise<void> {
     if (!this.botInstance) return;
     const config = loadConfig();
     const whitelist = config.veronica?.telegram_whitelist || [];
 
     for (const chatId of whitelist) {
       try {
-        await this.botInstance.api.sendMessage(chatId, message, { parse_mode: 'HTML' });
+        await this.botInstance.api.sendMessage(chatId, message, {
+          parse_mode: 'HTML',
+          reply_markup: replyMarkup,
+        });
       } catch (err) {
         console.error(`[Veronica Telegram] Failed to send message to ${chatId}:`, err);
       }
@@ -43,6 +47,19 @@ export class NotificationService {
 
   public async notifyTaskCompleted(task: AgentTask, rawChanges?: string[] | string): Promise<void> {
     const changes = Array.isArray(rawChanges) ? rawChanges : rawChanges ? [rawChanges] : [];
+
+    // Automatically synchronize lastTaskId and project into Veronica Orchestrator session
+    const config = loadConfig();
+    const whitelist = config.veronica?.telegram_whitelist || [];
+    for (const chatId of whitelist) {
+      try {
+        const session = veronicaOrchestrator.getUserSession(Number(chatId));
+        session.lastTaskId = task.id;
+        session.lastTaskProject = task.project;
+        session.lastTaskSummary = task.summary || undefined;
+        veronicaOrchestrator.persistSessionMeta(session);
+      } catch {}
+    }
 
     const lines: string[] = [
       `✅ <b>Задача завершена:</b> <code>${task.id.substring(0, 8)}</code>`,
@@ -65,8 +82,12 @@ export class NotificationService {
       lines.push('');
     }
 
+    const keyboard = new InlineKeyboard()
+      .text('🔄 Продолжить задачу', `veronica:continue:${task.id}`)
+      .text('📁 Меню проектов', 'veronica:projects_menu');
+
     const msg = lines.join('\n').trim();
-    await this.broadcastToWhitelist(msg);
+    await this.broadcastToWhitelist(msg, keyboard);
   }
 
   public async notifyTaskCrashed(task: AgentTask, reason: string): Promise<void> {
