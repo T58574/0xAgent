@@ -61,14 +61,84 @@ export class VeronicaOrchestrator {
     }
   }
 
+  private loadUserSessionMeta(userId: number): {
+    active_project?: string;
+    awaiting_prompt_for_project?: string;
+    last_task_id?: string;
+    last_task_project?: string;
+    last_task_summary?: string;
+    antigravity_conversation_id?: string;
+    updated_at?: number;
+  } | null {
+    try {
+      const db = getVeronicaDb();
+      const row = db.prepare(
+        'SELECT active_project, awaiting_prompt_for_project, last_task_id, last_task_project, last_task_summary, antigravity_conversation_id, updated_at FROM telegram_user_sessions WHERE user_id = ?'
+      ).get(userId) as any;
+      if (!row) return null;
+      return {
+        active_project: row.active_project || undefined,
+        awaiting_prompt_for_project: row.awaiting_prompt_for_project || undefined,
+        last_task_id: row.last_task_id || undefined,
+        last_task_project: row.last_task_project || undefined,
+        last_task_summary: row.last_task_summary || undefined,
+        antigravity_conversation_id: row.antigravity_conversation_id || undefined,
+        updated_at: row.updated_at ? Number(row.updated_at) : undefined,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  public persistSessionMeta(session: UserSessionState): void {
+    const now = Date.now();
+    session.lastMessageTime = now;
+    writeQueue.enqueue(() => {
+      try {
+        const db = getVeronicaDb();
+        db.prepare(`
+          INSERT INTO telegram_user_sessions 
+            (user_id, active_project, awaiting_prompt_for_project, last_task_id, last_task_project, last_task_summary, antigravity_conversation_id, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(user_id) DO UPDATE SET
+            active_project = excluded.active_project,
+            awaiting_prompt_for_project = excluded.awaiting_prompt_for_project,
+            last_task_id = excluded.last_task_id,
+            last_task_project = excluded.last_task_project,
+            last_task_summary = excluded.last_task_summary,
+            antigravity_conversation_id = excluded.antigravity_conversation_id,
+            updated_at = excluded.updated_at
+        `).run(
+          session.userId,
+          session.activeProject || null,
+          session.awaitingPromptForProject || null,
+          session.lastTaskId || null,
+          session.lastTaskProject || null,
+          session.lastTaskSummary || null,
+          session.antigravityConversationId || null,
+          now
+        );
+      } catch (err) {
+        console.warn('[Veronica Orchestrator] Failed to persist session metadata:', err);
+      }
+    }).catch(() => {});
+  }
+
   public getUserSession(userId: number): UserSessionState {
     let session = this.userSessions.get(userId);
     if (!session) {
       // Load recent history from SQLite
       const recentMessages = this.loadConversationHistory(userId, this.maxHistoryPerSession);
+      const meta = this.loadUserSessionMeta(userId);
       session = {
         userId,
-        lastMessageTime: Date.now(),
+        activeProject: meta?.active_project,
+        awaitingPromptForProject: meta?.awaiting_prompt_for_project,
+        lastTaskId: meta?.last_task_id,
+        lastTaskProject: meta?.last_task_project,
+        lastTaskSummary: meta?.last_task_summary,
+        antigravityConversationId: meta?.antigravity_conversation_id,
+        lastMessageTime: meta?.updated_at || Date.now(),
         messages: recentMessages,
       };
       this.userSessions.set(userId, session);
@@ -86,11 +156,14 @@ export class VeronicaOrchestrator {
     session.lastTaskSummary = undefined;
     session.lastMessageTime = Date.now();
 
+    this.persistSessionMeta(session);
+
     // Clear from DB
     writeQueue.enqueue(() => {
       try {
         const db = getVeronicaDb();
         db.prepare('DELETE FROM telegram_conversations WHERE user_id = ?').run(userId);
+        db.prepare('DELETE FROM telegram_user_sessions WHERE user_id = ?').run(userId);
       } catch {}
     }).catch(() => {});
   }
@@ -99,17 +172,20 @@ export class VeronicaOrchestrator {
     const session = this.getUserSession(userId);
     session.activeProject = project;
     session.awaitingPromptForProject = undefined;
+    this.persistSessionMeta(session);
   }
 
   public setAwaitingPrompt(userId: number, project: string): void {
     const session = this.getUserSession(userId);
     session.activeProject = project;
     session.awaitingPromptForProject = project;
+    this.persistSessionMeta(session);
   }
 
   public clearAwaitingPrompt(userId: number): void {
     const session = this.getUserSession(userId);
     session.awaitingPromptForProject = undefined;
+    this.persistSessionMeta(session);
   }
 
   private persistMessage(userId: number, role: 'user' | 'assistant' | 'system', content: string): void {
@@ -433,11 +509,7 @@ ORCHESTRATION INSTRUCTIONS:
       const errDetail = err?.cause?.message || err?.cause?.code || err?.message || String(err);
       console.warn('[Veronica Orchestrator] All LLM backends exhausted:', errDetail);
 
-      // Graceful conversational fallback
-      return (
-        `Сэр, приняла ваше сообщение: <i>«${this.escapeHtml(userText)}»</i>.\n\n` +
-        `💡 Вы можете выбрать проект кнопкой <b>«📁 Проекты»</b> ниже для прямого запуска задач или просмотра документации.`
-      );
+      return this.formatLlmErrorResponse(err, userText, session);
     }
   }
 
@@ -474,6 +546,7 @@ ORCHESTRATION INSTRUCTIONS:
           session.lastTaskId = task.id;
           session.lastTaskProject = resolvedProject;
           session.lastTaskSummary = prompt;
+          this.persistSessionMeta(session);
 
           cleanText = cleanText.replace(match[0], '');
         } catch (err: any) {
@@ -505,6 +578,7 @@ ORCHESTRATION INSTRUCTIONS:
             session.lastTaskId = task.id;
             session.lastTaskProject = targetProj;
             session.lastTaskSummary = refinementPrompt;
+            this.persistSessionMeta(session);
 
             cleanText = cleanText.replace(match[0], '');
           } catch (err: any) {
@@ -632,8 +706,8 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
             args.push('--add-dir', path.dirname(imagePath));
           }
 
-          // If retry or dropped, don't reuse stuck conversation
-          const isContinuing = attempt === 1 && Boolean(sessionState?.antigravityConversationId);
+          // If retry or continue, reuse active conversation
+          const isContinuing = Boolean(sessionState?.antigravityConversationId);
           if (isContinuing && sessionState?.antigravityConversationId) {
             args.push('--conversation', sessionState.antigravityConversationId);
           }
@@ -668,7 +742,7 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
             let errOut = '';
             let lineBuffer = '';
 
-            // Stream watchdog: kill if no data received for 35 seconds
+            // Stream watchdog: kill if no data received for 45 seconds
             let streamWatchdog: NodeJS.Timeout | null = null;
             const resetWatchdog = () => {
               if (streamWatchdog) clearTimeout(streamWatchdog);
@@ -676,8 +750,8 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
                 try {
                   child.kill('SIGKILL');
                 } catch {}
-                reject(new Error('Watchdog: Antigravity stream dropped / stalled for 35s'));
-              }, 35000);
+                reject(new Error('Watchdog: Antigravity stream dropped / stalled for 45s'));
+              }, 45000);
             };
 
             resetWatchdog();
@@ -699,12 +773,14 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
                   if (ev.event === 'init' && ev.conversation_id) {
                     if (sessionState) {
                       sessionState.antigravityConversationId = ev.conversation_id;
+                      this.persistSessionMeta(sessionState);
                     }
                   } else if (ev.event === 'step_update' && ev.step_update?.text_delta) {
                     out += ev.step_update.text_delta;
                   } else if (ev.event === 'result') {
                     if (ev.result?.conversation_id && sessionState) {
                       sessionState.antigravityConversationId = ev.result.conversation_id;
+                      this.persistSessionMeta(sessionState);
                     }
                     if (ev.result?.response && !out.trim()) {
                       out = ev.result.response;
@@ -726,14 +802,14 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
               errOut += d.toString();
             });
 
-            // Hard timeout at 60s total
+            // Hard timeout at 240s total execution limit
             const totalTimer = setTimeout(() => {
               if (streamWatchdog) clearTimeout(streamWatchdog);
               try {
                 child.kill('SIGKILL');
               } catch {}
-              reject(new Error('Antigravity CLI timed out after 60s total execution limit'));
-            }, 60000);
+              reject(new Error('Antigravity CLI timed out after 240s total execution limit'));
+            }, 240000);
 
             child.on('close', (code) => {
               clearTimeout(totalTimer);
@@ -768,11 +844,22 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
           if (agyOutput) return agyOutput;
         } catch (agyErr: any) {
           lastError = agyErr;
-          console.warn(`[Veronica Orchestrator] [Antigravity CLI Attempt ${attempt} Failed]:`, agyErr?.message || agyErr);
+          const errMsg = agyErr?.message || String(agyErr);
+          console.warn(`[Veronica Orchestrator] [Antigravity CLI Attempt ${attempt} Failed]:`, errMsg);
 
-          // Reset conversation on error so next attempt doesn't hang on corrupt session
-          if (sessionState) {
+          // Check if quota error - DO NOT retry immediately and DO NOT reset conversation ID!
+          const isQuota = /quota reached|quota exceeded|subscription to increase your limits|rate limit|resets in/i.test(errMsg);
+          if (isQuota) {
+            console.warn('[Veronica Orchestrator] Quota limit reached, aborting retry loop.');
+            break;
+          }
+
+          // Only reset conversation ID if CLI explicitly reports the conversation is corrupt or not found
+          const isCorruptedSession = /conversation.*(?:not found|corrupt|invalid)/i.test(errMsg);
+          if (isCorruptedSession && sessionState) {
+            console.warn('[Veronica Orchestrator] Session invalid in agy, resetting conversation ID.');
             sessionState.antigravityConversationId = undefined;
+            this.persistSessionMeta(sessionState);
           }
 
           if (attempt === 1) {
@@ -824,6 +911,64 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
     }
 
     throw lastError || new Error('All LLM inference attempts exhausted.');
+  }
+
+  /**
+   * Technical, informative error response for Telegram when LLM fails
+   */
+  private formatLlmErrorResponse(err: any, _userText: string, session: UserSessionState): string {
+    const rawMsg = err?.cause?.message || err?.cause?.code || err?.message || String(err);
+    const isQuota = /quota reached|quota exceeded|subscription to increase your limits|resets in/i.test(rawMsg);
+    const isTimeout = /timed out|watchdog|stalled/i.test(rawMsg);
+    const isNotFound = /enoent|not found|cannot find/i.test(rawMsg);
+
+    // Extract reset time if available
+    const resetMatch = rawMsg.match(/Resets in ([^\.\n\r]+)/i);
+    const resetText = resetMatch ? resetMatch[1].trim() : '';
+
+    const sessionInfo = session.antigravityConversationId
+      ? `\n\n📌 <i>Активная сессия сохранена (<code>${session.antigravityConversationId.substring(0, 8)}</code>). После устранения причины диалог продолжится в этой же сессии.</i>`
+      : '';
+
+    if (isQuota) {
+      return (
+        `⚠️ <b>Квота Antigravity CLI исчерпана</b>\n\n` +
+        `Сэр, запрос к модели отклонён из-за достижения лимита квоты Google/CLI:\n` +
+        `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
+        `💡 <b>Что необходимо сделать:</b>\n` +
+        (resetText ? `• <b>Автоматический сброс:</b> через <b>${this.escapeHtml(resetText)}</b>\n` : '') +
+        `• <b>Сменить аккаунт:</b> выполните в терминале <code>agy auth</code>\n` +
+        `• Либо переключите модель/профиль в настройках 0xAgent.` +
+        sessionInfo
+      );
+    }
+
+    if (isTimeout) {
+      return (
+        `⏱️ <b>Таймаут выполнения команды</b>\n\n` +
+        `Сэр, движок <code>agy</code> выполнялся дольше лимита или поток данных был прерван:\n` +
+        `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
+        `💡 <i>Сессия сохранена. Попробуйте повторить запрос или разбить его на более компактные шаги.</i>` +
+        sessionInfo
+      );
+    }
+
+    if (isNotFound) {
+      return (
+        `❌ <b>Исполняемый файл agy не найден</b>\n\n` +
+        `Сэр, операционная система не может найти CLI <code>agy</code>:\n` +
+        `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
+        `💡 <i>Проверьте путь к agy в настройках Вероники или добавьте путь к agy в системную переменную PATH.</i>`
+      );
+    }
+
+    return (
+      `❌ <b>Сбой инференса Вероники</b>\n\n` +
+      `Сэр, не удалось получить ответ от движков инференса:\n` +
+      `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
+      `💡 <i>Проверьте сетевой статус/прокси или повторите запрос через несколько минут.</i>` +
+      sessionInfo
+    );
   }
 
   private escapeHtml(text: string): string {

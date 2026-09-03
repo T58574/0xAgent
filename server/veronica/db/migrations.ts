@@ -95,6 +95,24 @@ export const migrations: Migration[] = [
       `);
     },
   },
+  {
+    version: 4,
+    name: 'add_telegram_user_sessions',
+    up: (db: DatabaseSync) => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS telegram_user_sessions (
+          user_id INTEGER PRIMARY KEY,
+          active_project TEXT,
+          awaiting_prompt_for_project TEXT,
+          last_task_id TEXT,
+          last_task_project TEXT,
+          last_task_summary TEXT,
+          antigravity_conversation_id TEXT,
+          updated_at INTEGER NOT NULL
+        );
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db: DatabaseSync): void {
