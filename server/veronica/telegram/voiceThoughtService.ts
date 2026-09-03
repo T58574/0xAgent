@@ -17,6 +17,20 @@ export interface StructuredThought {
   fileSavedPath?: string;
 }
 
+function resolvePythonPath(): string {
+  const home = process.env.USERPROFILE || process.env.HOME || os.homedir();
+  const venvPaths = [
+    path.join(home, 'Documents', 'dev', '0xVoice2Text', 'venv', 'Scripts', 'python.exe'),
+    path.resolve(process.cwd(), '..', '0xVoice2Text', 'venv', 'Scripts', 'python.exe'),
+  ];
+  for (const vp of venvPaths) {
+    if (fs.existsSync(vp)) {
+      return vp;
+    }
+  }
+  return 'python';
+}
+
 export class VoiceThoughtService {
   private static instance: VoiceThoughtService;
 
@@ -67,7 +81,9 @@ export class VoiceThoughtService {
     if (fs.existsSync(scriptPath)) {
       try {
         const pythonResult = await new Promise<{ text: string; engine: string }>((resolve, reject) => {
-          const child = spawn('python', [scriptPath, audioPath, '--engine', 'auto'], {
+          const pythonBin = resolvePythonPath();
+          console.log(`[VoiceThoughtService] Executing local STT helper via: ${pythonBin}`);
+          const child = spawn(pythonBin, [scriptPath, audioPath, '--engine', 'auto'], {
             cwd: process.cwd(),
             shell: false,
             stdio: ['pipe', 'pipe', 'pipe'],
@@ -88,16 +104,23 @@ export class VoiceThoughtService {
 
           child.on('close', (code) => {
             clearTimeout(timer);
-            if (code === 0 && stdout.trim()) {
-              try {
-                const parsed = JSON.parse(stdout.trim());
-                if (parsed.success && parsed.text) {
-                  resolve({ text: parsed.text.trim(), engine: parsed.engine || 'python-stt' });
-                  return;
-                }
-              } catch {}
+            const lines = stdout.trim().split('\n');
+            let jsonParsed: any = null;
+            for (let i = lines.length - 1; i >= 0; i--) {
+              const line = lines[i].trim();
+              if (line.startsWith('{') && line.endsWith('}')) {
+                try {
+                  jsonParsed = JSON.parse(line);
+                  break;
+                } catch {}
+              }
             }
-            reject(new Error(`Python transcription exited (${code}): ${stderr || stdout}`));
+
+            if (jsonParsed && jsonParsed.success) {
+              resolve({ text: (jsonParsed.text || '').trim(), engine: jsonParsed.engine || 'local-qwen3-onnx' });
+              return;
+            }
+            reject(new Error(`Python transcription exited (${code}): ${jsonParsed?.error || stderr || stdout}`));
           });
 
           child.on('error', (err) => {

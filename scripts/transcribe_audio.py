@@ -32,6 +32,12 @@ def transcribe_with_qwen3_onnx(audio_path: str) -> dict:
     if voice2text_path not in sys.path:
         sys.path.insert(0, voice2text_path)
 
+    import logging
+    # Ensure all logger output goes to stderr so stdout remains pure JSON
+    for h in logging.getLogger().handlers + logging.getLogger("0xVoice2Text").handlers:
+        if isinstance(h, logging.StreamHandler):
+            h.stream = sys.stderr
+
     import soundfile as sf
     import librosa
 
@@ -157,12 +163,12 @@ def main():
         # Auto: Try Local Qwen3 DirectML first, fallback to Groq, fallback to Vosk
         try:
             res_qwen = transcribe_with_qwen3_onnx(args.file)
-            if res_qwen.get("success") and res_qwen.get("text"):
+            if res_qwen.get("success"):
                 result = res_qwen
         except Exception as e:
             print(f"[Transcribe] Qwen3 DirectML failed: {e}", file=sys.stderr)
 
-        if not result or not result.get("success") or not result.get("text"):
+        if not result or not result.get("success"):
             try:
                 res_groq = transcribe_with_groq(args.file, args.api_key)
                 if res_groq.get("success") and res_groq.get("text"):
