@@ -1,12 +1,8 @@
 import {
   AppConfig,
-  ChatSession,
-  FileNode,
   GgufMetadata,
-  HardwareInfo,
   MemoryItem,
   SkillInfo,
-  ServerStatusInfo,
   PersonaMetadata,
   PersonaDetail,
   ToolsState,
@@ -14,17 +10,13 @@ import {
   KnowledgeEntry,
   KnowledgeQueryOptions,
   JarvisState,
-  ContextBreakdownReport,
   StagedProposal,
   SearchEngineInfo,
   WebSearchProvider,
-  ApprovalResult,
   SystemPromptItem,
   SystemVersionInfo,
   UpdateCheckResult,
   UpdateApplyResult,
-  VeronicaStreamEvent,
-  VeronicaModuleStatus,
   ProxyItem,
   ProxyProtocol,
   ProxyHealthCheckResult,
@@ -138,65 +130,13 @@ export async function logout(): Promise<void> {
   clearStoredToken();
 }
 
-// Config & Sessions
+// Config
 export const get_config = () => get<AppConfig>('/config');
 export const save_config = (config: AppConfig) => post<void>('/config', config);
-export const list_sessions = () => get<ChatSession[]>('/sessions');
-export const load_session = (id: string) => get<ChatSession>(`/sessions/${id}`);
-export const save_session = (session: ChatSession) => post<void>(`/sessions/${session.id}/save`, session);
-export const create_session = (title?: string, workspace_dir?: string | null) =>
-  post<ChatSession>('/sessions', { title, workspace_dir });
-export const create_auto_workspace = () => post<{ slug: string; path: string }>('/workspaces/create-auto');
-export const update_session_workspace = (sessionId: string, workspace_dir: string | null) =>
-  post<ChatSession>(`/sessions/${sessionId}/workspace`, { workspace_dir });
-export const delete_session = (id: string) => del<void>(`/sessions/${id}`);
-export const fork_session = (sessionId: string, fromMessageId?: string, newTitle?: string) =>
-  post<any>(`/sessions/${sessionId}/fork`, { fromMessageId, newTitle });
-export const rollback_session = (
-  sessionId: string,
-  targetMessageId: string,
-  mode: 'to_user_edit' | 'to_assistant' = 'to_user_edit'
-) => post<{ session: ChatSession; restoredContent: string }>(`/sessions/${sessionId}/rollback`, { targetMessageId, mode });
 
-// Workspace & Files
-export async function select_workspace(): Promise<string | null> {
-  const data = await post<{ folder: string | null }>('/select-workspace');
-  return data.folder;
-}
+// Re-export Chat, Session & Workspace API from modular domain
+export * from './api/chat';
 
-export async function select_file_native(filter?: string): Promise<string | null> {
-  const data = await post<{ filePath: string | null }>('/select-file', { filter });
-  return data.filePath;
-}
-
-export const get_workspace_tree = (workspaceDir?: string | null) =>
-  get<FileNode[]>(workspaceDir ? `/workspace-tree?workspaceDir=${encodeURIComponent(workspaceDir)}` : '/workspace-tree');
-
-export const get_workspace_context = (workspaceDir?: string | null) =>
-  get<{ loaded: boolean; filePath: string | null; filename: string | null; content: string | null }>(
-    workspaceDir ? `/workspace-context?workspaceDir=${encodeURIComponent(workspaceDir)}` : '/workspace-context'
-  );
-
-export async function read_file_raw(path: string, workspaceDir?: string | null): Promise<string> {
-  const url = workspaceDir
-    ? `/read-file-raw?path=${encodeURIComponent(path)}&workspaceDir=${encodeURIComponent(workspaceDir)}`
-    : `/read-file-raw?path=${encodeURIComponent(path)}`;
-  const data = await get<{ content: string }>(url);
-  return data.content;
-}
-
-export const write_file_raw = (path: string, content: string, workspaceDir?: string | null) =>
-  post<void>('/write-file-raw', { path, content, workspaceDir });
-
-// Agent Messaging & Tool Interaction
-export const send_message = (sessionId: string) => post<void>('/send-message', { sessionId });
-export const cancel_agent = (sessionId: string) => post<void>('/cancel-agent', { sessionId });
-export const respond_to_tool = (sessionId: string, toolCallId: string, approve: boolean | string) =>
-  post<void>('/respond-to-tool', { sessionId, toolCallId, approve });
-export const respond_to_approval = (ticketOrNonce: string, approve: boolean, overrideText?: string, currentContent?: string) =>
-  post<ApprovalResult>('/respond-to-approval', { ticketOrNonce, approve, overrideText, currentContent });
-export const answer_user_question = (toolCallId: string, answers: any[]) =>
-  post<void>('/answer-question', { toolCallId, answers });
 
 // Llama Releases & Installation
 export const get_llama_releases = () => get<any[]>('/llama-releases');
@@ -215,102 +155,17 @@ export const cleanup_old_llama_versions = (keepTag?: string) =>
 export const parse_gguf = (filePath: string) => post<GgufMetadata>('/parse-gguf', { filePath });
 export const scan_models_dir = (dirPath?: string) =>
   get<{ dirPath: string; models: GgufMetadata[] }>(dirPath ? `/scan-models-dir?dirPath=${encodeURIComponent(dirPath)}` : '/scan-models-dir');
-export const detect_hardware = () => get<HardwareInfo>('/detect-hardware');
 export const get_available_models = () => get<AvailableModelsResponse>('/models');
 export const set_active_model = (modelId: string) =>
   post<{ success: boolean; activeModelId: string }>('/models/active', { modelId });
 
-// Server Health & Status
-export async function get_server_health(host: string, port: number): Promise<{ ok: boolean; status: string }> {
-  try {
-    return await get<{ ok: boolean; status: string }>(`/server-health?host=${encodeURIComponent(host)}&port=${port}`);
-  } catch {
-    return { ok: false, status: 'stopped' };
-  }
-}
+// Re-export Telemetry, Hardware & Server Health API from modular domain
+export * from './api/telemetry';
 
-export async function get_server_slots(host: string, port: number): Promise<{ ok: boolean; totalSlots: number; activeSlots: number }> {
-  try {
-    return await get<{ ok: boolean; totalSlots: number; activeSlots: number }>(`/server-slots?host=${encodeURIComponent(host)}&port=${port}`);
-  } catch {
-    return { ok: false, totalSlots: 0, activeSlots: 0 };
-  }
-}
 
-export const start_local_server = (params?: any) =>
-  post<{ success: boolean; message: string }>('/start-local-server', params || {});
-export const stop_local_server = () => post<{ success: boolean; message: string }>('/stop-local-server');
-export const purge_vram = () => post<{ success: boolean; message: string; killedCount?: number }>('/purge-vram');
-export const get_server_status = () => get<ServerStatusInfo>('/server-status');
-export const get_server_logs = () => get<{ logs: string[]; logFilePath: string; running: boolean }>('/server-logs');
-export const get_lan_info = () => get<{ urls: string[] }>('/get-local-ips');
-export const get_local_ips = () => get<{ urls: string[] }>('/get-local-ips');
+// Re-export Veronica & Remote Node API from modular domain
+export * from './api/veronica';
 
-// Veronica & Remote Node API
-export const get_veronica_status = () => get<any>('/veronica/status');
-export const get_veronica_projects = () => get<{ projects: any[] }>('/veronica/projects');
-export const rescan_veronica_projects = () => post<{ success: boolean; projects: any[] }>('/veronica/projects/rescan', {});
-export const get_veronica_paths = () => get<{ paths: string[] }>('/veronica/projects/paths');
-export const add_veronica_path = (path: string) => post<{ success: boolean; paths: string[]; projects: any[] }>('/veronica/projects/paths', { path });
-export const get_veronica_models = () => get<{ local: string[]; antigravity: { slug: string; name: string; effort?: string }[] }>('/veronica/models');
-export const get_veronica_agents = () => get<{ agents: { slug: string; name: string; description?: string }[] }>('/veronica/agents');
-export const spawn_veronica_task = (params: {
-  project: string;
-  skill: string;
-  runtime_profile?: string;
-  autonomy_level?: string;
-  custom_prompt?: string;
-  model?: string;
-  effort?: string;
-  agent?: string;
-  print_timeout?: string;
-  conversation_id?: string;
-  continue_recent?: boolean;
-}) => post<{ success: boolean; task: any }>('/veronica/tasks/spawn', params);
-export const kill_veronica_task = (taskId: string) =>
-  post<{ success: boolean }>(`/veronica/tasks/${encodeURIComponent(taskId)}/kill`, {});
-export const reload_veronica_module = () =>
-  post<{ success: boolean; status: VeronicaModuleStatus; timestamp: number }>('/veronica/reload', {});
-export const get_veronica_task_stream_url = (taskId: string) =>
-  `${API_BASE}/veronica/tasks/${encodeURIComponent(taskId)}/stream`;
-
-export function stream_veronica_task(
-  taskId: string,
-  onEvent: (event: VeronicaStreamEvent) => void,
-  onError?: (err: any) => void
-): () => void {
-  const token = getStoredToken();
-  const url = `${get_veronica_task_stream_url(taskId)}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-  const eventSource = new EventSource(url);
-
-  const handleMessage = (e: MessageEvent) => {
-    try {
-      const parsed: VeronicaStreamEvent = JSON.parse(e.data);
-      onEvent(parsed);
-      if (parsed.type === 'end') {
-        eventSource.close();
-      }
-    } catch (parseErr) {
-      console.warn('[Veronica Stream Parse Error]', parseErr);
-    }
-  };
-
-  eventSource.addEventListener('open', handleMessage as any);
-  eventSource.addEventListener('stdout', handleMessage as any);
-  eventSource.addEventListener('stderr', handleMessage as any);
-  eventSource.addEventListener('heartbeat', handleMessage as any);
-  eventSource.addEventListener('status', handleMessage as any);
-  eventSource.addEventListener('end', handleMessage as any);
-
-  eventSource.onerror = (err) => {
-    if (onError) onError(err);
-    eventSource.close();
-  };
-
-  return () => {
-    eventSource.close();
-  };
-}
 
 // Memories & Skills
 export const get_memories = (query?: string) =>
@@ -353,13 +208,6 @@ export const get_persona_history = (id: string, file?: string) =>
   get<any[]>(file ? `/personas/${encodeURIComponent(id)}/history?file=${encodeURIComponent(file)}` : `/personas/${encodeURIComponent(id)}/history`);
 export const rollback_persona_file = (id: string, file: string, version_id: string) =>
   post<any>(`/personas/${encodeURIComponent(id)}/rollback`, { file, version_id });
-export const get_eval_benchmark = () => get<any>('/eval/benchmark');
-export const trigger_memory_decay_cycle = () => post<any>('/personas/decay/cycle', {});
-export const get_evolution_analytics = (days?: number) =>
-  get<any>(days ? `/analytics/evolution?days=${days}` : '/analytics/evolution');
-export const get_evolution_telemetry = (limit?: number) =>
-  get<any[]>(limit ? `/analytics/evolution/telemetry?limit=${limit}` : '/analytics/evolution/telemetry');
-
 export const get_system_prompts = () => get<SystemPromptItem[]>('/system-prompts');
 
 export async function get_summarizer_prompt(): Promise<string> {
@@ -436,8 +284,7 @@ export const start_voice_daemon_recording = () => post<{ success: boolean; state
 export const stop_voice_daemon_recording = () => post<{ success: boolean; state: string }>('/jarvis/voice-record/stop');
 export const send_voice_input = (audioBase64: string, mimeType?: string) =>
   post<{ success: boolean; text: string; macro?: string }>('/jarvis/voice-input', { audioBase64, mimeType });
-export const get_context_breakdown = (sessionId?: string | null) =>
-  get<ContextBreakdownReport>(sessionId ? `/context/breakdown?sessionId=${encodeURIComponent(sessionId)}` : '/context/breakdown');
+
 
 // Self-Improvement & Pull Request Proposals API
 export const list_proposals = (sessionId?: string) =>
