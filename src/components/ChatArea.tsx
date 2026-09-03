@@ -17,6 +17,7 @@ import { EmptyChatHero } from './chat/EmptyChatHero';
 import { TelemetryHUD } from './chat/TelemetryHUD';
 import { ChatMessageItem } from './chat/ChatMessageItem';
 import { ChatHeader } from './chat/ChatHeader';
+import { ChatTelemetryBar } from './chat/ChatTelemetryBar';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useI18n } from '../i18n';
@@ -333,6 +334,15 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
         onSelectWorkspace={onSelectWorkspace}
         onUpdateSessionWorkspace={onUpdateSessionWorkspace}
       />
+
+      {/* 1.1 TELEMETRY STATUS STRIP (agy CLI live stopwatch & 10-segment quota gauge) */}
+      {(liveTelemetry || agentStatus === 'thinking' || agentStatus === 'executing_tool') && (
+        <ChatTelemetryBar
+          liveTelemetry={liveTelemetry ?? null}
+          planningMode={config?.planning_mode ?? false}
+          isGenerating={agentStatus === 'thinking' || agentStatus === 'executing_tool'}
+        />
+      )}
 
       {/* 2. EMPTY CHAT STATE */}
       {!hasMessages && (

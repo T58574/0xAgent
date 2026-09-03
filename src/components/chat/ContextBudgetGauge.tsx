@@ -133,18 +133,25 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
         className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)] transition-all text-xs font-mono select-none cursor-pointer shadow-sm"
         title={t.chat.contextBudget}
       >
-        <Layers className="w-3.5 h-3.5 text-[var(--theme-text-muted)]" />
-        <span className="text-[var(--theme-text)] text-[11px] font-semibold">
+        <Layers className="w-3.5 h-3.5 text-[var(--theme-text-muted)] shrink-0" />
+        <span className="text-[var(--theme-text)] text-[11px] font-semibold whitespace-nowrap">
           {formatK(usedTokens)} / {formatK(maxTokens)}
         </span>
-        <div className="w-12 h-1.5 rounded-full bg-[var(--theme-panel)] overflow-hidden border border-[var(--theme-border)]">
+        <div className="w-10 h-1.5 rounded-full bg-[var(--theme-panel)] overflow-hidden border border-[var(--theme-border)] hidden sm:block shrink-0">
           <div
             className={`h-full transition-all duration-300 ${getBarColor(pct)}`}
             style={{ width: `${Math.max(4, pct)}%` }}
           />
         </div>
-        <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">
-          {pct}%
+        {/* agy CLI 10-segment Unicode context quota indicator */}
+        <span
+          className={`text-[10px] tracking-tight font-mono whitespace-nowrap select-none font-bold ${
+            pct > 85 ? 'text-rose-400' : pct > 65 ? 'text-amber-400' : 'text-emerald-400'
+          }`}
+          title={`Context Usage: ${pct}%`}
+        >
+          [{'●'.repeat(Math.min(10, Math.max(0, Math.round(pct / 10))))}
+          {'○'.repeat(Math.max(0, 10 - Math.min(10, Math.max(0, Math.round(pct / 10)))))}] {pct}%
         </span>
       </button>
 

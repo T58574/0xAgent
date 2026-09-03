@@ -104,20 +104,34 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
                 <span>{liveTelemetry.tokenCount} tok</span>
               </span>
             )}
-            {liveTelemetry.contextUsed !== undefined && (
-              <button
-                type="button"
-                onClick={onOpenCustomizations}
-                className="flex items-center gap-1 hidden sm:flex text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
-                title="Нажмите, чтобы открыть детальный анализ токенов и кастомизаций"
-              >
-                <MaterialIcon name="storage" size={12} />
-                <span>
-                  {liveTelemetry.contextUsed.toLocaleString()}
-                  {liveTelemetry.contextMax ? ` / ${liveTelemetry.contextMax.toLocaleString()}` : ''}
-                </span>
-              </button>
-            )}
+            {liveTelemetry.contextUsed !== undefined && (() => {
+              const ctxMax = liveTelemetry.contextMax || 32768;
+              const pct = Math.min(100, Math.max(0, Math.round((liveTelemetry.contextUsed / ctxMax) * 100)));
+              const filled = Math.min(10, Math.max(0, Math.round(pct / 10)));
+              const empty = Math.max(0, 10 - filled);
+              const gaugeStr = `[${'●'.repeat(filled)}${'○'.repeat(empty)}] ${pct}%`;
+              return (
+                <button
+                  type="button"
+                  onClick={onOpenCustomizations}
+                  className="flex items-center gap-1.5 hidden sm:flex text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] transition-colors cursor-pointer"
+                  title="Нажмите, чтобы открыть детальный анализ токенов и кастомизаций"
+                >
+                  <MaterialIcon name="storage" size={12} />
+                  <span>
+                    {liveTelemetry.contextUsed.toLocaleString()}
+                    {liveTelemetry.contextMax ? ` / ${liveTelemetry.contextMax.toLocaleString()}` : ''}
+                  </span>
+                  <span
+                    className={`font-mono text-[10px] font-bold tracking-tight select-none ${
+                      pct > 85 ? 'text-rose-400' : pct > 65 ? 'text-amber-400' : 'text-emerald-400'
+                    }`}
+                  >
+                    {gaugeStr}
+                  </span>
+                </button>
+              );
+            })()}
           </div>
         </div>
       )}
