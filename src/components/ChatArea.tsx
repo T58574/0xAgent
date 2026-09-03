@@ -7,6 +7,7 @@ import {
   PersonaMetadata,
   JarvisSparkProposal,
   ChatSession,
+  QuotaStatus,
 } from '../types';
 import { isSameDay, extractQuickResponses } from '../utils/helpers';
 import { FloatingCommandBar } from './chat/FloatingCommandBar';
@@ -17,7 +18,6 @@ import { EmptyChatHero } from './chat/EmptyChatHero';
 import { TelemetryHUD } from './chat/TelemetryHUD';
 import { ChatMessageItem } from './chat/ChatMessageItem';
 import { ChatHeader } from './chat/ChatHeader';
-import { ChatTelemetryBar } from './chat/ChatTelemetryBar';
 import * as api from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useI18n } from '../i18n';
@@ -36,6 +36,7 @@ interface ChatAreaProps {
   onRollbackSession?: (targetMessageId: string, mode: 'to_user_edit' | 'to_assistant') => Promise<string>;
   reasoningEnabled?: boolean;
   liveTelemetry?: LiveTelemetry | null;
+  quotaStatus?: QuotaStatus | null;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
   onConfigChanged?: (newConfig: AppConfig) => void;
@@ -60,6 +61,7 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
   onAcceptSpark,
   reasoningEnabled = true,
   liveTelemetry,
+  quotaStatus,
   config,
   onModelChanged,
   onConfigChanged,
@@ -335,15 +337,6 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
         onUpdateSessionWorkspace={onUpdateSessionWorkspace}
       />
 
-      {/* 1.1 TELEMETRY STATUS STRIP (agy CLI live stopwatch & 10-segment quota gauge) */}
-      {(liveTelemetry || agentStatus === 'thinking' || agentStatus === 'executing_tool') && (
-        <ChatTelemetryBar
-          liveTelemetry={liveTelemetry ?? null}
-          planningMode={config?.planning_mode ?? false}
-          isGenerating={agentStatus === 'thinking' || agentStatus === 'executing_tool'}
-        />
-      )}
-
       {/* 2. EMPTY CHAT STATE */}
       {!hasMessages && (
         <div className="flex-1 min-h-0 relative flex flex-col overflow-hidden">
@@ -450,6 +443,7 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
             {/* Live Telemetry & Thinking Indicator via TelemetryHUD */}
             <TelemetryHUD
               liveTelemetry={liveTelemetry}
+              quotaStatus={quotaStatus}
               agentStatus={agentStatus}
               showThinkingBanner={
                 agentStatus === 'thinking' &&

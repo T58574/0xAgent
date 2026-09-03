@@ -38,12 +38,12 @@ export class TaskRegistry {
     const veronica_version = '1.0.0';
     const max_retries = params.max_retries ?? 2;
 
-    // Determine initial status based on lock
-    const isLocked = projectLockManager.isLocked(params.project);
+    // Determine initial status based on global sequential lock (Concurrency = 1)
+    const isLocked = projectLockManager.isGlobalLocked() || projectLockManager.isLocked(params.project);
     const status: TaskStatus = isLocked ? 'queued' : 'running';
 
     if (status === 'running') {
-      projectLockManager.acquireLock(params.project, id);
+      projectLockManager.acquireGlobalLock(id, params.project);
     }
 
     const task: AgentTask = {
@@ -168,10 +168,10 @@ export class TaskRegistry {
       return;
     }
 
-    // Release project lock if terminal
+    // Release global and project lock if terminal
     if (isTerminal) {
-      projectLockManager.releaseLock(task.project, taskId);
-      this.promoteQueuedTask(task.project).catch(() => {});
+      projectLockManager.releaseGlobalLock(taskId);
+      this.promoteNextQueuedTask(task.project).catch(() => {});
     }
 
     await snapshotCache.refreshSnapshot(task.project);
@@ -194,14 +194,14 @@ export class TaskRegistry {
     const nextRetry = currentRetries + 1;
     await writeQueue.enqueue(() => {
       const db = getVeronicaDb();
-      db.prepare('UPDATE agent_tasks SET retry_count = ?, status = ? WHERE id = ?').run(nextRetry, 'running', taskId);
+      db.prepare('UPDATE agent_tasks SET retry_count = ? WHERE id = ?').run(nextRetry, taskId);
       db.prepare(`
         INSERT INTO agent_events (task_id, event_type, timestamp, message)
         VALUES (?, 'warning', ?, ?)
       `).run(taskId, Date.now(), `Retrying task (Attempt ${nextRetry} of ${maxRetries})`);
     });
 
-    // Re-launch task asynchronously
+    // Re-launch task asynchronously reusing taskId so watchdog tracks the new PID
     try {
       await antigravityAdapter.spawnTask({
         project: task.project,
@@ -209,9 +209,14 @@ export class TaskRegistry {
         runtime_profile: task.runtime_profile,
         autonomy_level: task.autonomy_level,
         custom_prompt: task.custom_prompt || undefined,
+        existing_task_id: taskId,
       });
       return true;
     } catch {
+      await this.updateTaskStatus(taskId, 'failed', {
+        summary: 'Failed to restart task process on retry',
+        skip_retry: true,
+      });
       return false;
     }
   }
@@ -262,23 +267,71 @@ export class TaskRegistry {
     }
   }
 
-  /**
-   * If a queued task exists for the project, promote it to running
-   */
-  public async promoteQueuedTask(project: string): Promise<AgentTask | null> {
-    const db = getVeronicaDb();
-    const stmt = db.prepare(
-      "SELECT id FROM agent_tasks WHERE project = ? AND status = 'queued' ORDER BY started_at ASC LIMIT 1"
-    );
-    const row: any = stmt.get(project);
-    if (!row) return null;
+  private isPromotingQueue: boolean = false;
 
-    const taskId = row.id;
-    if (projectLockManager.acquireLock(project, taskId)) {
-      await this.updateTaskStatus(taskId, 'running');
-      return this.getTask(taskId);
+  /**
+   * Promotes the next queued task in the global sequential FIFO queue (Concurrency = 1)
+   * and spawns its execution via AntigravityAdapter.
+   */
+  public async promoteNextQueuedTask(preferredProject?: string): Promise<AgentTask | null> {
+    if (this.isPromotingQueue) return null;
+    if (projectLockManager.isGlobalLocked()) return null;
+
+    this.isPromotingQueue = true;
+    try {
+      const db = getVeronicaDb();
+      let row: any = null;
+
+      if (preferredProject) {
+        row = db.prepare(
+          "SELECT * FROM agent_tasks WHERE project = ? AND status = 'queued' ORDER BY started_at ASC LIMIT 1"
+        ).get(preferredProject);
+      }
+
+      if (!row) {
+        row = db.prepare(
+          "SELECT * FROM agent_tasks WHERE status = 'queued' ORDER BY started_at ASC LIMIT 1"
+        ).get();
+      }
+
+      if (!row) return null;
+
+      const nextTaskId = row.id;
+      const nextProject = row.project;
+
+      if (!projectLockManager.acquireGlobalLock(nextTaskId, nextProject)) {
+        return null;
+      }
+
+      await this.updateTaskStatus(nextTaskId, 'running', {
+        summary: 'Promoted from global sequential FIFO queue to running',
+      });
+
+      // In production, asynchronously launch the real OS agent task via AntigravityAdapter
+      if (!process.env.NODE_TEST_CONTEXT && process.env.NODE_ENV !== 'test') {
+        antigravityAdapter.spawnTask({
+          project: nextProject,
+          skill: row.skill,
+          runtime_profile: row.runtime_profile,
+          autonomy_level: row.autonomy_level,
+          custom_prompt: row.custom_prompt || undefined,
+          existing_task_id: nextTaskId,
+        }).catch((spawnErr) => {
+          console.error(`[Veronica Task Queue] Failed to spawn promoted task ${nextTaskId}:`, spawnErr);
+        });
+      }
+
+      return this.getTask(nextTaskId);
+    } finally {
+      this.isPromotingQueue = false;
     }
-    return null;
+  }
+
+  /**
+   * Backwards-compatible alias for queue promotion
+   */
+  public async promoteQueuedTask(project?: string): Promise<AgentTask | null> {
+    return this.promoteNextQueuedTask(project);
   }
 
   /**
@@ -288,6 +341,10 @@ export class TaskRegistry {
     const now = Date.now();
     await writeQueue.enqueue(() => {
       const db = getVeronicaDb();
+      const taskExists = db.prepare('SELECT id FROM agent_tasks WHERE id = ?').get(taskId);
+      if (!taskExists) {
+        return;
+      }
       db.prepare('UPDATE agent_tasks SET last_heartbeat = ? WHERE id = ?').run(now, taskId);
 
       const msg = action ? `Heartbeat: ${action}${progress ? ` (${progress})` : ''}` : 'Heartbeat';
@@ -304,6 +361,10 @@ export class TaskRegistry {
   public async logEvent(event: AgentEvent): Promise<void> {
     await writeQueue.enqueue(() => {
       const db = getVeronicaDb();
+      const taskExists = db.prepare('SELECT id FROM agent_tasks WHERE id = ?').get(event.task_id);
+      if (!taskExists) {
+        return;
+      }
       db.prepare(`
         INSERT INTO agent_events (task_id, event_type, timestamp, message, data_json)
         VALUES (?, ?, ?, ?, ?)

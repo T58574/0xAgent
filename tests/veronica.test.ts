@@ -175,6 +175,7 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       assert.equal(res.success, false);
       assert.ok(res.error?.includes('Permission Denied'));
       assert.ok(res.error?.includes('L2'));
+      await taskRegistry.updateTaskStatus(task.id, 'completed');
     });
   });
 
@@ -206,6 +207,7 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       });
 
       assert.equal(res.success, true);
+      await taskRegistry.updateTaskStatus(task.id, 'completed');
     });
 
     it('should process report CLI request and write to operational_journal', async () => {
@@ -326,6 +328,19 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   });
 
   describe('9. Task Retry Mechanism & Max Retries', () => {
+    let origSpawnTask: typeof antigravityAdapter.spawnTask;
+
+    before(() => {
+      origSpawnTask = antigravityAdapter.spawnTask;
+      antigravityAdapter.spawnTask = async (options: any) => {
+        return (taskRegistry.getTask(options.existing_task_id) || { id: options.existing_task_id, status: 'running' }) as any;
+      };
+    });
+
+    after(() => {
+      antigravityAdapter.spawnTask = origSpawnTask;
+    });
+
     it('should increment retry_count when retrying a task', async () => {
       const task = await taskRegistry.createTask({
         project: 'RetryTestProj',
@@ -351,6 +366,7 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       // Exceeded max_retries
       const retried3 = await taskRegistry.retryTask(task.id);
       assert.equal(retried3, false);
+      await taskRegistry.updateTaskStatus(task.id, 'completed');
     });
   });
 
@@ -375,6 +391,7 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       const approvedTask = taskRegistry.getTask(task.id);
       assert.equal(approvedTask?.status, 'running');
       assert.ok(approvedTask?.summary?.includes('Alice Admin'));
+      await taskRegistry.updateTaskStatus(task.id, 'completed');
     });
   });
 

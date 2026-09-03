@@ -496,8 +496,8 @@ Commands:
       try {
         payload.changes = JSON.parse(rawChg);
       } catch {
-        // Fallback: clean list syntax like "[item 1, item 2]"
-        const cleaned = rawChg.replace(/^\[|\]$/g, '').split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+        // Fallback: clean list syntax like "[item 1, item 2]" or "item 1; item 2"
+        const cleaned = rawChg.replace(/^\[|\]$/g, '').split(/[,;]/).map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
         payload.changes = cleaned.length > 0 ? cleaned : [rawChg];
       }
     }

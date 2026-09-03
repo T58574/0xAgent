@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AppConfig, ChatMessage, ToolCallInfo } from '../src/types';
+import { AppConfig, ChatMessage, ToolCallInfo, ContextBreakdown } from '../src/types';
 import { loadSession, saveSession } from './session';
 import { strip_ai_reasoning_fluff } from './agent/fluffSanitizer';
 import { detectRepetitionLoop } from './agent/contextManager';
@@ -12,7 +12,10 @@ import { evaluateToolPermission, READONLY_TOOLS } from './agent/permissionGuard'
 import { runCompactionPipeline } from './agent/compactionPipeline';
 import { memoryWorker } from './agent/memoryWorker';
 import { cancelPendingApprovalsForSession } from './agent/approvalManager';
-import { fetchLlmResponse, readLlmStream, PRIMARY_TEXT_MODEL, DEFAULT_FALLBACK_CHAIN, GEMMA_MODEL, FAST_LITE_MODEL, NATIVE_AUDIO_MODEL } from './agent/llmClient';
+import { fetchLlmResponse, readLlmStream, resolveModelContextMax, PRIMARY_TEXT_MODEL, DEFAULT_FALLBACK_CHAIN, GEMMA_MODEL, FAST_LITE_MODEL, NATIVE_AUDIO_MODEL } from './agent/llmClient';
+import { quotaManager } from './agent/quotaManager';
+import { getSystemPromptMemoryContext } from './memory';
+import { estimatePromptTokens } from './summarizer';
 import {
   PendingConfirmation,
   activeConfirmations,
@@ -63,7 +66,6 @@ export async function runAgentLoop(
     broadcast('agent-status-changed', { sessionId, status: 'thinking' });
     let loopRetryCount = 0;
     let truncationRetryCount = 0;
-    const contextMax = config.local_server?.ctx_size || config.max_tokens || 16384;
 
     while (true) {
       if (activeCancelTokens.has(sessionId)) {
@@ -92,6 +94,30 @@ export async function runAgentLoop(
       }
 
       const { response, activeModelName } = llmFetchResult;
+      const contextMax = resolveModelContextMax(activeModelName, sessionConfig);
+
+      // Compute genuine context token breakdown dynamically from active session data
+      const systemTokens = estimatePromptTokens([{ role: 'system', content: fullSystemPrompt }]);
+      const historyTokens = Math.max(0, compactionRes.estimatedTokens - systemTokens);
+      const workspaceDir = typeof sessionConfig.workspace_dir === 'string' ? sessionConfig.workspace_dir : undefined;
+      const activePersonaId = sessionConfig.active_persona_id || 'default';
+      const memoryContext = getSystemPromptMemoryContext(activePersonaId, latestUserQuery, workspaceDir);
+      const memoryTokens = memoryContext ? estimatePromptTokens([{ role: 'system', content: memoryContext }]) : 0;
+      const compactionTier = compactionRes.wasSummarized
+        ? 3
+        : compactionRes.estimatedTokens > contextMax * 0.75
+        ? 2
+        : session.messages.length > 4
+        ? 1
+        : 0;
+
+      const contextBreakdown: ContextBreakdown = {
+        systemTokens,
+        historyTokens,
+        memoryTokens,
+        compactionTier,
+      };
+
       const assistantMessageId = uuidv4();
       const assistantMessage: ChatMessage = {
         id: assistantMessageId,
@@ -116,7 +142,8 @@ export async function runAgentLoop(
         sessionId,
         session,
         activeCancelTokens,
-        broadcast
+        broadcast,
+        contextBreakdown
       );
 
       if (!streamResult) {
@@ -143,11 +170,14 @@ export async function runAgentLoop(
         tokensPerSec: streamResult.tokensPerSec,
         promptTokens: streamResult.promptTokens,
         completionTokens: streamResult.completionTokens,
+        tokenCount: streamResult.completionTokens,
         totalTokens: streamResult.totalTokens,
         contextUsed: streamResult.totalTokens,
         contextMax,
         evalDurationMs: streamResult.evalDurationMs,
         modelName: streamResult.modelName,
+        contextBreakdown,
+        quotaStatus: quotaManager.getQuotaStatus(),
       };
 
       // Save assistant message to session

@@ -12,6 +12,7 @@ import { antigravityAdapter } from '../adapters/antigravityAdapter';
 import type { UserSessionState } from './veronicaOrchestrator';
 import { loadConfig } from '../../config';
 import { proxyService } from '../../proxyService';
+import { quotaManager } from '../../agent/quotaManager';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -119,6 +120,20 @@ export class MessageBuilder {
       }`,
     ];
 
+    // Add Antigravity Quota Indicators
+    const quota = quotaManager.getQuotaStatus();
+    if (quota.limits && quota.limits.length > 0) {
+      lines.push(`\n📊 <b>Квоты Antigravity CLI:</b>`);
+      for (const lim of quota.limits) {
+        const filled = Math.max(0, Math.min(10, Math.round(lim.remainingPercentage / 10)));
+        const empty = 10 - filled;
+        const bar = `[${'●'.repeat(filled)}${'○'.repeat(empty)}]`;
+        lines.push(`• <b>${escapeHtml(lim.modelGroup)}</b> (${escapeHtml(lim.limitType)}): <code>${bar} ${lim.remainingPercentage}%</code>`);
+      }
+    } else if (quota.exhausted) {
+      lines.push(`\n⚠️ <b>Квота:</b> <code>[○○○○○○○○○○] 0% (429 Исчерпана)</code>${quota.resetText ? ` — сброс через ${quota.resetText}` : ''}`);
+    }
+
     if (activeTasks.length > 0) {
       lines.push(`\n📋 <b>Текущие задачи в работе:</b>`);
       for (const t of activeTasks) {
@@ -218,12 +233,10 @@ export class MessageBuilder {
 
   public static buildProjectActionsKeyboard(projectName: string): InlineKeyboard {
     return new InlineKeyboard()
-      .text('⚡ Запустить Skill', `veronica:skills:${projectName}`)
       .text('📝 Поставить задачу', `veronica:prompt:${projectName}`)
-      .row()
       .text('📄 Паспорт и Доки', `veronica:doc:${projectName}`)
-      .text('📊 История задач', `veronica:history:${projectName}`)
       .row()
+      .text('📊 История задач', `veronica:history:${projectName}`)
       .text('🔙 Все проекты', 'veronica:projects_menu');
   }
 
@@ -463,7 +476,7 @@ export class MessageBuilder {
 
     let cronCount = 0;
     try {
-      const cronStats = db.prepare(`SELECT COUNT(*) as cnt FROM scheduler_jobs WHERE enabled = 1`).get() as any;
+      const cronStats = db.prepare(`SELECT COUNT(*) as cnt FROM cron_jobs WHERE enabled = 1`).get() as any;
       if (cronStats) cronCount = cronStats.cnt || 0;
     } catch {}
 
@@ -563,6 +576,7 @@ export class MessageBuilder {
       `• /new — начать новый чистый диалог`,
       ``,
       `🔹 <b>Инференс и система:</b>`,
+      `• /quota — подробный статус квот инференса agy CLI (5h, Weekly)`,
       `• /model — меню выбора активной модели (Gemini, Claude, GGUF)`,
       `• /status — системная телеметрия, статус GPU Node, порты`,
       ``,

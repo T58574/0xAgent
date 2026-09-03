@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Layers, Database, MessageSquare, ShieldCheck, Cpu } from 'lucide-react';
-import { LiveTelemetry, MessageMetrics, AppConfig, ChatSession } from '../../types';
+import { Layers, Database, MessageSquare, ShieldCheck, Cpu, AlertTriangle } from 'lucide-react';
+import { LiveTelemetry, MessageMetrics, AppConfig, ChatSession, QuotaStatus } from '../../types';
 import { useI18n } from '../../i18n';
 
 interface ContextBudgetGaugeProps {
@@ -8,6 +8,7 @@ interface ContextBudgetGaugeProps {
   lastMessageMetrics?: MessageMetrics | null;
   currentSession?: ChatSession | null;
   config?: AppConfig | null;
+  quotaStatus?: QuotaStatus | null;
 }
 
 export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(({
@@ -15,6 +16,7 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
   lastMessageMetrics,
   currentSession,
   config,
+  quotaStatus,
 }) => {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
@@ -33,13 +35,6 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
-  const maxTokens =
-    liveTelemetry?.contextMax ||
-    lastMessageMetrics?.contextMax ||
-    config?.local_server?.ctx_size ||
-    config?.max_tokens ||
-    32768;
-
   const messages = currentSession?.messages || [];
 
   // Find last assistant message with saved metrics in session history
@@ -52,7 +47,28 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
     return null;
   }, [messages]);
 
-  // Calculate estimated tokens from conversation text if no metrics exist
+  const activeModelName =
+    liveTelemetry?.modelName ||
+    lastMessageMetrics?.modelName ||
+    lastAssistantMsgWithMetrics?.metrics?.modelName ||
+    config?.model_name ||
+    '';
+
+  const isGemini = activeModelName.toLowerCase().includes('gemini');
+  const isClaude = activeModelName.toLowerCase().includes('claude');
+  const isGpt = /gpt|o1|o3/i.test(activeModelName);
+
+  const resolvedModelMax = isGemini ? 1048576 : isClaude ? 200000 : isGpt ? 128000 : null;
+
+  const maxTokens =
+    liveTelemetry?.contextMax ||
+    lastMessageMetrics?.contextMax ||
+    resolvedModelMax ||
+    config?.local_server?.ctx_size ||
+    config?.max_tokens ||
+    32768;
+
+  // Calculate genuine estimated tokens from conversation messages
   const dialogueTokens = useMemo(() => {
     if (messages.length === 0) return 0;
     let totalChars = 0;
@@ -60,7 +76,7 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
       totalChars += (m.content || '').length;
       if (m.tool_calls) {
         m.tool_calls.forEach((tc) => {
-          totalChars += (typeof tc.arguments === 'string' ? tc.arguments.length : JSON.stringify(tc.arguments || {}).length);
+          totalChars += typeof tc.arguments === 'string' ? tc.arguments.length : JSON.stringify(tc.arguments || {}).length;
           totalChars += (tc.output || tc.result || '').length;
         });
       }
@@ -80,22 +96,20 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
     if (sessionMetrics && typeof sessionMetrics.totalTokens === 'number' && sessionMetrics.totalTokens > 0) {
       return sessionMetrics.totalTokens;
     }
-    if (messages.length > 0) {
-      return 650 + 280 + dialogueTokens;
-    }
-    return 0;
-  }, [liveTelemetry?.contextUsed, sessionMetrics, messages.length, dialogueTokens]);
+    return dialogueTokens;
+  }, [liveTelemetry?.contextUsed, sessionMetrics, dialogueTokens]);
 
-  const pct = Math.min(100, Math.max(0, Math.round((usedTokens / maxTokens) * 100)));
+  const pct = maxTokens > 0 ? Math.min(100, Math.max(0, Math.round((usedTokens / maxTokens) * 100))) : 0;
 
-  // Detailed token breakdown
+  // Genuine token breakdown from backend metadata (zero hardcoded dummy values)
   const breakdown = liveTelemetry?.contextBreakdown || sessionMetrics?.contextBreakdown;
-  const hasMessages = messages.length > 0;
-  const systemTokens = breakdown?.systemTokens ?? (hasMessages ? Math.min(usedTokens, 650) : 0);
-  const memoryTokens = breakdown?.memoryTokens ?? (hasMessages ? Math.min(Math.max(0, usedTokens - systemTokens), 280) : 0);
-  const historyTokens = breakdown?.historyTokens ?? (hasMessages ? Math.max(0, usedTokens - systemTokens - memoryTokens) : 0);
+  const systemTokens = breakdown?.systemTokens ?? 0;
+  const memoryTokens = breakdown?.memoryTokens ?? 0;
+  const historyTokens = breakdown?.historyTokens ?? dialogueTokens;
   const freeTokens = Math.max(0, maxTokens - usedTokens);
   const compactionTier = breakdown?.compactionTier ?? (pct > 85 ? 2 : pct > 70 ? 1 : 0);
+
+  const activeQuota = liveTelemetry?.quotaStatus || quotaStatus;
 
   const getTierLabel = (tier: number) => {
     switch (tier) {
@@ -117,6 +131,9 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
   };
 
   const formatK = (tokens: number) => {
+    if (tokens >= 1000000) {
+      return `${(tokens / 1000000).toFixed(1)}M`;
+    }
     if (tokens >= 1000) {
       return `${(tokens / 1000).toFixed(1)}k`;
     }
@@ -124,13 +141,13 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
   };
 
   return (
-    <div className="relative inline-flex items-center" ref={popoverRef}>
+    <div className="relative inline-flex items-center select-none" ref={popoverRef}>
       {/* Gauge Pill Button */}
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
         onMouseEnter={() => setIsOpen(true)}
-        className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)] transition-all text-xs font-mono select-none cursor-pointer shadow-sm"
+        className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)] transition-all text-xs font-mono cursor-pointer shadow-sm"
         title={t.chat.contextBudget}
       >
         <Layers className="w-3.5 h-3.5 text-[var(--theme-text-muted)] shrink-0" />
@@ -143,16 +160,20 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
             style={{ width: `${Math.max(4, pct)}%` }}
           />
         </div>
-        {/* agy CLI 10-segment Unicode context quota indicator */}
+
         <span
-          className={`text-[10px] tracking-tight font-mono whitespace-nowrap select-none font-bold ${
-            pct > 85 ? 'text-rose-400' : pct > 65 ? 'text-amber-400' : 'text-emerald-400'
+          className={`text-[10px] tracking-tight font-mono whitespace-nowrap font-bold ${
+            pct > 85 ? 'text-rose-400' : pct > 65 ? 'text-amber-400' : 'text-[var(--theme-text-muted)]'
           }`}
           title={`Context Usage: ${pct}%`}
         >
-          [{'●'.repeat(Math.min(10, Math.max(0, Math.round(pct / 10))))}
-          {'○'.repeat(Math.max(0, 10 - Math.min(10, Math.max(0, Math.round(pct / 10)))))}] {pct}%
+          {pct}%
         </span>
+
+        {/* Quota Exhaustion Alert dot */}
+        {activeQuota?.exhausted && (
+          <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-0.5" title="Квота исчерпана (429)" />
+        )}
       </button>
 
       {/* Breakdown Hover / Click Popover */}
@@ -171,15 +192,30 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
             </span>
           </div>
 
+          {/* Quota Exhaustion Alert Row */}
+          {activeQuota?.exhausted && (
+            <div className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[11px] flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-[10px] uppercase tracking-wider">Квота исчерпана (429)</div>
+                {activeQuota.resetText && (
+                  <div className="text-[10px] text-rose-200">Сброс через: {activeQuota.resetText}</div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Breakdown Items */}
           <div className="space-y-1.5 text-[11px]">
-            <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
-              <span className="flex items-center gap-1.5">
-                <Cpu className="w-3 h-3 text-cyan-400" />
-                {t.chat.contextSystem}
-              </span>
-              <span className="text-[var(--theme-text)] font-semibold">{systemTokens} tok</span>
-            </div>
+            {systemTokens > 0 && (
+              <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
+                <span className="flex items-center gap-1.5">
+                  <Cpu className="w-3 h-3 text-cyan-400" />
+                  {t.chat.contextSystem}
+                </span>
+                <span className="text-[var(--theme-text)] font-semibold">{systemTokens} tok</span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
               <span className="flex items-center gap-1.5">
@@ -189,13 +225,15 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
               <span className="text-[var(--theme-text)] font-semibold">{historyTokens} tok</span>
             </div>
 
-            <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
-              <span className="flex items-center gap-1.5">
-                <Database className="w-3 h-3 text-violet-400" />
-                {t.chat.contextMemory}
-              </span>
-              <span className="text-[var(--theme-text)] font-semibold">{memoryTokens} tok</span>
-            </div>
+            {memoryTokens > 0 && (
+              <div className="flex items-center justify-between text-[var(--theme-text-muted)]">
+                <span className="flex items-center gap-1.5">
+                  <Database className="w-3 h-3 text-violet-400" />
+                  {t.chat.contextMemory}
+                </span>
+                <span className="text-[var(--theme-text)] font-semibold">{memoryTokens} tok</span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between text-[var(--theme-text-muted)] border-t border-[var(--theme-border)] pt-1.5">
               <span className="flex items-center gap-1.5">

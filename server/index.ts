@@ -21,6 +21,8 @@ import { systemRouter } from './routes/systemRoutes';
 import { createProxyRouter } from './routes/proxyRoutes';
 import { proxyService } from './proxyService';
 import { closeProxyDb } from './proxyDb';
+import { quotaRouter } from './routes/quotaRoutes';
+import { quotaManager } from './agent/quotaManager';
 
 
 import path from 'node:path';
@@ -146,11 +148,12 @@ function broadcast(event: string, payload: any): void {
   }
 }
 
-// Wire WS broadcaster to Jarvis & Voice Daemon & Proxy Service
+// Wire WS broadcaster to Jarvis & Voice Daemon & Proxy Service & Quota Manager
 jarvisSupervisor.setWsBroadcaster(broadcast);
 voiceDaemonManager.setWsBroadcaster(broadcast);
 voiceDaemonManager.autoStartIfEnabled();
 proxyService.setBroadcaster(broadcast);
+quotaManager.setBroadcaster(broadcast);
 
 // Mount Router Modules
 app.use('/api', authRouter);
@@ -163,6 +166,7 @@ app.use('/api', hardwareRouter);
 app.use('/api', createLlamaRouter(broadcast));
 app.use('/api', createAgentRouter(broadcast));
 app.use('/api', contextRouter);
+app.use('/api', quotaRouter);
 app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/veronica', createVeronicaRouter(broadcast));
@@ -251,6 +255,9 @@ server.listen(Number(PORT), HOST, () => {
 
   // Start continuous memory decay & conflict hygiene scheduler
   startMemoryDecayScheduler();
+
+  // Start periodic polling of agy CLI quota limits
+  quotaManager.startPeriodicPolling();
 
   // Start Remote Node probe if configured
   const cfg = loadConfig();

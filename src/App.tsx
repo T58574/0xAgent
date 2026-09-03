@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import * as api from './services/api';
 import { sounds } from './services/soundEffects';
-import { AppConfig, LiveTelemetry, JarvisState, PersonaMetadata, ActiveView } from './types';
+import { AppConfig, LiveTelemetry, JarvisState, PersonaMetadata, ActiveView, QuotaStatus } from './types';
 import { getWorkspaceBaseName } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -60,6 +60,7 @@ export default function App() {
   // Agent loop & telemetry state
   const [agentStatus, setAgentStatus] = useState<'idle' | 'thinking' | 'waiting_approval' | 'executing_tool'>('idle');
   const [liveTelemetry, setLiveTelemetry] = useState<LiveTelemetry | null>(null);
+  const [quotaStatus, setQuotaStatus] = useState<QuotaStatus | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
   const [showLogsDrawer, setShowLogsDrawer] = useState<boolean>(false);
 
@@ -331,6 +332,7 @@ export default function App() {
     loadWorkspaceTree,
     addLog,
     workspaceDir: config?.workspace_dir || undefined,
+    setQuotaStatus,
   });
 
   // Global Keyboard Shortcuts (Ctrl+N, Ctrl+B, Ctrl+,, Escape)
@@ -357,6 +359,7 @@ export default function App() {
       onRollbackSession={handleRollbackSession}
       reasoningEnabled={config?.reasoning_enabled !== false}
       liveTelemetry={liveTelemetry}
+      quotaStatus={quotaStatus}
       config={config}
       onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
       onConfigChanged={(updated) => setConfig(updated)}
@@ -385,6 +388,7 @@ export default function App() {
         onStartServer={handleStartServer}
         onNewChat={() => handleCreateSession('Новый диалог', 'auto')}
         liveTelemetry={liveTelemetry}
+        quotaStatus={quotaStatus}
       />
 
       {/* 2. MAIN APPLICATION WORKSPACE AREA */}

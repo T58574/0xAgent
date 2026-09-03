@@ -122,6 +122,9 @@
 14. **Safe Process Spawning & Model Effort Resolution**:
     - Never execute CLI processes with `{ shell: true }` when passing arguments (eliminates `DEP0190`). Always resolve full paths via `getSafeCliPath` and spawn with `{ shell: false }`.
     - Always pass Antigravity models through `resolveAntigravityModelAndEffort`. Claude and GPT-OSS models must never receive `--effort` flags, while Gemini models default to `low` with optional `medium` and `high` levels.
+15. **Antigravity File Creation & Tool Invariants**:
+    - When creating new workspace source files with `write_to_file`, NEVER pass the `ArtifactMetadata` property. `ArtifactMetadata` is reserved exclusively for Antigravity Brain markdown artifacts (`.gemini/.../brain/`). Passing `ArtifactMetadata` on any project workspace file triggers a fatal Cortex permission rejection (`not a valid artifact path; artifacts must be in .../brain/...`).
+    - For new workspace files, pass ONLY `TargetFile`, `Overwrite: true`, `CodeContent`, and `Description`.
 
 ---
 

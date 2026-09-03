@@ -14,6 +14,7 @@ import { veronicaOrchestrator } from './veronicaOrchestrator';
 import { voiceThoughtService } from './voiceThoughtService';
 import { videoIngestionService } from './videoIngestionService';
 import { factCheckingService } from './factCheckingService';
+import { quotaManager } from '../../agent/quotaManager';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -102,6 +103,11 @@ export function initTelegramBot(): Bot | null {
     bot.command('status', async (ctx) => {
       const msg = MessageBuilder.buildStatusMessage();
       await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
+    });
+
+    // /quota
+    bot.command('quota', async (ctx) => {
+      await sendQuotaStatus(ctx);
     });
 
     async function sendModelMenu(ctx: any) {
@@ -388,11 +394,13 @@ export function initTelegramBot(): Bot | null {
             jobs
               .map(
                 (j) =>
-                  `• <b>${escapeHtml(j.project)}</b> | <code>${escapeHtml(j.skill)}</code> | график: <i>${escapeHtml(
+                  `• <b>${escapeHtml(j.project)}</b> | график: <i>${escapeHtml(
                     j.schedule
-                  )}</i> [${j.enabled ? '🟢 Активен' : '⏸ Выключен'}]`
+                  )}</i> [${j.enabled ? '🟢 Активен' : '⏸ Выключен'}]\n  📝 <i>${escapeHtml(
+                    (j.custom_prompt || j.skill || 'Регулярная задача').substring(0, 80)
+                  )}</i>`
               )
-              .join('\n')
+              .join('\n\n')
           : `⏱ <b>Автоматизации:</b> Нет активных расписаний.\n<i>Вы можете настроить запуск через меню проекта или CLI.</i>`;
 
       const keyboard = new InlineKeyboard()
@@ -419,19 +427,90 @@ export function initTelegramBot(): Bot | null {
       await ctx.answerCallbackQuery();
     });
 
-    bot.callbackQuery('veronica:settings:check_quota', async (ctx) => {
-      await ctx.answerCallbackQuery({ text: 'Проверяю статус квоты...' });
+    bot.callbackQuery('veronica:menu:settings', async (ctx) => {
+      const dash = MessageBuilder.buildSettingsDashboard();
+      try {
+        await ctx.editMessageText(dash.text, { parse_mode: 'HTML', reply_markup: dash.keyboard });
+      } catch {
+        await ctx.reply(dash.text, { parse_mode: 'HTML', reply_markup: dash.keyboard });
+      }
+      await ctx.answerCallbackQuery();
+    });
+
+    async function sendQuotaStatus(ctx: any, isEdit: boolean = false) {
+      const quota = quotaManager.getQuotaStatus();
       const config = loadConfig();
       const activeModel = config.veronica?.model || config.model_name || 'gemini-3.7-flash-high';
-      await ctx.reply(
-        `📊 <b>Диагностика квоты и инференса:</b>\n━━━━━━━━━━━━━━━━━━━━━━\n` +
-          `• <b>Активная модель:</b> <code>${escapeHtml(activeModel)}</code>\n` +
-          `• <b>CLI Движок:</b> <code>agy-wrapper v1.6.5</code>\n` +
-          `• <b>Статус вызовов:</b> 🟢 Доступен\n` +
-          `• <b>Авто-таймаут:</b> 240 секунд\n\n` +
-          `<i>При достижении индивидуальной квоты Google система покажет точное время сброса таймера в чате.</i>`,
-        { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() }
-      );
+      const cleanModel = activeModel.replace(/^local:/, '');
+
+      const lines: string[] = [
+        `📊 <b>Мониторинг Квот Antigravity (agy CLI):</b>`,
+        `━━━━━━━━━━━━━━━━━━━━━━`,
+        `• <b>Активная модель:</b> <code>${escapeHtml(cleanModel)}</code>`,
+      ];
+
+      if (quota.exhausted) {
+        lines.push(`• <b>Статус:</b> ⚠️ <b>Исчерпана (429)</b>`);
+        lines.push(`• <b>Заполненность:</b> <code>[○○○○○○○○○○] 0%</code>`);
+        if (quota.reason) lines.push(`• <b>Причина:</b> <i>${escapeHtml(quota.reason)}</i>`);
+        if (quota.resetText) lines.push(`• <b>Сброс через:</b> <b>${escapeHtml(quota.resetText)}</b>`);
+      } else {
+        lines.push(`• <b>Статус:</b> 🟢 <b>В норме (Инференс активен)</b>`);
+      }
+
+      if (quota.limits && quota.limits.length > 0) {
+        lines.push(`\n📈 <b>Реальные лимиты инференса:</b>`);
+        for (const lim of quota.limits) {
+          const filled = Math.max(0, Math.min(10, Math.round(lim.remainingPercentage / 10)));
+          const empty = 10 - filled;
+          const bar = `[${'●'.repeat(filled)}${'○'.repeat(empty)}]`;
+
+          let resetCountdown = lim.resetAtUtc;
+          try {
+            const diffMs = new Date(lim.resetAtUtc).getTime() - Date.now();
+            if (diffMs > 0) {
+              const totalSec = Math.ceil(diffMs / 1000);
+              const h = Math.floor(totalSec / 3600);
+              const m = Math.floor((totalSec % 3600) / 60);
+              const s = totalSec % 60;
+              const pad = (n: number) => String(n).padStart(2, '0');
+              resetCountdown = h > 0 ? `${h}h ${pad(m)}m` : `${m}m ${pad(s)}s`;
+            } else {
+              resetCountdown = 'Готово к сбросу';
+            }
+          } catch {}
+
+          lines.push(`\n🔹 <b>${escapeHtml(lim.modelGroup)}</b> — <i>${escapeHtml(lim.limitType)}</i>`);
+          lines.push(`  Остаток: <code>${bar} ${lim.remainingPercentage}%</code>`);
+          lines.push(`  Сброс через: <b>${escapeHtml(resetCountdown)}</b>`);
+        }
+      } else if (!quota.exhausted) {
+        lines.push(`\n<i>Лимиты инференса обновляются в фоновом режиме из agy CLI.</i>`);
+      }
+
+      lines.push(`\n💡 <i>Для переключения аккаунта выполните <code>agy auth</code> в консоли.</i>`);
+
+      const keyboard = new InlineKeyboard()
+        .text('🔄 Обновить квоты', 'veronica:settings:check_quota')
+        .text('⚙️ Настройки', 'veronica:menu:settings');
+
+      const text = lines.join('\n');
+      if (isEdit) {
+        try {
+          await ctx.editMessageText(text, { parse_mode: 'HTML', reply_markup: keyboard });
+        } catch {
+          await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard });
+        }
+      } else {
+        await ctx.reply(text, { parse_mode: 'HTML', reply_markup: keyboard });
+      }
+    }
+
+    bot.callbackQuery('veronica:settings:check_quota', async (ctx) => {
+      // Trigger a fresh fetch of quota limits in background
+      quotaManager.fetchQuotaLimits(true).catch(() => {});
+      await sendQuotaStatus(ctx, true);
+      await ctx.answerCallbackQuery();
     });
 
     bot.callbackQuery(/^veronica:proj_page:(\d+)$/, async (ctx) => {
@@ -713,6 +792,10 @@ export function initTelegramBot(): Bot | null {
         await sendModelMenu(ctx);
         return;
       }
+      if (text === '📊 Квота' || text === 'Квота' || text === '🔄 Квота') {
+        await sendQuotaStatus(ctx);
+        return;
+      }
       if (text === '⚙️ Статус') {
         const msg = MessageBuilder.buildStatusMessage();
         await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
@@ -816,8 +899,11 @@ export function initTelegramBot(): Bot | null {
       }
 
       // Delegate all natural language conversation to Veronica Orchestrator
+      const typingTimer = setInterval(() => {
+        ctx.replyWithChatAction('typing').catch(() => {});
+      }, 4000);
       try {
-        await ctx.replyWithChatAction('typing');
+        await ctx.replyWithChatAction('typing').catch(() => {});
         const replyText = await veronicaOrchestrator.handleUserMessage(userId, text);
         await ctx.reply(replyText, {
           parse_mode: 'HTML',
@@ -826,6 +912,8 @@ export function initTelegramBot(): Bot | null {
       } catch (err: any) {
         console.error('[Veronica Telegram] Error handling user message:', err);
         await ctx.reply(`⚠️ Произошла ошибка при обработке запроса: ${escapeHtml(err?.message || err)}`);
+      } finally {
+        clearInterval(typingTimer);
       }
     });
 
@@ -1051,15 +1139,17 @@ export function initTelegramBot(): Bot | null {
 
     notificationService.setBot(bot);
 
-    // Start polling in background with pending updates dropped to prevent message replays on restarts
-    bot.start({
-      drop_pending_updates: true,
-      onStart: (info) => {
-        console.log(`[Veronica Telegram] [OK] Bot started as @${info.username}`);
-      },
-    }).catch((err) => {
-      console.error('[Veronica Telegram] Polling failed to start:', err);
-    });
+    // Start polling in background with pending updates dropped to prevent message replays on restarts (skip in test mode)
+    if (process.env.NODE_ENV !== 'test') {
+      bot.start({
+        drop_pending_updates: true,
+        onStart: (info) => {
+          console.log(`[Veronica Telegram] [OK] Bot started as @${info.username}`);
+        },
+      }).catch((err) => {
+        console.error('[Veronica Telegram] Polling failed to start:', err);
+      });
+    }
 
     botInstance = bot;
     return bot;

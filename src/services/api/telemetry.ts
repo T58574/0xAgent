@@ -1,5 +1,5 @@
 import { get, post } from './core';
-import { HardwareInfo, ServerStatusInfo, ContextBreakdownReport } from '../../types';
+import { HardwareInfo, ServerStatusInfo, ContextBreakdownReport, QuotaStatus, QuotaLimitsState } from '../../types';
 
 // Hardware & Server Telemetry
 export const detect_hardware = () => get<HardwareInfo>('/detect-hardware');
@@ -39,3 +39,10 @@ export const get_evolution_telemetry = (limit?: number) =>
 
 export const get_context_breakdown = (sessionId?: string | null) =>
   get<ContextBreakdownReport>(sessionId ? `/context/breakdown?sessionId=${encodeURIComponent(sessionId)}` : '/context/breakdown');
+
+// Quota & Rate Limit Management
+export const get_quota_status = () => get<QuotaStatus>('/quota/status');
+export const get_quota_limits = (force?: boolean) =>
+  get<QuotaLimitsState>(force ? '/quota/limits?force=true' : '/quota/limits');
+export const reset_quota = () => post<{ success: boolean; status: QuotaStatus }>('/quota/reset');
+

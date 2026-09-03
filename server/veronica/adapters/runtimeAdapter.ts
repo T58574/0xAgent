@@ -13,6 +13,9 @@ export interface SpawnTaskOptions {
   conversation_id?: string;
   continue_recent?: boolean;
   output_format?: 'text' | 'json' | 'stream-json';
+  max_tool_calls?: number;
+  existing_task_id?: string;
+  network_retry_count?: number;
 }
 
 export interface RuntimeAdapter {

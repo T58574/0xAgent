@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { getVeronicaDb } from '../db/veronicaDb';
 import { taskRegistry } from '../core/taskRegistry';
 import { projectLockManager } from '../core/projectLockManager';
@@ -53,8 +56,28 @@ export class RecoveryService {
       const queuedRes: any = queuedStmt.get();
       queuedCount = queuedRes?.count || 0;
 
+      // Clean up stale presence locks from antigravity-cli to prevent CLI deadlocks
+      try {
+        const presenceDir = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'presence');
+        if (fs.existsSync(presenceDir)) {
+          const files = fs.readdirSync(presenceDir);
+          for (const file of files) {
+            if (file.endsWith('.lock')) {
+              try { fs.unlinkSync(path.join(presenceDir, file)); } catch {}
+            }
+          }
+        }
+      } catch {}
+
       if (recoveredCount > 0) {
         console.log(`[Veronica Recovery] [OK] Cleaned up ${recoveredCount} orphaned tasks on boot.`);
+      }
+
+      // If no task is running and queued tasks exist, resume processing the global sequential queue
+      if (!projectLockManager.isGlobalLocked() && queuedCount > 0) {
+        taskRegistry.promoteNextQueuedTask().catch((pErr) => {
+          console.warn('[Veronica Recovery] Error promoting queued task on boot:', pErr);
+        });
       }
     } catch (err) {
       console.error('[Veronica Recovery] Error during startup reconciliation:', err);

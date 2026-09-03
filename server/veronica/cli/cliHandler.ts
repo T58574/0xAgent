@@ -304,6 +304,16 @@ export class CliHandler {
         return { success: true, data: tasks };
       }
 
+      case 'task_list':
+      case 'tasks_list': {
+        const tasks = taskRegistry.listTasks({
+          project: req.project,
+          status: req.status as TaskStatus,
+          limit: req.limit || 20,
+        });
+        return { success: true, data: tasks };
+      }
+
       default:
         return { success: false, error: `Unknown CLI command '${command}'` };
     }

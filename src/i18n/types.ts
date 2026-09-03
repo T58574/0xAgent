@@ -127,6 +127,16 @@ export interface Translations {
     rollbackHere: string;
     forkSession: string;
     editAndResend: string;
+    quotaExhausted: string;
+    resetsIn: string;
+    resetQuota: string;
+    quotaReady: string;
+    quotaLimitsTitle: string;
+    quotaWeekly: string;
+    quota5Hour: string;
+    quotaRemaining: string;
+    quotaResetAt: string;
+    quotaNoLimits: string;
   };
 
   // Code Editor & Workspace

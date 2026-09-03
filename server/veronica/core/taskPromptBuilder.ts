@@ -84,16 +84,24 @@ You MUST use the internal Veronica CLI protocol to query state and report progre
 - Periodic Heartbeat during multi-step operations:
   \`0xagent veronica heartbeat --task ${task_id} --action "<current_step>" --progress "<pct>"\`
 - Final Completion Report (MANDATORY on completion):
-  \`0xagent veronica report --task ${task_id} --status completed --summary "<Понятное, ёмкое описание сделанного на русском языке>" --changes '["Конкретное изменение 1 на русском", "Конкретное изменение 2 на русском"]' --important\`
+  \`0xagent veronica report --task ${task_id} --status completed --summary "<Понятное, ёмкое описание сделанного на русском языке>" --changes "<Изменение 1>; <Изменение 2>" --important\`
   IMPORTANT: The summary and changes MUST be written strictly in RUSSIAN for the user to easily understand.
 - Error Reporting (if blocked or fatal error occurs):
   \`0xagent veronica error --task ${task_id} --message "<detailed error message>" --fatal\`
 
-CRITICAL INVARIANTS:
-1. Do NOT directly modify system Markdown files or internal documentation; the Veronica CLI automatically updates operational journals, changelogs, and state snapshots.
-2. Keep code changes modular, clean, and strictly aligned with the existing codebase style.
-3. Verify your changes (run test suites or build commands) before reporting completion.
-4. Always deliver your final report text in Russian.
+CRITICAL TOOL & INVARIANT RULES:
+1. File Creation (\`write_to_file\`): When creating or writing regular source code files in the project workspace, NEVER pass the \`ArtifactMetadata\` parameter. The \`ArtifactMetadata\` parameter is strictly reserved by Cortex for brain markdown artifacts (\`.gemini/.../brain/...\`). If you pass \`ArtifactMetadata\` on a project file path, the Cortex schema validator will reject your tool call with 'not a valid artifact path'. For source files, pass ONLY \`TargetFile\`, \`Overwrite\`, \`CodeContent\`, and \`Description\`.
+2. Do NOT spawn background processes, inline node/tsx scripts, or complex nested JSON arrays to report completion. Execute the clean \`0xagent veronica report\` command synchronously and conclude immediately.
+3. Do NOT directly modify system Markdown files or internal documentation; the Veronica CLI automatically updates operational journals, changelogs, and state snapshots.
+4. Keep code changes modular, clean, and strictly aligned with the existing codebase style.
+5. Verify your changes (run test suites or build commands) before reporting completion.
+6. Always deliver your final report text in Russian.
+
+CRITICAL OPERATIONAL CONSTRAINTS:
+1. Surgical Precision: Work directly and efficiently. Read only the necessary files in a single pass, make exact targeted modifications, and verify once. Avoid repetitive tool loops or exploratory rabbit holes.
+2. Zero Scope Bloat: Implement strictly what was requested in the objective. NEVER add unrequested UI toolbars, unrequested buttons, or unsolicited extra lines/strips to layouts.
+3. Focused Execution: Run targeted checks or targeted tests once. Do NOT loop running entire test suites or re-reading files indefinitely.
+4. Conclude Promptly: As soon as the objective is met and verified, call \`0xagent veronica report --task ${task_id} --status completed ...\` and exit immediately.
 
 # 4. [EXECUTION WORKFLOW]
 1. Step 1 (Inspect): Read relevant files and understand code architecture before modifying.

@@ -9,9 +9,10 @@ import {
   Plus,
   ArrowUpCircle,
 } from 'lucide-react';
-import { AppConfig, ChatSession, LiveTelemetry, ActiveView, UpdateCheckResult, SystemVersionInfo } from '../types';
+import { AppConfig, ChatSession, LiveTelemetry, ActiveView, UpdateCheckResult, SystemVersionInfo, QuotaStatus } from '../types';
 import { useI18n } from '../i18n';
 import { ContextBudgetGauge } from './chat/ContextBudgetGauge';
+import { QuotaGaugePill } from './chat/QuotaGaugePill';
 import { UpdateModal } from './UpdateModal';
 import { check_for_updates, get_system_version } from '../services/api';
 
@@ -28,6 +29,7 @@ interface NavbarProps {
   onStartServer?: () => Promise<void>;
   onNewChat?: () => void;
   liveTelemetry?: LiveTelemetry | null;
+  quotaStatus?: QuotaStatus | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = React.memo(({
@@ -40,6 +42,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
   onStartServer,
   onNewChat,
   liveTelemetry,
+  quotaStatus,
 }) => {
   const { t } = useI18n();
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -167,9 +170,13 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
           {/* Real-time Context Budget Gauge */}
           <ContextBudgetGauge
             liveTelemetry={liveTelemetry}
+            quotaStatus={quotaStatus}
             currentSession={currentSession}
             config={config}
           />
+
+          {/* Real-time Antigravity CLI Quota Gauge */}
+          <QuotaGaugePill quotaStatus={quotaStatus} />
         </div>
 
       </header>

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 import { loadConfig } from '../../config';
 import { taskRegistry } from '../core/taskRegistry';
@@ -8,9 +9,11 @@ import { projectDocManager } from '../core/projectDocManager';
 import { antigravityAdapter, resolveAntigravityModelAndEffort, getSafeCliPath } from '../adapters/antigravityAdapter';
 import { getVeronicaDb } from '../db/veronicaDb';
 import { writeQueue } from '../db/writeQueue';
+import { veronicaScheduler } from '../core/scheduler';
 import { MessageBuilder } from './messageBuilder';
 import { getUserMemories } from '../../memory';
 import { proxyService } from '../../proxyService';
+import { AntigravityUsage } from '../../../src/types';
 
 export interface DialogMessage {
   role: 'user' | 'assistant' | 'system';
@@ -28,6 +31,8 @@ export interface UserSessionState {
   lastMessageTime: number;
   messages: DialogMessage[];
   antigravityConversationId?: string;
+  lastUsage?: AntigravityUsage;
+  lastDurationSeconds?: number;
 }
 
 export class VeronicaOrchestrator {
@@ -473,11 +478,12 @@ ${yesterdayReport}
 
 ORCHESTRATION INSTRUCTIONS:
 1. Multi-turn Dialog Continuity: You remember previous messages and context. If the user asks to clarify, refine, or follow up on a previous task or answer, maintain full conversational continuity.
-2. Task Placement & Action Tags:
-   - When the user wants to implement something, add a feature, refactor, or fix an issue in a project:
-     Identify the target project from their request or context.
-     Emit an action tag:
-     <action type="run_task" project="<ProjectName>" skill="<SkillOrCustom>" prompt="<EnrichedDetailedTaskPrompt>" />
+2. Task Formulation & Action Tags (Zero Generic Skills):
+   - You MUST formulate the COMPLETE, DETAILED technical specification (ТЗ) yourself. Do NOT bind to rigid, generic markdown skill templates. You are the senior architect: write the concrete instructions and requirements in the \`prompt\` attribute.
+   - Immediate execution:
+     <action type="run_task" project="<ProjectName>" prompt="<FullTechnicalSpecificationAndInstructions>" />
+   - Recurring/Periodic automated execution (e.g. daily, hourly, every_30m):
+     <action type="schedule_task" project="<ProjectName>" schedule="daily|hourly|every_30m" prompt="<FullTechnicalSpecificationAndInstructions>" />
    - If the user is asking to refine or continue the previous task:
      <action type="continue_task" task_id="${session.lastTaskId || ''}" prompt="<RefinementInstructions>" />
    - Accompany action tags with a natural concise response ("Принято${userName ? `, ${userName}` : ''}. Запустила задачу для проекта X...").
@@ -588,6 +594,40 @@ ORCHESTRATION INSTRUCTIONS:
       }
     }
 
+    // Action 3: schedule_task (Periodic automated ТЗ placement)
+    const scheduleTaskRegex = /<action\s+type="schedule_task"\s+project="([^"]+)"\s+schedule="([^"]+)"\s+prompt="([^"]+)"\s*\/>/gi;
+    while ((match = scheduleTaskRegex.exec(rawText)) !== null) {
+      const targetProjectCandidate = match[1];
+      const schedule = match[2];
+      const prompt = match[3];
+
+      const resolvedProject = await this.resolveTargetProject(
+        targetProjectCandidate,
+        prompt,
+        session.activeProject
+      );
+
+      if (resolvedProject) {
+        try {
+          const jobId = `cron_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+          await veronicaScheduler.addCronJob({
+            id: jobId,
+            project: resolvedProject,
+            skill: 'custom_task',
+            schedule,
+            enabled: true,
+            custom_prompt: prompt,
+          });
+
+          cleanText = cleanText.replace(match[0], '');
+        } catch (err: any) {
+          cleanText += `\n\n⚠️ <i>Не удалось запланировать задачу: ${err?.message || err}</i>`;
+        }
+      } else {
+        cleanText += `\n\n⚠️ <i>Проект «${targetProjectCandidate}» не найден для планирования.</i>`;
+      }
+    }
+
     return cleanText.trim();
   }
 
@@ -677,6 +717,11 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
     sessionState?: UserSessionState,
     imagePath?: string
   ): Promise<string> {
+    // HARD GUARD: Never call real LLM inference during automated test executions
+    if (process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR || process.env.NODE_TEST_CONTEXT) {
+      return 'Тестовый мок-ответ: инференс заблокирован тестовым контуром.';
+    }
+
     const activeModel = config.veronica?.model || config.model_name || 'gemini-3.7-flash-high';
     const isAgy = MessageBuilder.isAntigravityModel(activeModel);
 
@@ -709,6 +754,12 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
           // If retry or continue, reuse active conversation
           const isContinuing = Boolean(sessionState?.antigravityConversationId);
           if (isContinuing && sessionState?.antigravityConversationId) {
+            try {
+              const lockPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'presence', `${sessionState.antigravityConversationId}.lock`);
+              if (fs.existsSync(lockPath)) {
+                fs.unlinkSync(lockPath);
+              }
+            } catch {}
             args.push('--conversation', sessionState.antigravityConversationId);
           }
 
@@ -738,6 +789,16 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
               stdio: ['pipe', 'pipe', 'pipe'],
             });
 
+            const killChild = () => {
+              try {
+                if (process.platform === 'win32' && child.pid) {
+                  spawn('taskkill', ['/pid', child.pid.toString(), '/T', '/F'], { shell: true });
+                } else {
+                  child.kill('SIGKILL');
+                }
+              } catch {}
+            };
+
             let out = '';
             let errOut = '';
             let lineBuffer = '';
@@ -747,9 +808,7 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
             const resetWatchdog = () => {
               if (streamWatchdog) clearTimeout(streamWatchdog);
               streamWatchdog = setTimeout(() => {
-                try {
-                  child.kill('SIGKILL');
-                } catch {}
+                killChild();
                 reject(new Error('Watchdog: Antigravity stream dropped / stalled for 45s'));
               }, 45000);
             };
@@ -782,6 +841,12 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
                       sessionState.antigravityConversationId = ev.result.conversation_id;
                       this.persistSessionMeta(sessionState);
                     }
+                    if (ev.result?.usage && sessionState) {
+                      sessionState.lastUsage = ev.result.usage;
+                    }
+                    if (typeof ev.result?.duration_seconds === 'number' && sessionState) {
+                      sessionState.lastDurationSeconds = ev.result.duration_seconds;
+                    }
                     if (ev.result?.response && !out.trim()) {
                       out = ev.result.response;
                     }
@@ -805,9 +870,7 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
             // Hard timeout at 240s total execution limit
             const totalTimer = setTimeout(() => {
               if (streamWatchdog) clearTimeout(streamWatchdog);
-              try {
-                child.kill('SIGKILL');
-              } catch {}
+              killChild();
               reject(new Error('Antigravity CLI timed out after 240s total execution limit'));
             }, 240000);
 
@@ -822,13 +885,33 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
                     out += ev.step_update.text_delta;
                   } else if (ev.result?.response && !out.trim()) {
                     out = ev.result.response;
-                  } else if (ev.result?.error) {
+                  }
+                  if (ev.result?.usage && sessionState) {
+                    sessionState.lastUsage = ev.result.usage;
+                  }
+                  if (typeof ev.result?.duration_seconds === 'number' && sessionState) {
+                    sessionState.lastDurationSeconds = ev.result.duration_seconds;
+                  }
+                  if (ev.result?.error) {
                     errOut = (errOut ? errOut + '\n' : '') + ev.result.error;
                   }
                 } catch {}
               }
               if (code === 0 && out.trim()) {
-                resolve(out.trim());
+                let finalOut = out.trim();
+                if (sessionState?.lastUsage && (sessionState.lastUsage.total_tokens || sessionState.lastUsage.input_tokens)) {
+                  const u = sessionState.lastUsage;
+                  const sec = sessionState.lastDurationSeconds;
+                  const details: string[] = [];
+                  if (u.input_tokens) details.push(`in: ${Number(u.input_tokens).toLocaleString()}`);
+                  if (u.output_tokens) details.push(`out: ${Number(u.output_tokens).toLocaleString()}`);
+                  if (u.thinking_tokens) details.push(`think: ${Number(u.thinking_tokens).toLocaleString()}`);
+                  if (u.cache_read_tokens) details.push(`cached: ${Number(u.cache_read_tokens).toLocaleString()}`);
+                  const secStr = sec ? ` | ${Number(sec).toFixed(1)}с` : '';
+                  const badge = `\n\n⚡ <i>${Number(u.total_tokens || 0).toLocaleString()} токенов (${details.join(' | ')})${secStr}</i>`;
+                  finalOut += badge;
+                }
+                resolve(finalOut);
               } else {
                 reject(new Error(`agy exited with code ${code}: ${errOut || out || 'no output'}`));
               }
@@ -854,10 +937,16 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
             break;
           }
 
-          // Only reset conversation ID if CLI explicitly reports the conversation is corrupt or not found
-          const isCorruptedSession = /conversation.*(?:not found|corrupt|invalid)/i.test(errMsg);
-          if (isCorruptedSession && sessionState) {
-            console.warn('[Veronica Orchestrator] Session invalid in agy, resetting conversation ID.');
+          // If conversation failed, timed out, stalled, or is corrupted, reset conversation ID
+          // so retry and subsequent messages do NOT hang on a stuck session or lock.
+          if (sessionState && sessionState.antigravityConversationId) {
+            console.warn('[Veronica Orchestrator] Resetting stale/stalled conversation ID:', sessionState.antigravityConversationId);
+            try {
+              const lockPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'presence', `${sessionState.antigravityConversationId}.lock`);
+              if (fs.existsSync(lockPath)) {
+                fs.unlinkSync(lockPath);
+              }
+            } catch {}
             sessionState.antigravityConversationId = undefined;
             this.persistSessionMeta(sessionState);
           }
@@ -959,6 +1048,20 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
         `Сэр, операционная система не может найти CLI <code>agy</code>:\n` +
         `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
         `💡 <i>Проверьте путь к agy в настройках Вероники или добавьте путь к agy в системную переменную PATH.</i>`
+      );
+    }
+
+    const isNet = /fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502|503|504|tls handshake timeout|network is unreachable/i.test(rawMsg);
+    if (isNet) {
+      return (
+        `🌐 <b>Сетевая ошибка связи с инференсом Google AI / CLI</b>\n\n` +
+        `Сэр, не удалось установить сетевое соединение с облачным движком:\n` +
+        `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
+        `💡 <b>Что проверить:</b>\n` +
+        `• Доступность интернета и прокси-шлюза (VPN / Clash)\n` +
+        `• Статус подключения к Google AI Studio\n` +
+        `• Попробуйте повторить запрос через минуту.` +
+        sessionInfo
       );
     }
 

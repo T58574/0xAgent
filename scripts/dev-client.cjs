@@ -29,14 +29,23 @@ async function waitForServerAndStart() {
   const start = Date.now();
   const maxWaitMs = 15000;
 
+  let isReady = false;
   while (Date.now() - start < maxWaitMs) {
     const ready = await checkServerReady();
     if (ready) {
+      isReady = true;
       const elapsed = Date.now() - start;
       process.stdout.write(`[CLIENT] Backend ready on port ${PORT} (${elapsed}ms). Launching Vite dev server...\n`);
       break;
     }
     await new Promise((r) => setTimeout(r, 150));
+  }
+
+  if (!isReady) {
+    process.stderr.write(
+      `\x1b[31m[CLIENT] [WARNING] Backend failed to start on port ${PORT} within ${maxWaitMs / 1000}s!\x1b[0m\n` +
+      `\x1b[33m[CLIENT] The backend may have crashed. Check logs at: ~/.0xagent/logs/server-crash.log\x1b[0m\n`
+    );
   }
 
   const isWin = process.platform === 'win32';

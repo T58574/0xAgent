@@ -54,6 +54,7 @@ export class ProcessWatchdog {
             console.warn(`[Watchdog] Task ${task.id} PID ${task.pid} is no longer alive in OS. Marking as crashed.`);
             await taskRegistry.updateTaskStatus(task.id, 'crashed', {
               summary: 'Process died unexpectedly in OS',
+              skip_retry: true,
             });
             await notificationService.notifyTaskCrashed(task, 'Process disappeared from OS process table');
             continue;
@@ -69,6 +70,7 @@ export class ProcessWatchdog {
           }
           await taskRegistry.updateTaskStatus(task.id, 'timeout', {
             summary: `Heartbeat timeout exceeded (${defaultTimeoutSec}s inactivity)`,
+            skip_retry: true,
           });
           await notificationService.notifyTaskTimeout(task, defaultTimeoutSec);
         }

@@ -1,6 +1,6 @@
 {
   "name": "0xagent",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Autonomous AI Coding Agent & Web-IDE platform powered by local llama.cpp and hybrid cloud LLMs",
   "type": "module",
   "bin": {
@@ -31,8 +31,8 @@
   "scripts": {
     "postinstall": "node ./scripts/ensure-mcp.cjs",
     "predev": "node ./scripts/ensure-ssl.cjs && node ./scripts/ensure-mcp.cjs",
-    "dev": "concurrently -k -p \"[{name}]\" -c \"blue,green\" -n \"SERVER,CLIENT\" \"tsx watch server/index.ts\" \"node ./scripts/dev-client.cjs\"",
-    "dev:server": "tsx watch server/index.ts",
+    "dev": "concurrently -k -p \"[{name}]\" -c \"blue,green\" -n \"SERVER,CLIENT\" \"node ./scripts/dev-server.cjs\" \"node ./scripts/dev-client.cjs\"",
+    "dev:server": "node ./scripts/dev-server.cjs",
     "dev:client": "vite --host 0.0.0.0",
     "prebuild": "node ./scripts/ensure-ssl.cjs && node ./scripts/ensure-mcp.cjs",
     "build": "tsc && vite build",
@@ -41,7 +41,7 @@
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1",
     "audit:security": "node ./scripts/security_audit.cjs",
     "bridge": "tsx scripts/agent-bridge.ts",
-    "test": "tsx --test tests/**/*.test.ts",
+    "test": "tsc --noEmit && tsx --test tests/**/*.test.ts",
     "release": "node ./scripts/release.cjs",
     "release:patch": "node ./scripts/release.cjs patch",
     "release:minor": "node ./scripts/release.cjs minor",

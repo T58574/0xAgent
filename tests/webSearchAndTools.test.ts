@@ -63,23 +63,49 @@ test('Web Search Multi-Engine & Tools Architecture Test Suite', async (t) => {
   });
 
   await t.test('3. Auto Cascade Fallback Mechanism', async () => {
-    // When no Firecrawl key is provided, search cascades gracefully to DuckDuckGo/Wikipedia
-    const outcome = await searchEngineRegistry.search('TypeScript tutorial', 2, {
-      ...baseMockConfig,
-      web_search_provider: 'auto',
-    });
+    // Isolate network call with fast local stub
+    const origSearch = searchEngineRegistry.get('duckduckgo')?.search;
+    const ddgProvider = searchEngineRegistry.get('duckduckgo');
+    if (ddgProvider) {
+      ddgProvider.search = async (q: string) => [
+        { title: `Result for ${q}`, url: 'https://example.com/test', snippet: 'Test snippet', engine: 'duckduckgo' }
+      ];
+    }
 
-    assert.ok(outcome.results.length >= 0, 'Should return results or handled empty response');
-    assert.ok(outcome.cascadeTrail && outcome.cascadeTrail.length > 0, 'Cascade trail should be populated');
+    try {
+      const outcome = await searchEngineRegistry.search('TypeScript tutorial', 2, {
+        ...baseMockConfig,
+        web_search_provider: 'auto',
+      });
+
+      assert.ok(outcome.results.length >= 0, 'Should return results or handled empty response');
+      assert.ok(outcome.cascadeTrail && outcome.cascadeTrail.length > 0, 'Cascade trail should be populated');
+    } finally {
+      if (ddgProvider && origSearch) {
+        ddgProvider.search = origSearch;
+      }
+    }
   });
 
   await t.test('4. Web Search Tool Execution', async () => {
     const emptyRes = await executeWebSearch('');
     assert.match(emptyRes, /empty/i, 'Empty query should be rejected with clear message');
 
-    const validRes = await executeWebSearch('TypeScript');
-    assert.ok(typeof validRes === 'string', 'Should return formatted text response');
-    assert.ok(validRes.length > 0);
+    const origSearch = searchEngineRegistry.search;
+    searchEngineRegistry.search = async (q: string) => ({
+      results: [{ title: `TypeScript Guide`, url: 'https://ts.dev', snippet: 'Intro to TS', engine: 'mock' }],
+      engineUsed: 'MockEngine',
+      latencyMs: 5,
+    });
+
+    try {
+      const validRes = await executeWebSearch('TypeScript');
+      assert.ok(typeof validRes === 'string', 'Should return formatted text response');
+      assert.ok(validRes.includes('TypeScript Guide'));
+      assert.ok(validRes.length > 0);
+    } finally {
+      searchEngineRegistry.search = origSearch;
+    }
   });
 
   await t.test('5. Tool Toggles & Dynamic TOOLS.md Generation', () => {

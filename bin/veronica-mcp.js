@@ -151,6 +151,53 @@ const TOOLS = [
       properties: {},
     },
   },
+  {
+    name: 'veronica_task_list',
+    description: 'Query recent and active autonomous agent tasks in 0xAgent ecosystem.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: { type: 'string', description: 'Filter by project name (optional)' },
+        status: { type: 'string', description: 'Filter by task status: running, completed, failed, crashed (optional)' },
+        limit: { type: 'number', description: 'Max tasks to return (default: 20)' },
+      },
+    },
+  },
+  {
+    name: 'veronica_task_get',
+    description: 'Retrieve detailed status, summary, and telemetry for a specific task.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string', description: 'Task ID' },
+      },
+      required: ['task_id'],
+    },
+  },
+  {
+    name: 'veronica_history',
+    description: 'Fetch operational journal history and changelogs for a project.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: { type: 'string', description: 'Project name' },
+        limit: { type: 'number', description: 'Number of history items (default: 20)' },
+      },
+      required: ['project'],
+    },
+  },
+  {
+    name: 'veronica_context',
+    description: 'Retrieve rich dense project context and architecture metadata for a project.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        project: { type: 'string', description: 'Project name' },
+        task_id: { type: 'string', description: 'Optional task ID' },
+      },
+      required: ['project'],
+    },
+  },
 ];
 
 async function handleToolCall(name, args) {
@@ -163,6 +210,42 @@ async function handleToolCall(name, args) {
         skill: args.skill || 'custom_task',
       });
       return JSON.stringify(data, null, 2);
+    }
+
+    case 'veronica_task_list': {
+      const data = await callVeronicaCli({
+        command: 'task_list',
+        project: args.project,
+        status: args.status,
+        limit: args.limit || 20,
+      });
+      return JSON.stringify(data, null, 2);
+    }
+
+    case 'veronica_task_get': {
+      const data = await callVeronicaCli({
+        command: 'task_get',
+        task_id: args.task_id,
+      });
+      return JSON.stringify(data, null, 2);
+    }
+
+    case 'veronica_history': {
+      const data = await callVeronicaCli({
+        command: 'history',
+        project: args.project,
+        limit: args.limit || 20,
+      });
+      return JSON.stringify(data, null, 2);
+    }
+
+    case 'veronica_context': {
+      const data = await callVeronicaCli({
+        command: 'context',
+        project: args.project,
+        task_id: args.task_id,
+      });
+      return typeof data === 'string' ? data : JSON.stringify(data, null, 2);
     }
 
     case 'veronica_project_list': {

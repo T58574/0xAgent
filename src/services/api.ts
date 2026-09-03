@@ -335,4 +335,8 @@ export const get_proxy_routing = () =>
 export const update_proxy_routing = (config: Partial<ProxyRoutingConfig>) =>
   post<{ routing: ProxyRoutingConfig; bestProxy: ProxyItem | null }>('/proxies/routing', config);
 
+// Telemetry & Quota APIs
+export * from './api/telemetry';
+
+
 

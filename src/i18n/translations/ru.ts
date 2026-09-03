@@ -126,6 +126,16 @@ export const ru: Translations = {
     rollbackHere: 'Откатить диалог сюда',
     forkSession: 'Ветвить сессию отсюда',
     editAndResend: 'Редактировать и отправить',
+    quotaExhausted: 'Квота 429 исчерпана',
+    resetsIn: 'Сброс через',
+    resetQuota: 'Сбросить квоту',
+    quotaReady: 'Квота готова',
+    quotaLimitsTitle: 'Лимиты квот Antigravity',
+    quotaWeekly: 'Недельный лимит',
+    quota5Hour: '5-часовой лимит',
+    quotaRemaining: 'остаток',
+    quotaResetAt: 'Сброс в',
+    quotaNoLimits: 'Данные о квотах недоступны',
   },
 
   editor: {

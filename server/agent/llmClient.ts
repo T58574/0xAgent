@@ -1,4 +1,4 @@
-import { AppConfig } from '../../src/types';
+import { AppConfig, ContextBreakdown } from '../../src/types';
 import {
   handleAgentError,
   registerActiveSessionStream,
@@ -8,6 +8,15 @@ import {
 import { strip_ai_reasoning_fluff } from './fluffSanitizer';
 import { filterCloudPayload } from './cloudPrivacyFilter';
 import { estimatePromptTokens } from '../summarizer';
+import { quotaManager } from './quotaManager';
+
+export function resolveModelContextMax(modelName: string, config: AppConfig): number {
+  const lower = (modelName || '').toLowerCase();
+  if (lower.includes('gemini')) return 1048576;
+  if (lower.includes('claude')) return 200000;
+  if (lower.includes('gpt') || lower.includes('o1') || lower.includes('o3')) return 128000;
+  return config.local_server?.ctx_size || config.max_tokens || 16384;
+}
 
 export const PRIMARY_TEXT_MODEL = 'local:qwen2.5-coder-32b.gguf';
 export const GEMMA_MODEL = 'local:gemma-4-31b-it.gguf';
@@ -67,6 +76,15 @@ async function spawnAgyStreamResponse(
   session?: any,
   _sessionId?: string
 ): Promise<Response> {
+  // HARD GUARD: Never call real CLI processes or spend tokens in test runner
+  if (process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR || process.env.NODE_TEST_CONTEXT) {
+    const sseMock = `data: ${JSON.stringify({ choices: [{ delta: { content: 'Mock response in test environment' } }] })}\n\ndata: [DONE]\n\n`;
+    return new Response(sseMock, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+  }
+
   const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
   const args = ['--dangerously-skip-permissions', '--output-format', 'stream-json'];
 
@@ -148,6 +166,8 @@ async function spawnAgyStreamResponse(
       const encoder = new TextEncoder();
       let lineBuffer = '';
       let totalEmittedChars = 0;
+      let stderrAccumulator = '';
+      let lastResultError = '';
 
       child.stdout?.on('data', (chunk) => {
         lineBuffer += chunk.toString();
@@ -157,6 +177,21 @@ async function spawnAgyStreamResponse(
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed) continue;
+
+          // Check if stdout contains quota exhaustion error in plain text or JSON
+          if (quotaManager.isQuotaExhausted(trimmed)) {
+            const quota = quotaManager.recordQuotaExhaustion({
+              rawMessage: trimmed,
+              modelName: selectedModel,
+            });
+            if (totalEmittedChars === 0) {
+              const quotaNotice = `\n\n> [!WARNING]\n> **Квота Antigravity CLI исчерпана (429)**\n> ${quota.reason}\n> • **Автоматический сброс через:** \`${quota.resetText || '60s'}\`\n\n`;
+              totalEmittedChars += quotaNotice.length;
+              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: quotaNotice } }] })}\n\n`;
+              controller.enqueue(encoder.encode(sseLine));
+            }
+          }
+
           try {
             const event = JSON.parse(trimmed);
             if (event.event === 'init' && event.conversation_id) {
@@ -181,6 +216,9 @@ async function spawnAgyStreamResponse(
                 const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: fallbackText } }] })}\n\n`;
                 controller.enqueue(encoder.encode(sseLine));
               }
+              if (event.result?.error) {
+                lastResultError = event.result.error;
+              }
             }
           } catch {
             if (!trimmed.startsWith('{') && !trimmed.startsWith('warning:') && !trimmed.startsWith('jetski:')) {
@@ -195,11 +233,18 @@ async function spawnAgyStreamResponse(
       child.stderr?.on('data', (errChunk) => {
         const errText = errChunk.toString().trim();
         if (errText && !errText.includes('Debugger attached')) {
+          stderrAccumulator += errText + '\n';
           console.warn('[agy stream stderr]', errText);
+          if (quotaManager.isQuotaExhausted(errText)) {
+            quotaManager.recordQuotaExhaustion({
+              rawMessage: errText,
+              modelName: selectedModel,
+            });
+          }
         }
       });
 
-      child.on('close', (_code) => {
+      child.on('close', (code) => {
         if (lineBuffer.trim()) {
           try {
             const event = JSON.parse(lineBuffer.trim());
@@ -212,8 +257,30 @@ async function spawnAgyStreamResponse(
               const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: event.result.response } }] })}\n\n`;
               controller.enqueue(encoder.encode(sseLine));
             }
+            if (event.result?.error) {
+              lastResultError = event.result.error;
+            }
           } catch {}
         }
+
+        // Handle case where process died without emitting tokens
+        const errorCandidate = (lastResultError || stderrAccumulator).trim();
+        if (totalEmittedChars === 0 && errorCandidate) {
+          if (quotaManager.isQuotaExhausted(errorCandidate)) {
+            const quota = quotaManager.recordQuotaExhaustion({
+              rawMessage: errorCandidate,
+              modelName: selectedModel,
+            });
+            const quotaNotice = `\n\n> [!WARNING]\n> **Квота Antigravity CLI исчерпана (429)**\n> ${quota.reason}\n> • **Автоматический сброс через:** \`${quota.resetText || '60s'}\`\n\n`;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: quotaNotice } }] })}\n\n`));
+          } else {
+            const isNet = /fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502|503|504|tls handshake timeout|network is unreachable/i.test(errorCandidate);
+            const errTitle = isNet ? 'Сетевая ошибка связи с Antigravity / Google AI' : `Antigravity CLI завершился с ошибкой (код ${code})`;
+            const errNotice = `\n\n> [!CAUTION]\n> **${errTitle}**\n> \`\`\`\n> ${errorCandidate}\n> \`\`\`\n\n`;
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: errNotice } }] })}\n\n`));
+          }
+        }
+
         const finishLine = `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`;
         controller.enqueue(encoder.encode(finishLine));
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -390,6 +457,26 @@ export async function fetchLlmResponse(
     if (!lastErrorText && response) {
       lastErrorText = await response.text().catch(() => '');
     }
+
+    // Check if error represents HTTP 429 or Quota Exhaustion
+    if (quotaManager.isQuotaExhausted(lastErrorText, lastStatusCode)) {
+      const retryAfter =
+        response?.headers?.get('retry-after') ||
+        response?.headers?.get('x-ratelimit-reset') ||
+        response?.headers?.get('x-ratelimit-reset-requests');
+      const quota = quotaManager.recordQuotaExhaustion({
+        statusCode: lastStatusCode,
+        rawMessage: lastErrorText,
+        retryAfterHeader: retryAfter,
+        modelName: activeModelName,
+        broadcast,
+      });
+
+      const errMsg = `⚠️ **Квота LLM API исчерпана (Ошибка ${lastStatusCode})**\nЛимит запросов к модели \`${activeModelName}\` временно исчерпан.\n\n• **Автоматический сброс через:** \`${quota.resetText || '60s'}\`\n• **Причина:** \`${quota.reason}\`\n\n[›] Переключите модель в Настройках или дождитесь окончания таймера сброса.`;
+      handleAgentError(session, sessionId, broadcast, errMsg);
+      return null;
+    }
+
     const errMsg = `[!] **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server'}\n\`\`\``;
     handleAgentError(session, sessionId, broadcast, errMsg);
     return null;
@@ -407,14 +494,15 @@ export async function readLlmStream(
   sessionId: string,
   session: any,
   activeCancelTokens: Set<string>,
-  broadcast: (event: string, payload: any) => void
+  broadcast: (event: string, payload: any) => void,
+  contextBreakdown?: ContextBreakdown
 ): Promise<LlmStreamResult | null> {
   if (!response.body) return null;
 
   const genStartTime = Date.now();
   let tokenCount = 0;
   const estimatedPromptTokens = estimatePromptTokens(messages);
-  const contextMax = config.local_server?.ctx_size || config.max_tokens || 16384;
+  const contextMax = resolveModelContextMax(activeModelName, config);
   const modelName = activeModelName || config.model_name || PRIMARY_TEXT_MODEL;
 
   let assistantContent = '';
@@ -455,6 +543,8 @@ export async function readLlmStream(
       contextUsed,
       contextMax,
       modelName,
+      contextBreakdown,
+      quotaStatus: quotaManager.getQuotaStatus(),
     });
   };
 

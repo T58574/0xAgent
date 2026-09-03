@@ -126,6 +126,16 @@ export const en: Translations = {
     rollbackHere: 'Rollback here',
     forkSession: 'Fork session here',
     editAndResend: 'Edit & Resend',
+    quotaExhausted: '429 Quota Exhausted',
+    resetsIn: 'Resets in',
+    resetQuota: 'Reset Quota',
+    quotaReady: 'Quota Ready',
+    quotaLimitsTitle: 'Antigravity Quota Limits',
+    quotaWeekly: 'Weekly Limit',
+    quota5Hour: '5-Hour Limit',
+    quotaRemaining: 'remaining',
+    quotaResetAt: 'Resets at',
+    quotaNoLimits: 'Quota data unavailable',
   },
 
   editor: {

@@ -12,6 +12,7 @@ import { operationalJournal } from '../core/operationalJournal';
 import { notificationService } from '../telegram/notificationService';
 import { getVeronicaDataDir } from '../db/veronicaDb';
 import { proxyService } from '../../proxyService';
+import { quotaManager } from '../../agent/quotaManager';
 
 // Re-export Model info, defaults, resolution & CLI path from modular antigravityModels
 export type { AntigravityModelInfo } from './antigravityModels';
@@ -30,6 +31,13 @@ import {
   resolveAntigravityModelAndEffort,
 } from './antigravityModels';
 
+import { AntigravityUsage } from '../../../src/types';
+
+export function isNetworkError(text: string): boolean {
+  if (!text) return false;
+  return /network issue|issue connecting to the server|fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502 bad gateway|503 service unavailable|504 gateway timeout|ssl.*handshake|request to .* failed|abort(?:ed)?|tls handshake timeout|network is unreachable|stream was interrupted|error id:\s*[a-f0-9-]+/i.test(text);
+}
+
 
 export interface AntigravityAgentInfo {
   slug: string;
@@ -45,6 +53,7 @@ export interface VeronicaStreamEvent {
   timestamp: number;
   summary?: string;
   metadata?: any;
+  usage?: AntigravityUsage;
 }
 
 export type VeronicaStreamListener = (event: VeronicaStreamEvent) => void;
@@ -274,16 +283,41 @@ export class AntigravityAdapter implements RuntimeAdapter {
   }
 
   public async spawnTask(options: SpawnTaskOptions): Promise<AgentTask> {
-    const task = await taskRegistry.createTask({
-      project: options.project,
-      skill: options.skill,
-      runtime_profile: options.runtime_profile,
-      autonomy_level: options.autonomy_level,
-      custom_prompt: options.custom_prompt,
-    });
+    const task = options.existing_task_id
+      ? (taskRegistry.getTask(options.existing_task_id) || await taskRegistry.createTask({
+          project: options.project,
+          skill: options.skill,
+          runtime_profile: options.runtime_profile,
+          autonomy_level: options.autonomy_level,
+          custom_prompt: options.custom_prompt,
+        }))
+      : await taskRegistry.createTask({
+          project: options.project,
+          skill: options.skill,
+          runtime_profile: options.runtime_profile,
+          autonomy_level: options.autonomy_level,
+          custom_prompt: options.custom_prompt,
+        });
 
     if (task.status === 'queued') {
       VeronicaLogger.log('INFO', `Task queued for project ${options.project} (locked by another task)`, task.id);
+      return task;
+    }
+
+    // HARD GUARD: Never spawn real OS Antigravity CLI processes or consume AI tokens during test executions
+    if (process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR || process.env.NODE_TEST_CONTEXT) {
+      VeronicaLogger.log('INFO', `[TEST ENVIRONMENT GUARD] Simulating Antigravity task execution without spawning OS process for task ${task.id}`);
+      await taskRegistry.updateTaskStatus(task.id, 'running');
+      setTimeout(async () => {
+        await taskRegistry.updateTaskStatus(task.id, 'completed', {
+          summary: 'Simulated task completed in test environment',
+          result_json: JSON.stringify({
+            conversation_id: 'test-mock-convo',
+            tool_call_count: 0,
+            usage: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, cache_read_tokens: 0, total_tokens: 0 },
+          }),
+        });
+      }, 50);
       return task;
     }
 
@@ -302,6 +336,8 @@ export class AntigravityAdapter implements RuntimeAdapter {
       VERONICA_PROJECT_PATH: resolvedProjectPath,
       VERONICA_API_URL: 'http://127.0.0.1:3001/api/veronica/cli',
     };
+    delete env.NODE_TEST_CONTEXT;
+    delete env.NODE_TEST_WORKER_ID;
 
     const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
     if (proxyUrl) {
@@ -326,7 +362,8 @@ export class AntigravityAdapter implements RuntimeAdapter {
     const resolved = resolveAntigravityModelAndEffort(options.model || config.veronica?.model, options.effort || config.veronica?.effort);
     const selectedAgent = options.agent || config.veronica?.agent;
     const selectedTimeout = options.print_timeout || config.veronica?.print_timeout || '15m';
-    const outputFormat = options.output_format || 'text';
+    const outputFormat = options.output_format || 'stream-json';
+    const maxToolCalls = options.max_tool_calls || config.veronica?.max_task_tool_calls || 120;
 
     const args = [
       '--dangerously-skip-permissions',
@@ -334,6 +371,9 @@ export class AntigravityAdapter implements RuntimeAdapter {
       '--print-timeout', selectedTimeout,
       '--add-dir', resolvedProjectPath,
     ];
+    if (options.project) {
+      args.push('--project', options.project);
+    }
 
     if (resolved.model) {
       args.push('--model', resolved.model);
@@ -353,7 +393,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
 
     VeronicaLogger.log(
       'TASK',
-      `Spawning agy task for project '${options.project}' [model: ${resolved.model || 'default'}, agent: ${selectedAgent || 'default'}, timeout: ${selectedTimeout}]`,
+      `Spawning agy task for project '${options.project}' [model: ${resolved.model || 'default'}, agent: ${selectedAgent || 'default'}, timeout: ${selectedTimeout}, max_tool_calls: ${maxToolCalls}]`,
       task.id
     );
 
@@ -386,28 +426,156 @@ export class AntigravityAdapter implements RuntimeAdapter {
 
         let stdoutAccumulator = '';
         let lastOutputSnippet = '';
+        let lineBuffer = '';
+        let toolCallCount = 0;
+        let circuitBreakerTriggered = false;
+        let detectedNetworkError = '';
+        let lastErrorDetails = '';
+        let capturedConversationId = options.conversation_id;
+        let finalResponseText = '';
+        let capturedUsage: AntigravityUsage | undefined = undefined;
+        let capturedDurationSeconds: number | undefined = undefined;
+
+        // 90-second inactivity watchdog
+        let watchdogTimer: NodeJS.Timeout | null = null;
+        const WATCHDOG_TIMEOUT_MS = 90000;
+
+        const resetWatchdog = () => {
+          if (watchdogTimer) clearTimeout(watchdogTimer);
+          watchdogTimer = setTimeout(() => {
+            VeronicaLogger.log(
+              'WARN',
+              `[Antigravity Watchdog] Task ${task.id} stalled (no stream activity for 90s). Terminating hung process.`,
+              task.id
+            );
+            try {
+              child.kill('SIGTERM');
+              setTimeout(() => {
+                try {
+                  child.kill('SIGKILL');
+                } catch {}
+              }, 3000);
+            } catch {}
+          }, WATCHDOG_TIMEOUT_MS);
+        };
+
+        resetWatchdog();
 
         child.stdout?.on('data', (data) => {
-          const text = data.toString().trim();
-          if (text) {
-            stdoutAccumulator += '\n' + text;
-            lastOutputSnippet = text.substring(0, 200);
-            VeronicaLogger.log('TASK', text, task.id);
-            taskRegistry.recordHeartbeat(task.id, text.substring(0, 100)).catch(() => {});
+          resetWatchdog();
+          const chunkStr = data.toString();
+          stdoutAccumulator += '\n' + chunkStr;
+          lineBuffer += chunkStr;
+
+          const lines = lineBuffer.split('\n');
+          lineBuffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+
+            lastOutputSnippet = trimmed.substring(0, 200);
+
+            if (isNetworkError(trimmed)) {
+              detectedNetworkError = trimmed;
+            }
+
+            // Parse stream-json events
+            if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+              try {
+                const ev = JSON.parse(trimmed);
+                if (ev.event === 'init' && ev.conversation_id) {
+                  capturedConversationId = ev.conversation_id;
+                } else if (ev.conversation_id) {
+                  capturedConversationId = ev.conversation_id;
+                }
+
+                if (ev.event === 'step_update') {
+                  const su = ev.step_update;
+                  if (su?.step_type === 'tool' && su?.state === 'ACTIVE') {
+                    toolCallCount++;
+                    const toolName = su.tool_name || su.tool_info?.name || 'tool';
+                    taskRegistry
+                      .recordHeartbeat(task.id, `Tool: ${toolName} (#${toolCallCount}/${maxToolCalls})`)
+                      .catch(() => {});
+
+                    // Circuit Breaker: prevent rogue loops (e.g. 450 tool calls)
+                    if (toolCallCount >= maxToolCalls && !circuitBreakerTriggered) {
+                      circuitBreakerTriggered = true;
+                      VeronicaLogger.log(
+                        'WARN',
+                        `[Circuit Breaker] Task ${task.id} reached tool limit (${toolCallCount}/${maxToolCalls}). Terminating process.`,
+                        task.id
+                      );
+                      try {
+                        child.kill('SIGTERM');
+                        setTimeout(() => {
+                          try {
+                            child.kill('SIGKILL');
+                          } catch {}
+                        }, 3000);
+                      } catch {}
+                    }
+                  } else if (su?.step_type === 'tool' && su?.state === 'ERROR') {
+                    const errMsg = su?.tool_info?.error?.message || '';
+                    if (isNetworkError(errMsg)) {
+                      detectedNetworkError = errMsg;
+                    }
+                  }
+                }
+
+                if (ev.event === 'result') {
+                  if (ev.result?.conversation_id) {
+                    capturedConversationId = ev.result.conversation_id;
+                  }
+                  if (ev.result?.response) {
+                    finalResponseText = ev.result.response;
+                  }
+                  if (ev.result?.usage) {
+                    capturedUsage = ev.result.usage;
+                  }
+                  if (typeof ev.result?.duration_seconds === 'number') {
+                    capturedDurationSeconds = ev.result.duration_seconds;
+                  }
+                  if (ev.result?.error) {
+                    lastErrorDetails = ev.result.error;
+                    if (isNetworkError(ev.result.error)) {
+                      detectedNetworkError = ev.result.error;
+                    }
+                  }
+                }
+              } catch {}
+            } else {
+              if (trimmed.toLowerCase().startsWith('error:')) {
+                lastErrorDetails = trimmed;
+              }
+            }
+
+            VeronicaLogger.log('TASK', trimmed, task.id);
 
             this.emitStreamEvent({
               taskId: task.id,
               type: 'stdout',
-              chunk: text,
+              chunk: trimmed,
               timestamp: Date.now(),
             });
           }
         });
 
         child.stderr?.on('data', (data) => {
+          resetWatchdog();
           const text = data.toString().trim();
           if (text) {
             VeronicaLogger.log('WARN', text, task.id);
+            if (isNetworkError(text)) {
+              detectedNetworkError = text;
+            }
+            if (quotaManager.isQuotaExhausted(text)) {
+              quotaManager.recordQuotaExhaustion({
+                rawMessage: text,
+                modelName: options.model,
+              });
+            }
             taskRegistry
               .logEvent({
                 task_id: task.id,
@@ -426,69 +594,139 @@ export class AntigravityAdapter implements RuntimeAdapter {
           }
         });
 
-        child.on('close', async (code, signal) => {
+        child.on('error', async (err) => {
+          if (watchdogTimer) clearTimeout(watchdogTimer);
           this.activeProcesses.delete(task.id);
+          const errMsg = err?.message || String(err);
+          VeronicaLogger.log('ERROR', `Process execution error on task ${task.id}: ${errMsg}`, task.id);
+
+          const isNet = isNetworkError(errMsg);
+          const failReason = isNet
+            ? `Сетевой сбой при связи с сервером инференса Antigravity CLI: ${errMsg}`
+            : `Ошибка запуска процесса Antigravity CLI: ${errMsg}`;
+
+          const currentTask = taskRegistry.getTask(task.id);
+          if (currentTask && currentTask.status === 'running') {
+            await taskRegistry.updateTaskStatus(task.id, 'failed', {
+              error_message: errMsg,
+              summary: failReason,
+            });
+
+            this.emitStreamEvent({
+              taskId: task.id,
+              type: 'end',
+              status: 'failed',
+              summary: failReason,
+              chunk: `[Veronica Error] ${failReason}`,
+              timestamp: Date.now(),
+            });
+
+            await operationalJournal.logEntry({
+              project: options.project,
+              task_id: task.id,
+              agent: 'Antigravity Agent',
+              operation_type: options.skill,
+              status: 'failed',
+              summary: failReason,
+            });
+
+            const updatedTask = taskRegistry.getTask(task.id);
+            if (updatedTask) {
+              await notificationService.notifyTaskCrashed(updatedTask, failReason);
+            }
+          }
+        });
+
+        child.on('close', async (code, signal) => {
+          if (watchdogTimer) clearTimeout(watchdogTimer);
+          this.activeProcesses.delete(task.id);
+
+          // Flush remaining line buffer
+          if (lineBuffer.trim()) {
+            const trimmed = lineBuffer.trim();
+            if (isNetworkError(trimmed)) detectedNetworkError = trimmed;
+            if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+              try {
+                const ev = JSON.parse(trimmed);
+                if (ev.result?.response) finalResponseText = ev.result.response;
+                if (ev.result?.usage) capturedUsage = ev.result.usage;
+                if (typeof ev.result?.duration_seconds === 'number') capturedDurationSeconds = ev.result.duration_seconds;
+                if (ev.result?.error) {
+                  lastErrorDetails = ev.result.error;
+                  if (isNetworkError(ev.result.error)) detectedNetworkError = ev.result.error;
+                }
+              } catch {}
+            }
+          }
+
+          // Auto-resume on network error (e.g. Google inference blip or interrupted stream)
+          if (detectedNetworkError && (options.network_retry_count || 0) < 2) {
+            const nextRetry = (options.network_retry_count || 0) + 1;
+            const resumeConvoId = capturedConversationId || options.conversation_id;
+            VeronicaLogger.log(
+              'WARN',
+              `[Antigravity Auto-Resume] Network issue detected (${detectedNetworkError}). Resuming task ${task.id} (attempt ${nextRetry}/2) in 3s...`,
+              task.id
+            );
+            this.emitStreamEvent({
+              taskId: task.id,
+              type: 'status',
+              status: 'running',
+              chunk: `[Veronica] Перехвачен сетевой сбой связи с сервером инференса (Google AI). Автоматически возобновляю выполнение задачи (попытка ${nextRetry}/2)...`,
+              timestamp: Date.now(),
+            });
+
+            setTimeout(() => {
+              this.spawnTask({
+                ...options,
+                existing_task_id: task.id,
+                conversation_id: resumeConvoId || undefined,
+                continue_recent: false,
+                network_retry_count: nextRetry,
+              }).catch((err) => {
+                VeronicaLogger.log('ERROR', `Failed to auto-resume task ${task.id}: ${err.message}`, task.id);
+              });
+            }, 3000);
+            return;
+          }
+
           const currentTask = taskRegistry.getTask(task.id);
           if (currentTask && currentTask.status === 'running') {
             let finalStatus: TaskStatus = code === 0 ? 'completed' : 'failed';
             let cleanSummary =
+              finalResponseText ||
               lastOutputSnippet ||
               (code === 0 ? 'Agent execution finished successfully.' : `Agent process exited with code ${code}`);
 
-            // Antigravity Terminal Status & Conversation ID parsing (SUCCESS, ERROR, CANCELED, INTERRUPTED, INVALID, WAITING, RUNNING)
-            let capturedConversationId = options.conversation_id;
-            try {
-              const lines = stdoutAccumulator.split('\n');
-              for (const line of lines) {
-                const lTrim = line.trim();
-                if (lTrim.startsWith('{') && lTrim.endsWith('}')) {
-                  try {
-                    const parsed = JSON.parse(lTrim);
-                    if (parsed.event === 'init' && parsed.conversation_id) {
-                      capturedConversationId = parsed.conversation_id;
-                    } else if (parsed.conversation_id) {
-                      capturedConversationId = parsed.conversation_id;
-                    }
-                    if (parsed.result?.conversation_id) {
-                      capturedConversationId = parsed.result.conversation_id;
-                    }
-                    if (parsed.status) {
-                      const s = String(parsed.status).toUpperCase();
-                      if (s === 'SUCCESS') finalStatus = 'completed';
-                      else if (s === 'ERROR') finalStatus = 'failed';
-                      else if (s === 'CANCELED') finalStatus = 'cancelled';
-                      else if (s === 'INTERRUPTED') finalStatus = 'interrupted';
-                      else if (s === 'INVALID') finalStatus = 'invalid';
-                      else if (s === 'WAITING') finalStatus = 'waiting';
-                      else if (s === 'RUNNING') finalStatus = 'running';
-
-                      if (parsed.response || parsed.summary || parsed.output) {
-                        cleanSummary = String(parsed.response || parsed.summary || parsed.output).substring(0, 500);
-                      }
-                    } else if (parsed.result?.status) {
-                      const s = String(parsed.result.status).toUpperCase();
-                      if (s === 'SUCCESS') finalStatus = 'completed';
-                      else if (s === 'ERROR') finalStatus = 'failed';
-                      if (parsed.result.response || parsed.result.summary) {
-                        cleanSummary = String(parsed.result.response || parsed.result.summary).substring(0, 500);
-                      }
-                    }
-                  } catch {}
-                }
-              }
-            } catch {}
-
-            if (signal === 'SIGINT' || signal === 'SIGTERM') {
-              finalStatus = 'interrupted';
-              cleanSummary = `Process was interrupted by signal ${signal}`;
+            // Circuit Breaker priority status
+            if (circuitBreakerTriggered) {
+              finalStatus = 'failed';
+              cleanSummary = `Предохранитель (Circuit Breaker): агент выполнил ${toolCallCount} вызовов инструментов (лимит ${maxToolCalls}). Процесс принудительно остановлен для защиты от зацикливания и экономии токенов.`;
+            } else if (detectedNetworkError) {
+              finalStatus = 'failed';
+              cleanSummary = `Сетевая ошибка связи с сервером инференса (Google AI / Antigravity CLI): ${detectedNetworkError}`;
+            } else if (lastErrorDetails && code !== 0) {
+              finalStatus = 'failed';
+              cleanSummary = lastErrorDetails.substring(0, 500);
             }
 
-            VeronicaLogger.log(code === 0 ? 'INFO' : 'WARN', `Task finished with status '${finalStatus}' (exit code ${code})`, task.id);
+            if (signal === 'SIGINT' || signal === 'SIGTERM') {
+              if (!circuitBreakerTriggered) {
+                finalStatus = 'interrupted';
+                cleanSummary = `Process was interrupted by signal ${signal}`;
+              }
+            }
+
+            VeronicaLogger.log(code === 0 && !circuitBreakerTriggered && !detectedNetworkError ? 'INFO' : 'WARN', `Task finished with status '${finalStatus}' (exit code ${code})`, task.id);
 
             await taskRegistry.updateTaskStatus(task.id, finalStatus, {
               summary: cleanSummary,
+              skip_retry: circuitBreakerTriggered || !!detectedNetworkError,
               result_json: JSON.stringify({
                 conversation_id: capturedConversationId,
+                tool_call_count: toolCallCount,
+                duration_seconds: capturedDurationSeconds,
+                usage: capturedUsage,
                 raw: stdoutAccumulator.length > 0 ? stdoutAccumulator.substring(0, 10000) : undefined,
               }),
             });
@@ -500,6 +738,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
               summary: cleanSummary,
               chunk: `[Veronica] Task finished with status: ${finalStatus}`,
               timestamp: Date.now(),
+              usage: capturedUsage,
             });
 
             // Log to Operational Journal
@@ -517,12 +756,12 @@ export class AntigravityAdapter implements RuntimeAdapter {
             if (updatedTask) {
               if (finalStatus === 'completed') {
                 await notificationService.notifyTaskCompleted(updatedTask);
-              } else if (finalStatus === 'cancelled') {
+              } else if ((finalStatus as any) === 'cancelled') {
                 VeronicaLogger.log('INFO', `Task ${finalStatus}`, task.id);
               } else if (finalStatus === 'interrupted') {
                 await notificationService.notifyTaskCrashed(
                   updatedTask,
-                  'Процесс агента был прерван из-за обрыва соединения или перезапуска'
+                  cleanSummary || 'Процесс агента был прерван из-за обрыва соединения или перезапуска'
                 );
               } else {
                 await notificationService.notifyTaskCrashed(updatedTask, cleanSummary);

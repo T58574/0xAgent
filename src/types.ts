@@ -146,6 +146,7 @@ export interface VeronicaConfig {
   effort?: 'low' | 'medium' | 'high' | 'auto' | null;
   agent?: string | null;
   print_timeout?: string | null;
+  max_task_tool_calls?: number;
 }
 
 export interface VeronicaModelInfo {
@@ -307,10 +308,20 @@ export interface ToolsState {
   content: string;
 }
 
+export interface AntigravityUsage {
+  input_tokens?: number;
+  output_tokens?: number;
+  thinking_tokens?: number;
+  cache_read_tokens?: number;
+  total_tokens?: number;
+}
+
 export interface MessageMetrics {
   tokensPerSec?: number;
   promptTokens?: number;
   completionTokens?: number;
+  thinkingTokens?: number;
+  cacheReadTokens?: number;
   tokenCount?: number;
   totalTokens?: number;
   contextUsed?: number;
@@ -322,6 +333,8 @@ export interface MessageMetrics {
   promptCacheHit?: boolean;
   modelName?: string;
   contextBreakdown?: ContextBreakdown;
+  quotaStatus?: QuotaStatus;
+  agyUsage?: AntigravityUsage;
 }
 
 export interface ContextBreakdown {
@@ -382,6 +395,31 @@ export interface ApprovalResult {
   reason?: string;
 }
 
+export interface AgyQuotaLimit {
+  modelGroup: string;
+  limitType: string;
+  remainingPercentage: number;
+  resetAtUtc: string;
+}
+
+export interface QuotaLimitsState {
+  limits: AgyQuotaLimit[];
+  lastUpdated: number;
+  error?: string;
+}
+
+export interface QuotaStatus {
+  exhausted: boolean;
+  statusCode?: number;
+  resetAt?: number;
+  resetInSeconds?: number;
+  resetText?: string;
+  reason?: string;
+  modelName?: string;
+  lastChecked?: number;
+  limits?: AgyQuotaLimit[];
+}
+
 export interface LiveTelemetry {
   messageId?: string;
   tokensPerSec?: number;
@@ -394,6 +432,10 @@ export interface LiveTelemetry {
   promptCacheHit?: boolean;
   modelName?: string;
   contextBreakdown?: ContextBreakdown;
+  quotaStatus?: QuotaStatus;
+  thinkingTokens?: number;
+  cacheReadTokens?: number;
+  agyUsage?: AntigravityUsage;
 }
 
 export interface ChatMessage {

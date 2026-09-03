@@ -66,18 +66,26 @@ export class VeronicaScheduler {
       db.prepare('UPDATE cron_jobs SET last_run = ?, next_run = ? WHERE id = ?').run(now, nextRun, job.id);
     });
 
-    // Load prompt from skill file if available
-    let skillPrompt = job.custom_prompt || '';
-    if (!skillPrompt) {
-      skillPrompt = this.getSkillContent(job.skill) || '';
+    // Guard: prevent overlapping executions if project already has an active or queued task
+    const db = getVeronicaDb();
+    const existingTask = db.prepare(
+      "SELECT id FROM agent_tasks WHERE project = ? AND status IN ('running', 'queued') LIMIT 1"
+    ).get(job.project);
+
+    if (existingTask) {
+      console.log(`[Veronica Scheduler] [SKIP] Cron job ${job.id} (${job.project}) skipped - project already has an active or queued task.`);
+      return;
     }
+
+    // Direct ТЗ formulated by Veronica without generic markdown skill template bindings
+    const taskPrompt = job.custom_prompt || job.skill_file || `Периодическое регламентное задание для проекта ${job.project}`;
 
     // Launch task via Antigravity Adapter
     try {
       await antigravityAdapter.spawnTask({
         project: job.project,
-        skill: job.skill,
-        custom_prompt: skillPrompt || undefined,
+        skill: job.skill || 'custom_task',
+        custom_prompt: taskPrompt,
       });
     } catch (err) {
       console.error(`[Veronica Scheduler] Failed to spawn task for job ${job.id}:`, err);
@@ -143,7 +151,7 @@ export class VeronicaScheduler {
       stmt.run(
         job.id,
         job.project,
-        job.skill,
+        job.skill || 'custom_task',
         job.schedule,
         job.enabled ? 1 : 0,
         job.skill_file || null,

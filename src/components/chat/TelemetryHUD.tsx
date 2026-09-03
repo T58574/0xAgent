@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LiveTelemetry } from '../../types';
+import { LiveTelemetry, QuotaStatus } from '../../types';
 import { MaterialIcon } from '../common/MaterialIcon';
 import { useI18n } from '../../i18n';
 
@@ -7,6 +7,7 @@ const ASCII_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '�
 
 interface TelemetryHUDProps {
   liveTelemetry?: LiveTelemetry | null;
+  quotaStatus?: QuotaStatus | null;
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
   thinkingSeconds?: number;
   asciiFrame?: string;
@@ -16,6 +17,7 @@ interface TelemetryHUDProps {
 
 export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
   liveTelemetry,
+  quotaStatus,
   agentStatus,
   thinkingSeconds: externalThinkingSeconds,
   asciiFrame: externalAsciiFrame,
@@ -82,6 +84,19 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
         </div>
       )}
 
+      {/* Quota Exhaustion Alert during Generation/Thinking */}
+      {quotaStatus?.exhausted && (
+        <div className="flex justify-start max-w-3xl mx-auto w-full my-2">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-[11px] font-mono text-rose-300 shadow-sm animate-pulse">
+            <MaterialIcon name="hourglass_empty" size={12} className="text-rose-400" />
+            <span>[429 QUOTA EXHAUSTED]</span>
+            {quotaStatus.resetText && (
+              <span className="text-amber-300 font-mono ml-1">Resets: {quotaStatus.resetText}</span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Live Telemetry Card during Generation */}
       {liveTelemetry && agentStatus !== 'idle' && (
         <div className="flex justify-start max-w-3xl mx-auto w-full my-2">
@@ -105,10 +120,10 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
               </span>
             )}
             {liveTelemetry.contextUsed !== undefined && (() => {
-              const ctxMax = liveTelemetry.contextMax || 32768;
-              const pct = Math.min(100, Math.max(0, Math.round((liveTelemetry.contextUsed / ctxMax) * 100)));
-              const filled = Math.min(10, Math.max(0, Math.round(pct / 10)));
-              const empty = Math.max(0, 10 - filled);
+              const ctxMax = liveTelemetry.contextMax || 16384;
+              const pct = ctxMax > 0 ? Math.min(100, Math.max(0, Math.round((liveTelemetry.contextUsed / ctxMax) * 100))) : 0;
+              const filled = pct > 0 ? Math.max(1, Math.min(10, Math.round(pct / 10))) : 0;
+              const empty = 10 - filled;
               const gaugeStr = `[${'●'.repeat(filled)}${'○'.repeat(empty)}] ${pct}%`;
               return (
                 <button

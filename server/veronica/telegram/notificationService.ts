@@ -82,6 +82,28 @@ export class NotificationService {
       lines.push('');
     }
 
+    // Display Antigravity token usage telemetry if available
+    if (task.result_json) {
+      try {
+        const parsedResult = JSON.parse(task.result_json);
+        const usage = parsedResult.usage;
+        const durationSec = parsedResult.duration_seconds;
+        if (usage && (usage.total_tokens || usage.input_tokens)) {
+          const parts: string[] = [];
+          if (usage.total_tokens) parts.push(`⚡ <b>${Number(usage.total_tokens).toLocaleString()} токенов</b>`);
+          const details: string[] = [];
+          if (usage.input_tokens) details.push(`in: ${Number(usage.input_tokens).toLocaleString()}`);
+          if (usage.output_tokens) details.push(`out: ${Number(usage.output_tokens).toLocaleString()}`);
+          if (usage.thinking_tokens) details.push(`think: ${Number(usage.thinking_tokens).toLocaleString()}`);
+          if (usage.cache_read_tokens) details.push(`cached: ${Number(usage.cache_read_tokens).toLocaleString()}`);
+          if (details.length > 0) parts.push(`(${details.join(' | ')})`);
+          if (durationSec) parts.push(`⏱ ${Number(durationSec).toFixed(1)}с`);
+          lines.push(`📊 <b>Расход:</b> ${parts.join(' ')}`);
+          lines.push('');
+        }
+      } catch {}
+    }
+
     const keyboard = new InlineKeyboard()
       .text('🔄 Продолжить задачу', `veronica:continue:${task.id}`)
       .text('📁 Меню проектов', 'veronica:projects_menu');
