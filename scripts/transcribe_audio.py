@@ -49,6 +49,10 @@ def transcribe_with_qwen3_onnx(audio_path: str) -> dict:
     if sr != 16000:
         audio_data = librosa.resample(audio_data, orig_sr=sr, target_sr=16000)
 
+    rms = float(np.sqrt(np.mean(audio_data ** 2))) if len(audio_data) > 0 else 0.0
+    if rms < 0.003:
+        return {"success": True, "text": "", "engine": "silence-gate"}
+
     from src.core.stt.qwen3_onnx_adapter import Qwen3ONNXAdapter
     adapter = Qwen3ONNXAdapter(model_name="andrewleech/qwen3-asr-1.7b-onnx", device="auto", language="ru")
     adapter.load_model()
@@ -68,6 +72,11 @@ def transcribe_with_qwen3_onnx(audio_path: str) -> dict:
 
     if text.startswith("ERR:"):
         return {"success": False, "error": text}
+
+    # Anti-hallucination filter: if model looped on repetitive Chinese numbers/counting on low noise
+    import re
+    if re.match(r'^[一二三四五六七八九十百千万0-9、，。\s]+$', text.strip()):
+        return {"success": True, "text": "", "engine": f"local-qwen3-onnx ({adapter.device_name_str})"}
 
     return {"success": True, "text": text.strip(), "engine": f"local-qwen3-onnx ({adapter.device_name_str})"}
 

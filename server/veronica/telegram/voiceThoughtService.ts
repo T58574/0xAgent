@@ -346,7 +346,7 @@ export class VoiceThoughtService {
       const rawText = transcriptionResult.text;
 
       if (!rawText || !rawText.trim()) {
-        throw new Error('Аудиозапись пустая или не содержит распознаваемой речи.');
+        throw new Error('Аудиозапись слишком тихая или не содержит чёткой речи. Попробуйте сказать чуть громче или ближе к микрофону.');
       }
 
       // 3. Structure thought with Veronica
