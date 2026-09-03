@@ -29,11 +29,12 @@
     "privacy-first"
   ],
   "scripts": {
-    "predev": "node ./scripts/ensure-ssl.cjs",
+    "postinstall": "node ./scripts/ensure-mcp.cjs",
+    "predev": "node ./scripts/ensure-ssl.cjs && node ./scripts/ensure-mcp.cjs",
     "dev": "concurrently -k -p \"[{name}]\" -c \"blue,green\" -n \"SERVER,CLIENT\" \"tsx watch server/index.ts\" \"node ./scripts/dev-client.cjs\"",
     "dev:server": "tsx watch server/index.ts",
     "dev:client": "vite --host 0.0.0.0",
-    "prebuild": "node ./scripts/ensure-ssl.cjs",
+    "prebuild": "node ./scripts/ensure-ssl.cjs && node ./scripts/ensure-mcp.cjs",
     "build": "tsc && vite build",
     "build:launcher": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-launcher.ps1",
     "preview": "vite preview",

@@ -214,6 +214,7 @@ export interface AppConfig {
   firecrawl_api_key?: string | null;
   firecrawl_api_url?: string | null;
   searxng_url?: string | null;
+  groq_api_key?: string | null;
   tool_toggles?: Record<string, boolean> | null;
 }
 

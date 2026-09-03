@@ -11,6 +11,7 @@ import { snapshotCache } from './core/snapshotCache';
 import { antigravityAdapter } from './adapters/antigravityAdapter';
 
 import { writeQueue } from './db/writeQueue';
+import { ensureVeronicaMcpConfig } from './core/mcpRegistration';
 
 let isModuleInitialized = false;
 let backupIntervalTimer: NodeJS.Timeout | null = null;
@@ -29,6 +30,9 @@ export async function initVeronicaModule(): Promise<boolean> {
   try {
     // 1. Initialize SQLite Database (WAL mode)
     initVeronicaDatabase();
+
+    // 1.1 Ensure Veronica MCP Server is registered for Antigravity
+    ensureVeronicaMcpConfig();
 
     // 2. Run startup reconciliation for crashed/orphan tasks
     await RecoveryService.reconcileOnStartup();

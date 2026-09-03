@@ -10,6 +10,7 @@ import { projectDiscovery } from '../core/projectDiscovery';
 import { projectDocManager } from '../core/projectDocManager';
 import { veronicaScheduler } from '../core/scheduler';
 import { veronicaOrchestrator } from './veronicaOrchestrator';
+import { voiceThoughtService } from './voiceThoughtService';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -535,6 +536,70 @@ export function initTelegramBot(): Bot | null {
       } catch (err: any) {
         console.error('[Veronica Telegram] Error handling user message:', err);
         await ctx.reply(`⚠️ Произошла ошибка при обработке запроса: ${escapeHtml(err?.message || err)}`);
+      }
+    });
+
+    // -------------------------------------------------------------
+    // Voice Message Handler (Voice Brain Dump)
+    // -------------------------------------------------------------
+    bot.on(['message:voice', 'message:audio'], async (ctx) => {
+      const userId = ctx.from.id;
+      const voice = ctx.message.voice || ctx.message.audio;
+      if (!voice) return;
+
+      const cleanToken = token.trim();
+      const statusMsg = await ctx.reply('🎙️ <i>Слушаю и расшифровываю голосовую мысль...</i>', { parse_mode: 'HTML' });
+
+      try {
+        await ctx.replyWithChatAction('record_voice');
+        const file = await ctx.getFile();
+        if (!file.file_path) {
+          throw new Error('Не удалось получить файл голосового сообщения из Telegram.');
+        }
+
+        const result = await voiceThoughtService.processVoiceMessage(cleanToken, file.file_path, userId);
+        const thought = result.thought;
+
+        const lines: string[] = [
+          `💡 <b>Голосовая мысль поймана!</b>`,
+          ``,
+          `📌 <b>Суть:</b> ${escapeHtml(thought.summary || thought.title)}`,
+        ];
+
+        if (thought.detectedProject) {
+          lines.push(`📁 <b>Проект:</b> <code>${escapeHtml(thought.detectedProject)}</code>`);
+        }
+
+        if (thought.actionPoints && thought.actionPoints.length > 0) {
+          lines.push(``);
+          lines.push(`🎯 <b>Что сделать:</b>`);
+          for (const pt of thought.actionPoints) {
+            lines.push(`• ${escapeHtml(pt)}`);
+          }
+        }
+
+        if (thought.tags && thought.tags.length > 0) {
+          lines.push(``);
+          lines.push(`🏷 <i>${thought.tags.map((t) => `#${t.replace(/^#/, '')}`).join(' ')}</i>`);
+        }
+
+        lines.push(``);
+        lines.push(`💾 <i>Сохранено в заметки: <code>brain/inbox.md</code></i>`);
+
+        try {
+          await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+        } catch {}
+
+        await ctx.reply(lines.join('\n'), {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.getMainReplyKeyboard(),
+        });
+      } catch (err: any) {
+        console.error('[Veronica Telegram] Error processing voice message:', err);
+        try {
+          await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+        } catch {}
+        await ctx.reply(`⚠️ Ошибка обработки голосовой записи: ${escapeHtml(err?.message || err)}`);
       }
     });
 
