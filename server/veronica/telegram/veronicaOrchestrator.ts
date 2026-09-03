@@ -578,9 +578,19 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
   }
 
   /**
+   * Raw LLM call helper for background tasks (fact-checking, summarization)
+   */
+  public async callRawLlm(prompt: string): Promise<string> {
+    const config = loadConfig();
+    const messages = [{ role: 'user', content: prompt }];
+    return this.callLlm(config, messages, '', prompt);
+  }
+
+  /**
    * 2 Strict Execution Engines for Veronica:
    * 1. Antigravity Headless CLI (agy -p --model <model> --effort <effort>)
    * 2. Local LLM (llama-server.exe / local GGUF model via 127.0.0.1:11434)
+   * With adaptive stream watchdog and graceful retry.
    */
   private async callLlm(
     config: any,
@@ -592,147 +602,196 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
     const activeModel = config.veronica?.model || config.model_name || 'gemini-3.7-flash-high';
     const isAgy = MessageBuilder.isAntigravityModel(activeModel);
 
-    // Engine 1: Antigravity Headless CLI
-    if (isAgy) {
-      try {
-        const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
-        const args = ['--dangerously-skip-permissions', '--output-format', 'stream-json'];
+    let lastError: any = null;
 
-        const resolved = resolveAntigravityModelAndEffort(activeModel, config.veronica?.effort);
-        if (resolved.model) {
-          args.push('--model', resolved.model);
-        }
-        if (resolved.effort) {
-          args.push('--effort', resolved.effort);
-        }
-        const agent = config.veronica?.agent;
-        if (agent && agent !== 'default' && agent !== 'none') {
-          args.push('--agent', agent);
-        }
+    // Retry loop: up to 2 attempts
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      // Engine 1: Antigravity Headless CLI
+      if (isAgy) {
+        try {
+          const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
+          const args = ['--dangerously-skip-permissions', '--output-format', 'stream-json'];
 
-        const isContinuing = Boolean(sessionState?.antigravityConversationId);
-        if (isContinuing && sessionState?.antigravityConversationId) {
-          args.push('--conversation', sessionState.antigravityConversationId);
-        }
+          const resolved = resolveAntigravityModelAndEffort(activeModel, config.veronica?.effort);
+          if (resolved.model) {
+            args.push('--model', resolved.model);
+          }
+          if (resolved.effort) {
+            args.push('--effort', resolved.effort);
+          }
+          const agent = config.veronica?.agent;
+          if (agent && agent !== 'default' && agent !== 'none') {
+            args.push('--agent', agent);
+          }
 
-        const promptPayload = isContinuing
-          ? `USER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`
-          : `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
+          // If retry or dropped, don't reuse stuck conversation
+          const isContinuing = attempt === 1 && Boolean(sessionState?.antigravityConversationId);
+          if (isContinuing && sessionState?.antigravityConversationId) {
+            args.push('--conversation', sessionState.antigravityConversationId);
+          }
 
-        const agyOutput = await new Promise<string>((resolve, reject) => {
-          const child = spawn(cliPath, args, {
-            shell: false,
-            stdio: ['pipe', 'pipe', 'pipe'],
-          });
+          const promptPayload = isContinuing
+            ? `USER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`
+            : `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
 
-          let out = '';
-          let errOut = '';
-          let lineBuffer = '';
+          const agyOutput = await new Promise<string>((resolve, reject) => {
+            const child = spawn(cliPath, args, {
+              shell: false,
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
 
-          // Stream prompt over stdin to avoid cmd.exe quoting and newline issues
-          child.stdin?.write(promptPayload);
-          child.stdin?.end();
+            let out = '';
+            let errOut = '';
+            let lineBuffer = '';
 
-          child.stdout?.on('data', (d) => {
-            lineBuffer += d.toString();
-            const lines = lineBuffer.split('\n');
-            lineBuffer = lines.pop() || '';
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed) continue;
-              try {
-                const ev = JSON.parse(trimmed);
-                if (ev.event === 'init' && ev.conversation_id) {
-                  if (sessionState) {
-                    sessionState.antigravityConversationId = ev.conversation_id;
+            // Stream watchdog: kill if no data received for 35 seconds
+            let streamWatchdog: NodeJS.Timeout | null = null;
+            const resetWatchdog = () => {
+              if (streamWatchdog) clearTimeout(streamWatchdog);
+              streamWatchdog = setTimeout(() => {
+                try {
+                  child.kill('SIGKILL');
+                } catch {}
+                reject(new Error('Watchdog: Antigravity stream dropped / stalled for 35s'));
+              }, 35000);
+            };
+
+            resetWatchdog();
+
+            // Stream prompt over stdin
+            child.stdin?.write(promptPayload);
+            child.stdin?.end();
+
+            child.stdout?.on('data', (d) => {
+              resetWatchdog();
+              lineBuffer += d.toString();
+              const lines = lineBuffer.split('\n');
+              lineBuffer = lines.pop() || '';
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed) continue;
+                try {
+                  const ev = JSON.parse(trimmed);
+                  if (ev.event === 'init' && ev.conversation_id) {
+                    if (sessionState) {
+                      sessionState.antigravityConversationId = ev.conversation_id;
+                    }
+                  } else if (ev.event === 'step_update' && ev.step_update?.text_delta) {
+                    out += ev.step_update.text_delta;
+                  } else if (ev.event === 'result') {
+                    if (ev.result?.conversation_id && sessionState) {
+                      sessionState.antigravityConversationId = ev.result.conversation_id;
+                    }
+                    if (ev.result?.response && !out.trim()) {
+                      out = ev.result.response;
+                    }
                   }
-                } else if (ev.event === 'step_update' && ev.step_update?.text_delta) {
-                  out += ev.step_update.text_delta;
-                } else if (ev.event === 'result') {
-                  if (ev.result?.conversation_id && sessionState) {
-                    sessionState.antigravityConversationId = ev.result.conversation_id;
+                } catch {
+                  if (!trimmed.startsWith('{') && !trimmed.startsWith('warning:') && !trimmed.startsWith('jetski:')) {
+                    out += trimmed + '\n';
                   }
-                  if (ev.result?.response && !out.trim()) {
-                    out = ev.result.response;
-                  }
-                }
-              } catch {
-                if (!trimmed.startsWith('{') && !trimmed.startsWith('warning:') && !trimmed.startsWith('jetski:')) {
-                  out += trimmed + '\n';
                 }
               }
-            }
-          });
-          child.stderr?.on('data', (d) => (errOut += d.toString()));
+            });
 
-          const timer = setTimeout(() => {
-            try {
-              child.kill();
-            } catch {}
-            reject(new Error('Antigravity CLI timed out after 45s'));
-          }, 45000);
+            child.stderr?.on('data', (d) => {
+              resetWatchdog();
+              errOut += d.toString();
+            });
 
-          child.on('close', (code) => {
-            clearTimeout(timer);
-            if (lineBuffer.trim()) {
+            // Hard timeout at 60s total
+            const totalTimer = setTimeout(() => {
+              if (streamWatchdog) clearTimeout(streamWatchdog);
               try {
-                const ev = JSON.parse(lineBuffer.trim());
-                if (ev.step_update?.text_delta) {
-                  out += ev.step_update.text_delta;
-                } else if (ev.result?.response && !out.trim()) {
-                  out = ev.result.response;
-                }
+                child.kill('SIGKILL');
               } catch {}
-            }
-            if (code === 0 && out.trim()) {
-              resolve(out.trim());
-            } else {
-              reject(new Error(`agy exited with code ${code}: ${errOut || out || 'no output'}`));
-            }
+              reject(new Error('Antigravity CLI timed out after 60s total execution limit'));
+            }, 60000);
+
+            child.on('close', (code) => {
+              clearTimeout(totalTimer);
+              if (streamWatchdog) clearTimeout(streamWatchdog);
+
+              if (lineBuffer.trim()) {
+                try {
+                  const ev = JSON.parse(lineBuffer.trim());
+                  if (ev.step_update?.text_delta) {
+                    out += ev.step_update.text_delta;
+                  } else if (ev.result?.response && !out.trim()) {
+                    out = ev.result.response;
+                  }
+                } catch {}
+              }
+              if (code === 0 && out.trim()) {
+                resolve(out.trim());
+              } else {
+                reject(new Error(`agy exited with code ${code}: ${errOut || out || 'no output'}`));
+              }
+            });
+
+            child.on('error', (err) => {
+              clearTimeout(totalTimer);
+              if (streamWatchdog) clearTimeout(streamWatchdog);
+              reject(err);
+            });
           });
 
-          child.on('error', (err) => {
-            clearTimeout(timer);
-            reject(err);
-          });
+          if (agyOutput) return agyOutput;
+        } catch (agyErr: any) {
+          lastError = agyErr;
+          console.warn(`[Veronica Orchestrator] [Antigravity CLI Attempt ${attempt} Failed]:`, agyErr?.message || agyErr);
+
+          // Reset conversation on error so next attempt doesn't hang on corrupt session
+          if (sessionState) {
+            sessionState.antigravityConversationId = undefined;
+          }
+
+          if (attempt === 1) {
+            // Brief backoff before retry
+            await new Promise((r) => setTimeout(r, 1000));
+            continue;
+          }
+          throw agyErr;
+        }
+      }
+
+      // Engine 2: Local llama-server
+      const timeoutMs = 8000;
+      const localHost = config.local_server?.host || '127.0.0.1';
+      const localPort = config.local_server?.port || 11434;
+
+      try {
+        const localRes = await fetch(`http://${localHost}:${localPort}/v1/chat/completions`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: activeModel.replace(/^local:/, '') || 'local',
+            messages,
+            temperature: 0.4,
+            max_tokens: 2048,
+          }),
+          signal: AbortSignal.timeout(timeoutMs),
         });
 
-        if (agyOutput) return agyOutput;
-      } catch (agyErr: any) {
-        console.warn(`[Veronica Orchestrator] [Antigravity CLI Failed]:`, agyErr?.message || agyErr);
-        throw agyErr;
+        if (localRes.ok) {
+          const localJson: any = await localRes.json();
+          const text = localJson.choices?.[0]?.message?.content;
+          if (text) return text;
+        }
+        throw new Error(`Local LLM HTTP ${localRes.status}`);
+      } catch (localErr: any) {
+        lastError = localErr;
+        const detail = localErr?.cause?.code || localErr?.cause?.message || localErr?.message;
+        console.warn(`[Veronica Orchestrator] [Local LLM Offline/Timeout Attempt ${attempt}]:`, detail);
+        if (attempt === 1) {
+          await new Promise((r) => setTimeout(r, 1000));
+          continue;
+        }
+        throw localErr;
       }
     }
 
-    // Engine 2: Local llama-server
-    const timeoutMs = 6000;
-    const localHost = config.local_server?.host || '127.0.0.1';
-    const localPort = config.local_server?.port || 11434;
-
-    try {
-      const localRes = await fetch(`http://${localHost}:${localPort}/v1/chat/completions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: activeModel.replace(/^local:/, '') || 'local',
-          messages,
-          temperature: 0.4,
-          max_tokens: 2048,
-        }),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-
-      if (localRes.ok) {
-        const localJson: any = await localRes.json();
-        const text = localJson.choices?.[0]?.message?.content;
-        if (text) return text;
-      }
-      throw new Error(`Local LLM HTTP ${localRes.status}`);
-    } catch (localErr: any) {
-      const detail = localErr?.cause?.code || localErr?.cause?.message || localErr?.message;
-      console.warn(`[Veronica Orchestrator] [Local LLM Offline]:`, detail);
-      throw localErr;
-    }
+    throw lastError || new Error('All LLM inference attempts exhausted.');
   }
 
   private escapeHtml(text: string): string {

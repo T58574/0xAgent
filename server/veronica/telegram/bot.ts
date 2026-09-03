@@ -11,6 +11,8 @@ import { projectDocManager } from '../core/projectDocManager';
 import { veronicaScheduler } from '../core/scheduler';
 import { veronicaOrchestrator } from './veronicaOrchestrator';
 import { voiceThoughtService } from './voiceThoughtService';
+import { videoIngestionService } from './videoIngestionService';
+import { factCheckingService } from './factCheckingService';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -525,6 +527,89 @@ export function initTelegramBot(): Bot | null {
         return;
       }
 
+      // Video / TikTok / Shorts / Reels URL interceptor for instant fact-checking
+      const detectedVideo = videoIngestionService.extractVideoUrl(text);
+      if (detectedVideo) {
+        let statusMsg: any = null;
+        try {
+          statusMsg = await ctx.reply('🔍 <i>Анализирую видеоматериал... Извлекаю субтитры</i>', { parse_mode: 'HTML' });
+          await ctx.replyWithChatAction('typing');
+
+          let transcriptText = '';
+          let videoTitle = '';
+
+          // 1. Try fast cloud subtitle extraction first (~0.5s)
+          const subs = await videoIngestionService.fetchSubtitles(detectedVideo.url);
+          if (subs && subs.text) {
+            transcriptText = subs.text;
+          } else {
+            // 2. Fallback: Download audio and transcribe via local STT
+            try {
+              if (statusMsg) {
+                await ctx.api.editMessageText(
+                  ctx.chat.id,
+                  statusMsg.message_id,
+                  '🎧 <i>Субтитры отсутствуют. Скачиваю аудиодорожку и запускаю распознавание...</i>',
+                  { parse_mode: 'HTML' }
+                );
+              }
+            } catch {}
+
+            const ingested = await videoIngestionService.ingestUrl(detectedVideo.url, detectedVideo.sourceType);
+            try {
+              videoTitle = ingested.metadata.title || '';
+              const trResult = await voiceThoughtService.transcribeAudio(ingested.audioPath);
+              transcriptText = trResult.text;
+            } finally {
+              await ingested.cleanup();
+            }
+          }
+
+          if (!transcriptText || transcriptText.trim().length < 15) {
+            try { if (statusMsg) await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+            await ctx.reply(
+              '⚠️ <i>Не удалось получить четкую речь или субтитры из этого видеоматериала. Возможно, в ролике играет только музыка или речь неразборчива.</i>',
+              { parse_mode: 'HTML' }
+            );
+            return;
+          }
+
+          // 3. Fact check
+          try {
+            if (statusMsg) {
+              await ctx.api.editMessageText(
+                ctx.chat.id,
+                statusMsg.message_id,
+                '⚖️ <i>Сверяю утверждения из видео с источниками и фактами...</i>',
+                { parse_mode: 'HTML' }
+              );
+            }
+          } catch {}
+
+          const report = await factCheckingService.verifyTranscript(transcriptText, {
+            title: videoTitle,
+            url: detectedVideo.url,
+          });
+
+          const formattedCard = factCheckingService.formatTelegramCard(report, detectedVideo.url);
+
+          try { if (statusMsg) await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+          await ctx.reply(formattedCard, {
+            parse_mode: 'HTML',
+            link_preview_options: { is_disabled: true },
+            reply_markup: MessageBuilder.getMainReplyKeyboard(),
+          });
+          return;
+        } catch (videoErr: any) {
+          console.error('[Veronica Telegram] Error processing video URL:', videoErr);
+          try { if (statusMsg) await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+          await ctx.reply(`⚠️ <i>Ошибка обработки видео:</i> ${escapeHtml(videoErr?.message || videoErr)}`, {
+            parse_mode: 'HTML',
+          });
+          return;
+        }
+      }
+
       // Delegate all natural language conversation to Veronica Orchestrator
       try {
         await ctx.replyWithChatAction('typing');
@@ -634,6 +719,70 @@ export function initTelegramBot(): Bot | null {
           await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
         } catch {}
         await ctx.reply(`⚠️ Ошибка обработки голосовой записи: ${escapeHtml(err?.message || err)}`);
+      }
+    });
+
+    // -------------------------------------------------------------
+    // Direct Video & Video Note (Кружочки) Handler
+    // -------------------------------------------------------------
+    bot.on(['message:video', 'message:video_note'], async (ctx) => {
+      const isVideoNote = Boolean(ctx.message.video_note);
+      const video = ctx.message.video || ctx.message.video_note;
+      if (!video) return;
+
+      const cleanToken = token.trim();
+      const statusMsg = await ctx.reply(
+        isVideoNote
+          ? '🎥 <i>Получила кружочек. Извлекаю аудио и проверяю факты...</i>'
+          : '📹 <i>Получила видеофайл. Извлекаю аудиодорожку...</i>',
+        { parse_mode: 'HTML' }
+      );
+
+      try {
+        await ctx.replyWithChatAction('record_video');
+        const file = await ctx.getFile();
+        if (!file.file_path) {
+          throw new Error('Не удалось получить файл видео из Telegram.');
+        }
+
+        const ingested = await videoIngestionService.ingestTelegramVideo(cleanToken, file.file_path, isVideoNote);
+        let transcriptText = '';
+        try {
+          try {
+            await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, '🎙️ <i>Распознаю речь из видео...</i>', { parse_mode: 'HTML' });
+          } catch {}
+
+          const trResult = await voiceThoughtService.transcribeAudio(ingested.audioPath);
+          transcriptText = trResult.text;
+        } finally {
+          await ingested.cleanup();
+        }
+
+        if (!transcriptText || transcriptText.trim().length < 15) {
+          try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+          await ctx.reply('⚠️ <i>В видео не обнаружено четкой речи для анализа или проверки фактов.</i>', { parse_mode: 'HTML' });
+          return;
+        }
+
+        try {
+          await ctx.api.editMessageText(ctx.chat.id, statusMsg.message_id, '⚖️ <i>Сверяю факты и тезисы из видео с источниками...</i>', { parse_mode: 'HTML' });
+        } catch {}
+
+        const report = await factCheckingService.verifyTranscript(transcriptText, {
+          title: isVideoNote ? 'Кружочек в Telegram' : 'Видеозапись в Telegram',
+        });
+
+        const formattedCard = factCheckingService.formatTelegramCard(report);
+
+        try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+        await ctx.reply(formattedCard, {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.getMainReplyKeyboard(),
+        });
+      } catch (err: any) {
+        console.error('[Veronica Telegram] Error processing video message:', err);
+        try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+        await ctx.reply(`⚠️ Ошибка обработки видео: ${escapeHtml(err?.message || err)}`, { parse_mode: 'HTML' });
       }
     });
 

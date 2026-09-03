@@ -18,6 +18,9 @@ import { createLlamaRouter, stopLlamaServerProcess } from './routes/llamaRoutes'
 import { createAgentRouter } from './routes/agentRoutes';
 import { contextRouter } from './routes/contextRoutes';
 import { systemRouter } from './routes/systemRoutes';
+import { createProxyRouter } from './routes/proxyRoutes';
+import { proxyService } from './proxyService';
+import { closeProxyDb } from './proxyDb';
 
 
 import path from 'node:path';
@@ -143,10 +146,11 @@ function broadcast(event: string, payload: any): void {
   }
 }
 
-// Wire WS broadcaster to Jarvis & Voice Daemon
+// Wire WS broadcaster to Jarvis & Voice Daemon & Proxy Service
 jarvisSupervisor.setWsBroadcaster(broadcast);
 voiceDaemonManager.setWsBroadcaster(broadcast);
 voiceDaemonManager.autoStartIfEnabled();
+proxyService.setBroadcaster(broadcast);
 
 // Mount Router Modules
 app.use('/api', authRouter);
@@ -162,6 +166,7 @@ app.use('/api', contextRouter);
 app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/veronica', createVeronicaRouter(broadcast));
+app.use('/api', createProxyRouter(broadcast));
 app.use('/api', systemRouter);
 
 
@@ -193,6 +198,7 @@ const cleanupOnExit = () => {
   stopLlamaServerProcess(broadcast);
   remoteNodeService.stopProbe();
   shutdownVeronicaModule();
+  closeProxyDb();
 };
 
 server.on('error', (err: any) => {

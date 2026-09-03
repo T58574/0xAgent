@@ -1025,3 +1025,59 @@ export interface UpdateApplyResult {
   restarted?: boolean;
 }
 
+// ============================================================================
+// 0xPROXY SUBSYSTEM TYPES
+// ============================================================================
+
+export type ProxyProtocol = 'http' | 'https' | 'socks5';
+export type ProxyStatus = 'online' | 'offline' | 'checking' | 'expired' | 'unknown';
+
+export interface ProxyAuth {
+  username?: string;
+  password?: string;
+}
+
+export interface ProxyItem {
+  id: string;
+  raw_line: string;
+  host: string;
+  port: number;
+  protocol: ProxyProtocol;
+  auth?: ProxyAuth | null;
+  status: ProxyStatus;
+  latency_ms: number | null;
+  last_checked_at: number | null;
+  added_at: number;
+  expires_at: number | null;
+  is_active: boolean;
+  error_message?: string | null;
+  tag?: string | null;
+}
+
+export interface ProxyHealthCheckResult {
+  proxyId: string;
+  protocol: ProxyProtocol;
+  status: ProxyStatus;
+  latencyMs: number | null;
+  error?: string | null;
+}
+
+export interface ProxyExportConfig {
+  version: string;
+  exported_at: string;
+  total: number;
+  active_count: number;
+  proxies: {
+    url: string;
+    protocol: ProxyProtocol;
+    host: string;
+    port: number;
+    username?: string;
+    password?: string;
+    status: ProxyStatus;
+    latency_ms: number | null;
+    expires_at: string | null;
+  }[];
+}
+
+
