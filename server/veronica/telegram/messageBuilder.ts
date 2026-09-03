@@ -9,6 +9,9 @@ import { remoteNodeService } from '../../remoteNodeService';
 import { projectDiscovery, DiscoveredProject } from '../core/projectDiscovery';
 import { projectDocManager } from '../core/projectDocManager';
 import { antigravityAdapter } from '../adapters/antigravityAdapter';
+import type { UserSessionState } from './veronicaOrchestrator';
+import { loadConfig } from '../../config';
+import { proxyService } from '../../proxyService';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -20,18 +23,17 @@ function escapeHtml(text: string): string {
 
 export class MessageBuilder {
   /**
-   * Persistent Main Reply Keyboard (Fixed at bottom of screen)
+   * Persistent Main Reply Keyboard (Redesigned 3-row layout)
    */
   public static getMainReplyKeyboard(): Keyboard {
     return new Keyboard()
       .text('📁 Проекты')
-      .text('📊 Что сделано')
+      .text('💬 Сессии')
       .row()
-      .text('⚡ Быстрый запуск')
-      .text('⏱ Автоматизации')
+      .text('📈 Аналитика')
+      .text('⚙️ Настройки')
       .row()
-      .text('🧠 Модель')
-      .text('⚙️ Статус')
+      .text('⌨️ Команды /')
       .text('❓ Помощь')
       .resized();
   }
@@ -332,5 +334,251 @@ export class MessageBuilder {
       .text('Сегодня', 'veronica:report:today')
       .text('Вчера', 'veronica:report:yesterday')
       .text('Все время', 'veronica:report:all');
+  }
+
+  /**
+   * Sessions management card
+   */
+  public static buildSessionsCard(session: UserSessionState): { text: string; keyboard: InlineKeyboard } {
+    const activeConvId = session.antigravityConversationId || 'Не инициализирована (создастся при запросе)';
+    const cleanConvId = session.antigravityConversationId ? session.antigravityConversationId.substring(0, 8) : '—';
+    const activeProject = session.activeProject || '0xAgent';
+    const historyCount = session.messages ? session.messages.length : 0;
+    const lastTask = session.lastTaskId ? `${session.lastTaskId.substring(0, 8)} (${session.lastTaskProject || ''})` : 'Нет активных';
+
+    const lines: string[] = [
+      `💬 <b>Управление Сессиями Вероники</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `🔹 <b>Активная сессия:</b> <code>${escapeHtml(activeConvId)}</code>`,
+      `🔹 <b>Короткий ID:</b> <code>${escapeHtml(cleanConvId)}</code>`,
+      `🔹 <b>Текущий проект:</b> <code>${escapeHtml(activeProject)}</code>`,
+      `🔹 <b>Сообщений в памяти:</b> <code>${historyCount}</code>`,
+      `🔹 <b>Последняя задача:</b> <code>${escapeHtml(lastTask)}</code>`,
+      ``,
+      `💡 <i>Контекст сессии надёжно персистится в SQLite и автоматически восстанавливается после любых перезапусков сервера.</i>`,
+    ];
+
+    const keyboard = new InlineKeyboard()
+      .text('🔄 Сбросить сессию (/reset)', 'veronica:session:reset')
+      .text('📋 История сессий CLI', 'veronica:session:recent')
+      .row()
+      .text('📁 Выбрать проект', 'veronica:projects_menu')
+      .text('📈 Аналитика', 'veronica:menu:analytics');
+
+    return { text: lines.join('\n'), keyboard };
+  }
+
+  /**
+   * Recent CLI sessions card
+   */
+  public static buildRecentSessionsCard(limit = 5): { text: string; keyboard: InlineKeyboard } {
+    const dbPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'conversation_summaries.db');
+    const sessions: Array<{ id: string; title: string; steps: number }> = [];
+
+    if (fs.existsSync(dbPath)) {
+      try {
+        const Database = (getVeronicaDb() as any).constructor;
+        const agyDb = new Database(dbPath, { readonly: true });
+        const rows: any[] = agyDb.prepare(`
+          SELECT conversation_id, title, preview, step_count
+          FROM conversation_summaries
+          WHERE preview != '' OR title != ''
+          ORDER BY last_modified_time DESC
+          LIMIT ?
+        `).all(limit);
+        agyDb.close();
+
+        for (const r of rows) {
+          sessions.push({
+            id: r.conversation_id,
+            title: (r.title || r.preview || 'Сессия без названия').trim(),
+            steps: r.step_count || 0,
+          });
+        }
+      } catch (err) {
+        console.warn('[MessageBuilder] Could not read conversation_summaries.db:', err);
+      }
+    }
+
+    const lines: string[] = [
+      `📋 <b>Недавние сессии Antigravity CLI:</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+    ];
+
+    const keyboard = new InlineKeyboard();
+
+    if (sessions.length === 0) {
+      lines.push(`<i>Сохранённых сессий пока не найдено.</i>`);
+    } else {
+      for (const s of sessions) {
+        const shortId = s.id.substring(0, 8);
+        const title = s.title.length > 32 ? s.title.substring(0, 30) + '...' : s.title;
+        lines.push(`• <code>${shortId}</code> — <b>${escapeHtml(title)}</b> (<i>${s.steps} шагов</i>)`);
+        keyboard.text(`📌 ${shortId}: ${title}`, `veronica:session:switch:${s.id}`).row();
+      }
+      lines.push(``);
+      lines.push(`<i>Нажмите на кнопку сессии для мгновенного переключения диалога:</i>`);
+    }
+
+    keyboard.text('◀️ Назад к текущей сессии', 'veronica:menu:sessions');
+
+    return { text: lines.join('\n'), keyboard };
+  }
+
+  /**
+   * Unified Analytics & Gamification Dashboard
+   */
+  public static buildAnalyticsDashboard(): { text: string; keyboard: InlineKeyboard } {
+    const db = getVeronicaDb();
+    
+    let totalTasks = 0;
+    let completedTasks = 0;
+    let failedTasks = 0;
+    try {
+      const stats = db.prepare(`
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN status = 'failed' OR status = 'crashed' THEN 1 ELSE 0 END) as failed
+        FROM agent_tasks
+      `).get() as any;
+      if (stats) {
+        totalTasks = stats.total || 0;
+        completedTasks = stats.completed || 0;
+        failedTasks = stats.failed || 0;
+      }
+    } catch {}
+
+    let totalDurationMinutes = 0;
+    try {
+      const dur = db.prepare(`
+        SELECT SUM(COALESCE(finished_at, started_at) - started_at) as dur_ms
+        FROM agent_tasks
+        WHERE started_at IS NOT NULL
+      `).get() as any;
+      if (dur && dur.dur_ms) {
+        totalDurationMinutes = Math.round(dur.dur_ms / 60000);
+      }
+    } catch {}
+
+    let cronCount = 0;
+    try {
+      const cronStats = db.prepare(`SELECT COUNT(*) as cnt FROM scheduler_jobs WHERE enabled = 1`).get() as any;
+      if (cronStats) cronCount = cronStats.cnt || 0;
+    } catch {}
+
+    let activeDays = 1;
+    try {
+      const dayStats = db.prepare(`SELECT COUNT(DISTINCT date(timestamp/1000, 'unixepoch')) as days FROM operational_journal`).get() as any;
+      if (dayStats && dayStats.days > 0) activeDays = dayStats.days;
+    } catch {}
+
+    // Gamification XP calculation
+    const xp = totalTasks * 150 + completedTasks * 100;
+    const level = Math.floor(xp / 500) + 1;
+    const progressInLevel = Math.min(10, Math.max(0, Math.round(((xp % 500) / 500) * 10)));
+    const progressBar = '█'.repeat(progressInLevel) + '░'.repeat(Math.max(0, 10 - progressInLevel));
+    const progressPct = Math.round(((xp % 500) / 500) * 100);
+
+    let rankTitle = 'Новобранец ИИ-Операций 🛸';
+    if (level >= 3 && level < 6) rankTitle = 'Кибер-Инженер 0xAgent ⚡';
+    else if (level >= 6 && level < 10) rankTitle = 'Главный Архитектор Систем 🛠';
+    else if (level >= 10) rankTitle = 'Сингулярный Мастер Оркестрации 🌟';
+
+    const successRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 100;
+    const hours = Math.floor(totalDurationMinutes / 60);
+    const mins = totalDurationMinutes % 60;
+    const timeFormatted = hours > 0 ? `${hours} ч ${mins} мин` : `${mins} мин`;
+
+    const lines: string[] = [
+      `📈 <b>Центр Аналитики & Активности Вероники</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `🏆 <b>Ваш ранг:</b> <b>${rankTitle}</b> (Уровень ${level})`,
+      `⭐ <b>Опыт взаимодействия (XP):</b> <code>${xp} XP</code>`,
+      `📊 <b>Прогресс до Ур. ${level + 1}:</b> <code>[${progressBar}] ${progressPct}%</code>`,
+      ``,
+      `⚡ <b>Метрики продуктивности:</b>`,
+      `• Всего поставлено задач: <b>${totalTasks}</b>`,
+      `• Успешно выполнено: <b>${completedTasks}</b> (✅ ${successRate}%)`,
+      `• Ошибок / падений: <b>${failedTasks}</b>`,
+      `• Времени работы агентов: <b>${timeFormatted}</b> ⏱`,
+      `• Ударных дней активности: <b>${activeDays}</b> 🔥`,
+      `• Автоматизаций на расписании: <b>${cronCount}</b> ⏱`,
+      ``,
+      `<i>Выберите раздел для детального просмотра:</i>`,
+    ];
+
+    const keyboard = new InlineKeyboard()
+      .text('📋 Активные задачи', 'veronica:menu:tasks')
+      .text('📊 Что сделано', 'veronica:menu:today')
+      .row()
+      .text('⏱ Автоматизации', 'veronica:menu:cron')
+      .text('📁 Меню проектов', 'veronica:projects_menu');
+
+    return { text: lines.join('\n'), keyboard };
+  }
+
+  /**
+   * Settings & Quota Dashboard
+   */
+  public static buildSettingsDashboard(): { text: string; keyboard: InlineKeyboard } {
+    const config = loadConfig();
+    const activeModel = config.veronica?.model || config.model_name || 'gemini-3.7-flash-high';
+    const isAgy = MessageBuilder.isAntigravityModel(activeModel);
+    const cleanModel = activeModel.replace(/^local:/, '');
+    const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
+    const proxyEnabled = Boolean(proxyUrl);
+
+    const lines: string[] = [
+      `⚙️ <b>Панель Настроек & Квоты Вероники:</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `🧠 <b>Активная модель:</b> <code>${escapeHtml(cleanModel)}</code>`,
+      `⚡ <b>Движок инференса:</b> ${isAgy ? '⚡ Antigravity CLI (Headless)' : '🖥️ Local llama-server (GGUF)'}`,
+      `👤 <b>Аккаунт CLI:</b> <code>Google AI / Antigravity Pro</code>`,
+      `📊 <b>Статус квоты:</b> 🟢 <i>Активна / В норме</i>`,
+      `🛡️ <b>Прокси-шлюз:</b> ${proxyEnabled ? '🟢 Включен' : '⚪ Прямое подключение'}`,
+      ``,
+      `💡 <i>Для переключения или смены аккаунта выполните <code>agy auth</code> в консоли.</i>`,
+    ];
+
+    const keyboard = new InlineKeyboard()
+      .text('🧠 Сменить модель', 'veronica:menu:model')
+      .text('🔄 Проверить квоту', 'veronica:settings:check_quota')
+      .row()
+      .text('⚙️ Полный статус (/status)', 'veronica:menu:status')
+      .text('📁 Каталог проектов', 'veronica:projects_menu');
+
+    return { text: lines.join('\n'), keyboard };
+  }
+
+  /**
+   * Slash command cheatsheet
+   */
+  public static buildCommandsHelpMessage(): string {
+    return [
+      `⌨️ <b>Быстрые команды Вероники (/):</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `🔹 <b>Диалог и сессии:</b>`,
+      `• /reset или /clear — сбросить контекст диалога и начать новую сессию`,
+      `• /new — начать новый чистый диалог`,
+      ``,
+      `🔹 <b>Инференс и система:</b>`,
+      `• /model — меню выбора активной модели (Gemini, Claude, GGUF)`,
+      `• /status — системная телеметрия, статус GPU Node, порты`,
+      ``,
+      `🔹 <b>Задачи и проекты:</b>`,
+      `• /projects — интерактивный каталог проектов`,
+      `• /tasks — мониторинг работающих сейчас агентов`,
+      `• /kill <code>id</code> — принудительно остановить агента`,
+      `• /run <code>skill</code> <code>project</code> — запуск конкретного навыка`,
+      ``,
+      `🔹 <b>Аналитика и отчеты:</b>`,
+      `• /today — сводка выполненных задач за сегодня`,
+      `• /yesterday — сводка за вчера`,
+      `• /history <code>project</code> — архив изменений проекта`,
+      `• /help — эта интерактивная справка`,
+      ``,
+      `💡 <i>Нажмите на любую синюю команду выше для моментального ввода!</i>`,
+    ].join('\n');
   }
 }
