@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sliders, Cpu, Check, RefreshCw, ChevronLeft, Brain, Wrench } from 'lucide-react';
+import { Sliders, Cpu, Check, RefreshCw, ChevronLeft, Brain, Wrench, Shield } from 'lucide-react';
 import { AppConfig } from '../../types';
 import { useI18n } from '../../i18n';
 import { Button } from '../ui/Button';
@@ -7,6 +7,7 @@ import { GeneralTab } from './GeneralTab';
 import { ToolsTab } from './ToolsTab';
 import { PersonasTab } from './PersonasTab';
 import { LocalServerTab } from './LocalServerTab';
+import { ProxiesTab } from './ProxiesTab';
 import { useSettingsState } from './useSettingsState';
 
 interface SettingsPageProps {
@@ -70,6 +71,7 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
             { id: 'local_server', label: t.settings.tabs.localServer, icon: Cpu },
             { id: 'tools', label: t.settings.tabs.tools, icon: Wrench },
             { id: 'personas', label: t.settings.tabs.personas, icon: Brain },
+            { id: 'proxies', label: '0xProxy & Шлюзы', icon: Shield },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = s.activeSubtab === tab.id;
@@ -226,6 +228,10 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
 
           {s.activeSubtab === 'personas' && (
             <PersonasTab currentSessionId={currentSessionId} />
+          )}
+
+          {s.activeSubtab === 'proxies' && (
+            <ProxiesTab />
           )}
         </div>
       </div>

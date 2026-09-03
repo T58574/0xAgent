@@ -6,14 +6,15 @@ export function useSettingsState(
   onSaveConfig: (updated: AppConfig) => Promise<void>,
   initialSubtab?: 'general' | 'tools' | 'personas' | 'customizations' | 'themes' | 'local_server' | 'security'
 ) {
-  const normalizeSubtab = (sub?: string): 'general' | 'tools' | 'personas' | 'local_server' => {
+  const normalizeSubtab = (sub?: string): 'general' | 'tools' | 'personas' | 'local_server' | 'proxies' => {
     if (sub === 'tools') return 'tools';
     if (sub === 'personas' || sub === 'customizations') return 'personas';
     if (sub === 'local_server') return 'local_server';
+    if (sub === 'proxies') return 'proxies';
     return 'general';
   };
 
-  const [activeSubtab, setActiveSubtab] = useState<'general' | 'tools' | 'personas' | 'local_server'>(
+  const [activeSubtab, setActiveSubtab] = useState<'general' | 'tools' | 'personas' | 'local_server' | 'proxies'>(
     normalizeSubtab(initialSubtab)
   );
 

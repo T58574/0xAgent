@@ -25,6 +25,10 @@ import {
   UpdateApplyResult,
   VeronicaStreamEvent,
   VeronicaModuleStatus,
+  ProxyItem,
+  ProxyProtocol,
+  ProxyHealthCheckResult,
+  ProxyExportConfig,
 } from '../types';
 
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
@@ -450,4 +454,31 @@ export const apply_proposal = (id: string, workspaceDir?: string) =>
 export const get_system_version = () => get<SystemVersionInfo>('/system/version');
 export const check_for_updates = (force = false) => get<UpdateCheckResult>(`/system/check-update${force ? '?force=true' : ''}`);
 export const apply_system_update = () => post<UpdateApplyResult>('/system/apply-update');
+
+// 0xProxy API
+export const list_proxies = (params?: { active?: boolean; status?: string; protocol?: string; tag?: string }) => {
+  const query = new URLSearchParams();
+  if (params?.active !== undefined) query.set('active', String(params.active));
+  if (params?.status) query.set('status', params.status);
+  if (params?.protocol) query.set('protocol', params.protocol);
+  if (params?.tag) query.set('tag', params.tag);
+  const qStr = query.toString();
+  return get<{ proxies: ProxyItem[]; count: number }>(`/proxies${qStr ? `?${qStr}` : ''}`);
+};
+
+export const add_proxies = (input: string, protocol?: ProxyProtocol, expiresAt?: number | null) =>
+  post<{ added: number; proxies: ProxyItem[]; errors: string[] }>('/proxies', { input, protocol, expiresAt });
+
+export const check_proxies = (id?: string) =>
+  post<{ checked: number; results: ProxyHealthCheckResult[] } | ProxyHealthCheckResult>('/proxies/check', { id });
+
+export const toggle_proxy = (id: string, isActive: boolean) =>
+  put<ProxyItem>(`/proxies/${encodeURIComponent(id)}/toggle`, { isActive });
+
+export const delete_proxy = (id: string) =>
+  del<{ success: boolean; id: string }>(`/proxies/${encodeURIComponent(id)}`);
+
+export const export_proxies = () =>
+  get<ProxyExportConfig>('/proxies/export');
+
 
