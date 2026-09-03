@@ -22,6 +22,7 @@ import { createVeronicaRouter } from '../server/routes/veronicaRoutes';
 import { operationalJournal } from '../server/veronica/core/operationalJournal';
 import { taskPromptBuilder } from '../server/veronica/core/taskPromptBuilder';
 import { buildFullSystemPrompt } from '../server/agent/promptBuilder';
+import { VeronicaOrchestrator } from '../server/veronica/telegram/veronicaOrchestrator';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -580,6 +581,22 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       assert.ok(localPrompt.includes('TOOL REGISTRY & XML SPECIFICATION'), 'Should contain XML tool registry for local GGUF');
       assert.ok(localPrompt.includes('TWO-TIER APPROVAL & INTERACTION PROTOCOL'), 'Should contain Two-Tier approval gate for local GGUF');
       assert.ok(localPrompt.includes('<patch_file'), 'Should contain <patch_file> for local GGUF');
+    });
+
+    it('should maintain and reset Antigravity conversation ID in VeronicaOrchestrator user sessions', () => {
+      const orchestrator = VeronicaOrchestrator.getInstance();
+      const testUserId = 99887766;
+
+      const userSession = orchestrator.getUserSession(testUserId);
+      assert.equal(userSession.antigravityConversationId, undefined);
+
+      // Simulate first turn capturing conversation ID
+      userSession.antigravityConversationId = 'conv-test-uuid-1234';
+      assert.equal(orchestrator.getUserSession(testUserId).antigravityConversationId, 'conv-test-uuid-1234');
+
+      // Resetting session should clear antigravityConversationId
+      orchestrator.resetSession(testUserId);
+      assert.equal(orchestrator.getUserSession(testUserId).antigravityConversationId, undefined);
     });
   });
 

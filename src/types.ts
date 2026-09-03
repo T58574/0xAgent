@@ -416,6 +416,7 @@ export interface ChatSession {
   workspace_dir?: string | null;
   active_todos?: TodoItem[];
   messages: ChatMessage[];
+  antigravity_conversation_id?: string;
   created_at: number;
   updated_at: number;
 }

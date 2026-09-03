@@ -56,15 +56,18 @@ async function fetchWithHeaderTimeout(
 
 import { spawn } from 'node:child_process';
 import { resolveAntigravityModelAndEffort, getSafeCliPath, isAntigravityModel } from '../veronica/adapters/antigravityAdapter';
+import { saveSession } from '../session';
 
 async function spawnAgyStreamResponse(
   config: AppConfig,
   messages: { role: string; content: string | any[] }[],
   selectedModel: string,
-  configuredEffort: string
+  configuredEffort: string,
+  session?: any,
+  _sessionId?: string
 ): Promise<Response> {
   const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
-  const args = ['--dangerously-skip-permissions', '--output-format', 'text'];
+  const args = ['--dangerously-skip-permissions', '--output-format', 'stream-json'];
 
   const resolved = resolveAntigravityModelAndEffort(selectedModel, configuredEffort);
   if (resolved.model) {
@@ -81,15 +84,40 @@ async function spawnAgyStreamResponse(
     args.push('--add-dir', config.workspace_dir);
   }
 
+  const isContinuing = Boolean(session?.antigravity_conversation_id);
+  if (isContinuing && session?.antigravity_conversation_id) {
+    args.push('--conversation', session.antigravity_conversation_id);
+  }
+
   // Format messages into clean multi-turn prompt payload
   let promptText = '';
-  for (const m of messages) {
-    if (m.role === 'system') {
-      promptText += `[SYSTEM INSTRUCTIONS]\n${m.content}\n\n`;
-    } else if (m.role === 'user') {
-      promptText += `[USER]\n${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}\n\n`;
-    } else if (m.role === 'assistant') {
-      promptText += `[ASSISTANT]\n${m.content}\n\n`;
+  if (isContinuing) {
+    let lastAssistantIdx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    const newMessages = lastAssistantIdx !== -1 ? messages.slice(lastAssistantIdx + 1) : messages;
+    for (const m of newMessages) {
+      if (m.role === 'system') {
+        promptText += `[SYSTEM INSTRUCTIONS]\n${m.content}\n\n`;
+      } else if (m.role === 'user') {
+        promptText += `[USER]\n${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}\n\n`;
+      } else if (m.role === 'assistant') {
+        promptText += `[ASSISTANT]\n${m.content}\n\n`;
+      }
+    }
+  } else {
+    for (const m of messages) {
+      if (m.role === 'system') {
+        promptText += `[SYSTEM INSTRUCTIONS]\n${m.content}\n\n`;
+      } else if (m.role === 'user') {
+        promptText += `[USER]\n${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}\n\n`;
+      } else if (m.role === 'assistant') {
+        promptText += `[ASSISTANT]\n${m.content}\n\n`;
+      }
     }
   }
 
@@ -105,12 +133,49 @@ async function spawnAgyStreamResponse(
   const stream = new ReadableStream({
     start(controller) {
       const encoder = new TextEncoder();
+      let lineBuffer = '';
+      let totalEmittedChars = 0;
 
       child.stdout?.on('data', (chunk) => {
-        const text = chunk.toString();
-        if (text) {
-          const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: text } }] })}\n\n`;
-          controller.enqueue(encoder.encode(sseLine));
+        lineBuffer += chunk.toString();
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() || '';
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const event = JSON.parse(trimmed);
+            if (event.event === 'init' && event.conversation_id) {
+              const convId = event.conversation_id;
+              if (session && session.antigravity_conversation_id !== convId) {
+                session.antigravity_conversation_id = convId;
+                saveSession(session).catch((err) => console.warn('[agy session save error]', err));
+              }
+            } else if (event.event === 'step_update' && event.step_update?.text_delta) {
+              const textDelta = event.step_update.text_delta;
+              totalEmittedChars += textDelta.length;
+              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: textDelta } }] })}\n\n`;
+              controller.enqueue(encoder.encode(sseLine));
+            } else if (event.event === 'result') {
+              if (event.result?.conversation_id && session && session.antigravity_conversation_id !== event.result.conversation_id) {
+                session.antigravity_conversation_id = event.result.conversation_id;
+                saveSession(session).catch((err) => console.warn('[agy session save error]', err));
+              }
+              if (totalEmittedChars === 0 && event.result?.response) {
+                const fallbackText = event.result.response;
+                totalEmittedChars += fallbackText.length;
+                const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: fallbackText } }] })}\n\n`;
+                controller.enqueue(encoder.encode(sseLine));
+              }
+            }
+          } catch {
+            if (!trimmed.startsWith('{') && !trimmed.startsWith('warning:') && !trimmed.startsWith('jetski:')) {
+              totalEmittedChars += trimmed.length;
+              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: trimmed + '\n' } }] })}\n\n`;
+              controller.enqueue(encoder.encode(sseLine));
+            }
+          }
         }
       });
 
@@ -122,6 +187,20 @@ async function spawnAgyStreamResponse(
       });
 
       child.on('close', (_code) => {
+        if (lineBuffer.trim()) {
+          try {
+            const event = JSON.parse(lineBuffer.trim());
+            if (event.step_update?.text_delta) {
+              const textDelta = event.step_update.text_delta;
+              totalEmittedChars += textDelta.length;
+              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: textDelta } }] })}\n\n`;
+              controller.enqueue(encoder.encode(sseLine));
+            } else if (totalEmittedChars === 0 && event.result?.response) {
+              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: event.result.response } }] })}\n\n`;
+              controller.enqueue(encoder.encode(sseLine));
+            }
+          } catch {}
+        }
         const finishLine = `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`;
         controller.enqueue(encoder.encode(finishLine));
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -176,7 +255,7 @@ export async function fetchLlmResponse(
   // 1. Antigravity Headless CLI Stream
   if (isAntigravity) {
     try {
-      response = await spawnAgyStreamResponse(config, messages, selectedModel, configuredEffort);
+      response = await spawnAgyStreamResponse(config, messages, selectedModel, configuredEffort, session, sessionId);
       return { response, activeModelName };
     } catch (agyErr: any) {
       const errMsg = `[!] **Antigravity Engine Error:**\n\`\`\`\n${agyErr.message || agyErr}\n\`\`\``;

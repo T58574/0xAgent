@@ -23,6 +23,7 @@ export interface UserSessionState {
   lastTaskSummary?: string;
   lastMessageTime: number;
   messages: DialogMessage[];
+  antigravityConversationId?: string;
 }
 
 export class VeronicaOrchestrator {
@@ -57,6 +58,7 @@ export class VeronicaOrchestrator {
   public resetSession(userId: number): void {
     const session = this.getUserSession(userId);
     session.messages = [];
+    session.antigravityConversationId = undefined;
     session.awaitingPromptForProject = undefined;
     session.lastTaskId = undefined;
     session.lastTaskProject = undefined;
@@ -389,7 +391,7 @@ ORCHESTRATION INSTRUCTIONS:
     conversationPayload.push({ role: 'user', content: userText });
 
     try {
-      const rawResponse = await this.callLlm(config, conversationPayload, systemPrompt, userText);
+      const rawResponse = await this.callLlm(config, conversationPayload, systemPrompt, userText, session);
       return await this.processLlmOutput(userId, rawResponse);
     } catch (err: any) {
       const errDetail = err?.cause?.message || err?.cause?.code || err?.message || String(err);
@@ -488,7 +490,8 @@ ORCHESTRATION INSTRUCTIONS:
     config: any,
     messages: { role: string; content: string }[],
     systemPrompt: string,
-    userText: string
+    userText: string,
+    sessionState?: UserSessionState
   ): Promise<string> {
     const activeModel = config.veronica?.model || config.model_name || 'gemini-3.7-flash-high';
     const isAgy = MessageBuilder.isAntigravityModel(activeModel);
@@ -497,8 +500,7 @@ ORCHESTRATION INSTRUCTIONS:
     if (isAgy) {
       try {
         const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
-        const promptPayload = `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
-        const args = ['--dangerously-skip-permissions', '--output-format', 'text'];
+        const args = ['--dangerously-skip-permissions', '--output-format', 'stream-json'];
 
         const resolved = resolveAntigravityModelAndEffort(activeModel, config.veronica?.effort);
         if (resolved.model) {
@@ -512,6 +514,15 @@ ORCHESTRATION INSTRUCTIONS:
           args.push('--agent', agent);
         }
 
+        const isContinuing = Boolean(sessionState?.antigravityConversationId);
+        if (isContinuing && sessionState?.antigravityConversationId) {
+          args.push('--conversation', sessionState.antigravityConversationId);
+        }
+
+        const promptPayload = isContinuing
+          ? `USER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`
+          : `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
+
         const agyOutput = await new Promise<string>((resolve, reject) => {
           const child = spawn(cliPath, args, {
             shell: false,
@@ -520,23 +531,63 @@ ORCHESTRATION INSTRUCTIONS:
 
           let out = '';
           let errOut = '';
+          let lineBuffer = '';
 
           // Stream prompt over stdin to avoid cmd.exe quoting and newline issues
           child.stdin?.write(promptPayload);
           child.stdin?.end();
 
-          child.stdout?.on('data', (d) => (out += d.toString()));
+          child.stdout?.on('data', (d) => {
+            lineBuffer += d.toString();
+            const lines = lineBuffer.split('\n');
+            lineBuffer = lines.pop() || '';
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              try {
+                const ev = JSON.parse(trimmed);
+                if (ev.event === 'init' && ev.conversation_id) {
+                  if (sessionState) {
+                    sessionState.antigravityConversationId = ev.conversation_id;
+                  }
+                } else if (ev.event === 'step_update' && ev.step_update?.text_delta) {
+                  out += ev.step_update.text_delta;
+                } else if (ev.event === 'result') {
+                  if (ev.result?.conversation_id && sessionState) {
+                    sessionState.antigravityConversationId = ev.result.conversation_id;
+                  }
+                  if (ev.result?.response && !out.trim()) {
+                    out = ev.result.response;
+                  }
+                }
+              } catch {
+                if (!trimmed.startsWith('{') && !trimmed.startsWith('warning:') && !trimmed.startsWith('jetski:')) {
+                  out += trimmed + '\n';
+                }
+              }
+            }
+          });
           child.stderr?.on('data', (d) => (errOut += d.toString()));
 
           const timer = setTimeout(() => {
             try {
               child.kill();
             } catch {}
-            reject(new Error('Antigravity CLI timed out after 30s'));
-          }, 30000);
+            reject(new Error('Antigravity CLI timed out after 45s'));
+          }, 45000);
 
           child.on('close', (code) => {
             clearTimeout(timer);
+            if (lineBuffer.trim()) {
+              try {
+                const ev = JSON.parse(lineBuffer.trim());
+                if (ev.step_update?.text_delta) {
+                  out += ev.step_update.text_delta;
+                } else if (ev.result?.response && !out.trim()) {
+                  out = ev.result.response;
+                }
+              } catch {}
+            }
             if (code === 0 && out.trim()) {
               resolve(out.trim());
             } else {

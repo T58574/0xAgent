@@ -428,24 +428,45 @@ export class AntigravityAdapter implements RuntimeAdapter {
               lastOutputSnippet ||
               (code === 0 ? 'Agent execution finished successfully.' : `Agent process exited with code ${code}`);
 
-            // Antigravity Terminal Status parsing (SUCCESS, ERROR, CANCELED, INTERRUPTED, INVALID, WAITING, RUNNING)
+            // Antigravity Terminal Status & Conversation ID parsing (SUCCESS, ERROR, CANCELED, INTERRUPTED, INVALID, WAITING, RUNNING)
+            let capturedConversationId = options.conversation_id;
             try {
-              const trimmed = stdoutAccumulator.trim();
-              if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-                const parsed = JSON.parse(trimmed);
-                if (parsed.status) {
-                  const s = String(parsed.status).toUpperCase();
-                  if (s === 'SUCCESS') finalStatus = 'completed';
-                  else if (s === 'ERROR') finalStatus = 'failed';
-                  else if (s === 'CANCELED') finalStatus = 'cancelled';
-                  else if (s === 'INTERRUPTED') finalStatus = 'interrupted';
-                  else if (s === 'INVALID') finalStatus = 'invalid';
-                  else if (s === 'WAITING') finalStatus = 'waiting';
-                  else if (s === 'RUNNING') finalStatus = 'running';
+              const lines = stdoutAccumulator.split('\n');
+              for (const line of lines) {
+                const lTrim = line.trim();
+                if (lTrim.startsWith('{') && lTrim.endsWith('}')) {
+                  try {
+                    const parsed = JSON.parse(lTrim);
+                    if (parsed.event === 'init' && parsed.conversation_id) {
+                      capturedConversationId = parsed.conversation_id;
+                    } else if (parsed.conversation_id) {
+                      capturedConversationId = parsed.conversation_id;
+                    }
+                    if (parsed.result?.conversation_id) {
+                      capturedConversationId = parsed.result.conversation_id;
+                    }
+                    if (parsed.status) {
+                      const s = String(parsed.status).toUpperCase();
+                      if (s === 'SUCCESS') finalStatus = 'completed';
+                      else if (s === 'ERROR') finalStatus = 'failed';
+                      else if (s === 'CANCELED') finalStatus = 'cancelled';
+                      else if (s === 'INTERRUPTED') finalStatus = 'interrupted';
+                      else if (s === 'INVALID') finalStatus = 'invalid';
+                      else if (s === 'WAITING') finalStatus = 'waiting';
+                      else if (s === 'RUNNING') finalStatus = 'running';
 
-                  if (parsed.response || parsed.summary || parsed.output) {
-                    cleanSummary = String(parsed.response || parsed.summary || parsed.output).substring(0, 500);
-                  }
+                      if (parsed.response || parsed.summary || parsed.output) {
+                        cleanSummary = String(parsed.response || parsed.summary || parsed.output).substring(0, 500);
+                      }
+                    } else if (parsed.result?.status) {
+                      const s = String(parsed.result.status).toUpperCase();
+                      if (s === 'SUCCESS') finalStatus = 'completed';
+                      else if (s === 'ERROR') finalStatus = 'failed';
+                      if (parsed.result.response || parsed.result.summary) {
+                        cleanSummary = String(parsed.result.response || parsed.result.summary).substring(0, 500);
+                      }
+                    }
+                  } catch {}
                 }
               }
             } catch {}
@@ -459,7 +480,10 @@ export class AntigravityAdapter implements RuntimeAdapter {
 
             await taskRegistry.updateTaskStatus(task.id, finalStatus, {
               summary: cleanSummary,
-              result_json: stdoutAccumulator.length > 0 ? stdoutAccumulator.substring(0, 10000) : undefined,
+              result_json: JSON.stringify({
+                conversation_id: capturedConversationId,
+                raw: stdoutAccumulator.length > 0 ? stdoutAccumulator.substring(0, 10000) : undefined,
+              }),
             });
 
             this.emitStreamEvent({

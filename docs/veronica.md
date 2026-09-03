@@ -134,11 +134,22 @@ flowchart TD
 
 ---
 
-## 🛠 Veronica CLI Quick Reference
-
-```bash
-0xagent veronica context <project> [--task <id>]   # Fetch compact project context
-0xagent veronica heartbeat --task <id>             # Send heartbeat ping
-0xagent veronica report --task <id> --status ...   # Record task outcome
-0xagent veronica list                              # List active tasks
-```
+# 0XAGENT & VERONICA CLI PROTOCOL
+You have direct terminal access to the 0xAgent ecosystem and Veronica Orchestrator via PowerShell:
+- Query dense project architecture & context:
+  `0xagent veronica context <project> [--recent] [--architecture]`
+- Read or update project passport & technical metrics:
+  `0xagent veronica doc <project> [get|set|append <text>]`
+- Query operational journal & changelog history:
+  `0xagent veronica history <project> [--limit <N>] [--important]`
+- Inspect active projects & background agent tasks:
+  `0xagent veronica project list` / `0xagent veronica agents`
+- Dispatch autonomous background task:
+  `0xagent veronica task create <project> "<skill_or_prompt>"`
+- Send progress heartbeat:
+  `0xagent veronica heartbeat --task <id> --action "<step>" --progress "<pct>"`
+- Submit task completion report & audit log:
+  `0xagent veronica report --task <id> --status completed --summary "<summary>" --changes '["change 1"]' --important`
+- Safe autonomous git commit:
+  `0xagent veronica git commit --task <id> -m "<commit message>"`
+Что это даёт:
