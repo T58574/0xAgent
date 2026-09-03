@@ -10,6 +10,7 @@ import { getVeronicaDb } from '../db/veronicaDb';
 import { writeQueue } from '../db/writeQueue';
 import { MessageBuilder } from './messageBuilder';
 import { getUserMemories } from '../../memory';
+import { proxyService } from '../../proxyService';
 
 export interface DialogMessage {
   role: 'user' | 'assistant' | 'system';
@@ -645,9 +646,21 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
             ? `USER REQUEST: ${userText}${imagePromptDirective}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`
             : `${systemPrompt}\n\nUSER REQUEST: ${userText}${imagePromptDirective}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
 
+          const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
+          const spawnEnv: NodeJS.ProcessEnv = { ...process.env };
+          if (proxyUrl) {
+            spawnEnv.HTTP_PROXY = proxyUrl;
+            spawnEnv.HTTPS_PROXY = proxyUrl;
+            spawnEnv.ALL_PROXY = proxyUrl;
+            spawnEnv.http_proxy = proxyUrl;
+            spawnEnv.https_proxy = proxyUrl;
+            spawnEnv.all_proxy = proxyUrl;
+          }
+
           const agyOutput = await new Promise<string>((resolve, reject) => {
             const child = spawn(cliPath, args, {
               shell: false,
+              env: spawnEnv,
               stdio: ['pipe', 'pipe', 'pipe'],
             });
 
@@ -696,6 +709,9 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
                     if (ev.result?.response && !out.trim()) {
                       out = ev.result.response;
                     }
+                    if (ev.result?.error) {
+                      errOut = (errOut ? errOut + '\n' : '') + ev.result.error;
+                    }
                   }
                 } catch {
                   if (!trimmed.startsWith('{') && !trimmed.startsWith('warning:') && !trimmed.startsWith('jetski:')) {
@@ -730,6 +746,8 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
                     out += ev.step_update.text_delta;
                   } else if (ev.result?.response && !out.trim()) {
                     out = ev.result.response;
+                  } else if (ev.result?.error) {
+                    errOut = (errOut ? errOut + '\n' : '') + ev.result.error;
                   }
                 } catch {}
               }
@@ -762,7 +780,10 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
             await new Promise((r) => setTimeout(r, 1000));
             continue;
           }
-          throw agyErr;
+
+          // Antigravity failed after 2 attempts. Fall through to Engine 2 (Local LLM)
+          console.warn('[Veronica Orchestrator] Antigravity failed. Falling through to Engine 2 (Local LLM)...');
+          break;
         }
       }
 

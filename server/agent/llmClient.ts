@@ -57,6 +57,7 @@ async function fetchWithHeaderTimeout(
 import { spawn } from 'node:child_process';
 import { resolveAntigravityModelAndEffort, getSafeCliPath, isAntigravityModel } from '../veronica/adapters/antigravityAdapter';
 import { saveSession } from '../session';
+import { proxyService } from '../proxyService';
 
 async function spawnAgyStreamResponse(
   config: AppConfig,
@@ -121,8 +122,20 @@ async function spawnAgyStreamResponse(
     }
   }
 
+  const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
+  const spawnEnv: NodeJS.ProcessEnv = { ...process.env };
+  if (proxyUrl) {
+    spawnEnv.HTTP_PROXY = proxyUrl;
+    spawnEnv.HTTPS_PROXY = proxyUrl;
+    spawnEnv.ALL_PROXY = proxyUrl;
+    spawnEnv.http_proxy = proxyUrl;
+    spawnEnv.https_proxy = proxyUrl;
+    spawnEnv.all_proxy = proxyUrl;
+  }
+
   const child = spawn(cliPath, args, {
     cwd: config.workspace_dir || process.cwd(),
+    env: spawnEnv,
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
   });

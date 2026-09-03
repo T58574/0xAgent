@@ -12,6 +12,7 @@ import { taskPromptBuilder } from '../core/taskPromptBuilder';
 import { operationalJournal } from '../core/operationalJournal';
 import { notificationService } from '../telegram/notificationService';
 import { getVeronicaDataDir } from '../db/veronicaDb';
+import { proxyService } from '../../proxyService';
 
 export interface AntigravityModelInfo {
   slug: string;
@@ -531,7 +532,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
     const resolvedProjectPath = (await projectDiscovery.resolveProjectPath(options.project)) || process.cwd();
 
     // Environment variables injected for agent
-    const env = {
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
       VERONICA_TASK_ID: task.id,
       VERONICA_TASK_TOKEN: task.task_token,
@@ -539,6 +540,16 @@ export class AntigravityAdapter implements RuntimeAdapter {
       VERONICA_PROJECT_PATH: resolvedProjectPath,
       VERONICA_API_URL: 'http://127.0.0.1:3001/api/veronica/cli',
     };
+
+    const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
+    if (proxyUrl) {
+      env.HTTP_PROXY = proxyUrl;
+      env.HTTPS_PROXY = proxyUrl;
+      env.ALL_PROXY = proxyUrl;
+      env.http_proxy = proxyUrl;
+      env.https_proxy = proxyUrl;
+      env.all_proxy = proxyUrl;
+    }
 
     // Construct structured autonomous prompt using TaskPromptBuilder
     const prompt = await taskPromptBuilder.buildAutonomousTaskPrompt({
