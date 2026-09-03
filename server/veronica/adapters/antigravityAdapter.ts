@@ -744,8 +744,13 @@ export class AntigravityAdapter implements RuntimeAdapter {
             if (updatedTask) {
               if (finalStatus === 'completed') {
                 await notificationService.notifyTaskCompleted(updatedTask);
-              } else if (finalStatus === 'interrupted' || finalStatus === 'cancelled') {
+              } else if (finalStatus === 'cancelled') {
                 VeronicaLogger.log('INFO', `Task ${finalStatus}`, task.id);
+              } else if (finalStatus === 'interrupted') {
+                await notificationService.notifyTaskCrashed(
+                  updatedTask,
+                  'Процесс агента был прерван из-за обрыва соединения или перезапуска'
+                );
               } else {
                 await notificationService.notifyTaskCrashed(updatedTask, cleanSummary);
               }

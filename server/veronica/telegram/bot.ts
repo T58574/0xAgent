@@ -1,5 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
+import os from 'node:os';
 import { Bot } from 'grammy';
 import { loadConfig, saveConfig } from '../../config';
 import { MessageBuilder } from './messageBuilder';
@@ -783,6 +784,64 @@ export function initTelegramBot(): Bot | null {
         console.error('[Veronica Telegram] Error processing video message:', err);
         try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
         await ctx.reply(`⚠️ Ошибка обработки видео: ${escapeHtml(err?.message || err)}`, { parse_mode: 'HTML' });
+      }
+    });
+
+    // -------------------------------------------------------------
+    // Photo & Image Understanding Handler
+    // -------------------------------------------------------------
+    bot.on('message:photo', async (ctx) => {
+      const photos = ctx.message.photo;
+      if (!photos || photos.length === 0) return;
+
+      const largestPhoto = photos[photos.length - 1];
+      const caption = (ctx.message.caption || '').trim();
+      const userId = ctx.from.id;
+
+      let statusMsg: any = null;
+      try {
+        statusMsg = await ctx.reply('🖼️ <i>Загружаю и анализирую изображение...</i>', { parse_mode: 'HTML' });
+        await ctx.replyWithChatAction('typing');
+
+        const file = await ctx.getFile();
+        if (!file.file_path) {
+          throw new Error('Не удалось получить файл изображения из Telegram.');
+        }
+
+        const tempDir = path.join(os.tmpdir(), '0xagent_images');
+        if (!fs.existsSync(tempDir)) {
+          await fs.promises.mkdir(tempDir, { recursive: true });
+        }
+
+        const ext = path.extname(file.file_path) || '.jpg';
+        const localImagePath = path.join(tempDir, `photo_${Date.now()}_${largestPhoto.file_unique_id}${ext}`);
+
+        const cleanToken = token.trim();
+        const downloadUrl = `https://api.telegram.org/file/bot${cleanToken}/${file.file_path}`;
+        const res = await fetch(downloadUrl);
+        if (!res.ok) {
+          throw new Error(`Ошибка скачивания фото: HTTP ${res.status}`);
+        }
+
+        const arrayBuffer = await res.arrayBuffer();
+        await fs.promises.writeFile(localImagePath, Buffer.from(arrayBuffer));
+
+        const userPrompt = caption || 'Что изображено на этой картинке? Опиши её детально и выдели ключевые элементы.';
+        const replyText = await veronicaOrchestrator.handleUserMessage(userId, userPrompt, localImagePath);
+
+        try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+        await ctx.reply(replyText, {
+          parse_mode: 'HTML',
+          reply_markup: MessageBuilder.getMainReplyKeyboard(),
+        });
+      } catch (err: any) {
+        console.error('[Veronica Telegram] Error processing photo:', err);
+        try {
+          if (statusMsg) await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+        } catch {}
+        await ctx.reply(`⚠️ Ошибка анализа изображения: ${escapeHtml(err?.message || err)}`, {
+          parse_mode: 'HTML',
+        });
       }
     });
 

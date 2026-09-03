@@ -1,6 +1,7 @@
 import { getVeronicaDb } from '../db/veronicaDb';
 import { taskRegistry } from '../core/taskRegistry';
 import { projectLockManager } from '../core/projectLockManager';
+import { notificationService } from '../telegram/notificationService';
 
 export class RecoveryService {
   public static async reconcileOnStartup(): Promise<{
@@ -33,6 +34,14 @@ export class RecoveryService {
           });
           projectLockManager.releaseLock(t.project, t.id);
           recoveredCount++;
+
+          const task = taskRegistry.getTask(t.id);
+          if (task) {
+            await notificationService.notifyTaskCrashed(
+              task,
+              'Фоновый агент прерван из-за перезапуска сервера / сбоя процесса'
+            );
+          }
         } else {
           // Process is surprisingly still alive; acquire lock
           projectLockManager.acquireLock(t.project, t.id);

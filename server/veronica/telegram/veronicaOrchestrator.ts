@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { loadConfig } from '../../config';
 import { taskRegistry } from '../core/taskRegistry';
@@ -197,15 +199,15 @@ export class VeronicaOrchestrator {
   /**
    * Process incoming natural language message from Telegram user.
    */
-  public async handleUserMessage(userId: number, userText: string): Promise<string> {
+  public async handleUserMessage(userId: number, userText: string, imagePath?: string): Promise<string> {
     const session = this.getUserSession(userId);
     session.lastMessageTime = Date.now();
 
     const cleanText = userText.trim();
-    if (!cleanText) return 'Сэр, вы отправили пустое сообщение.';
+    if (!cleanText && !imagePath) return 'Сэр, вы отправили пустое сообщение.';
 
     // Record user message into session history
-    this.persistMessage(userId, 'user', cleanText);
+    this.persistMessage(userId, 'user', cleanText || '🖼️ [Изображение]');
 
     const { userName } = this.getUserProfileContext();
     const nameSuffix = userName ? `, ${userName}` : '';
@@ -330,7 +332,7 @@ export class VeronicaOrchestrator {
     }
 
     // 3. Multi-turn LLM Orchestrator Reasoning across the 2 backends
-    const response = await this.generateLlmResponse(userId, cleanText);
+    const response = await this.generateLlmResponse(userId, cleanText, imagePath);
     this.persistMessage(userId, 'assistant', response);
     return response;
   }
@@ -338,7 +340,7 @@ export class VeronicaOrchestrator {
   /**
    * Invoke LLM with multi-turn conversation memory and dynamic orchestrator prompt
    */
-  private async generateLlmResponse(userId: number, userText: string): Promise<string> {
+  private async generateLlmResponse(userId: number, userText: string, imagePath?: string): Promise<string> {
     const config = loadConfig();
     const session = this.getUserSession(userId);
 
@@ -424,7 +426,7 @@ ORCHESTRATION INSTRUCTIONS:
     conversationPayload.push({ role: 'user', content: userText });
 
     try {
-      const rawResponse = await this.callLlm(config, conversationPayload, systemPrompt, userText, session);
+      const rawResponse = await this.callLlm(config, conversationPayload, systemPrompt, userText, session, imagePath);
       return await this.processLlmOutput(userId, rawResponse);
     } catch (err: any) {
       const errDetail = err?.cause?.message || err?.cause?.code || err?.message || String(err);
@@ -597,7 +599,8 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
     messages: { role: string; content: string }[],
     systemPrompt: string,
     userText: string,
-    sessionState?: UserSessionState
+    sessionState?: UserSessionState,
+    imagePath?: string
   ): Promise<string> {
     const activeModel = config.veronica?.model || config.model_name || 'gemini-3.7-flash-high';
     const isAgy = MessageBuilder.isAntigravityModel(activeModel);
@@ -624,15 +627,23 @@ CRITICAL: Return ONLY a valid JSON object matching this schema, with no markdown
             args.push('--agent', agent);
           }
 
+          if (imagePath && fs.existsSync(imagePath)) {
+            args.push('--add-dir', path.dirname(imagePath));
+          }
+
           // If retry or dropped, don't reuse stuck conversation
           const isContinuing = attempt === 1 && Boolean(sessionState?.antigravityConversationId);
           if (isContinuing && sessionState?.antigravityConversationId) {
             args.push('--conversation', sessionState.antigravityConversationId);
           }
 
+          const imagePromptDirective = imagePath
+            ? `\n\n[ATTACHED IMAGE FILE: ${imagePath}]\n[DIRECTIVE: Use your multimodal vision capabilities and the view_file tool to thoroughly examine the image at "${imagePath}". Inspect all visual details, text, code, diagrams, or objects in the image, and answer the user question based on the image content.]`
+            : '';
+
           const promptPayload = isContinuing
-            ? `USER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`
-            : `${systemPrompt}\n\nUSER REQUEST: ${userText}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
+            ? `USER REQUEST: ${userText}${imagePromptDirective}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`
+            : `${systemPrompt}\n\nUSER REQUEST: ${userText}${imagePromptDirective}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
 
           const agyOutput = await new Promise<string>((resolve, reject) => {
             const child = spawn(cliPath, args, {
