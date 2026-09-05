@@ -75,6 +75,9 @@ export class CliHandler {
         let skillName = req.skill || 'custom_task';
 
         if (req.task_id) {
+          const existingTask = taskRegistry.getTask(req.task_id);
+          const wasAlreadyCompleted = existingTask?.status === 'completed';
+
           await taskRegistry.updateTaskStatus(req.task_id, finalStatus, {
             summary,
           });
@@ -82,7 +85,7 @@ export class CliHandler {
           if (task) {
             targetProject = targetProject || task.project;
             skillName = task.skill;
-            if (finalStatus === 'completed') {
+            if (finalStatus === 'completed' && !wasAlreadyCompleted) {
               await notificationService.notifyTaskCompleted(task, req.changes);
             }
           }

@@ -30,6 +30,7 @@ export class InferenceGateway {
     const activeModel = config.veronica?.model || config.model_name || 'gemini-3.7-flash-high';
     const isAgy = MessageBuilder.isAntigravityModel(activeModel);
 
+    let primaryAgyError: any = null;
     let lastError: any = null;
 
     // Retry loop: up to 2 attempts
@@ -231,6 +232,7 @@ export class InferenceGateway {
 
           if (agyOutput) return agyOutput;
         } catch (agyErr: any) {
+          primaryAgyError = agyErr;
           lastError = agyErr;
           const errMsg = agyErr?.message || String(agyErr);
           console.warn(`[InferenceGateway] [Antigravity CLI Attempt ${attempt} Failed]:`, errMsg);
@@ -289,14 +291,14 @@ export class InferenceGateway {
         }
         throw new Error(`Local LLM HTTP ${localRes.status}`);
       } catch (localErr: any) {
-        lastError = localErr;
+        lastError = primaryAgyError || localErr;
         const detail = localErr?.cause?.code || localErr?.cause?.message || localErr?.message;
         console.warn(`[InferenceGateway] [Local LLM Offline/Timeout Attempt ${attempt}]:`, detail);
         if (attempt === 1) {
           await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
-        throw localErr;
+        throw lastError;
       }
     }
 
@@ -319,12 +321,12 @@ export class InferenceGateway {
     if (isQuota) {
       return (
         `⚠️ <b>Квота Antigravity CLI исчерпана</b>\n\n` +
-        `Сэр, запрос к модели отклонён из-за достижения лимита квоты Google/CLI:\n` +
+        `Запрос к модели отклонён из-за достижения лимита квоты Google AI / Antigravity CLI:\n` +
         `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
-        `💡 <b>Что необходимо сделать:</b>\n` +
+        `💡 <b>Что делать:</b>\n` +
         (resetText ? `• <b>Автоматический сброс:</b> через <b>${this.escapeHtml(resetText)}</b>\n` : '') +
         `• <b>Сменить аккаунт:</b> выполните в терминале <code>agy auth</code>\n` +
-        `• Либо переключите модель/профиль в настройках 0xAgent.` +
+        `• Либо переключите модель/профиль в меню или настройках 0xAgent.` +
         sessionInfo
       );
     }
@@ -332,9 +334,9 @@ export class InferenceGateway {
     if (isTimeout) {
       return (
         `⏱️ <b>Таймаут выполнения команды</b>\n\n` +
-        `Сэр, движок <code>agy</code> выполнялся дольше лимита или поток данных был прерван:\n` +
+        `Движок <code>agy</code> выполнялся дольше лимита или поток данных был прерван:\n` +
         `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
-        `💡 <i>Сессия сохранена. Попробуйте повторить запрос или разбить его на более компактные шаги.</i>` +
+        `💡 <i>Сессия сохранена. Попробуйте повторить запрос или разбить задачу на более компактные шаги.</i>` +
         sessionInfo
       );
     }
@@ -342,21 +344,21 @@ export class InferenceGateway {
     if (isNotFound) {
       return (
         `❌ <b>Исполняемый файл agy не найден</b>\n\n` +
-        `Сэр, операционная система не может найти CLI <code>agy</code>:\n` +
+        `Операционная система не может найти CLI <code>agy</code>:\n` +
         `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
         `💡 <i>Проверьте путь к agy в настройках Вероники или добавьте путь к agy в системную переменную PATH.</i>`
       );
     }
 
-    const isNet = /fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502|503|504|tls handshake timeout|network is unreachable/i.test(rawMsg);
+    const isNet = /network issue|issue connecting to the server|error id:\s*[a-f0-9-]+|fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502|503|504|tls handshake timeout|network is unreachable|stream was interrupted/i.test(rawMsg);
     if (isNet) {
       return (
-        `🌐 <b>Сетевая ошибка связи с инференсом Google AI / CLI</b>\n\n` +
-        `Сэр, не удалось установить сетевое соединение с облачным движком:\n` +
+        `🌐 <b>Сетевой сбой связи с Google AI / Antigravity CLI</b>\n\n` +
+        `Не удалось установить соединение с сервером инференса:\n` +
         `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
         `💡 <b>Что проверить:</b>\n` +
-        `• Доступность интернета и прокси-шлюза (VPN / Clash)\n` +
-        `• Статус подключения к Google AI Studio\n` +
+        `• Доступность интернета и прокси / VPN\n` +
+        `• Статус подключения к Google AI Studio / Antigravity\n` +
         `• Попробуйте повторить запрос через минуту.` +
         sessionInfo
       );
@@ -364,9 +366,9 @@ export class InferenceGateway {
 
     return (
       `❌ <b>Сбой инференса Вероники</b>\n\n` +
-      `Сэр, не удалось получить ответ от движков инференса:\n` +
+      `Не удалось получить ответ от движков инференса:\n` +
       `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
-      `💡 <i>Проверьте сетевой статус/прокси или повторите запрос через несколько минут.</i>` +
+      `💡 <i>Проверьте сетевой статус / прокси или повторите запрос через минуту.</i>` +
       sessionInfo
     );
   }

@@ -2,7 +2,7 @@ import { AntigravityUsage } from '../../../src/types';
 
 export function isNetworkError(text: string): boolean {
   if (!text) return false;
-  return /network issue|issue connecting to the server|fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502 bad gateway|503 service unavailable|504 gateway timeout|ssl.*handshake|request to .* failed|abort(?:ed)?|tls handshake timeout|network is unreachable|stream was interrupted|error id:\s*[a-f0-9-]+/i.test(text);
+  return /network issue|issue connecting to the server|fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502 bad gateway|503 service unavailable|504 gateway timeout|ssl.*handshake|request to .* failed|request.*abort(?:ed)?|stream.*abort(?:ed)?|connection.*abort(?:ed)?|tls handshake timeout|network is unreachable|stream was interrupted|error id:\s*[a-f0-9-]+/i.test(text);
 }
 
 export interface ParsedStreamJsonEvent {
@@ -25,7 +25,7 @@ export class AntigravityLogParser {
     isNetworkErr: boolean;
     errorSnippet?: string;
   } {
-    const isNetworkErr = isNetworkError(trimmedLine);
+    let isNetworkErr = false;
     let errorSnippet: string | undefined = undefined;
 
     if (trimmedLine.toLowerCase().startsWith('error:')) {
@@ -81,17 +81,22 @@ export class AntigravityLogParser {
           }
         }
 
+        if (result.error && isNetworkError(result.error)) {
+          isNetworkErr = true;
+        }
+
         return {
           isJson: true,
           parsedEvent: result,
-          isNetworkErr: isNetworkErr || (result.error ? isNetworkError(result.error) : false),
+          isNetworkErr,
           errorSnippet,
         };
       } catch {
-        return { isJson: false, isNetworkErr, errorSnippet };
+        // Fall through to non-json
       }
     }
 
+    isNetworkErr = isNetworkError(trimmedLine);
     return { isJson: false, isNetworkErr, errorSnippet };
   }
 }

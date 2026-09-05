@@ -553,6 +553,10 @@ export class AntigravityAdapter implements RuntimeAdapter {
               timestamp: Date.now(),
             });
 
+            notificationService.broadcastToWhitelist(
+              `⚠️ <b>Сетевой сбой инференса (${options.project}):</b>\n<code>${detectedNetworkError.substring(0, 300)}</code>\n\n🔄 <i>Автоматически возобновляю задачу <code>${task.id.substring(0, 8)}</code> (попытка ${nextRetry}/2) через 3с...</i>`
+            ).catch(() => {});
+
             setTimeout(() => {
               this.spawnTask({
                 ...options,

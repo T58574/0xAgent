@@ -14,6 +14,7 @@ function escapeHtml(text: string): string {
 export class NotificationService {
   private static instance: NotificationService;
   private botInstance: Bot | null = null;
+  private notifiedTaskIds = new Set<string>();
 
   private constructor() {}
 
@@ -26,6 +27,22 @@ export class NotificationService {
 
   public setBot(bot: Bot): void {
     this.botInstance = bot;
+  }
+
+  public isTaskNotified(taskId: string): boolean {
+    return this.notifiedTaskIds.has(taskId);
+  }
+
+  public markTaskNotified(taskId: string): void {
+    if (this.notifiedTaskIds.size >= 1000) {
+      const firstKey = this.notifiedTaskIds.values().next().value;
+      if (firstKey) this.notifiedTaskIds.delete(firstKey);
+    }
+    this.notifiedTaskIds.add(taskId);
+  }
+
+  public resetTaskNotification(taskId: string): void {
+    this.notifiedTaskIds.delete(taskId);
   }
 
   public async broadcastToWhitelist(message: string, replyMarkup?: InlineKeyboard): Promise<void> {
@@ -46,6 +63,11 @@ export class NotificationService {
   }
 
   public async notifyTaskCompleted(task: AgentTask, rawChanges?: string[] | string): Promise<void> {
+    if (this.notifiedTaskIds.has(task.id)) {
+      return;
+    }
+    this.markTaskNotified(task.id);
+
     const changes = Array.isArray(rawChanges) ? rawChanges : rawChanges ? [rawChanges] : [];
 
     // Automatically synchronize lastTaskId and project into Veronica Orchestrator session
