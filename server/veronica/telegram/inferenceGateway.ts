@@ -74,8 +74,8 @@ export class InferenceGateway {
             : '';
 
           const promptPayload = isContinuing
-            ? `USER REQUEST: ${userText}${imagePromptDirective}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`
-            : `${systemPrompt}\n\nUSER REQUEST: ${userText}${imagePromptDirective}\n\nREPLY IN RUSSIAN USING TELEGRAM HTML:`;
+            ? `USER REQUEST: ${userText}${imagePromptDirective}`
+            : `${systemPrompt}\n\nUSER REQUEST: ${userText}${imagePromptDirective}`;
 
           const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
           const spawnEnv: NodeJS.ProcessEnv = { ...process.env };
@@ -244,16 +244,23 @@ export class InferenceGateway {
             break;
           }
 
+          const isNet = /network issue|issue connecting to the server|error id:\s*[a-f0-9-]+|fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502|503|504|tls handshake timeout|network is unreachable|stream was interrupted/i.test(errMsg);
+
           if (sessionState && sessionState.antigravityConversationId) {
-            console.warn('[InferenceGateway] Resetting stale/stalled conversation ID:', sessionState.antigravityConversationId);
             try {
               const lockPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'presence', `${sessionState.antigravityConversationId}.lock`);
               if (fs.existsSync(lockPath)) {
                 fs.unlinkSync(lockPath);
               }
             } catch {}
-            sessionState.antigravityConversationId = undefined;
-            sessionStateManager.persistSessionMeta(sessionState);
+
+            if (!isNet) {
+              console.warn('[InferenceGateway] Resetting stale/corrupt conversation ID:', sessionState.antigravityConversationId);
+              sessionState.antigravityConversationId = undefined;
+              sessionStateManager.persistSessionMeta(sessionState);
+            } else {
+              console.warn('[InferenceGateway] Network issue detected: preserving conversation ID for seamless continuation:', sessionState.antigravityConversationId);
+            }
           }
 
           if (attempt === 1) {
@@ -356,10 +363,9 @@ export class InferenceGateway {
         `🌐 <b>Сетевой сбой связи с Google AI / Antigravity CLI</b>\n\n` +
         `Не удалось установить соединение с сервером инференса:\n` +
         `<code>${this.escapeHtml(rawMsg.trim())}</code>\n\n` +
-        `💡 <b>Что проверить:</b>\n` +
-        `• Доступность интернета и прокси / VPN\n` +
-        `• Статус подключения к Google AI Studio / Antigravity\n` +
-        `• Попробуйте повторить запрос через минуту.` +
+        `💡 <b>Что сделать:</b>\n` +
+        `• Сессия сохранена! Напиши <b>«продолжить»</b>, чтобы возобновить диалог ровно с этого места.\n` +
+        `• Проверь доступность сети и прокси / VPN.` +
         sessionInfo
       );
     }

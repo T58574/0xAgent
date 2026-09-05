@@ -10,13 +10,92 @@ export function escapeHtml(text: string): string {
 }
 
 /**
+ * Convert modern Markdown (code blocks, inline code, bold, italics, blockquotes, expandable quotes, spoilers, links)
+ * to valid Telegram HTML formatting.
+ * Preserves already present valid HTML tags.
+ */
+export function markdownToTelegramHtml(markdown: string): string {
+  if (!markdown) return '';
+
+  // 1. Extract and preserve code blocks (fenced ```...```)
+  const codeBlocks: string[] = [];
+  let text = markdown.replace(/```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)```/g, (_match, lang, code) => {
+    const escapedCode = escapeHtml(code.trimEnd());
+    const placeholder = `___TG_CODE_BLOCK_${codeBlocks.length}___`;
+    if (lang) {
+      codeBlocks.push(`<pre><code class="language-${escapeHtml(lang)}">${escapedCode}</code></pre>`);
+    } else {
+      codeBlocks.push(`<pre>${escapedCode}</pre>`);
+    }
+    return placeholder;
+  });
+
+  // 2. Extract and preserve inline code (`...`)
+  const inlineCodes: string[] = [];
+  text = text.replace(/`([^`\n]+)`/g, (_match, code) => {
+    const placeholder = `___TG_INLINE_CODE_${inlineCodes.length}___`;
+    inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
+    return placeholder;
+  });
+
+  // 3. Expandable blockquotes: **> quote or **>quote
+  text = text.replace(/(?:^\s*\*\*> ?(.*(?:\n\s*\*\*> ?.*)*))/gm, (block) => {
+    const content = block
+      .split('\n')
+      .map((line) => line.replace(/^\s*\*\*> ?/, ''))
+      .join('\n');
+    return `<blockquote expandable>${content}</blockquote>`;
+  });
+
+  // 4. Standard blockquotes: > quote
+  text = text.replace(/(?:^\s*> ?(.*(?:\n\s*> ?.*)*))/gm, (block) => {
+    const content = block
+      .split('\n')
+      .map((line) => line.replace(/^\s*> ?/, ''))
+      .join('\n');
+    return `<blockquote>${content}</blockquote>`;
+  });
+
+  // 5. Headers: ### Header -> <b>Header</b>
+  text = text.replace(/^#{1,6}\s+(.+)$/gm, '<b>$1</b>');
+
+  // 6. Bold: **text** or __text__
+  text = text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  text = text.replace(/(?<=^|[\s(])__(.+?)__(?=$|[\s),.!?])/g, '<b>$1</b>');
+
+  // 7. Italic: *text* or _text_ (excluding inside identifiers)
+  text = text.replace(/(?<=^|[\s(])\*([^*\n]+?)\*(?=$|[\s),.!?])/g, '<i>$1</i>');
+  text = text.replace(/(?<=^|[\s(])_([^_\n]+?)_(?=$|[\s),.!?])/g, '<i>$1</i>');
+
+  // 8. Strikethrough: ~~text~~
+  text = text.replace(/~~(.+?)~~/g, '<s>$1</s>');
+
+  // 9. Spoilers: ||text||
+  text = text.replace(/\|\|(.+?)\|\|/g, '<tg-spoiler>$1</tg-spoiler>');
+
+  // 10. Links: [text](url)
+  text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
+
+  // 11. Restore inline codes
+  text = text.replace(/___TG_INLINE_CODE_(\d+)___/g, (_match, idx) => inlineCodes[Number(idx)] || '');
+
+  // 12. Restore code blocks
+  text = text.replace(/___TG_CODE_BLOCK_(\d+)___/g, (_match, idx) => codeBlocks[Number(idx)] || '');
+
+  return text;
+}
+
+/**
  * Safely send a message, splitting into chunks if length exceeds Telegram's 4096-character limit.
+ * Converts markdown to Telegram HTML formatting when parse_mode is HTML.
  * Falls back gracefully to plain text if HTML entity parsing fails.
  */
-export async function safeReply(ctx: any, text: string, options: any = { parse_mode: 'HTML' }): Promise<any> {
+export async function safeReply(ctx: any, rawText: string, options: any = { parse_mode: 'HTML' }): Promise<any> {
   const MAX_CHUNK = 3800;
 
-  if (!text) return;
+  if (!rawText) return;
+
+  const text = options?.parse_mode === 'HTML' ? markdownToTelegramHtml(rawText) : rawText;
 
   if (text.length <= MAX_CHUNK) {
     try {

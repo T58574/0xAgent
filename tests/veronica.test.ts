@@ -25,6 +25,8 @@ import { buildFullSystemPrompt } from '../server/agent/promptBuilder';
 import { VeronicaOrchestrator } from '../server/veronica/telegram/veronicaOrchestrator';
 import { getDefaultConfig } from '../server/config';
 import { voiceThoughtService } from '../server/veronica/telegram/voiceThoughtService';
+import { markdownToTelegramHtml } from '../server/veronica/telegram/handlers/telegramUtils';
+import { notificationService } from '../server/veronica/telegram/notificationService';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -716,5 +718,40 @@ gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
       assert.equal(typeof voiceThoughtService.structureThought, 'function');
     });
   });
+
+  describe('16. Telegram Modern Markdown & Deduplication Invariants', () => {
+    it('should convert modern rich markdown to Telegram HTML formatting', () => {
+      const input = `### Заголовок
+**Жирный текст** и *курсив*.
+Код в строке: \`npm test\` и ссылка: [Telegram](https://telegram.org).
+> Это блок цитаты
+**> Это раскрываемая цитата
+\`\`\`ts
+const answer = 42;
+\`\`\``;
+
+      const html = markdownToTelegramHtml(input);
+      assert.ok(html.includes('<b>Заголовок</b>'), 'Header conversion failed');
+      assert.ok(html.includes('<b>Жирный текст</b>'), 'Bold conversion failed');
+      assert.ok(html.includes('<i>курсив</i>'), 'Italic conversion failed');
+      assert.ok(html.includes('<code>npm test</code>'), 'Inline code conversion failed');
+      assert.ok(html.includes('<a href="https://telegram.org">Telegram</a>'), 'Link conversion failed');
+      assert.ok(html.includes('<blockquote>Это блок цитаты</blockquote>'), 'Blockquote conversion failed');
+      assert.ok(html.includes('<blockquote expandable>Это раскрываемая цитата</blockquote>'), 'Expandable blockquote failed');
+      assert.ok(html.includes('<pre><code class="language-ts">const answer = 42;</code></pre>'), 'Code block failed');
+    });
+
+    it('should deduplicate completed task notifications', () => {
+      const testTaskId = 'test-dedup-task-' + Date.now();
+      assert.equal(notificationService.isTaskNotified(testTaskId), false);
+
+      notificationService.markTaskNotified(testTaskId);
+      assert.equal(notificationService.isTaskNotified(testTaskId), true);
+
+      notificationService.resetTaskNotification(testTaskId);
+      assert.equal(notificationService.isTaskNotified(testTaskId), false);
+    });
+  });
 });
+
 

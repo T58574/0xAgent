@@ -295,7 +295,7 @@ export class VeronicaOrchestrator {
 ${identityBlock}
 ${memoryBlock}
 Tone: Direct, warm, concise, witty, highly competent. Never use robotic bureaucratic boilerplate, stiffness, or canned templates. Speak naturally like a close trusted partner in engineering and life.
-Language: Always reply in Russian. Format messages using Telegram HTML tags (<b>, <i>, <code>, <pre>). Do not use Markdown asterisks.
+Language: Always reply in Russian. Format messages using modern, rich Telegram-compatible Markdown (bold **text**, italic *text*, \`inline code\`, \`\`\`code blocks\`\`\`, > blockquotes, tables, bullet points).
 
 CURRENT SYSTEM CONTEXT:
 - Discovered Projects: [${projectNames || 'none'}]
