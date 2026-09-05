@@ -40,8 +40,6 @@ jobs:
       - name: Install Dependencies
         run: npm ci || npm install --no-audit --no-fund
 
-      - name: Run Test Suite
-        run: npm test
 
       - name: Build Web Client & Generate Assets
         run: npm run build

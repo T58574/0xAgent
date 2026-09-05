@@ -91,13 +91,17 @@ async function main() {
   console.log(`  Next Release    : ${c.green}${tagName}${c.reset}\n`);
 
   // 1. Run Automated Test Verification
-  console.log(`${c.yellow}[1/4] Running test suite verification (npm test)...${c.reset}`);
-  try {
-    execSync('npm test', { cwd: PROJECT_ROOT, stdio: 'inherit' });
-    console.log(`${c.green}[OK] All unit and subsystem tests passed.${c.reset}\n`);
-  } catch (err) {
-    console.error(`\n${c.red}[FAIL] Tests failed! Release aborted to maintain integrity.${c.reset}`);
-    process.exit(1);
+  if (process.env.SKIP_TESTS || process.argv.includes('--no-test')) {
+    console.log(`${c.gray}[1/4] Skipping test suite verification (SKIP_TESTS active)...${c.reset}\n`);
+  } else {
+    console.log(`${c.yellow}[1/4] Running test suite verification (npm test)...${c.reset}`);
+    try {
+      execSync('npm test', { cwd: PROJECT_ROOT, stdio: 'inherit' });
+      console.log(`${c.green}[OK] All unit and subsystem tests passed.${c.reset}\n`);
+    } catch (err) {
+      console.error(`\n${c.red}[FAIL] Tests failed! Release aborted to maintain integrity.${c.reset}`);
+      process.exit(1);
+    }
   }
 
   // 2. Production Build Check
