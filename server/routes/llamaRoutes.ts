@@ -31,7 +31,7 @@ export function purgeGpuVramAndProcesses(broadcast?: BroadcastFn): { success: bo
     const targets = ['llama-server.exe', 'llama.exe', 'llama-bench.exe'];
     for (const target of targets) {
       try {
-        execSync(`taskkill /F /T /IM ${target}`, { stdio: 'ignore' });
+        execSync(`taskkill /F /T /IM ${target}`, { stdio: 'ignore', windowsHide: true });
         killedCount++;
       } catch {}
     }
@@ -57,7 +57,7 @@ export function stopLlamaServerProcess(broadcast?: BroadcastFn) {
   if (activeLlamaProcess) {
     try {
       if (process.platform === 'win32' && activeLlamaProcess.pid) {
-        execSync(`taskkill /F /T /PID ${activeLlamaProcess.pid}`, { stdio: 'ignore' });
+        execSync(`taskkill /F /T /PID ${activeLlamaProcess.pid}`, { stdio: 'ignore', windowsHide: true });
       } else {
         activeLlamaProcess.kill('SIGKILL');
       }
@@ -74,7 +74,7 @@ function stripAnsiCodes(str: string): string {
 function killProcessOnPort(port: number): void {
   try {
     if (process.platform === 'win32') {
-      const output = execSync(`netstat -ano | findstr ":${port}" | findstr "LISTENING"`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      const output = execSync(`netstat -ano | findstr ":${port}" | findstr "LISTENING"`, { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).trim();
       const pids = new Set<string>();
       for (const line of output.split(/\r?\n/).filter(Boolean)) {
         const parts = line.trim().split(/\s+/);
@@ -82,7 +82,7 @@ function killProcessOnPort(port: number): void {
         if (pid && pid !== '0') pids.add(pid);
       }
       for (const pid of pids) {
-        try { execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore' }); } catch {}
+        try { execSync(`taskkill /F /T /PID ${pid}`, { stdio: 'ignore', windowsHide: true }); } catch {}
       }
     }
   } catch {}
@@ -198,7 +198,7 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       lastLaunchParams = { targetExe, args, host, port };
 
       appendServerLog(`[CMD] ${path.basename(targetExe)} ${args.join(' ')}`);
-      const spawnedProc = spawn(targetExe, args, { cwd: path.dirname(targetExe) });
+      const spawnedProc = spawn(targetExe, args, { cwd: path.dirname(targetExe), windowsHide: true });
       activeLlamaProcess = spawnedProc;
       broadcast('llama-server-status', { status: 'running', pid: spawnedProc.pid, host, port });
 

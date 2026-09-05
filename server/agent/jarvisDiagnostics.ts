@@ -286,7 +286,10 @@ except Exception as e:
     print(f"ERR:{e}")
 `.trim();
 
-      const proc = spawn('python', ['-c', py]);
+      const proc = spawn('python', ['-c', py], {
+        windowsHide: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
       let stdout = '';
       let stderr = '';
 

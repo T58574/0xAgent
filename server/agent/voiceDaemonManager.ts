@@ -46,6 +46,7 @@ export class VoiceDaemonManager {
 
       this.process = spawn('python', ['-u', this.scriptPath], {
         cwd: process.cwd(),
+        windowsHide: true,
         stdio: ['pipe', 'pipe', 'pipe'],
         env: {
           ...process.env,
@@ -122,7 +123,7 @@ export class VoiceDaemonManager {
       const pid = this.process.pid;
       try {
         if (process.platform === 'win32' && pid) {
-          spawn('taskkill', ['/pid', pid.toString(), '/f', '/t']);
+          spawn('taskkill', ['/pid', pid.toString(), '/f', '/t'], { windowsHide: true });
         } else {
           this.process.kill('SIGTERM');
         }

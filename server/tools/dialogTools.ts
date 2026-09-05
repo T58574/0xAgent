@@ -6,7 +6,7 @@ async function runPowerShellDialogScript(psScript: string): Promise<string | nul
     try {
       const buf = Buffer.from(psScript, 'utf-16le');
       const base64 = buf.toString('base64');
-      execFile('powershell', ['-Sta', '-NoProfile', '-EncodedCommand', base64], { encoding: 'utf-8' }, (err: any, stdout: string) => {
+      execFile('powershell', ['-Sta', '-NoProfile', '-EncodedCommand', base64], { encoding: 'utf-8', windowsHide: true }, (err: any, stdout: string) => {
         if (err) {
           console.error('Failed to open native Windows dialog:', err);
           resolve(null);

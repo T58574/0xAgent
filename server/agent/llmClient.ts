@@ -63,7 +63,7 @@ async function fetchWithHeaderTimeout(
   }
 }
 
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { resolveAntigravityModelAndEffort, getSafeCliPath, isAntigravityModel } from '../veronica/adapters/antigravityAdapter';
 import { saveSession } from '../session';
 import { proxyService } from '../proxyService';
@@ -155,6 +155,7 @@ async function spawnAgyStreamResponse(
     cwd: config.workspace_dir || process.cwd(),
     env: spawnEnv,
     shell: false,
+    windowsHide: true,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 
@@ -293,7 +294,13 @@ async function spawnAgyStreamResponse(
     },
     cancel() {
       try {
-        child.kill();
+        if (child.pid) {
+          if (process.platform === 'win32') {
+            execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore', windowsHide: true });
+          } else {
+            child.kill('SIGKILL');
+          }
+        }
       } catch {}
     },
   });

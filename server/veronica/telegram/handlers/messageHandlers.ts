@@ -8,7 +8,8 @@ import { veronicaOrchestrator } from '../veronicaOrchestrator';
 import { voiceThoughtService } from '../voiceThoughtService';
 import { videoIngestionService } from '../videoIngestionService';
 import { factCheckingService } from '../factCheckingService';
-import { escapeHtml, safeReply } from './telegramUtils';
+import { escapeHtml, safeReply, handleResponseAttachments, deliverWithStatusTransition } from './telegramUtils';
+import { projectDiscovery } from '../../core/projectDiscovery';
 import { sendProjectsMenu, sendModelMenu, sendQuotaStatus } from './menuHandlers';
 
 export function registerMessageHandlers(bot: Bot, token: string): void {
@@ -195,22 +196,55 @@ export function registerMessageHandlers(bot: Bot, token: string): void {
       }
     }
 
-    // Delegate all natural language conversation to Veronica Orchestrator
-    const typingTimer = setInterval(() => {
-      ctx.replyWithChatAction('typing').catch(() => {});
-    }, 4000);
+    // Dynamic status indicator stages for Agent Thinking & Execution UX/UI
+    const statusStages = [
+      '🧠 <i>Вероника думает над задачей...</i>',
+      '🔍 <i>Анализирую контекст проекта и инструменты...</i>',
+      '⚡ <i>Прорабатываю решение и код...</i>',
+      '✍️ <i>Шлифую финальный ответ...</i>',
+    ];
+    let stageIdx = 0;
+    let statusMsg: any = null;
+
+    try {
+      statusMsg = await ctx.reply(statusStages[0], { parse_mode: 'HTML' });
+    } catch {}
+
+    const typingTimer = setInterval(async () => {
+      try {
+        await ctx.replyWithChatAction('typing');
+        if (statusMsg) {
+          stageIdx = (stageIdx + 1) % statusStages.length;
+          await ctx.api.editMessageText(
+            ctx.chat.id,
+            statusMsg.message_id,
+            statusStages[stageIdx],
+            { parse_mode: 'HTML' }
+          );
+        }
+      } catch {}
+    }, 4500);
+
     try {
       await ctx.replyWithChatAction('typing').catch(() => {});
       const replyText = await veronicaOrchestrator.handleUserMessage(userId, text);
-      await safeReply(ctx, replyText, {
+      clearInterval(typingTimer);
+
+      const session = veronicaOrchestrator.getUserSession(userId);
+      const activeDir = session?.activeProject ? (await projectDiscovery.resolveProjectPath(session.activeProject)) || undefined : undefined;
+      const processedReply = await handleResponseAttachments(ctx, replyText, activeDir);
+
+      await deliverWithStatusTransition(ctx, statusMsg, processedReply, {
         parse_mode: 'HTML',
         reply_markup: MessageBuilder.getMainReplyKeyboard(),
       });
     } catch (err: any) {
+      clearInterval(typingTimer);
+      try {
+        if (statusMsg) await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id);
+      } catch {}
       console.error('[Veronica Telegram] Error handling user message:', err);
       await ctx.reply(`⚠️ Произошла ошибка при обработке запроса: ${escapeHtml(err?.message || err)}`);
-    } finally {
-      clearInterval(typingTimer);
     }
   });
 
@@ -320,10 +354,12 @@ export function registerMessageHandlers(bot: Bot, token: string): void {
       await ctx.replyWithChatAction('typing');
       const veronicaReply = await veronicaOrchestrator.handleUserMessage(userId, rawText);
 
-      try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
+      const session = veronicaOrchestrator.getUserSession(userId);
+      const activeDir = session?.activeProject ? (await projectDiscovery.resolveProjectPath(session.activeProject)) || undefined : undefined;
+      const processedReply = await handleResponseAttachments(ctx, veronicaReply, activeDir);
 
-      const finalReply = `🎙 <i>«${escapeHtml(displayQuote)}»</i>\n\n${veronicaReply}`;
-      await safeReply(ctx, finalReply, {
+      const finalReply = `🎙 <i>«${escapeHtml(displayQuote)}»</i>\n\n${processedReply}`;
+      await deliverWithStatusTransition(ctx, statusMsg, finalReply, {
         parse_mode: 'HTML',
         reply_markup: MessageBuilder.getMainReplyKeyboard(),
       });
@@ -447,8 +483,11 @@ export function registerMessageHandlers(bot: Bot, token: string): void {
       const userPrompt = caption || 'Что изображено на этой картинке? Опиши её детально и выдели ключевые элементы.';
       const replyText = await veronicaOrchestrator.handleUserMessage(userId, userPrompt, localImagePath);
 
-      try { await ctx.api.deleteMessage(ctx.chat.id, statusMsg.message_id); } catch {}
-      await ctx.reply(replyText, {
+      const session = veronicaOrchestrator.getUserSession(userId);
+      const activeDir = session?.activeProject ? (await projectDiscovery.resolveProjectPath(session.activeProject)) || undefined : undefined;
+      const processedReply = await handleResponseAttachments(ctx, replyText, activeDir);
+
+      await deliverWithStatusTransition(ctx, statusMsg, processedReply, {
         parse_mode: 'HTML',
         reply_markup: MessageBuilder.getMainReplyKeyboard(),
       });

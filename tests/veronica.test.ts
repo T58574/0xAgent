@@ -25,7 +25,7 @@ import { buildFullSystemPrompt } from '../server/agent/promptBuilder';
 import { VeronicaOrchestrator } from '../server/veronica/telegram/veronicaOrchestrator';
 import { getDefaultConfig } from '../server/config';
 import { voiceThoughtService } from '../server/veronica/telegram/voiceThoughtService';
-import { markdownToTelegramHtml } from '../server/veronica/telegram/handlers/telegramUtils';
+import { markdownToTelegramHtml, extractButtonsToInlineKeyboard, handleResponseAttachments } from '../server/veronica/telegram/handlers/telegramUtils';
 import { notificationService } from '../server/veronica/telegram/notificationService';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
@@ -739,6 +739,53 @@ const answer = 42;
       assert.ok(html.includes('<blockquote>Это блок цитаты</blockquote>'), 'Blockquote conversion failed');
       assert.ok(html.includes('<blockquote expandable>Это раскрываемая цитата</blockquote>'), 'Expandable blockquote failed');
       assert.ok(html.includes('<pre><code class="language-ts">const answer = 42;</code></pre>'), 'Code block failed');
+    });
+
+    it('should convert markdown in-text buttons and wrap consecutive buttons into button rows', () => {
+      const input = `Выберите действие:
+[🔄 Продолжить](btn:veronica:continue:123) [📁 Проекты](btn:veronica:projects_menu)
+[🌐 Документация](btn-url:https://telegram.org)
+[📋 Скопировать](copy:git status)`;
+
+      const html = markdownToTelegramHtml(input);
+      assert.ok(html.includes('<tg-button type="callback_data" data="veronica:continue:123">🔄 Продолжить</tg-button>'), 'Callback button failed');
+      assert.ok(html.includes('<tg-button type="callback_data" data="veronica:projects_menu">📁 Проекты</tg-button>'), 'Second callback button failed');
+      assert.ok(html.includes('<tg-button-row align="center">'), 'Button row wrap failed');
+      assert.ok(html.includes('<tg-button type="url" url="https://telegram.org">🌐 Документация</tg-button>'), 'URL button failed');
+      assert.ok(html.includes('<tg-button type="copy_text" text="git status">📋 Скопировать</tg-button>'), 'Copy text button failed');
+    });
+
+    it('should extract in-text buttons into standard InlineKeyboard for backward compatibility fallback', () => {
+      const html = `Информация по задаче
+<tg-button-row align="center">
+  <tg-button type="callback_data" data="veronica:continue:abc">🔄 Продолжить</tg-button>
+  <tg-button type="url" url="https://github.com">🌐 GitHub</tg-button>
+</tg-button-row>`;
+
+      const extracted = extractButtonsToInlineKeyboard(html);
+      assert.ok(!extracted.cleanedHtml.includes('<tg-button'), 'Buttons should be stripped from cleaned HTML');
+      assert.ok(!extracted.cleanedHtml.includes('<tg-button-row'), 'Row tags should be stripped');
+      assert.ok(extracted.keyboard !== undefined, 'Keyboard should be extracted');
+    });
+
+    it('should detect and handle file attachment directives in Veronica output', async () => {
+      const tmpFile = path.join(os.tmpdir(), `veronica_test_${Date.now()}.txt`);
+      fs.writeFileSync(tmpFile, 'Test attachment content');
+
+      const mockCtx: any = {
+        chat: { id: 12345 },
+        replyWithDocument: async (doc: any, opts: any) => {
+          return { message_id: 1, doc, opts };
+        },
+      };
+
+      const replyWithAttachment = `Вот результат проверки: [file: ${tmpFile}]`;
+      const processed = await handleResponseAttachments(mockCtx, replyWithAttachment);
+
+      assert.ok(!processed.includes(`[file: ${tmpFile}]`), 'Directive should be replaced');
+      assert.ok(processed.includes('отправлен во вложении'), 'Attachment notice should be present');
+
+      try { fs.unlinkSync(tmpFile); } catch {}
     });
 
     it('should deduplicate completed task notifications', () => {

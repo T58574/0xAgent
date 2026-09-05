@@ -2,6 +2,7 @@ import { Bot, InlineKeyboard } from 'grammy';
 import { AgentTask } from '../types';
 import { loadConfig } from '../../config';
 import { veronicaOrchestrator } from './veronicaOrchestrator';
+import { extractButtonsToInlineKeyboard } from './handlers/telegramUtils';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -52,9 +53,20 @@ export class NotificationService {
 
     for (const chatId of whitelist) {
       try {
-        await this.botInstance.api.sendMessage(chatId, message, {
+        if (message.includes('<tg-button') && typeof (this.botInstance.api.raw as any)?.sendRichMessage === 'function') {
+          try {
+            await (this.botInstance.api.raw as any).sendRichMessage({
+              chat_id: chatId,
+              rich_message: { html: message },
+            });
+            continue;
+          } catch {}
+        }
+        const extracted = extractButtonsToInlineKeyboard(message);
+        const effectiveMarkup = replyMarkup || extracted.keyboard;
+        await this.botInstance.api.sendMessage(chatId, extracted.cleanedHtml, {
           parse_mode: 'HTML',
-          reply_markup: replyMarkup,
+          reply_markup: effectiveMarkup,
         });
       } catch (err) {
         console.error(`[Veronica Telegram] Failed to send message to ${chatId}:`, err);
@@ -126,6 +138,13 @@ export class NotificationService {
       } catch {}
     }
 
+    lines.push(
+      `<tg-button-row align="center">` +
+        `<tg-button type="callback_data" data="veronica:continue:${task.id}">🔄 Продолжить задачу</tg-button>` +
+        `<tg-button type="callback_data" data="veronica:projects_menu">📁 Меню проектов</tg-button>` +
+      `</tg-button-row>`
+    );
+
     const keyboard = new InlineKeyboard()
       .text('🔄 Продолжить задачу', `veronica:continue:${task.id}`)
       .text('📁 Меню проектов', 'veronica:projects_menu');
@@ -158,8 +177,6 @@ export class NotificationService {
 
   public async notifyApprovalRequired(task: AgentTask, payload: { action: string; details?: string }): Promise<void> {
     if (!this.botInstance) return;
-    const config = loadConfig();
-    const whitelist = config.veronica?.telegram_whitelist || [];
 
     const keyboard = new InlineKeyboard()
       .text('✅ Одобрить', `veronica:approve:${task.id}`)
@@ -171,18 +188,14 @@ export class NotificationService {
       `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
       `🎯 <b>Действие:</b> ${escapeHtml(payload.action)}`,
       payload.details ? `📝 <b>Детали:</b> ${escapeHtml(payload.details)}` : '',
+      '',
+      `<tg-button-row align="center">` +
+        `<tg-button type="callback_data" data="veronica:approve:${task.id}">✅ Одобрить</tg-button>` +
+        `<tg-button type="callback_data" data="veronica:reject:${task.id}">❌ Отклонить</tg-button>` +
+      `</tg-button-row>`,
     ].filter(Boolean).join('\n');
 
-    for (const chatId of whitelist) {
-      try {
-        await this.botInstance.api.sendMessage(chatId, msg, {
-          parse_mode: 'HTML',
-          reply_markup: keyboard,
-        });
-      } catch (err) {
-        console.error(`[Veronica Telegram] Failed to send approval request to ${chatId}:`, err);
-      }
-    }
+    await this.broadcastToWhitelist(msg, keyboard);
   }
 }
 

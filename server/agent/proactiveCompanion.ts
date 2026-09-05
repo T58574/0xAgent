@@ -170,7 +170,7 @@ export class ProactiveCompanion {
 
     // 1. Check for uncommitted modified files in git
     const gitChanges = await new Promise<string[]>((resolve) => {
-      exec('git status --short', { cwd, timeout: 3000 }, (err, stdout) => {
+      exec('git status --short', { cwd, timeout: 3000, windowsHide: true }, (err, stdout) => {
         if (err || !stdout) return resolve([]);
         const lines = stdout.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
         const files = lines.map((l) => l.replace(/^[MADRCU?!]+\s+/, '').trim()).filter(Boolean);

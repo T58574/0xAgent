@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { spawn, ChildProcess } from 'node:child_process';
+import { spawn, execSync, ChildProcess } from 'node:child_process';
 import { RuntimeAdapter, SpawnTaskOptions } from './runtimeAdapter';
 import { AgentTask, TaskStatus } from '../types';
 import { taskRegistry } from '../core/taskRegistry';
@@ -130,14 +130,24 @@ export class AntigravityAdapter implements RuntimeAdapter {
       const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
 
       const stdout = await new Promise<string>((resolve, reject) => {
-        const proc = spawn(cliPath, ['models'], { shell: false });
+        const proc = spawn(cliPath, ['models'], {
+          shell: false,
+          windowsHide: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
         let out = '';
         let err = '';
         proc.stdout?.on('data', (d) => (out += d.toString()));
         proc.stderr?.on('data', (d) => (err += d.toString()));
         const timer = setTimeout(() => {
           try {
-            proc.kill();
+            if (proc.pid) {
+              if (process.platform === 'win32') {
+                execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore', windowsHide: true });
+              } else {
+                proc.kill('SIGKILL');
+              }
+            }
           } catch {}
           reject(new Error('agy models timed out after 10s'));
         }, 10000);
@@ -255,7 +265,11 @@ export class AntigravityAdapter implements RuntimeAdapter {
       try {
         const config = loadConfig();
         const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
-        const proc = spawn(cliPath, ['--version'], { shell: false });
+        const proc = spawn(cliPath, ['--version'], {
+          shell: false,
+          windowsHide: true,
+          stdio: 'ignore',
+        });
         proc.on('error', () => resolve(false));
         proc.on('close', (code) => resolve(code === 0));
       } catch {

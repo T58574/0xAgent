@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { QuotaStatus, AgyQuotaLimit, QuotaLimitsState } from '../../src/types';
 import { loadConfig } from '../config';
 import { getSafeCliPath } from '../veronica/adapters/antigravityModels';
@@ -316,7 +316,11 @@ class QuotaManager {
       const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
 
       const stdout = await new Promise<string>((resolve, reject) => {
-        const proc = spawn(cliPath, ['-p', '/usage'], { shell: false });
+        const proc = spawn(cliPath, ['-p', '/usage'], {
+          shell: false,
+          windowsHide: true,
+          stdio: ['ignore', 'pipe', 'pipe'],
+        });
         let out = '';
         let err = '';
 
@@ -325,7 +329,13 @@ class QuotaManager {
 
         const timer = setTimeout(() => {
           try {
-            proc.kill();
+            if (proc.pid) {
+              if (process.platform === 'win32') {
+                execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore', windowsHide: true });
+              } else {
+                proc.kill('SIGKILL');
+              }
+            }
           } catch {}
           reject(new Error('Timeout querying agy -p /usage'));
         }, 12000);
@@ -383,13 +393,10 @@ class QuotaManager {
   }
 
   /**
-   * Starts periodic polling of quota limits (default every 5 minutes).
+   * Starts periodic polling of quota limits (default every 15 minutes).
    */
-  public startPeriodicPolling(intervalMs: number = 5 * 60 * 1000): void {
+  public startPeriodicPolling(intervalMs: number = 15 * 60 * 1000): void {
     if (this.pollingIntervalTimer) return;
-
-    // Trigger immediate background fetch on startup
-    this.fetchQuotaLimits().catch(() => {});
 
     this.pollingIntervalTimer = setInterval(() => {
       this.fetchQuotaLimits(true).catch(() => {});
