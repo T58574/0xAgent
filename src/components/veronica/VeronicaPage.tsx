@@ -76,11 +76,27 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs">
-              <span className="text-[var(--theme-text-muted)]">Active Tasks:</span>
+              <span className="text-[var(--theme-text-muted)]">В работе:</span>
               <span className="font-mono font-bold text-[var(--theme-accent)]">
                 {status?.active_tasks ?? 0}
               </span>
             </div>
+
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs">
+              <span className="text-[var(--theme-text-muted)]">Завершено сегодня:</span>
+              <span className="font-mono font-bold text-emerald-400">
+                {status?.today_completed ?? 0}
+              </span>
+            </div>
+
+            {typeof status?.today_failed === 'number' && status.today_failed > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs">
+                <span className="text-red-400 font-medium">Сбоев:</span>
+                <span className="font-mono font-bold text-red-400">
+                  {status.today_failed}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 

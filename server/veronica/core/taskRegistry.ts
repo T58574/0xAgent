@@ -24,7 +24,7 @@ export class TaskRegistry {
    */
   public async createTask(params: {
     project: string;
-    skill: string;
+    skill?: string;
     runtime_profile?: string;
     autonomy_level?: AutonomyLevel;
     custom_prompt?: string;
@@ -37,6 +37,7 @@ export class TaskRegistry {
     const autonomy_level = params.autonomy_level || 'L2';
     const veronica_version = '1.0.0';
     const max_retries = params.max_retries ?? 2;
+    const skill = params.skill || 'custom';
 
     // Determine initial status based on global sequential lock (Concurrency = 1)
     const isLocked = projectLockManager.isGlobalLocked() || projectLockManager.isLocked(params.project);
@@ -50,7 +51,7 @@ export class TaskRegistry {
       id,
       runtime_profile,
       project: params.project,
-      skill: params.skill,
+      skill,
       status,
       started_at,
       autonomy_level,

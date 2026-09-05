@@ -50,7 +50,8 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
   const fetchTasksAndMeta = async () => {
     try {
       setLoading(true);
-      const [projRes, modelsRes, agentsRes] = await Promise.all([
+      const [tasksRes, projRes, modelsRes, agentsRes] = await Promise.all([
+        api.get_veronica_tasks().catch(() => ({ tasks: [] })),
         api.get_veronica_projects().catch(() => ({ projects: [] })),
         api.get_veronica_models().catch(() => ({ local: [], antigravity: [] })),
         api.get_veronica_agents().catch(() => ({ agents: [] })),
@@ -59,16 +60,20 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
       if (modelsRes) setAvailableModels(modelsRes);
       if (agentsRes?.agents) setAvailableAgents(agentsRes.agents);
 
-      const allTasks: any[] = [];
-      if (projRes?.projects) {
-        projRes.projects.forEach((p: any) => {
-          try {
-            const parsed = JSON.parse(p.recent_completions || '[]');
-            allTasks.push(...parsed.map((t: any) => ({ ...t, project: p.project })));
-          } catch {}
-        });
+      if (tasksRes?.tasks && tasksRes.tasks.length > 0) {
+        setTasks(tasksRes.tasks);
+      } else {
+        const allTasks: any[] = [];
+        if (projRes?.projects) {
+          projRes.projects.forEach((p: any) => {
+            try {
+              const parsed = JSON.parse(p.recent_completions || '[]');
+              allTasks.push(...parsed.map((t: any) => ({ ...t, project: p.project })));
+            } catch {}
+          });
+        }
+        setTasks(allTasks);
       }
-      setTasks(allTasks);
     } catch (err: any) {
       console.error('Failed to fetch Veronica tasks:', err);
     } finally {

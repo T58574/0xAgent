@@ -25,6 +25,18 @@ export const spawn_veronica_task = (params: {
   continue_recent?: boolean;
 }) => post<{ success: boolean; task: any }>('/veronica/tasks/spawn', params);
 
+export const get_veronica_tasks = (params?: { project?: string; status?: string; limit?: number }) => {
+  const query = new URLSearchParams();
+  if (params?.project) query.set('project', params.project);
+  if (params?.status) query.set('status', params.status);
+  if (params?.limit) query.set('limit', String(params.limit));
+  const qs = query.toString();
+  return get<{ tasks: any[] }>(`/veronica/tasks${qs ? `?${qs}` : ''}`);
+};
+
+export const get_veronica_task = (taskId: string) =>
+  get<{ task: any }>(`/veronica/tasks/${encodeURIComponent(taskId)}`);
+
 export const kill_veronica_task = (taskId: string) =>
   post<{ success: boolean }>(`/veronica/tasks/${encodeURIComponent(taskId)}/kill`, {});
 

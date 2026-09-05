@@ -338,5 +338,5 @@ export const update_proxy_routing = (config: Partial<ProxyRoutingConfig>) =>
 // Telemetry & Quota APIs
 export * from './api/telemetry';
 
-
-
+// Veronica Subsystem APIs
+export * from './api/veronica';

@@ -178,6 +178,34 @@ export function createVeronicaRouter(broadcast?: BroadcastFn): Router {
     }
   });
 
+  // List tasks with optional project and status filters
+  router.get('/tasks', (req, res) => {
+    try {
+      const project = req.query.project ? String(req.query.project) : undefined;
+      const status = req.query.status ? (String(req.query.status) as any) : undefined;
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+      const tasks = taskRegistry.listTasks({ project, status, limit });
+      res.json({ tasks });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Get task detail by id
+  router.get('/tasks/:id', (req, res) => {
+    try {
+      const taskId = String(req.params.id);
+      const task = taskRegistry.getTask(taskId);
+      if (!task) {
+        res.status(404).json({ error: 'Task not found' });
+        return;
+      }
+      res.json({ task });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // Kill task endpoint
   router.post('/tasks/:id/kill', async (req, res) => {
     try {

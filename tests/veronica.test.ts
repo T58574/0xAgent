@@ -730,6 +730,57 @@ gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
       assert.ok(router);
       assert.equal(typeof router.use, 'function');
     });
+
+    it('should handle GET /tasks and GET /tasks/:id via router', async () => {
+      const created = await taskRegistry.createTask({
+        project: 'route-test-proj',
+        task_description: 'Test router tasks endpoint',
+      });
+
+      const router = createVeronicaRouter(() => {});
+
+      let tasksJson: any = null;
+      const mockReqTasks: any = {
+        method: 'GET',
+        url: '/tasks?project=route-test-proj',
+        query: { project: 'route-test-proj' },
+        headers: {},
+      };
+      const mockResTasks: any = {
+        json: (data: any) => { tasksJson = data; return mockResTasks; },
+        status: () => mockResTasks,
+      };
+
+      await new Promise<void>((resolve) => {
+        router.handle(mockReqTasks, mockResTasks, () => resolve());
+        resolve();
+      });
+
+      assert.ok(tasksJson, 'GET /tasks should return JSON response');
+      assert.ok(Array.isArray(tasksJson.tasks), 'tasks should be an array');
+      assert.ok(tasksJson.tasks.some((t: any) => t.id === created.id));
+
+      let taskDetailJson: any = null;
+      const mockReqDetail: any = {
+        method: 'GET',
+        url: `/tasks/${created.id}`,
+        params: { id: created.id },
+        headers: {},
+      };
+      const mockResDetail: any = {
+        json: (data: any) => { taskDetailJson = data; return mockResDetail; },
+        status: () => mockResDetail,
+      };
+
+      await new Promise<void>((resolve) => {
+        router.handle(mockReqDetail, mockResDetail, () => resolve());
+        resolve();
+      });
+
+      assert.ok(taskDetailJson, 'GET /tasks/:id should return JSON response');
+      assert.equal(taskDetailJson.task?.id, created.id);
+      assert.equal(taskDetailJson.task?.project, 'route-test-proj');
+    });
   });
 
   describe('15. Speech-To-Text (STT) Engine Selection & Configuration', () => {
