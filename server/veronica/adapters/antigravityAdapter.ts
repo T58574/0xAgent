@@ -418,6 +418,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
               const ev = parsed.parsedEvent;
               if (ev.conversationId) {
                 capturedConversationId = ev.conversationId;
+                taskRegistry.checkpointConversationId(task.id, ev.conversationId).catch(() => {});
               }
               if (ev.isToolActive) {
                 const toolName = ev.toolName || 'tool';
@@ -576,7 +577,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
                 ...options,
                 existing_task_id: task.id,
                 conversation_id: resumeConvoId || undefined,
-                continue_recent: false,
+                continue_recent: !resumeConvoId,
                 network_retry_count: nextRetry,
               }).catch((err) => {
                 VeronicaLogger.log('ERROR', `Failed to auto-resume task ${task.id}: ${err.message}`, task.id);

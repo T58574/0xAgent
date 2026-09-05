@@ -65,11 +65,21 @@ export class TaskActionDispatcher {
         const targetProj = prevTask?.project || session.lastTaskProject || session.activeProject;
 
         if (targetProj) {
+          let resumeConvoId: string | undefined = undefined;
+          if (prevTask?.result_json) {
+            try {
+              const res = JSON.parse(prevTask.result_json);
+              resumeConvoId = res.conversation_id;
+            } catch {}
+          }
+
           try {
             const task = await antigravityAdapter.spawnTask({
               project: targetProj,
               skill: 'custom_task',
               custom_prompt: refinementPrompt,
+              conversation_id: resumeConvoId,
+              continue_recent: !resumeConvoId,
             });
 
             session.lastTaskId = task.id;

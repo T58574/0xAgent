@@ -178,7 +178,29 @@ export class TaskRegistry {
   }
 
   /**
-   * Automatically retry a failed or interrupted task
+   * Real-time checkpoint of conversation_id for task recovery and granular resume
+   */
+  public async checkpointConversationId(taskId: string, conversationId: string): Promise<void> {
+    const task = this.getTask(taskId);
+    if (!task || !conversationId) return;
+
+    await writeQueue.enqueue(() => {
+      const db = getVeronicaDb();
+      let currentResult: any = {};
+      if (task.result_json) {
+        try {
+          currentResult = JSON.parse(task.result_json);
+        } catch {}
+      }
+      currentResult.conversation_id = conversationId;
+      const updatedJson = JSON.stringify(currentResult);
+
+      db.prepare('UPDATE agent_tasks SET result_json = ? WHERE id = ?').run(updatedJson, taskId);
+    });
+  }
+
+  /**
+   * Automatically retry a failed or interrupted task reusing its conversation checkpoint
    */
   public async retryTask(taskId: string): Promise<boolean> {
     const task = this.getTask(taskId);
@@ -201,7 +223,15 @@ export class TaskRegistry {
       `).run(taskId, Date.now(), `Retrying task (Attempt ${nextRetry} of ${maxRetries})`);
     });
 
-    // Re-launch task asynchronously reusing taskId so watchdog tracks the new PID
+    let resumeConvoId: string | undefined = undefined;
+    if (task.result_json) {
+      try {
+        const parsed = JSON.parse(task.result_json);
+        resumeConvoId = parsed.conversation_id;
+      } catch {}
+    }
+
+    // Re-launch task asynchronously reusing taskId and conversation checkpoint so watchdog tracks the new PID
     try {
       await antigravityAdapter.spawnTask({
         project: task.project,
@@ -210,6 +240,8 @@ export class TaskRegistry {
         autonomy_level: task.autonomy_level,
         custom_prompt: task.custom_prompt || undefined,
         existing_task_id: taskId,
+        conversation_id: resumeConvoId,
+        continue_recent: !resumeConvoId,
       });
       return true;
     } catch {

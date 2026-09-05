@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { execSync, spawn } from 'node:child_process';
+import { StreamingOutputCollector } from '../agent/outputSpiller';
 
 function resolveShellBinary(): { shell: string; shellArgs: string[] } {
   const isWindows = process.platform === 'win32';
@@ -82,8 +83,8 @@ export function executeShellCommand(
     const { shell, shellArgs } = resolveShellBinary();
     const fullArgs = [...shellArgs, command];
 
-    let stdout = '';
-    let stderr = '';
+    const stdoutCollector = new StreamingOutputCollector('shell_stdout', 10 * 1024);
+    const stderrCollector = new StreamingOutputCollector('shell_stderr', 10 * 1024);
     let isTimedOut = false;
 
     const child = spawn(shell, fullArgs, {
@@ -94,7 +95,7 @@ export function executeShellCommand(
 
     const effectiveTimeout = Math.min(600000, Math.max(5000, timeoutMs));
 
-    const timeoutTimer = setTimeout(() => {
+    const timeoutTimer = setTimeout(async () => {
       isTimedOut = true;
       try {
         if (isWindows && child.pid) {
@@ -104,7 +105,9 @@ export function executeShellCommand(
         }
       } catch {}
 
-      const partialOutput = (stdout + (stderr ? `\n--- STDERR ---\n${stderr}` : '')).trim();
+      const stdoutRes = await stdoutCollector.finalize();
+      const stderrRes = await stderrCollector.finalize();
+      const partialOutput = (stdoutRes.output + (stderrRes.output ? `\n--- STDERR ---\n${stderrRes.output}` : '')).trim();
       const timeoutSec = Math.round(effectiveTimeout / 1000);
       resolve(
         `[INFO] Error: Команда превысила ${timeoutSec}-секундный лимит и была принудительно остановлена.\n` +
@@ -112,8 +115,8 @@ export function executeShellCommand(
       );
     }, effectiveTimeout);
 
-    child.stdout?.on('data', (data) => { stdout += data.toString(); });
-    child.stderr?.on('data', (data) => { stderr += data.toString(); });
+    child.stdout?.on('data', (data) => { stdoutCollector.append(data); });
+    child.stderr?.on('data', (data) => { stderrCollector.append(data); });
 
     child.on('error', (err) => {
       clearTimeout(timeoutTimer);
@@ -122,17 +125,20 @@ export function executeShellCommand(
       }
     });
 
-    child.on('close', (code) => {
+    child.on('close', async (code) => {
       clearTimeout(timeoutTimer);
       if (isTimedOut) return;
 
+      const stdoutRes = await stdoutCollector.finalize();
+      const stderrRes = await stderrCollector.finalize();
+
       let result = '';
-      if (stdout && stdout.trim().length > 0) {
-        result += stdout;
+      if (stdoutRes.output && stdoutRes.output.trim().length > 0) {
+        result += stdoutRes.output;
       }
-      if (stderr && stderr.trim().length > 0) {
+      if (stderrRes.output && stderrRes.output.trim().length > 0) {
         if (result.length > 0) result += '\n--- STDERR ---\n';
-        result += stderr;
+        result += stderrRes.output;
       }
       if (result.length === 0) {
         result = code === 0 ? 'Command executed successfully with no output.' : `Command exited with code ${code}.`;

@@ -136,7 +136,8 @@ async function main() {
   console.log(`${c.green}${c.bold}[SUCCESS] Release ${tagName} is prepared!${c.reset}`);
   console.log(`${c.cyan}==============================================================${c.reset}\n`);
 
-  const pushNow = await prompt(`${c.yellow}Push commit & tag to GitHub now to trigger automated release? (Y/n): ${c.reset}`);
+  const autoYes = process.argv.includes('--yes') || process.argv.includes('-y') || !process.stdin.isTTY;
+  const pushNow = autoYes ? 'y' : await prompt(`${c.yellow}Push commit & tag to GitHub now to trigger automated release? (Y/n): ${c.reset}`);
   if (pushNow.toLowerCase() !== 'n') {
     console.log(`\n${c.cyan}[*] Pushing to GitHub with tags...${c.reset}`);
     try {

@@ -16,6 +16,7 @@ import {
   find0xAgentContext,
   getWorkspace0xAgentMdContext,
 } from '../server/tools';
+import { StreamingOutputCollector, handleOutputSpill, DEFAULT_SPILL_THRESHOLD } from '../server/agent/outputSpiller';
 
 test('Modular Tools & Abstractions Architecture Test Suite', async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), '0xagent-tools-test-'));
@@ -88,5 +89,42 @@ test('Modular Tools & Abstractions Architecture Test Suite', async (t) => {
     const fullContext = getWorkspace0xAgentMdContext(tmpDir);
     assert.ok(fullContext.includes('BEGIN 0xagent.md DIRECTIVES'));
     assert.ok(fullContext.includes('Keep all abstractions clean.'));
+  });
+
+  await t.test('5. Streaming Output Spiller & 10KB Threshold Invariant', async () => {
+    assert.strictEqual(DEFAULT_SPILL_THRESHOLD, 10 * 1024);
+
+    // 1. In-memory collector below threshold
+    const smallCollector = new StreamingOutputCollector('test_small', 10 * 1024);
+    smallCollector.append('Short line 1\nShort line 2\n');
+    const smallRes = await smallCollector.finalize();
+    assert.strictEqual(smallRes.spilled, false);
+    assert.strictEqual(smallRes.output, 'Short line 1\nShort line 2\n');
+
+    // 2. Streaming collector exceeding 10 KB
+    const largeCollector = new StreamingOutputCollector('test_large', 10 * 1024);
+    for (let i = 1; i <= 200; i++) {
+      largeCollector.append(`Line ${i}: ` + 'X'.repeat(80) + '\n');
+    }
+    const largeRes = await largeCollector.finalize();
+    assert.strictEqual(largeRes.spilled, true);
+    assert.ok(largeRes.filePath && fs.existsSync(largeRes.filePath));
+    assert.ok(largeRes.output.includes('ВЫВОД СОКРАЩЕН'));
+    assert.ok(largeRes.output.includes('Line 1:'));
+    assert.ok(largeRes.output.includes('Line 200:'));
+
+    // Clean up spill file
+    if (largeRes.filePath) {
+      try { fs.unlinkSync(largeRes.filePath); } catch {}
+    }
+
+    // 3. Static handleOutputSpill test
+    const oversized = 'A\n'.repeat(6000);
+    const spillStatic = await handleOutputSpill(oversized, 'static_tool', 10 * 1024);
+    assert.strictEqual(spillStatic.spilled, true);
+    assert.ok(spillStatic.output.includes('ВЫВОД СОКРАЩЕН'));
+    if (spillStatic.filePath) {
+      try { fs.unlinkSync(spillStatic.filePath); } catch {}
+    }
   });
 });

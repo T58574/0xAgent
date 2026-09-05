@@ -25,7 +25,7 @@ import { buildFullSystemPrompt } from '../server/agent/promptBuilder';
 import { VeronicaOrchestrator } from '../server/veronica/telegram/veronicaOrchestrator';
 import { getDefaultConfig } from '../server/config';
 import { voiceThoughtService } from '../server/veronica/telegram/voiceThoughtService';
-import { markdownToTelegramHtml, extractButtonsToInlineKeyboard, handleResponseAttachments } from '../server/veronica/telegram/handlers/telegramUtils';
+import { markdownToTelegramHtml, extractButtonsToInlineKeyboard, handleResponseAttachments, splitHtmlIntoBalancedChunks } from '../server/veronica/telegram/handlers/telegramUtils';
 import { notificationService } from '../server/veronica/telegram/notificationService';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
@@ -353,6 +353,11 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       });
 
       assert.equal(task.retry_count, 0);
+
+      // Verify conversation checkpointing
+      await taskRegistry.checkpointConversationId(task.id, 'convo-checkpoint-xyz');
+      const taskWithCheck = taskRegistry.getTask(task.id);
+      assert.ok(taskWithCheck?.result_json?.includes('convo-checkpoint-xyz'), 'Checkpoint should be persisted in result_json');
 
       const retried = await taskRegistry.retryTask(task.id);
       assert.equal(retried, true);
@@ -739,6 +744,37 @@ const answer = 42;
       assert.ok(html.includes('<blockquote>Это блок цитаты</blockquote>'), 'Blockquote conversion failed');
       assert.ok(html.includes('<blockquote expandable>Это раскрываемая цитата</blockquote>'), 'Expandable blockquote failed');
       assert.ok(html.includes('<pre><code class="language-ts">const answer = 42;</code></pre>'), 'Code block failed');
+    });
+
+    it('should format markdown tables into Telegram card bullets and escape stray tags', () => {
+      const input = `| Параметр | Значение | Описание |
+| :--- | :--- | :--- |
+| **Model** | \`gemini-3.8\` | Основная модель |
+| **Effort** | \`medium\` | Баланс скорости |
+
+Список задач:
+* **Пункт 1** с тегом <continue> и <10 КБ
+* **Пункт 2** без ошибок
+---`;
+
+      const html = markdownToTelegramHtml(input);
+      assert.ok(html.includes('• <b>Model</b>'), 'Table row 1 title failed');
+      assert.ok(html.includes('▫️ <i>Значение:</i> <code>gemini-3.8</code>'), 'Table row 1 column failed');
+      assert.ok(html.includes('• <b>Пункт 1</b>'), 'List bullet conversion failed');
+      assert.ok(!html.includes('<continue>'), 'Stray tag <continue> should be escaped');
+      assert.ok(html.includes('&lt;continue&gt;'), 'Stray tag should be escaped as &lt;continue&gt;');
+      assert.ok(html.includes('━━━━━━━━━━━━━━━━━━━━━━'), 'Divider conversion failed');
+    });
+
+    it('should balance open HTML tags across message chunk splits', () => {
+      const longText = '<b>' + 'A'.repeat(2500) + '</b> <i>' + 'B'.repeat(2500) + '</i>';
+      const chunks = splitHtmlIntoBalancedChunks(longText, 3000);
+      assert.ok(chunks.length >= 2, 'Should split into at least 2 chunks');
+      for (const chunk of chunks) {
+        const opens = (chunk.match(/<([a-z0-9]+)>/gi) || []).length;
+        const closes = (chunk.match(/<\/([a-z0-9]+)>/gi) || []).length;
+        assert.equal(opens, closes, `Chunk has unbalanced HTML tags: ${chunk.substring(0, 50)}...`);
+      }
     });
 
     it('should convert markdown in-text buttons and wrap consecutive buttons into button rows', () => {

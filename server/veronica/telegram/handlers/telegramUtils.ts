@@ -14,6 +14,69 @@ export function escapeHtml(text: string): string {
 }
 
 /**
+ * Helper to convert Markdown tables to structured cards for Telegram HTML
+ */
+function formatMarkdownTables(text: string): string {
+  const tableRegex = /(?:^|\n)((?:\|[^\n]+\|\r?\n)(?:\|[ \t]*:?-+:?[ \t]*)+\|\r?\n(?:\|[^\n]+\|\r?\n?)+)/g;
+  return text.replace(tableRegex, (_full, tableContent) => {
+    const lines = tableContent.trim().split(/\r?\n/).map((l: string) => l.trim()).filter(Boolean);
+    if (lines.length < 3) return tableContent;
+
+    const parseRow = (line: string): string[] =>
+      line
+        .replace(/^\|/, '')
+        .replace(/\|$/, '')
+        .split('|')
+        .map((cell: string) => cell.trim());
+
+    const headers = parseRow(lines[0]);
+    const dataRows = lines.slice(2).map(parseRow);
+
+    const cleanCell = (cell: string) => cell.replace(/^\*\*|\*\*$/g, '').replace(/^__|__$/g, '').trim();
+
+    const cards = dataRows.map((row: string[]) => {
+      if (row.length === 2) {
+        return `• <b>${cleanCell(row[0])}:</b> ${row[1]}`;
+      }
+      const title = cleanCell(row[0] || 'Пункт');
+      const details = row
+        .slice(1)
+        .map((cell: string, idx: number) => {
+          const header = cleanCell(headers[idx + 1] || `Параметр ${idx + 1}`);
+          return `  ▫️ <i>${header}:</i> ${cell}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+      return `• <b>${title}</b>\n${details}`;
+    });
+
+    return '\n\n' + cards.join('\n\n') + '\n\n';
+  });
+}
+
+export function escapeUnsafeHtmlEntities(html: string): string {
+  // 1. Escape ampersands not part of standard entity
+  let res = html.replace(/&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
+
+  // 2. Protect valid Telegram HTML tags
+  const allowedTagsRegex = /<\/?(?:b|strong|i|em|u|ins|s|strike|del|span|tg-spoiler|a\b[^>]*|code\b[^>]*|pre\b[^>]*|blockquote\b[^>]*|tg-button\b[^>]*|tg-button-row\b[^>]*)>/gi;
+  const validTagTokens: string[] = [];
+  res = res.replace(allowedTagsRegex, (match) => {
+    const token = `@@TGVALIDTAG_${validTagTokens.length}@@`;
+    validTagTokens.push(match);
+    return token;
+  });
+
+  // 3. Escape all remaining raw < and >
+  res = res.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // 4. Restore valid Telegram HTML tags
+  res = res.replace(/@@TGVALIDTAG_(\d+)@@/g, (_match, idx) => validTagTokens[Number(idx)] || '');
+
+  return res;
+}
+
+/**
  * Convert modern Markdown (code blocks, inline code, bold, italics, blockquotes, expandable quotes, spoilers, links, in-text buttons)
  * to valid Telegram HTML formatting.
  * Preserves already present valid HTML tags.
@@ -42,7 +105,19 @@ export function markdownToTelegramHtml(markdown: string): string {
     return placeholder;
   });
 
-  // 3. Expandable blockquotes: **> quote or **>quote
+  // 3. Convert Markdown tables to clean structured cards
+  text = formatMarkdownTables(text);
+
+  // 4. Convert markdown list bullets (* item, - item) to clean Telegram unicode bullets
+  text = text.replace(/^([ \t]*)[*-]\s+(.+)$/gm, (_match, indent, content) => {
+    const bullet = indent.length >= 2 ? '▫️' : '•';
+    return `${indent}${bullet} ${content}`;
+  });
+
+  // 5. Horizontal dividers (---, ___, ***)
+  text = text.replace(/^(?:---|___|\*\*\*)\s*$/gm, '━━━━━━━━━━━━━━━━━━━━━━');
+
+  // 6. Expandable blockquotes: **> quote or **>quote
   text = text.replace(/(?:^\s*\*\*> ?(.*(?:\n\s*\*\*> ?.*)*))/gm, (block) => {
     const content = block
       .split('\n')
@@ -51,7 +126,7 @@ export function markdownToTelegramHtml(markdown: string): string {
     return `<blockquote expandable>${content}</blockquote>`;
   });
 
-  // 4. Standard blockquotes: > quote
+  // 7. Standard blockquotes: > quote
   text = text.replace(/(?:^\s*> ?(.*(?:\n\s*> ?.*)*))/gm, (block) => {
     const content = block
       .split('\n')
@@ -60,53 +135,56 @@ export function markdownToTelegramHtml(markdown: string): string {
     return `<blockquote>${content}</blockquote>`;
   });
 
-  // 5. Headers: ### Header -> <b>Header</b>
+  // 8. Headers: ### Header -> <b>Header</b>
   text = text.replace(/^#{1,6}\s+(.+)$/gm, '<b>$1</b>');
 
-  // 6. Bold: **text** or __text__
+  // 9. Bold: **text** or __text__
   text = text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   text = text.replace(/(?<=^|[\s(])__(.+?)__(?=$|[\s),.!?])/g, '<b>$1</b>');
 
-  // 7. Italic: *text* or _text_ (excluding inside identifiers)
+  // 10. Italic: *text* or _text_ (excluding inside identifiers)
   text = text.replace(/(?<=^|[\s(])\*([^*\n]+?)\*(?=$|[\s),.!?])/g, '<i>$1</i>');
   text = text.replace(/(?<=^|[\s(])_([^_\n]+?)_(?=$|[\s),.!?])/g, '<i>$1</i>');
 
-  // 8. Strikethrough: ~~text~~
+  // 11. Strikethrough: ~~text~~
   text = text.replace(/~~(.+?)~~/g, '<s>$1</s>');
 
-  // 9. Spoilers: ||text||
+  // 12. Spoilers: ||text||
   text = text.replace(/\|\|(.+?)\|\|/g, '<tg-spoiler>$1</tg-spoiler>');
 
-  // 10. In-Text Buttons (Telegram 13 / Bot API 10.3)
-  // 10a. Callback buttons: [🔘 Button Text](btn:data) or [🔘 Button Text](callback:data) or [🔘 Button Text](tg-btn:data)
+  // 13. In-Text Buttons (Telegram 13 / Bot API 10.3)
+  // 13a. Callback buttons: [🔘 Button Text](btn:data) or [🔘 Button Text](callback:data) or [🔘 Button Text](tg-btn:data)
   text = text.replace(/\[([^\]]+)\]\((?:btn|callback|tg-btn):([^)]+)\)/g, (_match, label, data) => {
     return `<tg-button type="callback_data" data="${escapeHtml(data.trim())}">${escapeHtml(label)}</tg-button>`;
   });
 
-  // 10b. URL buttons: [🌐 Button Text](btn-url:https://...) or [🌐 Button Text](button-url:https://...)
+  // 13b. URL buttons: [🌐 Button Text](btn-url:https://...) or [🌐 Button Text](button-url:https://...)
   text = text.replace(/\[([^\]]+)\]\((?:btn-url|button-url):(https?:\/\/[^\s)]+)\)/g, (_match, label, url) => {
     return `<tg-button type="url" url="${escapeHtml(url.trim())}">${escapeHtml(label)}</tg-button>`;
   });
 
-  // 10c. Copy text buttons: [📋 Copy Text](copy:content) or [📋 Copy Text](copy-text:content)
+  // 13c. Copy text buttons: [📋 Copy Text](copy:content) or [📋 Copy Text](copy-text:content)
   text = text.replace(/\[([^\]]+)\]\((?:copy|copy-text):([^)]+)\)/g, (_match, label, toCopy) => {
     return `<tg-button type="copy_text" text="${escapeHtml(toCopy.trim())}">${escapeHtml(label)}</tg-button>`;
   });
 
-  // 10d. Auto-wrap multiple adjacent button elements on a single line into <tg-button-row>
+  // 13d. Auto-wrap multiple adjacent button elements on a single line into <tg-button-row>
   text = text.replace(/(?:^|\n)((?:[ \t]*<tg-button\b[^>]*>.*?<\/tg-button>[ \t]*){2,})(?=\n|$)/g, (_match, group) => {
     const inner = group.trim();
     if (inner.startsWith('<tg-button-row')) return group;
     return `\n<tg-button-row align="center">${inner}</tg-button-row>`;
   });
 
-  // 11. Links: [text](url)
+  // 14. Links: [text](url)
   text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
 
-  // 12. Restore inline codes
+  // 15. Escape any unhandled raw < or > or unescaped &
+  text = escapeUnsafeHtmlEntities(text);
+
+  // 16. Restore inline codes
   text = text.replace(/@@TGINLINECODE(\d+)@@/g, (_match, idx) => inlineCodes[Number(idx)] || '');
 
-  // 13. Restore code blocks
+  // 17. Restore code blocks
   text = text.replace(/@@TGCODEBLOCK(\d+)@@/g, (_match, idx) => codeBlocks[Number(idx)] || '');
 
   return text;
@@ -180,6 +258,69 @@ export function extractButtonsToInlineKeyboard(html: string): { cleanedHtml: str
   };
 }
 
+export function splitHtmlIntoBalancedChunks(html: string, maxChunk: number = 3800): string[] {
+  const chunks: string[] = [];
+  let rest = html;
+  let carryOpenTags: string[] = [];
+
+  while (rest.length > 0) {
+    const prefix = carryOpenTags.map((t) => `<${t}>`).join('');
+    const targetSlice = Math.max(200, maxChunk - prefix.length - carryOpenTags.length * 10);
+
+    if (rest.length <= targetSlice) {
+      chunks.push(prefix + rest);
+      break;
+    }
+
+    let cut = rest.lastIndexOf('\n\n', targetSlice);
+    if (cut === -1 || cut < targetSlice / 2) {
+      cut = rest.lastIndexOf('\n', targetSlice);
+    }
+    if (cut === -1 || cut < targetSlice / 2) {
+      cut = rest.lastIndexOf('. ', targetSlice);
+      if (cut !== -1) cut += 1;
+    }
+    if (cut === -1 || cut < targetSlice / 2) {
+      cut = rest.lastIndexOf(' ', targetSlice);
+    }
+    if (cut === -1) {
+      cut = targetSlice;
+    }
+
+    const chunkContent = rest.slice(0, cut);
+    rest = rest.slice(cut).trim();
+
+    const fullChunk = prefix + chunkContent;
+    const tagStack: string[] = [];
+    const tagRegex = /<\/?([a-zA-Z0-9_-]+)(?:\s+[^>]*)?>/g;
+    let match: RegExpExecArray | null;
+
+    while ((match = tagRegex.exec(fullChunk)) !== null) {
+      const fullTag = match[0];
+      const tagName = match[1].toLowerCase();
+      const isClosing = fullTag.startsWith('</');
+
+      if (isClosing) {
+        if (tagStack.length > 0 && tagStack[tagStack.length - 1] === tagName) {
+          tagStack.pop();
+        }
+      } else if (!fullTag.endsWith('/>')) {
+        tagStack.push(tagName);
+      }
+    }
+
+    let suffix = '';
+    for (let i = tagStack.length - 1; i >= 0; i--) {
+      suffix += `</${tagStack[i]}>`;
+    }
+
+    chunks.push(fullChunk + suffix);
+    carryOpenTags = [...tagStack];
+  }
+
+  return chunks;
+}
+
 /**
  * Safely send a message, splitting into chunks if length exceeds Telegram's 4096-character limit.
  * Converts markdown to Telegram HTML formatting when parse_mode is HTML.
@@ -234,34 +375,8 @@ export async function safeReply(ctx: any, rawText: string, options: any = { pars
     }
   }
 
-  // Split into smart chunks <= MAX_CHUNK
-  const chunks: string[] = [];
-  let rest = finalText;
-
-  while (rest.length > 0) {
-    if (rest.length <= MAX_CHUNK) {
-      chunks.push(rest);
-      break;
-    }
-
-    let cut = rest.lastIndexOf('\n\n', MAX_CHUNK);
-    if (cut === -1 || cut < MAX_CHUNK / 2) {
-      cut = rest.lastIndexOf('\n', MAX_CHUNK);
-    }
-    if (cut === -1 || cut < MAX_CHUNK / 2) {
-      cut = rest.lastIndexOf('. ', MAX_CHUNK);
-      if (cut !== -1) cut += 1;
-    }
-    if (cut === -1 || cut < MAX_CHUNK / 2) {
-      cut = rest.lastIndexOf(' ', MAX_CHUNK);
-    }
-    if (cut === -1) {
-      cut = MAX_CHUNK;
-    }
-
-    chunks.push(rest.slice(0, cut).trim());
-    rest = rest.slice(cut).trim();
-  }
+  // Split into smart chunks <= MAX_CHUNK with balanced HTML tags
+  const chunks = splitHtmlIntoBalancedChunks(finalText, MAX_CHUNK);
 
   let lastRes: any = null;
   for (let i = 0; i < chunks.length; i++) {
