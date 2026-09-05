@@ -25,6 +25,8 @@ export interface UserSessionState {
 export class SessionStateManager {
   private userSessions: Map<number, UserSessionState> = new Map();
   private maxHistoryPerSession: number = 15;
+  private maxCachedSessions: number = 100;
+  private maxPersistedHistoryPerUser: number = 250;
 
   public getUserSession(userId: number): UserSessionState {
     let session = this.userSessions.get(userId);
@@ -42,6 +44,22 @@ export class SessionStateManager {
         lastMessageTime: meta?.updated_at || Date.now(),
         messages: recentMessages,
       };
+
+      // Bounded LRU cache eviction
+      if (this.userSessions.size >= this.maxCachedSessions) {
+        let oldestUserId: number | null = null;
+        let oldestTime = Infinity;
+        for (const [uid, s] of this.userSessions.entries()) {
+          if (s.lastMessageTime < oldestTime) {
+            oldestTime = s.lastMessageTime;
+            oldestUserId = uid;
+          }
+        }
+        if (oldestUserId !== null) {
+          this.userSessions.delete(oldestUserId);
+        }
+      }
+
       this.userSessions.set(userId, session);
     }
     return session;
@@ -103,6 +121,14 @@ export class SessionStateManager {
         db.prepare(
           'INSERT INTO telegram_conversations (user_id, role, content, timestamp) VALUES (?, ?, ?, ?)'
         ).run(userId, role, content, now);
+
+        // Retention pruning: keep last 250 messages per user in SQLite
+        db.prepare(`
+          DELETE FROM telegram_conversations
+          WHERE user_id = ? AND id NOT IN (
+            SELECT id FROM telegram_conversations WHERE user_id = ? ORDER BY timestamp DESC LIMIT ?
+          )
+        `).run(userId, userId, this.maxPersistedHistoryPerUser);
       } catch {}
     }).catch(() => {});
   }

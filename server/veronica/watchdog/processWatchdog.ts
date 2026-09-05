@@ -93,7 +93,11 @@ export class ProcessWatchdog {
   private treeKill(pid: number): void {
     try {
       if (process.platform === 'win32') {
-        spawn('taskkill', ['/pid', pid.toString(), '/T', '/F'], { shell: true });
+        spawn('taskkill', ['/pid', pid.toString(), '/T', '/F'], {
+          shell: false,
+          windowsHide: true,
+          stdio: 'ignore',
+        });
       } else {
         process.kill(-pid, 'SIGKILL');
       }

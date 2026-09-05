@@ -98,7 +98,11 @@ export class InferenceGateway {
             const killChild = () => {
               try {
                 if (process.platform === 'win32' && child.pid) {
-                  spawn('taskkill', ['/pid', child.pid.toString(), '/T', '/F'], { shell: true });
+                  spawn('taskkill', ['/pid', child.pid.toString(), '/T', '/F'], {
+                    shell: false,
+                    windowsHide: true,
+                    stdio: 'ignore',
+                  });
                 } else {
                   child.kill('SIGKILL');
                 }
