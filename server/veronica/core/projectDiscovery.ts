@@ -5,6 +5,7 @@ import { getMemoryDb } from '../../memoryDb';
 import { getVeronicaDb } from '../db/veronicaDb';
 import { writeQueue } from '../db/writeQueue';
 import { extractGitRemote, computeProjectFingerprint } from '../../projectService';
+import { loadConfig } from '../../config';
 
 export interface DiscoveredProject {
   id: string;
@@ -46,6 +47,17 @@ export class ProjectDiscovery {
       }
       this.devFolders = [fallbackWorkspacePath];
     }
+
+    // Automatically incorporate configured workspace directory parent
+    try {
+      const config = loadConfig();
+      if (config.workspace_dir && fs.existsSync(config.workspace_dir)) {
+        const parentDir = path.dirname(path.resolve(config.workspace_dir));
+        if (fs.existsSync(parentDir) && !this.devFolders.includes(parentDir)) {
+          this.devFolders.push(parentDir);
+        }
+      }
+    } catch {}
   }
 
   public getSearchPaths(): string[] {

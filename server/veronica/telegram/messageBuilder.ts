@@ -195,6 +195,12 @@ export class MessageBuilder {
       }`,
     ];
 
+    const todayStats = taskRegistry.getTodayTaskStats();
+    lines.push(`🔹 <b>Завершено сегодня:</b> ${todayStats.completed}`);
+    if (todayStats.failed > 0) {
+      lines.push(`⚠️ <b>Сбоев сегодня:</b> ${todayStats.failed}`);
+    }
+
     // Add Antigravity Quota Indicators
     const quota = quotaManager.getQuotaStatus();
     if (quota.limits && quota.limits.length > 0) {

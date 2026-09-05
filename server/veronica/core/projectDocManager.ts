@@ -14,6 +14,8 @@ export interface ProjectMetrics {
 
 export class ProjectDocManager {
   private static instance: ProjectDocManager;
+  private verifiedDirs: Set<string> = new Set();
+  private metricsCache: Map<string, ProjectMetrics> = new Map();
 
   private constructor() {}
 
@@ -31,8 +33,11 @@ export class ProjectDocManager {
   public getProjectDir(project: string): string {
     const sanitized = this.sanitizeProjectName(project);
     const projDir = path.join(getVeronicaDataDir(), 'projects', sanitized);
-    if (!fs.existsSync(projDir)) {
-      fs.mkdirSync(projDir, { recursive: true });
+    if (!this.verifiedDirs.has(projDir)) {
+      if (!fs.existsSync(projDir)) {
+        fs.mkdirSync(projDir, { recursive: true });
+      }
+      this.verifiedDirs.add(projDir);
     }
     return projDir;
   }
@@ -44,8 +49,10 @@ export class ProjectDocManager {
     const dir = this.getProjectDir(project);
     const passportFile = path.join(dir, 'PASSPORT.md');
 
-    if (fs.existsSync(passportFile)) {
-      return fs.readFileSync(passportFile, 'utf-8');
+    try {
+      return await fs.promises.readFile(passportFile, 'utf-8');
+    } catch {
+      // File does not exist yet; generate initial template
     }
 
     // Generate initial default template
@@ -73,7 +80,7 @@ export class ProjectDocManager {
       `- Keep documentation in sync.`,
     ].join('\n');
 
-    fs.writeFileSync(passportFile, template, 'utf-8');
+    await fs.promises.writeFile(passportFile, template, 'utf-8');
     return template;
   }
 
@@ -83,7 +90,7 @@ export class ProjectDocManager {
   public async savePassport(project: string, content: string): Promise<void> {
     const dir = this.getProjectDir(project);
     const passportFile = path.join(dir, 'PASSPORT.md');
-    fs.writeFileSync(passportFile, content, 'utf-8');
+    await fs.promises.writeFile(passportFile, content, 'utf-8');
   }
 
   /**
@@ -106,10 +113,11 @@ export class ProjectDocManager {
 
     const line = `\n### [${timestamp}]${taskIdStr} ${entry.action} (${author})\n${entry.details ? entry.details.trim() + '\n' : ''}`;
 
-    if (!fs.existsSync(logFile)) {
-      fs.writeFileSync(logFile, `# Changelog & History: ${project}\n`, 'utf-8');
+    try {
+      await fs.promises.appendFile(logFile, line, 'utf-8');
+    } catch {
+      await fs.promises.writeFile(logFile, `# Changelog & History: ${project}\n` + line, 'utf-8');
     }
-    fs.appendFileSync(logFile, line, 'utf-8');
   }
 
   /**
@@ -118,21 +126,29 @@ export class ProjectDocManager {
   public async getChangelog(project: string, limitLines: number = 30): Promise<string> {
     const dir = this.getProjectDir(project);
     const logFile = path.join(dir, 'CHANGELOG.md');
-    if (!fs.existsSync(logFile)) return 'No changelog entries yet.';
-    const content = fs.readFileSync(logFile, 'utf-8');
-    const lines = content.split('\n');
-    return lines.slice(-limitLines).join('\n');
+    try {
+      const content = await fs.promises.readFile(logFile, 'utf-8');
+      const lines = content.split('\n');
+      return lines.slice(-limitLines).join('\n');
+    } catch {
+      return 'No changelog entries yet.';
+    }
   }
 
   /**
    * Get structured metrics
    */
   public getMetrics(project: string): ProjectMetrics {
+    const cached = this.metricsCache.get(project);
+    if (cached) return cached;
+
     const dir = this.getProjectDir(project);
     const metricsFile = path.join(dir, 'METRICS.json');
     if (fs.existsSync(metricsFile)) {
       try {
-        return JSON.parse(fs.readFileSync(metricsFile, 'utf-8'));
+        const parsed = JSON.parse(fs.readFileSync(metricsFile, 'utf-8'));
+        this.metricsCache.set(project, parsed);
+        return parsed;
       } catch {}
     }
     return {};
@@ -151,7 +167,10 @@ export class ProjectDocManager {
       custom: { ...(current.custom || {}), ...(updates.custom || {}) },
       last_updated: Date.now(),
     };
-    fs.writeFileSync(metricsFile, JSON.stringify(updated, null, 2), 'utf-8');
+    this.metricsCache.set(project, updated);
+    fs.promises.writeFile(metricsFile, JSON.stringify(updated, null, 2), 'utf-8').catch(() => {
+      try { fs.writeFileSync(metricsFile, JSON.stringify(updated, null, 2), 'utf-8'); } catch {}
+    });
     return updated;
   }
 
