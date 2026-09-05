@@ -16,6 +16,8 @@ import { veronicaOrchestrator } from '../server/veronica/telegram/veronicaOrches
 import { CliHandler } from '../server/veronica/cli/cliHandler';
 import { MessageBuilder } from '../server/veronica/telegram/messageBuilder';
 import { snapshotCache } from '../server/veronica/core/snapshotCache';
+import { taskActionDispatcher } from '../server/veronica/telegram/taskActionDispatcher';
+import { sessionStateManager } from '../server/veronica/telegram/sessionStateManager';
 
 describe('Veronica Orchestrator & Project Management Architecture', () => {
   before(() => {
@@ -184,6 +186,62 @@ describe('Veronica Orchestrator & Project Management Architecture', () => {
 
       const queryMatch = await veronicaOrchestrator.resolveTargetProject(undefined, 'Добавь кнопку в LogisticsApp');
       assert.strictEqual(queryMatch, 'LogisticsApp');
+    });
+  });
+
+  describe('6. TaskActionDispatcher & Resilient Action Tag Parsing', () => {
+    it('should parse action tags with arbitrary attribute ordering', async () => {
+      const session = sessionStateManager.getUserSession(554433);
+      session.activeProject = 'LogisticsApp';
+
+      // Attributes ordered differently: prompt first, then type, then project
+      const input = 'Отличная идея! <action prompt="Сделать аудит роутов" type="run_task" project="LogisticsApp" /> Я запустила задачу.';
+
+      const clean = await taskActionDispatcher.dispatchActionTags(
+        session,
+        input,
+        async (candidate) => candidate || 'LogisticsApp'
+      );
+
+      assert.ok(!clean.includes('<action'), 'Action tag should be stripped from response');
+      assert.ok(clean.includes('Отличная идея!'));
+      assert.ok(clean.includes('Я запустила задачу.'));
+      assert.strictEqual(session.lastTaskProject, 'LogisticsApp');
+      assert.strictEqual(session.lastTaskSummary, 'Сделать аудит роутов');
+    });
+
+    it('should parse continue_task with prompt before type', async () => {
+      const session = sessionStateManager.getUserSession(554433);
+      session.lastTaskId = 'mock-task-id-123';
+      session.lastTaskProject = 'LogisticsApp';
+
+      const input = 'Продолжаю работу: <action prompt="Уточни валидацию" type="continue_task" /> Процесс запущен.';
+
+      const clean = await taskActionDispatcher.dispatchActionTags(
+        session,
+        input,
+        async (candidate) => candidate || 'LogisticsApp'
+      );
+
+      assert.ok(!clean.includes('<action'), 'continue_task tag should be stripped');
+      assert.strictEqual(session.lastTaskSummary, 'Уточни валидацию');
+    });
+
+    it('should parse schedule_task regardless of attribute order', async () => {
+      const session = sessionStateManager.getUserSession(554433);
+      session.activeProject = 'LogisticsApp';
+
+      const input = 'Запланировано: <action schedule="0 9 * * *" prompt="Ежедневный аудит" type="schedule_task" project="LogisticsApp" /> Готово.';
+
+      const clean = await taskActionDispatcher.dispatchActionTags(
+        session,
+        input,
+        async (candidate) => candidate || 'LogisticsApp'
+      );
+
+      assert.ok(!clean.includes('<action'), 'schedule_task tag should be stripped');
+      assert.ok(clean.includes('Запланировано:'));
+      assert.ok(clean.includes('Готово.'));
     });
   });
 });

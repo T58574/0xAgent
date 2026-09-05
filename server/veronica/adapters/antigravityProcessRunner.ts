@@ -1,4 +1,4 @@
-import { spawn, execSync, ChildProcess } from 'node:child_process';
+import { spawn, ChildProcess } from 'node:child_process';
 import { loadConfig } from '../../config';
 import { proxyService } from '../../proxyService';
 import { getSafeCliPath, resolveAntigravityModelAndEffort } from './antigravityModels';
@@ -101,7 +101,15 @@ export class AntigravityProcessRunner {
     if (!child.pid) return;
     try {
       if (process.platform === 'win32') {
-        execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore', windowsHide: true });
+        const killer = spawn('taskkill', ['/F', '/T', '/PID', String(child.pid)], {
+          stdio: 'ignore',
+          windowsHide: true,
+        });
+        killer.on('error', () => {
+          try {
+            child.kill('SIGKILL');
+          } catch {}
+        });
       } else {
         process.kill(-child.pid, 'SIGKILL');
       }

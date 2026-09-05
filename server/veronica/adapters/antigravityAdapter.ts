@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { spawn, execSync, ChildProcess } from 'node:child_process';
+import { spawn, ChildProcess } from 'node:child_process';
 import { RuntimeAdapter, SpawnTaskOptions } from './runtimeAdapter';
 import { AgentTask, TaskStatus } from '../types';
 import { taskRegistry } from '../core/taskRegistry';
@@ -147,7 +147,15 @@ export class AntigravityAdapter implements RuntimeAdapter {
           try {
             if (proc.pid) {
               if (process.platform === 'win32') {
-                execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore', windowsHide: true });
+                const killer = spawn('taskkill', ['/F', '/T', '/PID', String(proc.pid)], {
+                  stdio: 'ignore',
+                  windowsHide: true,
+                });
+                killer.on('error', () => {
+                  try {
+                    proc.kill('SIGKILL');
+                  } catch {}
+                });
               } else {
                 proc.kill('SIGKILL');
               }
