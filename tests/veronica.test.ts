@@ -23,6 +23,8 @@ import { operationalJournal } from '../server/veronica/core/operationalJournal';
 import { taskPromptBuilder } from '../server/veronica/core/taskPromptBuilder';
 import { buildFullSystemPrompt } from '../server/agent/promptBuilder';
 import { VeronicaOrchestrator } from '../server/veronica/telegram/veronicaOrchestrator';
+import { getDefaultConfig } from '../server/config';
+import { voiceThoughtService } from '../server/veronica/telegram/voiceThoughtService';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -684,6 +686,34 @@ gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
       const router = createVeronicaRouter(() => {});
       assert.ok(router);
       assert.equal(typeof router.use, 'function');
+    });
+  });
+
+  describe('15. Speech-To-Text (STT) Engine Selection & Configuration', () => {
+    it('should define default stt_engine as auto in default config', () => {
+      const config = getDefaultConfig();
+      assert.equal(config.veronica?.stt_engine, 'auto');
+    });
+
+    it('should support explicit stt_engine choices in VeronicaConfig', () => {
+      const engines = ['auto', 'local', 'groq', 'vosk'] as const;
+      for (const eng of engines) {
+        const customConfig = {
+          ...getDefaultConfig(),
+          veronica: {
+            ...getDefaultConfig().veronica,
+            stt_engine: eng,
+          },
+        };
+        assert.equal(customConfig.veronica.stt_engine, eng);
+      }
+    });
+
+    it('should instantiate VoiceThoughtService and expose transcribeAudio method', () => {
+      assert.ok(voiceThoughtService);
+      assert.equal(typeof voiceThoughtService.transcribeAudio, 'function');
+      assert.equal(typeof voiceThoughtService.downloadTelegramAudio, 'function');
+      assert.equal(typeof voiceThoughtService.structureThought, 'function');
     });
   });
 });

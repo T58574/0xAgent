@@ -1,4 +1,3 @@
-import { DatabaseSync } from 'node:sqlite';
 import {
   CanonicalMemory,
   Episode,
@@ -12,10 +11,49 @@ import {
 import { getMemoryDb } from './memoryDb';
 import { resolveProjectForWorkspace } from './projectService';
 import { inferPromptMode, allocateScopedMemories } from './budgetManager';
+import {
+  DEFAULT_SUBJECT_ID,
+  normalizeCategory,
+  AddMemoryOptions,
+  addOrUpdateMemory,
+  getUserMemories,
+  getProjectMemories,
+  getPersonaMemories,
+  loadMemories,
+  getCanonicalMemories,
+  deleteMemory,
+  queryMemories,
+  getCandidateMemories,
+  resolveConflict,
+} from './memoryStore';
+import {
+  saveEpisode,
+  searchEpisodesFts,
+  getPersonaRelationship,
+  upsertPersonaRelationship,
+} from './memoryEpisodes';
 
-export { getMemoryDb };
+export {
+  getMemoryDb,
+  normalizeCategory,
+  addOrUpdateMemory,
+  getUserMemories,
+  getProjectMemories,
+  getPersonaMemories,
+  loadMemories,
+  getCanonicalMemories,
+  deleteMemory,
+  queryMemories,
+  getCandidateMemories,
+  resolveConflict,
+  saveEpisode,
+  searchEpisodesFts,
+  getPersonaRelationship,
+  upsertPersonaRelationship,
+};
 
 export type {
+  AddMemoryOptions,
   CanonicalMemory,
   Episode,
   PersonaRelationship,
@@ -26,486 +64,8 @@ export type {
   MemoryItem,
 };
 
-const DEFAULT_SUBJECT_ID = 'user_default';
-
-export function normalizeCategory(c?: string): MemoryCategory {
-  const valid: MemoryCategory[] = [
-    'profile',
-    'preference',
-    'interest',
-    'fact',
-    'user_preference',
-    'project_convention',
-    'architecture',
-    'general',
-  ];
-  if (c && valid.includes(c as MemoryCategory)) {
-    return c as MemoryCategory;
-  }
-  return 'fact';
-}
-
 // ============================================================================
-// 1. CANONICAL MEMORIES CRUD & WRITE POLICY
-// ============================================================================
-
-export interface AddMemoryOptions {
-  scope?: MemoryScope;
-  subjectId?: string;
-  projectId?: string | null;
-  personaId?: string | null;
-  sessionId?: string | null;
-  domain?: string;
-  displayText?: string | null;
-  isExplicit?: boolean | number;
-  confidence?: number;
-  importance?: number;
-  sourceId?: string;
-  actorScope?: string;
-  expiresAt?: string | null;
-}
-
-export function addOrUpdateMemory(
-  key: string,
-  value: string,
-  category?: string,
-  options: AddMemoryOptions = {}
-): MemoryItem | null {
-  const db = getMemoryDb();
-  const now = Date.now();
-  const scope: MemoryScope = options.scope || (category === 'project_convention' || category === 'architecture' ? 'project' : 'user');
-  const subjectId = scope === 'user' ? (options.subjectId || DEFAULT_SUBJECT_ID) : DEFAULT_SUBJECT_ID;
-  const projectId = options.projectId || null;
-  const personaId = options.personaId || null;
-  const sessionId = options.sessionId || null;
-  const displayText = options.displayText || null;
-  const expiresAt = options.expiresAt || null;
-  const cat = normalizeCategory(category);
-  const domain = options.domain || 'general';
-  const isExp = options.isExplicit ? 1 : 0;
-  const conf = options.confidence !== undefined ? options.confidence : (isExp ? 1.0 : 0.85);
-  const imp = options.importance !== undefined ? options.importance : 3;
-  const sourceId = options.sourceId || null;
-  const actorScope = options.actorScope || (isExp ? 'user_explicit' : 'extractor_worker');
-
-  // Memory Write Policy
-  // Explicit commands bypass confidence gate.
-  // Weak inferences (< 0.70) are discarded (IGNORE).
-  // Medium inferences (0.70 <= conf < 0.90) are saved as 'candidate'.
-  // Strong inferences (>= 0.90) or explicit are saved as 'active'.
-  let status: MemoryStatus = 'active';
-  if (!isExp) {
-    if (conf < 0.7) {
-      return null; // IGNORE
-    } else if (conf < 0.9) {
-      status = 'candidate';
-    }
-  }
-
-  // Check if an active record exists with the exact natural key identity
-  const existing = db.prepare(`
-    SELECT * FROM canonical_memories 
-    WHERE subject_id = ? AND category = ? AND domain = ? AND key = ? AND status = 'active'
-  `).get(subjectId, cat, domain, key) as any;
-
-  if (existing) {
-    if (existing.value === value) {
-      // Re-confirmation: update timestamp, confidence, and scope fields
-      db.prepare(`
-        UPDATE canonical_memories 
-        SET confidence = MAX(confidence, ?), last_confirmed_at = ?, updated_at = ?,
-            scope = ?, project_id = COALESCE(?, project_id), persona_id = COALESCE(?, persona_id),
-            session_id = COALESCE(?, session_id), display_text = COALESCE(?, display_text)
-        WHERE id = ?
-      `).run(conf, now, now, scope, projectId, personaId, sessionId, displayText, existing.id);
-
-      return mapCanonicalToMemoryItem({
-        ...existing,
-        scope,
-        project_id: projectId || existing.project_id,
-        persona_id: personaId || existing.persona_id,
-        session_id: sessionId || existing.session_id,
-        display_text: displayText || existing.display_text,
-        confidence: Math.max(existing.confidence, conf),
-        last_confirmed_at: now,
-        updated_at: now,
-      });
-    }
-
-    // Value changed: mark old active record as superseded
-    db.prepare(`
-      UPDATE canonical_memories 
-      SET status = 'superseded', updated_at = ? 
-      WHERE id = ?
-    `).run(now, existing.id);
-
-    logAuditEntry(db, {
-      memory_id: existing.id,
-      operation: 'UPDATE',
-      old_status: 'active',
-      new_status: 'superseded',
-      old_value: existing.value,
-      new_value: value,
-      reason: `Superseded by new value for ${key}`,
-      applied_by: isExp ? 'user_explicit' : 'extractor_worker',
-      actor_scope: actorScope,
-      timestamp: now,
-    });
-  }
-
-  const newId = `mem_${now}_${Math.random().toString(36).substring(2, 6)}`;
-  db.prepare(`
-    INSERT INTO canonical_memories (
-      id, scope, subject_id, project_id, persona_id, session_id, category, domain, key, value, display_text, confidence, is_explicit, importance, status, source_id, expires_at, created_at, updated_at, last_confirmed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(newId, scope, subjectId, projectId, personaId, sessionId, cat, domain, key, value, displayText, conf, isExp, imp, status, sourceId, expiresAt, now, now, now);
-
-  logAuditEntry(db, {
-    memory_id: newId,
-    operation: 'NEW',
-    new_status: status,
-    new_value: value,
-    reason: `Created ${status} fact: ${key}`,
-    applied_by: isExp ? 'user_explicit' : 'extractor_worker',
-    actor_scope: actorScope,
-    timestamp: now,
-  });
-
-  return {
-    id: newId,
-    scope,
-    key,
-    value,
-    category: cat,
-    subject_id: subjectId,
-    project_id: projectId,
-    persona_id: personaId,
-    session_id: sessionId,
-    domain,
-    display_text: displayText,
-    confidence: conf,
-    is_explicit: isExp,
-    importance: imp,
-    status,
-    source_id: sourceId,
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
-export function getUserMemories(subjectId: string = DEFAULT_SUBJECT_ID): MemoryItem[] {
-  const db = getMemoryDb();
-  const rows = db.prepare(`
-    SELECT * FROM canonical_memories
-    WHERE scope = 'user' AND subject_id = ? AND status = 'active'
-    ORDER BY importance DESC, updated_at DESC
-  `).all(subjectId) as any[];
-  return rows.map(mapCanonicalToMemoryItem);
-}
-
-export function getProjectMemories(projectId: string): MemoryItem[] {
-  const db = getMemoryDb();
-  const rows = db.prepare(`
-    SELECT * FROM canonical_memories
-    WHERE scope = 'project' AND project_id = ? AND status = 'active'
-    ORDER BY importance DESC, updated_at DESC
-  `).all(projectId) as any[];
-  return rows.map(mapCanonicalToMemoryItem);
-}
-
-export function getPersonaMemories(personaId: string): MemoryItem[] {
-  const db = getMemoryDb();
-  const rows = db.prepare(`
-    SELECT * FROM canonical_memories
-    WHERE scope = 'persona' AND persona_id = ? AND status = 'active'
-    ORDER BY importance DESC, updated_at DESC
-  `).all(personaId) as any[];
-  return rows.map(mapCanonicalToMemoryItem);
-}
-
-export function loadMemories(subjectId: string = DEFAULT_SUBJECT_ID): MemoryItem[] {
-  const db = getMemoryDb();
-  const rows = db.prepare(`
-    SELECT * FROM canonical_memories 
-    WHERE subject_id = ? AND status = 'active'
-    ORDER BY importance DESC, updated_at DESC
-  `).all(subjectId) as any[];
-
-  return rows.map(mapCanonicalToMemoryItem);
-}
-
-export function getCanonicalMemories(
-  subjectId: string = DEFAULT_SUBJECT_ID,
-  status: MemoryStatus = 'active'
-): CanonicalMemory[] {
-  const db = getMemoryDb();
-  return db.prepare(`
-    SELECT * FROM canonical_memories 
-    WHERE subject_id = ? AND status = ?
-    ORDER BY importance DESC, updated_at DESC
-  `).all(subjectId, status) as unknown as CanonicalMemory[];
-}
-
-export function deleteMemory(keyOrId: string, subjectId: string = DEFAULT_SUBJECT_ID): boolean {
-  const db = getMemoryDb();
-  const now = Date.now();
-  const row = db.prepare(`
-    SELECT * FROM canonical_memories 
-    WHERE subject_id = ? AND (id = ? OR LOWER(key) = LOWER(?)) AND status != 'invalidated'
-  `).get(subjectId, keyOrId, keyOrId) as any;
-
-  if (!row) {
-    return false;
-  }
-
-  db.prepare(`
-    UPDATE canonical_memories 
-    SET status = 'invalidated', updated_at = ? 
-    WHERE id = ?
-  `).run(now, row.id);
-
-  logAuditEntry(db, {
-    memory_id: row.id,
-    operation: 'INVALIDATE',
-    old_status: row.status,
-    new_status: 'invalidated',
-    old_value: row.value,
-    reason: `Invalidated by user command / delete request for ${keyOrId}`,
-    applied_by: 'user_explicit',
-    timestamp: now,
-  });
-
-  return true;
-}
-
-export function queryMemories(query: string, subjectId: string = DEFAULT_SUBJECT_ID): MemoryItem[] {
-  const db = getMemoryDb();
-  if (!query || query.trim() === '*' || query.trim() === '') {
-    return loadMemories(subjectId);
-  }
-
-  const q = `%${query.trim().toLowerCase()}%`;
-  const rows = db.prepare(`
-    SELECT * FROM canonical_memories 
-    WHERE subject_id = ? AND status = 'active' AND (
-      LOWER(key) LIKE ? OR LOWER(value) LIKE ? OR LOWER(category) LIKE ? OR LOWER(domain) LIKE ?
-    )
-    ORDER BY importance DESC, updated_at DESC
-  `).all(subjectId, q, q, q, q) as any[];
-
-  return rows.map(mapCanonicalToMemoryItem);
-}
-
-// ============================================================================
-// 2. EPISODES CRUD & FTS5 SEARCH
-// ============================================================================
-
-export function saveEpisode(params: {
-  sessionId: string;
-  title: string;
-  summary: string;
-  importance?: number;
-  eventTimestamp?: number;
-  subjectId?: string;
-  sourceId?: string;
-}): Episode {
-  const db = getMemoryDb();
-  const now = Date.now();
-  const id = `ep_${now}_${Math.random().toString(36).substring(2, 6)}`;
-  const subjectId = params.subjectId || DEFAULT_SUBJECT_ID;
-  const imp = params.importance || 3;
-  const evTime = params.eventTimestamp || now;
-
-  db.prepare(`
-    INSERT INTO episodes (
-      id, subject_id, session_id, title, summary, importance, lifecycle, event_timestamp, source_id, created_at, last_accessed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?)
-  `).run(id, subjectId, params.sessionId, params.title, params.summary, imp, evTime, params.sourceId || null, now, now);
-
-  return {
-    id,
-    subject_id: subjectId,
-    session_id: params.sessionId,
-    title: params.title,
-    summary: params.summary,
-    importance: imp,
-    lifecycle: 'active',
-    event_timestamp: evTime,
-    source_id: params.sourceId,
-    created_at: now,
-    last_accessed_at: now,
-  };
-}
-
-export function searchEpisodesFts(
-  query: string,
-  limit: number = 5,
-  subjectId: string = DEFAULT_SUBJECT_ID
-): Episode[] {
-  const db = getMemoryDb();
-  if (!query || !query.trim()) {
-    return [];
-  }
-
-  // Sanitize query for FTS5 syntax
-  const sanitized = query
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .join(' OR ');
-
-  if (!sanitized) {
-    return [];
-  }
-
-  try {
-    const rows = db.prepare(`
-      SELECT e.* FROM episodes e
-      JOIN episodes_fts f ON e.rowid = f.rowid
-      WHERE e.subject_id = ? AND e.lifecycle = 'active' AND episodes_fts MATCH ?
-      ORDER BY bm25(episodes_fts) ASC, e.event_timestamp DESC
-      LIMIT ?
-    `).all(subjectId, sanitized, limit) as unknown as Episode[];
-
-    const now = Date.now();
-    for (const r of rows) {
-      db.prepare('UPDATE episodes SET last_accessed_at = ? WHERE id = ?').run(now, r.id);
-    }
-    return rows;
-  } catch (err) {
-    console.warn('[memory] FTS query error fallback:', err);
-    return [];
-  }
-}
-
-// ============================================================================
-// 3. PERSONA RELATIONSHIPS
-// ============================================================================
-
-export function getPersonaRelationship(
-  personaId: string,
-  subjectId: string = DEFAULT_SUBJECT_ID
-): PersonaRelationship {
-  const db = getMemoryDb();
-  const row = db.prepare(`
-    SELECT * FROM persona_relationships 
-    WHERE subject_id = ? AND persona_id = ?
-  `).get(subjectId, personaId) as any;
-
-  if (row) {
-    let refs: string[] = [];
-    try {
-      refs = row.shared_references ? JSON.parse(row.shared_references) : [];
-    } catch {}
-    return {
-      ...row,
-      shared_references: refs,
-    };
-  }
-
-  // Default initial relationship
-  return {
-    subject_id: subjectId,
-    persona_id: personaId,
-    familiarity: 0.5,
-    formality: 0.5,
-    warmth: 0.6,
-    humor_level: 0.5,
-    preferred_address: undefined,
-    relationship_summary: 'Начальная стадия взаимодействия. Общение конструктивное и прямое.',
-    shared_references: [],
-    interaction_count: 0,
-    updated_at: Date.now(),
-  };
-}
-
-export function upsertPersonaRelationship(
-  data: Partial<PersonaRelationship> & { persona_id: string; subject_id?: string }
-): PersonaRelationship {
-  const db = getMemoryDb();
-  const now = Date.now();
-  const subjectId = data.subject_id || DEFAULT_SUBJECT_ID;
-  const current = getPersonaRelationship(data.persona_id, subjectId);
-
-  const updated: PersonaRelationship = {
-    ...current,
-    ...data,
-    subject_id: subjectId,
-    persona_id: data.persona_id,
-    interaction_count: (current.interaction_count || 0) + (data.interaction_count !== undefined ? data.interaction_count : 1),
-    updated_at: now,
-  };
-
-  const refsJson = JSON.stringify(updated.shared_references || []);
-
-  db.prepare(`
-    INSERT INTO persona_relationships (
-      subject_id, persona_id, familiarity, formality, warmth, humor_level, preferred_address, relationship_summary, shared_references, interaction_count, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(subject_id, persona_id) DO UPDATE SET
-      familiarity = excluded.familiarity,
-      formality = excluded.formality,
-      warmth = excluded.warmth,
-      humor_level = excluded.humor_level,
-      preferred_address = excluded.preferred_address,
-      relationship_summary = excluded.relationship_summary,
-      shared_references = excluded.shared_references,
-      interaction_count = excluded.interaction_count,
-      updated_at = excluded.updated_at
-  `).run(
-    subjectId,
-    updated.persona_id,
-    updated.familiarity,
-    updated.formality,
-    updated.warmth,
-    updated.humor_level,
-    updated.preferred_address || null,
-    updated.relationship_summary || null,
-    refsJson,
-    updated.interaction_count,
-    now
-  );
-
-  return updated;
-}
-
-// ============================================================================
-// 4. CANDIDATES & CONFLICT RESOLUTION
-// ============================================================================
-
-export function getCandidateMemories(subjectId: string = DEFAULT_SUBJECT_ID): CanonicalMemory[] {
-  return getCanonicalMemories(subjectId, 'candidate');
-}
-
-export function resolveConflict(
-  memoryId: string,
-  resolution: 'accept' | 'reject',
-  reason?: string
-): boolean {
-  const db = getMemoryDb();
-  const now = Date.now();
-  const row = db.prepare('SELECT * FROM canonical_memories WHERE id = ?').get(memoryId) as any;
-  if (!row) return false;
-
-  const newStatus: MemoryStatus = resolution === 'accept' ? 'active' : 'invalidated';
-  db.prepare('UPDATE canonical_memories SET status = ?, updated_at = ? WHERE id = ?').run(newStatus, now, memoryId);
-
-  logAuditEntry(db, {
-    memory_id: memoryId,
-    operation: 'RESOLVE',
-    old_status: row.status,
-    new_status: newStatus,
-    reason: reason || `Manual resolution: ${resolution}`,
-    applied_by: 'admin',
-    timestamp: now,
-  });
-
-  return true;
-}
-
-// ============================================================================
-// 5. DETERMINISTIC MEMORY ROUTER & DYNAMIC TOKEN BUDGET (0..400 Tokens)
+// DETERMINISTIC MEMORY ROUTER & DYNAMIC TOKEN BUDGET (0..400 Tokens)
 // ============================================================================
 
 export interface MemoryRoutingResult {
@@ -662,56 +222,6 @@ export function getSystemPromptMemoryContext(activePersonaId: string = 'default'
   }
 
   return `\n\n# Dynamic Persona & User Memory View\n${lines.join('\n')}`;
-}
-
-// Helpers
-function mapCanonicalToMemoryItem(row: any): MemoryItem {
-  return {
-    id: row.id,
-    scope: row.scope || 'user',
-    key: row.key,
-    value: row.value,
-    category: row.category,
-    subject_id: row.subject_id,
-    project_id: row.project_id || null,
-    persona_id: row.persona_id || null,
-    session_id: row.session_id || null,
-    domain: row.domain,
-    display_text: row.display_text || null,
-    confidence: row.confidence,
-    is_explicit: row.is_explicit,
-    importance: row.importance,
-    status: row.status,
-    source_id: row.source_id || null,
-    usage_count: row.usage_count || 0,
-    last_used_at: row.last_used_at || null,
-    expires_at: row.expires_at || null,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-function logAuditEntry(db: DatabaseSync, entry: MemoryAuditEntry): void {
-  try {
-    db.prepare(`
-      INSERT INTO memory_audit_log (
-        memory_id, operation, old_status, new_status, old_value, new_value, reason, applied_by, actor_scope, timestamp
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      entry.memory_id,
-      entry.operation,
-      entry.old_status || null,
-      entry.new_status || null,
-      entry.old_value || null,
-      entry.new_value || null,
-      entry.reason || null,
-      entry.applied_by,
-      entry.actor_scope || null,
-      entry.timestamp
-    );
-  } catch (err) {
-    console.warn('[memory] Audit log error:', err);
-  }
 }
 
 function estimateTokens(text: string): number {

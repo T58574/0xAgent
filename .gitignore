@@ -30,11 +30,16 @@ vite.config.js
 
 # AI Models & Large Binaries
 models/
+build-llama/
+llama/
 *.gguf
 *.bin
 *.safetensors
 *.mmproj
 *.onnx
+*.dll
+*.so
+*.dylib
 
 # Application Runtime Data & Local Cache
 .0xagent/

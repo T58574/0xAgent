@@ -67,26 +67,60 @@ export class MessageBuilder {
     return true;
   }
 
-  public static buildModelSelectMessage(currentModel: string): string {
+  public static buildModelSelectMessage(currentModel: string, currentStt?: string): string {
     const isAgy = MessageBuilder.isAntigravityModel(currentModel);
     const cleanModelName = currentModel.replace(/^local:/, '');
+    const config = loadConfig();
+    const stt = currentStt || config.veronica?.stt_engine || 'auto';
+
+    const sttLabels: Record<string, string> = {
+      auto: '⚡ Авто (Qwen3 ➜ Groq ➜ Vosk)',
+      local: '🧠 Локальный Qwen3 (DirectML)',
+      groq: '☁️ Groq Whisper (via 0xProxy)',
+      vosk: '📦 Vosk Offline',
+    };
 
     const lines: string[] = [
-      `🧠 <b>Выбор активной модели и движка для Вероники:</b>`,
+      `🧠 <b>Выбор активной модели и движков Вероники:</b>`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
-      `🔹 <b>Текущая модель:</b> <code>${escapeHtml(cleanModelName)}</code>`,
-      `🔹 <b>Движок:</b> ${isAgy ? '⚡ Antigravity CLI Headless (agy)' : '🖥️ Local llama-server (GGUF)'}`,
+      `🔹 <b>LLM модель:</b> <code>${escapeHtml(cleanModelName)}</code>`,
+      `🔹 <b>Инференс LLM:</b> ${isAgy ? '⚡ Antigravity CLI Headless (agy)' : '🖥️ Local llama-server (GGUF)'}`,
+      `🎙️ <b>Транскрибация (STT):</b> <code>${escapeHtml(sttLabels[stt] || stt)}</code>`,
       ``,
-      `<i>Выберите модель из списка ниже для переключения:</i>`,
+      `<i>Нажимайте кнопки ниже для моментального переключения:</i>`,
     ];
     return lines.join('\n');
   }
 
-  public static buildModelSelectKeyboard(models: string[], currentModel: string): InlineKeyboard {
+  public static buildModelSelectKeyboard(models: string[], currentModel: string, currentStt?: string): InlineKeyboard {
     const keyboard = new InlineKeyboard();
     const cleanCurrent = currentModel.replace(/^local:/, '');
+    const config = loadConfig();
+    const stt = currentStt || config.veronica?.stt_engine || 'auto';
 
-    // 1. Antigravity Official CLI Models (dynamically fetched from cache/CLI)
+    // 1. Transcription / STT Engine Selection Buttons
+    const sttOptions = [
+      { id: 'auto', label: '⚡ Авто STT' },
+      { id: 'local', label: '🧠 Локальный Qwen3' },
+      { id: 'groq', label: '☁️ Groq Whisper' },
+      { id: 'vosk', label: '📦 Vosk' },
+    ];
+
+    for (let i = 0; i < sttOptions.length; i += 2) {
+      const opt1 = sttOptions[i];
+      const opt2 = sttOptions[i + 1];
+      const sel1 = stt === opt1.id ? '🔘' : '⚪';
+      keyboard.text(`${sel1} ${opt1.label}`, `veronica:set_stt:${opt1.id}`);
+      if (opt2) {
+        const sel2 = stt === opt2.id ? '🔘' : '⚪';
+        keyboard.text(`${sel2} ${opt2.label}`, `veronica:set_stt:${opt2.id}`);
+      }
+      keyboard.row();
+    }
+
+    keyboard.text('──────── 🧠 LLM Модели ────────', 'veronica:noop').row();
+
+    // 2. Antigravity Official CLI Models (dynamically fetched from cache/CLI)
     const rawAgyModels = antigravityAdapter.getAvailableRawAntigravityModels();
 
     for (const am of rawAgyModels) {
@@ -95,7 +129,7 @@ export class MessageBuilder {
       keyboard.text(label, `veronica:set_model:${am.slug}`).row();
     }
 
-    // 2. Local llama-server GGUF Models (if any available)
+    // 3. Local llama-server GGUF Models (if any available)
     for (const m of models) {
       const isSelected = cleanCurrent === m;
       const label = `${isSelected ? '🔘' : '⚪'} 🖥️ ${m.length > 25 ? m.substring(0, 22) + '...' : m}`;
@@ -103,6 +137,47 @@ export class MessageBuilder {
     }
 
     return keyboard;
+  }
+
+  /**
+   * Dedicated STT Voice Model Selection Card
+   */
+  public static buildSttSelectMessage(currentStt?: string): { text: string; keyboard: InlineKeyboard } {
+    const config = loadConfig();
+    const stt = currentStt || config.veronica?.stt_engine || 'auto';
+    const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
+
+    const sttNames: Record<string, string> = {
+      auto: '⚡ Авто (Локальный Qwen3-ASR ➜ Groq ➜ Vosk)',
+      local: '🧠 Локальный STT (0xVoice2Text / Qwen3 DirectML)',
+      groq: '☁️ Groq Cloud (Whisper Large v3 Turbo через 0xProxy)',
+      vosk: '📦 Vosk Offline (Локальный легкий)',
+    };
+
+    const lines = [
+      `🎙️ <b>Выбор модели распознавания речи (STT):</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `🔹 <b>Текущий режим:</b> <code>${escapeHtml(sttNames[stt] || stt)}</code>`,
+      `🛡️ <b>Шлюз 0xProxy:</b> ${proxyUrl ? '🟢 Активен' : '⚪ Прямое подключение'}`,
+      ``,
+      `<i>Нажмите кнопку ниже для переключения движка транскрибации голосовых:</i>`,
+    ];
+
+    const keyboard = new InlineKeyboard();
+    const options = [
+      { id: 'auto', title: '⚡ Авто: Qwen3 ➜ Groq ➜ Vosk' },
+      { id: 'local', title: '🧠 Локальный STT (Qwen3-ASR DirectML)' },
+      { id: 'groq', title: '☁️ Groq Cloud (Whisper Large v3 Turbo)' },
+      { id: 'vosk', title: '📦 Vosk Offline (Локальный)' },
+    ];
+
+    for (const opt of options) {
+      const isSel = stt === opt.id ? '🔘' : '⚪';
+      keyboard.text(`${isSel} ${opt.title}`, `veronica:set_stt:${opt.id}`).row();
+    }
+    keyboard.text('« Назад в настройки', 'veronica:menu:settings');
+
+    return { text: lines.join('\n'), keyboard };
   }
 
   public static buildStatusMessage(): string {
@@ -541,12 +616,20 @@ export class MessageBuilder {
     const cleanModel = activeModel.replace(/^local:/, '');
     const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
     const proxyEnabled = Boolean(proxyUrl);
+    const stt = config.veronica?.stt_engine || 'auto';
+    const sttNames: Record<string, string> = {
+      auto: '⚡ Авто (Qwen3 ➜ Groq ➜ Vosk)',
+      local: '🧠 Локальный Qwen3 (DirectML)',
+      groq: '☁️ Groq Whisper (через 0xProxy)',
+      vosk: '📦 Vosk Offline',
+    };
 
     const lines: string[] = [
       `⚙️ <b>Панель Настроек & Квоты Вероники:</b>`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
       `🧠 <b>Активная модель:</b> <code>${escapeHtml(cleanModel)}</code>`,
       `⚡ <b>Движок инференса:</b> ${isAgy ? '⚡ Antigravity CLI (Headless)' : '🖥️ Local llama-server (GGUF)'}`,
+      `🎙️ <b>Движок STT:</b> <code>${escapeHtml(sttNames[stt] || stt)}</code>`,
       `👤 <b>Аккаунт CLI:</b> <code>Google AI / Antigravity Pro</code>`,
       `📊 <b>Статус квоты:</b> 🟢 <i>Активна / В норме</i>`,
       `🛡️ <b>Прокси-шлюз:</b> ${proxyEnabled ? '🟢 Включен' : '⚪ Прямое подключение'}`,
@@ -555,10 +638,12 @@ export class MessageBuilder {
     ];
 
     const keyboard = new InlineKeyboard()
-      .text('🧠 Сменить модель', 'veronica:menu:model')
-      .text('🔄 Проверить квоту', 'veronica:settings:check_quota')
+      .text('🧠 Сменить LLM модель', 'veronica:menu:model')
+      .text('🎙️ Сменить STT модель', 'veronica:menu:stt')
       .row()
+      .text('🔄 Проверить квоту', 'veronica:settings:check_quota')
       .text('⚙️ Полный статус (/status)', 'veronica:menu:status')
+      .row()
       .text('📁 Каталог проектов', 'veronica:projects_menu');
 
     return { text: lines.join('\n'), keyboard };
@@ -577,7 +662,8 @@ export class MessageBuilder {
       ``,
       `🔹 <b>Инференс и система:</b>`,
       `• /quota — подробный статус квот инференса agy CLI (5h, Weekly)`,
-      `• /model — меню выбора активной модели (Gemini, Claude, GGUF)`,
+      `• /model — меню выбора активной модели (Gemini, Claude, GGUF, STT)`,
+      `• /stt — выбор модели распознавания речи (Groq / Local Qwen3 / Auto)`,
       `• /status — системная телеметрия, статус GPU Node, порты`,
       ``,
       `🔹 <b>Задачи и проекты:</b>`,

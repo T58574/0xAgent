@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getProxyDb } from './proxyDb';
 import { parseProxyLine, detectProtocol, testSocks5Handshake, testHttpProxy } from './proxyParser';
 import { ProxyItem, ProxyProtocol, ProxyStatus, ProxyExportConfig, ProxyHealthCheckResult, ProxyRoutingConfig, ProxyRoutingCategory } from '../src/types';
-import { ProxyAgent } from 'undici';
+import { ProxyAgent, Socks5ProxyAgent, fetch as undiciFetch } from 'undici';
 import { SocksProxyAgent } from 'socks-proxy-agent';
 
 export class ProxyService {
@@ -468,7 +468,11 @@ export class ProxyService {
 
     try {
       if (proxyUrl.startsWith('socks5://') || proxyUrl.startsWith('socks4://')) {
-        return new SocksProxyAgent(proxyUrl);
+        try {
+          return new Socks5ProxyAgent(proxyUrl);
+        } catch {
+          return new SocksProxyAgent(proxyUrl);
+        }
       }
       return new ProxyAgent(proxyUrl);
     } catch (err) {
@@ -488,6 +492,14 @@ export class ProxyService {
     const dispatcher = this.getDispatcherFor(category);
     if (!dispatcher) {
       return fetch(url, init);
+    }
+
+    // Node 24 compatibility: undici ProxyAgent / Socks5ProxyAgent must be dispatched via undici.fetch
+    if (dispatcher instanceof ProxyAgent || (typeof Socks5ProxyAgent !== 'undefined' && dispatcher instanceof Socks5ProxyAgent)) {
+      return undiciFetch(url, {
+        ...init,
+        dispatcher,
+      } as any) as any;
     }
 
     const requestOptions: any = {

@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process';
 import { loadConfig } from '../../config';
 import { proxyService } from '../../proxyService';
 import { veronicaOrchestrator } from './veronicaOrchestrator';
+import { FormData as UndiciFormData } from 'undici';
 
 export interface StructuredThought {
   title: string;
@@ -53,7 +54,10 @@ export class VoiceThoughtService {
       fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    const ext = path.extname(telegramFilePath) || '.ogg';
+    let ext = (path.extname(telegramFilePath) || '.ogg').toLowerCase();
+    if (ext === '.oga' || !ext) {
+      ext = '.ogg';
+    }
     const tempFileName = `voice_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
     const localFilePath = path.join(tempDir, tempFileName);
 
@@ -72,108 +76,172 @@ export class VoiceThoughtService {
   }
 
   /**
-   * Transcribe audio file using local Qwen3 ONNX / Groq Whisper / Vosk
+   * Execute Python transcription helper with configurable engine, proxy, and 10-minute timeout
+   */
+  private async executePythonTranscription(
+    audioPath: string,
+    engine: 'auto' | 'local' | 'groq' | 'vosk',
+    proxyUrl?: string | null,
+    timeoutMs = 600000
+  ): Promise<{ text: string; engine: string }> {
+    const scriptPath = path.resolve(process.cwd(), 'scripts/transcribe_audio.py');
+    if (!fs.existsSync(scriptPath)) {
+      throw new Error(`Transcription helper script not found at ${scriptPath}`);
+    }
+
+    const pythonBin = resolvePythonPath();
+    console.log(`[VoiceThoughtService] Executing local STT helper via: ${pythonBin} (engine: ${engine})`);
+
+    const args = [scriptPath, audioPath, '--engine', engine];
+    if (proxyUrl) {
+      args.push('--proxy', proxyUrl);
+    }
+
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    if (proxyUrl) {
+      env.HTTP_PROXY = proxyUrl;
+      env.HTTPS_PROXY = proxyUrl;
+      env.ALL_PROXY = proxyUrl;
+    }
+
+    return new Promise<{ text: string; engine: string }>((resolve, reject) => {
+      const child = spawn(pythonBin, args, {
+        cwd: process.cwd(),
+        shell: false,
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      child.stdout?.on('data', (d) => (stdout += d.toString()));
+      child.stderr?.on('data', (d) => (stderr += d.toString()));
+
+      const timer = setTimeout(() => {
+        try {
+          child.kill();
+        } catch {}
+        reject(new Error(`Transcription timed out after ${Math.round(timeoutMs / 1000)}s`));
+      }, timeoutMs);
+
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        const lines = stdout.trim().split('\n');
+        let jsonParsed: any = null;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const line = lines[i].trim();
+          if (line.startsWith('{') && line.endsWith('}')) {
+            try {
+              jsonParsed = JSON.parse(line);
+              break;
+            } catch {}
+          }
+        }
+
+        if (jsonParsed && jsonParsed.success) {
+          resolve({ text: (jsonParsed.text || '').trim(), engine: jsonParsed.engine || 'local-qwen3-onnx' });
+          return;
+        }
+        reject(new Error(`Python transcription exited (${code}): ${jsonParsed?.error || stderr || stdout}`));
+      });
+
+      child.on('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
+  /**
+   * Direct Node.js Groq Whisper fallback routed via 0xProxy
+   */
+  private async transcribeWithGroqNode(
+    audioPath: string,
+    groqKey: string,
+    timeoutMs = 180000
+  ): Promise<{ text: string; engine: string }> {
+    const fileBytes = await fs.promises.readFile(audioPath);
+    let fileName = path.basename(audioPath) || 'voice.ogg';
+    const ext = path.extname(fileName).toLowerCase();
+    const allowedGroqExts = ['.flac', '.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.ogg', '.opus', '.wav', '.webm'];
+    if (!allowedGroqExts.includes(ext)) {
+      fileName = fileName.replace(/\.[^/.]+$/, '') + '.ogg';
+    }
+    const formData = new UndiciFormData();
+    const blob = new Blob([fileBytes], { type: 'audio/ogg' });
+    formData.append('file', blob, fileName);
+    formData.append('model', 'whisper-large-v3-turbo');
+    formData.append('language', 'ru');
+
+    const groqRes = await proxyService.fetchWithProxy(
+      'https://api.groq.com/openai/v1/audio/transcriptions',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${groqKey}`,
+        },
+        body: formData as any,
+        signal: AbortSignal.timeout(timeoutMs),
+      },
+      'cloud_ai'
+    );
+
+    if (groqRes.ok) {
+      const groqJson: any = await groqRes.json();
+      if (groqJson.text) {
+        return {
+          text: groqJson.text.trim(),
+          engine: 'groq-whisper-large-v3-turbo (node-direct)',
+        };
+      }
+    } else {
+      const errText = await groqRes.text().catch(() => '');
+      throw new Error(`Groq HTTP ${groqRes.status}: ${errText}`);
+    }
+
+    throw new Error('Groq returned empty transcript');
+  }
+
+  /**
+   * Transcribe audio file using configured STT engine (local Qwen3 ONNX / Groq Whisper / Vosk)
    */
   public async transcribeAudio(audioPath: string): Promise<{ text: string; engine: string }> {
     const config = loadConfig();
+    const sttEngine = (config.veronica?.stt_engine || 'auto') as 'auto' | 'local' | 'groq' | 'vosk';
+    const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
+    const groqKey = config.groq_api_key || process.env.GROQ_API_KEY;
 
-    // 1. Try Python transcribe_audio.py helper
-    const scriptPath = path.resolve(process.cwd(), 'scripts/transcribe_audio.py');
-    if (fs.existsSync(scriptPath)) {
-      try {
-        const pythonResult = await new Promise<{ text: string; engine: string }>((resolve, reject) => {
-          const pythonBin = resolvePythonPath();
-          console.log(`[VoiceThoughtService] Executing local STT helper via: ${pythonBin}`);
-          const child = spawn(pythonBin, [scriptPath, audioPath, '--engine', 'auto'], {
-            cwd: process.cwd(),
-            shell: false,
-            stdio: ['pipe', 'pipe', 'pipe'],
-          });
-
-          let stdout = '';
-          let stderr = '';
-
-          child.stdout?.on('data', (d) => (stdout += d.toString()));
-          child.stderr?.on('data', (d) => (stderr += d.toString()));
-
-          const timer = setTimeout(() => {
-            try {
-              child.kill();
-            } catch {}
-            reject(new Error('Transcription timed out after 60s'));
-          }, 60000);
-
-          child.on('close', (code) => {
-            clearTimeout(timer);
-            const lines = stdout.trim().split('\n');
-            let jsonParsed: any = null;
-            for (let i = lines.length - 1; i >= 0; i--) {
-              const line = lines[i].trim();
-              if (line.startsWith('{') && line.endsWith('}')) {
-                try {
-                  jsonParsed = JSON.parse(line);
-                  break;
-                } catch {}
-              }
-            }
-
-            if (jsonParsed && jsonParsed.success) {
-              resolve({ text: (jsonParsed.text || '').trim(), engine: jsonParsed.engine || 'local-qwen3-onnx' });
-              return;
-            }
-            reject(new Error(`Python transcription exited (${code}): ${jsonParsed?.error || stderr || stdout}`));
-          });
-
-          child.on('error', (err) => {
-            clearTimeout(timer);
-            reject(err);
-          });
-        });
-
-        if (pythonResult.text) {
-          return pythonResult;
+    // 1. Explicit Groq Cloud selection
+    if (sttEngine === 'groq') {
+      if (groqKey) {
+        try {
+          return await this.transcribeWithGroqNode(audioPath, groqKey);
+        } catch (nodeGroqErr: any) {
+          console.warn('[VoiceThoughtService] Direct Node Groq failed, trying Python Groq helper:', nodeGroqErr?.message || nodeGroqErr);
         }
-      } catch (pyErr: any) {
-        console.warn('[VoiceThoughtService] Python transcription helper failed, trying fallback:', pyErr?.message || pyErr);
       }
+      return await this.executePythonTranscription(audioPath, 'groq', proxyUrl);
     }
 
-    // 2. Direct Node.js fallback via Groq Whisper API if groq_api_key is present
-    const groqKey = config.groq_api_key || process.env.GROQ_API_KEY;
+    // 2. Explicit Local STT selection (Qwen3 ONNX -> Vosk offline fallback)
+    if (sttEngine === 'local' || sttEngine === 'vosk') {
+      return await this.executePythonTranscription(audioPath, sttEngine, proxyUrl);
+    }
+
+    // 3. Default 'auto' waterfall: Python (Qwen3 -> Groq via Proxy -> Vosk) -> Node Groq fallback
+    try {
+      return await this.executePythonTranscription(audioPath, 'auto', proxyUrl);
+    } catch (pyErr: any) {
+      console.warn('[VoiceThoughtService] Python transcription helper failed, trying fallback:', pyErr?.message || pyErr);
+    }
+
+    // Fallback to direct Node.js Groq if auto failed and groqKey is present
     if (groqKey) {
       try {
-        const fileBytes = await fs.promises.readFile(audioPath);
-        const fileName = path.basename(audioPath) || 'voice.ogg';
-        const formData = new FormData();
-        const blob = new Blob([fileBytes], { type: 'audio/ogg' });
-        formData.append('file', blob, fileName);
-        formData.append('model', 'whisper-large-v3-turbo');
-        formData.append('language', 'ru');
-
-        const groqRes = await proxyService.fetchWithProxy(
-          'https://api.groq.com/openai/v1/audio/transcriptions',
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${groqKey}`,
-            },
-            body: formData,
-            signal: AbortSignal.timeout(30000),
-          },
-          'cloud_ai'
-        );
-
-        if (groqRes.ok) {
-          const groqJson: any = await groqRes.json();
-          if (groqJson.text) {
-            return {
-              text: groqJson.text.trim(),
-              engine: 'groq-whisper-large-v3-turbo (node-direct)',
-            };
-          }
-        }
+        return await this.transcribeWithGroqNode(audioPath, groqKey);
       } catch (groqErr: any) {
-        console.warn('[VoiceThoughtService] Direct Groq API transcription failed:', groqErr?.message || groqErr);
+        console.warn('[VoiceThoughtService] Direct Groq API fallback failed:', groqErr?.message || groqErr);
       }
     }
 

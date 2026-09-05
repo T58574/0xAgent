@@ -1,15 +1,10 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
-  FolderPlus,
-  Trash2,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
   FolderTree,
   MessageSquare,
-  GitBranch,
-  Plus,
-  Sparkles,
   X,
   Settings as SettingsIcon,
   BarChart2,
@@ -18,9 +13,12 @@ import {
 } from 'lucide-react';
 import { ChatSession, FileNode, ActiveView } from '../types';
 import { WorkspaceTree } from './WorkspaceTree';
-import { getWorkspaceBaseName, formatRelativeTime, isAutoWorkspace } from '../utils/helpers';
+import { getWorkspaceBaseName, isAutoWorkspace } from '../utils/helpers';
 import { useI18n } from '../i18n';
 import { SessionTimelineModal, formatDialogCount } from './chat/SessionTimelineModal';
+import { AsciiParticleFlow } from './sidebar/AsciiParticleFlow';
+import { SessionGroup } from './sidebar/SessionGroup';
+import { SidebarNewChatMenu } from './sidebar/SidebarNewChatMenu';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -58,18 +56,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const [isHoveringHistory, setIsHoveringHistory] = useState(false);
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
-  const [showNewChatMenu, setShowNewChatMenu] = useState(false);
-  const newChatMenuRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (newChatMenuRef.current && !newChatMenuRef.current.contains(e.target as Node)) {
-        setShowNewChatMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   const toggleGroup = useCallback((key: string) => {
     setCollapsedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -108,11 +94,18 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   }, [onSelectSession, onToggleOpen]);
 
   const handleCreateAndCloseOnMobile = useCallback((title?: string, wsDir?: string | null) => {
-    onCreateSession(title, wsDir);
+    if (title !== undefined) {
+      onCreateSession(title, wsDir);
+    } else if (workspaceDir && !isAutoWorkspace(workspaceDir)) {
+      const folderName = getWorkspaceBaseName(workspaceDir);
+      onCreateSession(`${t.nav.chat} (${folderName})`, workspaceDir);
+    } else {
+      onCreateSession(t.nav.newChat, 'auto');
+    }
     if (window.innerWidth < 768) {
       onToggleOpen();
     }
-  }, [onCreateSession, onToggleOpen]);
+  }, [onCreateSession, onToggleOpen, workspaceDir, t]);
 
   if (!isOpen) return null;
 
@@ -141,7 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
         {/* Unified Dark Floating Sidebar Container */}
         <div className="w-full h-full bg-[var(--theme-panel)] border border-[var(--theme-border)] rounded-2xl sm:rounded-[26px] flex flex-col justify-between overflow-hidden shadow-sm">
           
-          {/* 1. TOP HEADER: DARK STYLISH NEW CHAT BUTTON (No search bar, no hard separator line) */}
+          {/* 1. TOP HEADER: DARK STYLISH NEW CHAT BUTTON */}
           <div className="p-3 shrink-0 space-y-2">
             
             {/* Mobile Header Title & Close Button */}
@@ -165,83 +158,11 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             </div>
 
             {/* Primary Action Button: Dark Subtle Tactile New Chat with Split dropdown */}
-            <div ref={newChatMenuRef} className="relative flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => {
-                  if (workspaceDir && !isAutoWorkspace(workspaceDir)) {
-                    const folderName = getWorkspaceBaseName(workspaceDir);
-                    handleCreateAndCloseOnMobile(`${t.nav.chat} (${folderName})`, workspaceDir);
-                  } else {
-                    handleCreateAndCloseOnMobile(t.nav.newChat, 'auto');
-                  }
-                }}
-                className="flex-1 py-2 px-3.5 rounded-xl bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold text-xs flex items-center justify-center gap-2 shadow-xs transition-all duration-150 cursor-pointer group active:scale-[0.98]"
-                title={t.sidebar.newChatTooltip}
-              >
-                <Plus size={14} className="transition-transform group-hover:rotate-90 text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)]" />
-                <span>{t.nav.newChat}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setShowNewChatMenu(!showNewChatMenu)}
-                className="p-2 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-all cursor-pointer shadow-xs active:scale-[0.98]"
-                title={t.nav.workspaceMenu}
-              >
-                <ChevronDown size={14} className={`transition-transform duration-200 ${showNewChatMenu ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* New Chat Dropdown Popover */}
-              {showNewChatMenu && (
-                <div className="absolute top-full left-0 right-0 mt-1.5 p-1.5 shadow-2xl border border-[var(--theme-border)] bg-[var(--theme-panel-solid)] backdrop-blur-2xl z-50 rounded-2xl space-y-1 animate-fadeIn">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowNewChatMenu(false);
-                      handleCreateAndCloseOnMobile(t.sidebar.autoWorkspace, 'auto');
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-colors cursor-pointer"
-                  >
-                    <Sparkles size={14} className="text-[var(--theme-text-muted)] shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold">{t.sidebar.autoWorkspace}</span>
-                      <span className="text-[10px] text-[var(--theme-text-muted)]">~/.0xagent/workspaces</span>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowNewChatMenu(false);
-                      handleCreateAndCloseOnMobile(t.sidebar.standalone, null);
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-colors cursor-pointer"
-                  >
-                    <MessageSquare size={14} className="text-[var(--theme-text-muted)] shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold">{t.sidebar.standalone}</span>
-                      <span className="text-[10px] text-[var(--theme-text-muted)]">{t.chat.context}</span>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowNewChatMenu(false);
-                      onSelectWorkspace();
-                    }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs hover:bg-[var(--theme-border-subtle)] text-[var(--theme-text)] transition-colors cursor-pointer border-t border-[var(--theme-border)] mt-0.5 pt-2"
-                  >
-                    <FolderPlus size={14} className="text-[var(--theme-text-muted)] shrink-0" />
-                    <div className="flex flex-col">
-                      <span className="font-semibold">{t.sidebar.openWorkspace}...</span>
-                      <span className="text-[10px] text-[var(--theme-text-muted)]">{t.nav.changeWorkspace}</span>
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
+            <SidebarNewChatMenu
+              onCreateChat={handleCreateAndCloseOnMobile}
+              onSelectWorkspace={onSelectWorkspace}
+              workspaceDir={workspaceDir}
+            />
           </div>
 
           {/* 2. CHATS TREE WITH VECTOR CONNECTORS & PIXEL-PERFECT ALIGNMENT */}
@@ -249,217 +170,55 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             
             {/* WORKSPACE PROJECT FOLDERS */}
             {projectWorkspaceDirs.map((dir) => {
-              const isCurrentActiveWs = workspaceDir && dir.toLowerCase() === workspaceDir.toLowerCase();
+              const isCurrentActiveWs = workspaceDir ? dir.toLowerCase() === workspaceDir.toLowerCase() : false;
               const projSessions = filteredSessions.filter(
                 (s) => s.workspace_dir && s.workspace_dir.toLowerCase() === dir.toLowerCase()
               );
-              const isCollapsed = collapsedGroups[dir];
+              const isCollapsed = Boolean(collapsedGroups[dir]);
               const folderName = getWorkspaceBaseName(dir);
 
               return (
-                <div key={dir} className="space-y-1 w-full">
-                  
-                  {/* Folder Node Header */}
-                  <div
-                    onClick={() => toggleGroup(dir)}
-                    className={`flex items-center justify-between px-2.5 py-1.5 rounded-xl cursor-pointer transition-colors text-xs font-medium w-full ${
-                      isCurrentActiveWs
-                        ? 'bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold shadow-2xs'
-                        : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      {isCollapsed ? (
-                        <ChevronRight size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                      ) : (
-                        <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                      )}
-                      <span className="truncate font-semibold">{folderName}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0 ml-auto">
-                      {isCurrentActiveWs && (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-mono bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] border border-[var(--theme-border)]">
-                          <GitBranch size={9} />
-                          <span>main</span>
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCreateAndCloseOnMobile(`${t.nav.chat} (${folderName})`, dir);
-                        }}
-                        className="p-1 rounded-lg hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] transition-colors cursor-pointer text-[var(--theme-text-muted)]"
-                        title={t.sidebar.newChatTooltip}
-                      >
-                        <Plus size={12} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Sessions Branch Tree */}
-                  {!isCollapsed && (
-                    <div className="relative pl-3.5 ml-2.5 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1 w-[calc(100%-0.625rem)]">
-                      {projSessions.length > 0 ? (
-                        projSessions.map((session) => {
-                          const isActive = session.id === currentSessionId;
-                          const relTime = formatRelativeTime(session.updated_at);
-                          return (
-                            <div
-                              key={session.id}
-                              onClick={() => handleSelectAndCloseOnMobile(session.id)}
-                              className={`relative group w-full px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 flex items-center justify-between gap-1.5 border before:absolute before:-left-3.5 before:top-1/2 before:w-3 before:h-px before:bg-[var(--theme-border)]/70 ${
-                                isActive
-                                  ? 'session-item-active text-[var(--theme-text)] font-semibold border-[var(--theme-border)]'
-                                  : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-                              }`}
-                            >
-                              <span className="truncate flex-1 text-left font-medium">{session.title}</span>
-
-                              <div className="flex items-center gap-1 shrink-0 ml-auto pl-1">
-                                {relTime && (
-                                  <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-text-muted)]' : 'text-[var(--theme-text-muted)] opacity-60'}`}>
-                                    {relTime}
-                                  </span>
-                                )}
-                                <button
-                                  type="button"
-                                  onClick={(e) => onDeleteSession(session.id, e)}
-                                  className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
-                                  title={t.sidebar.deleteSession}
-                                >
-                                  <Trash2 size={12} />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="text-[10px] text-[var(--theme-text-muted)] italic py-1 px-2 font-mono">
-                          {t.sidebar.noSessionsFound}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <SessionGroup
+                  key={dir}
+                  title={folderName}
+                  isCollapsed={isCollapsed}
+                  onToggleCollapse={() => toggleGroup(dir)}
+                  sessions={projSessions}
+                  currentSessionId={currentSessionId}
+                  onSelectSession={handleSelectAndCloseOnMobile}
+                  onDeleteSession={onDeleteSession}
+                  onCreateSession={() => handleCreateAndCloseOnMobile(`${t.nav.chat} (${folderName})`, dir)}
+                  isCurrentActiveWs={isCurrentActiveWs}
+                />
               );
             })}
 
-            {/* AUTO-WORKSPACE SESSIONS (Песочница чата) */}
+            {/* AUTO-WORKSPACE SESSIONS */}
             {autoWorkspaceSessions.length > 0 && (
-              <div className="space-y-1 w-full">
-                <div
-                  onClick={() => toggleGroup('auto_workspaces')}
-                  className="flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] cursor-pointer font-semibold text-xs transition-colors w-full"
-                >
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    {collapsedGroups['auto_workspaces'] ? (
-                      <ChevronRight size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                    ) : (
-                      <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                    )}
-                    <span className="truncate">{t.sidebar.autoWorkspace}</span>
-                  </div>
-                  <span className="text-[10px] font-mono opacity-60 ml-auto shrink-0">({autoWorkspaceSessions.length})</span>
-                </div>
-
-                {!collapsedGroups['auto_workspaces'] && (
-                  <div className="relative pl-3.5 ml-2.5 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1 w-[calc(100%-0.625rem)]">
-                    {autoWorkspaceSessions.map((session) => {
-                      const isActive = session.id === currentSessionId;
-                      const relTime = formatRelativeTime(session.updated_at);
-                      return (
-                        <div
-                          key={session.id}
-                          onClick={() => handleSelectAndCloseOnMobile(session.id)}
-                          className={`relative group w-full px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 flex items-center justify-between gap-1.5 border before:absolute before:-left-3.5 before:top-1/2 before:w-3 before:h-px before:bg-[var(--theme-border)]/70 ${
-                            isActive
-                              ? 'session-item-active text-[var(--theme-text)] font-semibold border-[var(--theme-border)]'
-                              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-                          }`}
-                        >
-                          <span className="truncate flex-1 text-left font-medium">{session.title}</span>
-
-                          <div className="flex items-center gap-1 shrink-0 ml-auto pl-1">
-                            {relTime && (
-                              <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-text-muted)]' : 'text-[var(--theme-text-muted)] opacity-60'}`}>
-                                {relTime}
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={(e) => onDeleteSession(session.id, e)}
-                              className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
-                              title={t.sidebar.deleteSession}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <SessionGroup
+                title={t.sidebar.autoWorkspace}
+                count={autoWorkspaceSessions.length}
+                isCollapsed={Boolean(collapsedGroups['auto_workspaces'])}
+                onToggleCollapse={() => toggleGroup('auto_workspaces')}
+                sessions={autoWorkspaceSessions}
+                currentSessionId={currentSessionId}
+                onSelectSession={handleSelectAndCloseOnMobile}
+                onDeleteSession={onDeleteSession}
+              />
             )}
 
             {/* STANDALONE GENERAL CHATS */}
             {standaloneSessions.length > 0 && (
-              <div className="space-y-1 w-full">
-                <div
-                  onClick={() => toggleGroup('standalone')}
-                  className="flex items-center justify-between px-2.5 py-1.5 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)] cursor-pointer font-semibold text-xs transition-colors w-full"
-                >
-                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                    {collapsedGroups['standalone'] ? (
-                      <ChevronRight size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                    ) : (
-                      <ChevronDown size={13} className="shrink-0 text-[var(--theme-text-muted)]" />
-                    )}
-                    <span className="truncate">{t.sidebar.standalone}</span>
-                  </div>
-                  <span className="text-[10px] font-mono opacity-60 ml-auto shrink-0">({standaloneSessions.length})</span>
-                </div>
-
-                {!collapsedGroups['standalone'] && (
-                  <div className="relative pl-3.5 ml-2.5 border-l border-[var(--theme-border)]/70 space-y-0.5 mt-1 w-[calc(100%-0.625rem)]">
-                    {standaloneSessions.map((session) => {
-                      const isActive = session.id === currentSessionId;
-                      const relTime = formatRelativeTime(session.updated_at);
-                      return (
-                        <div
-                          key={session.id}
-                          onClick={() => handleSelectAndCloseOnMobile(session.id)}
-                          className={`relative group w-full px-2.5 py-2 rounded-xl text-xs cursor-pointer transition-all duration-150 flex items-center justify-between gap-1.5 border before:absolute before:-left-3.5 before:top-1/2 before:w-3 before:h-px before:bg-[var(--theme-border)]/70 ${
-                            isActive
-                              ? 'session-item-active text-[var(--theme-text)] font-semibold border-[var(--theme-border)]'
-                              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-                          }`}
-                        >
-                          <span className="truncate flex-1 text-left font-medium">{session.title}</span>
-
-                          <div className="flex items-center gap-1 shrink-0 ml-auto pl-1">
-                            {relTime && (
-                              <span className={`text-[10px] font-mono group-hover:hidden ${isActive ? 'text-[var(--theme-text-muted)]' : 'text-[var(--theme-text-muted)] opacity-60'}`}>
-                                {relTime}
-                              </span>
-                            )}
-                            <button
-                              type="button"
-                              onClick={(e) => onDeleteSession(session.id, e)}
-                              className="p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]"
-                              title={t.sidebar.deleteSession}
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+              <SessionGroup
+                title={t.sidebar.standalone}
+                count={standaloneSessions.length}
+                isCollapsed={Boolean(collapsedGroups['standalone'])}
+                onToggleCollapse={() => toggleGroup('standalone')}
+                sessions={standaloneSessions}
+                currentSessionId={currentSessionId}
+                onSelectSession={handleSelectAndCloseOnMobile}
+                onDeleteSession={onDeleteSession}
+              />
             )}
 
             {/* WORKSPACE FILE EXPLORER */}
@@ -538,7 +297,6 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
             className="w-full p-3 border-t border-[var(--theme-border)] shrink-0 bg-[var(--theme-panel)] hover:bg-[var(--theme-border-subtle)] relative overflow-hidden group transition-all text-center cursor-pointer select-none"
             title={language === 'ru' ? 'Открыть хронологию всех диалогов' : 'Open session timeline'}
           >
-            {/* Interactive ASCII Particle Canvas */}
             <AsciiParticleFlow isActive={isHoveringHistory} />
 
             <div className="relative z-10 flex items-center justify-center text-xs font-mono text-[var(--theme-text-muted)] group-hover:text-[var(--theme-text)] font-semibold transition-colors">
@@ -562,79 +320,3 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     </>
   );
 });
-
-// Interactive Rising ASCII Particle Flow Canvas Component
-const AsciiParticleFlow: React.FC<{ isActive: boolean }> = ({ isActive }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animId: number;
-    const chars = ['·', '°', '⁺', '*', '‧', '•', '∘'];
-    const particles: Array<{ x: number; y: number; char: string; speed: number; opacity: number }> = [];
-
-    const resize = () => {
-      canvas.width = canvas.parentElement?.clientWidth || 200;
-      canvas.height = canvas.parentElement?.clientHeight || 40;
-    };
-    resize();
-
-    const spawn = () => {
-      if (particles.length < 18) {
-        particles.push({
-          x: Math.random() * canvas.width,
-          y: canvas.height + 5,
-          char: chars[Math.floor(Math.random() * chars.length)],
-          speed: 0.6 + Math.random() * 0.9,
-          opacity: 0.15 + Math.random() * 0.5,
-        });
-      }
-    };
-
-    const render = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (isActive) {
-        spawn();
-        spawn();
-      }
-
-      ctx.font = '10px monospace';
-
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        p.y -= p.speed;
-        p.opacity -= 0.012;
-
-        if (p.y < -5 || p.opacity <= 0) {
-          particles.splice(i, 1);
-          continue;
-        }
-
-        ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, p.opacity)})`;
-        ctx.fillText(p.char, p.x, p.y);
-      }
-
-      animId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      cancelAnimationFrame(animId);
-    };
-  }, [isActive]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${
-        isActive ? 'opacity-90' : 'opacity-0'
-      }`}
-    />
-  );
-};

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bot, Eye, EyeOff, Plus, Trash2, Sliders, Save, Sparkles, RefreshCw, Zap, ShieldCheck } from 'lucide-react';
+import { Bot, Eye, EyeOff, Plus, Trash2, Sliders, Save, Sparkles, RefreshCw, Zap, ShieldCheck, Mic } from 'lucide-react';
 import { Card, Button, Input, Select, Toggle, Badge } from '../ui';
 import { AppConfig, VeronicaConfig } from '../../types';
 import { useToast } from '../../context/ToastContext';
@@ -29,6 +29,7 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
   const [model, setModel] = useState(veronicaCfg.model || 'inherit');
   const [effort, setEffort] = useState(veronicaCfg.effort || 'auto');
   const [agent, setAgent] = useState(veronicaCfg.agent || 'default');
+  const [sttEngine, setSttEngine] = useState(veronicaCfg.stt_engine || 'auto');
   const [availableModels, setAvailableModels] = useState<{ local: string[]; antigravity: { slug: string; name: string; effort?: string }[] }>({ local: [], antigravity: [] });
   const [availableAgents, setAvailableAgents] = useState<{ slug: string; name: string; description?: string }[]>([]);
   const [saving, setSaving] = useState(false);
@@ -84,6 +85,7 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
         model: model !== 'inherit' ? model : null,
         effort: effort !== 'auto' ? effort as any : null,
         agent: agent !== 'default' ? agent : null,
+        stt_engine: (sttEngine || 'auto') as any,
       };
 
       await onSaveConfig({
@@ -182,6 +184,24 @@ export const VeronicaSettingsTab: React.FC<VeronicaSettingsTabProps> = ({
               onChange={(e) => setAgent(e.target.value)}
               options={agentOptions}
             />
+
+            <div className="pt-1">
+              <Select
+                label="Движок транскрибации речи (STT)"
+                prefixIcon={<Mic size={14} className="text-[var(--theme-accent)]" />}
+                value={sttEngine}
+                onChange={(e) => setSttEngine(e.target.value as any)}
+                options={[
+                  { value: 'auto', label: '⚡ Авто: Qwen3-ASR (локально) ➜ Groq Cloud ➜ Vosk' },
+                  { value: 'local', label: '🧠 Локальный STT (0xVoice2Text / Qwen3-ASR DirectML)' },
+                  { value: 'groq', label: '☁️ Groq Cloud (Whisper Large v3 Turbo через 0xProxy)' },
+                  { value: 'vosk', label: '📦 Vosk Offline (Локальный легкий STT)' },
+                ]}
+              />
+              <p className="text-[11px] text-[var(--theme-text-muted)] mt-1">
+                Используется для голосовых сообщений и кружочков в Telegram. При выборе облачного Groq запросы идут через локальный шлюз 0xProxy.
+              </p>
+            </div>
 
             <Input
               label="Команда / Путь Antigravity CLI"

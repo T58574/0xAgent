@@ -3,15 +3,15 @@ import { Zap, Folder, Sparkles } from 'lucide-react';
 import { LocalModelItem, GgufMetadata } from '../../../types';
 import { useI18n } from '../../../i18n';
 import { Button } from '../../ui/Button';
-import { Toggle } from '../../ui/Toggle';
 import { Card } from '../../ui/Card';
 import {
-  InfoTooltip,
   ParamNumberInput,
   ParamTextInput,
   ParamSlider,
   ParamToggleCard,
 } from './atoms';
+import { MtpSectionCard } from './MtpSectionCard';
+import { CustomCliArgsInput } from './CustomCliArgsInput';
 
 export interface ServerPerformanceParamsProps {
   host: string;
@@ -542,106 +542,18 @@ export const ServerPerformanceParams: React.FC<ServerPerformanceParamsProps> = (
               }}
             />
 
-            {/* MTP Section */}
-            <Card variant="recessed" className="space-y-3 rounded-xl">
-              <div className="flex items-center justify-between gap-3">
-                <div className="space-y-0.5">
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={15} className="text-[var(--theme-accent)]" />
-                    <span className="text-xs font-bold text-[var(--theme-text)]">
-                      {t.settings.localServer.params.mtpTitle}
-                    </span>
-                    <InfoTooltip
-                      title="Hardware MTP"
-                      text="Multi-Token Prediction accelerates token generation in 1 GPU step."
-                      benefit="Hardware multi-token prediction"
-                    />
-                  </div>
-                  <p className="text-[11px] text-[var(--theme-text-muted)]">
-                    {t.settings.localServer.params.mtpDesc}
-                  </p>
-                </div>
-
-                <Toggle checked={isMtpEnabled} onChange={handleToggleMtp} size="sm" />
-              </div>
-
-              {isMtpEnabled && (
-                <div className="pt-2 border-t border-[var(--theme-border)]">
-                  {modelMeta?.supportsFastMtp ? (
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
-                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
-                        <Zap size={14} className="animate-pulse text-emerald-500" />
-                        <span>{t.settings.localServer.params.mtpNativeDraft}</span>
-                      </div>
-                      <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                        {t.settings.localServer.params.mtpNativeDraftDesc}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs space-y-1">
-                      <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-bold">
-                        <Zap size={14} className="text-emerald-500" />
-                        <span>{t.settings.localServer.params.mtpActive}</span>
-                      </div>
-                      <p className="text-[11px] text-[var(--theme-text-muted)] leading-relaxed">
-                        {t.settings.localServer.params.mtpActiveDesc}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </Card>
+            {/* MTP Section Card */}
+            <MtpSectionCard
+              isMtpEnabled={isMtpEnabled}
+              onToggleMtp={handleToggleMtp}
+              modelMeta={modelMeta}
+            />
 
             {/* Extra CLI Arguments */}
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between items-center text-xs">
-                <div className="flex items-center">
-                  <label className="text-[11px] font-semibold text-[var(--theme-text-muted)]">
-                    {t.settings.localServer.params.customArgsLabel}
-                  </label>
-                  <InfoTooltip
-                    title="CLI Custom Args"
-                    text="Direct CLI arguments for llama-server.exe. e.g. -ctk q8_0 -ctv q8_0 saves 50% VRAM."
-                    benefit="KV quantization doubles context capacity"
-                  />
-                </div>
-                <div className="flex gap-1.5">
-                  <Button
-                    variant={customArgs.includes('q8_0') ? 'accent' : 'secondary'}
-                    size="xs"
-                    onClick={() => setCustomArgs('-ctk q8_0 -ctv q8_0')}
-                    title="8-bit KV cache quantization (saves 50% VRAM)"
-                  >
-                    Q8_0 KV
-                  </Button>
-                  <Button
-                    variant={customArgs.includes('q4_0') ? 'accent' : 'secondary'}
-                    size="xs"
-                    onClick={() => setCustomArgs('-ctk q4_0 -ctv q4_0')}
-                    title="4-bit KV cache quantization (max VRAM savings)"
-                  >
-                    Q4_0 KV
-                  </Button>
-                  {customArgs && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      onClick={() => setCustomArgs('')}
-                      title={t.settings.localServer.params.clearBtn}
-                    >
-                      [x]
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <input
-                type="text"
-                value={customArgs}
-                onChange={(e) => setCustomArgs(e.target.value)}
-                placeholder="-ctk q8_0 -ctv q8_0"
-                className="w-full px-3 py-2 rounded-xl bg-[var(--theme-input-bg)] border border-[var(--theme-border)] text-xs font-mono text-[var(--theme-text)] focus:border-[var(--theme-accent)] focus:outline-none transition-colors"
-              />
-            </div>
+            <CustomCliArgsInput
+              customArgs={customArgs}
+              setCustomArgs={setCustomArgs}
+            />
 
             {/* Switches Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-[var(--theme-border)]">

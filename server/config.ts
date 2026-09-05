@@ -139,6 +139,7 @@ export function getDefaultConfig(): AppConfig {
       default_autonomy_level: 'L2',
       watchdog_interval_sec: 15,
       default_heartbeat_timeout_sec: 300,
+      stt_engine: 'auto',
     },
     fallback_models: [
       'local:qwen2.5-coder-32b.gguf',

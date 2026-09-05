@@ -147,6 +147,7 @@ export interface VeronicaConfig {
   agent?: string | null;
   print_timeout?: string | null;
   max_task_tool_calls?: number;
+  stt_engine?: 'auto' | 'local' | 'groq' | 'vosk' | null;
 }
 
 export interface VeronicaModelInfo {
