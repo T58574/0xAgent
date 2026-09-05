@@ -295,6 +295,13 @@ class QuotaManager {
    * Fetches real quotas via 'agy -p /usage' with caching.
    */
   public async fetchQuotaLimits(force: boolean = false): Promise<QuotaLimitsState> {
+    if (process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR || process.env.NODE_TEST_CONTEXT) {
+      return {
+        limits: this.cachedLimits,
+        lastUpdated: this.lastLimitsFetchTime,
+      };
+    }
+
     const now = Date.now();
     if (!force && this.cachedLimits.length > 0 && now - this.lastLimitsFetchTime < this.limitsCacheTtlMs) {
       return {

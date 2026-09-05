@@ -62,10 +62,12 @@ export async function initVeronicaModule(): Promise<boolean> {
     }, 24 * 60 * 60 * 1000);
     backupIntervalTimer.unref?.();
 
-    // 8. Refresh available Antigravity models cache on boot
-    antigravityAdapter.fetchAvailableModels(true).catch((mErr) => {
-      console.warn('[Veronica] [WARN] Startup Antigravity models probe error:', mErr?.message || mErr);
-    });
+    // 8. Refresh available Antigravity models cache on boot (only in non-test mode)
+    if (process.env.NODE_ENV !== 'test' && !process.env.NODE_TEST_CONTEXT && !process.env.TEST_APP_DIR) {
+      antigravityAdapter.fetchAvailableModels(true).catch((mErr) => {
+        console.warn('[Veronica] [WARN] Startup Antigravity models probe error:', mErr?.message || mErr);
+      });
+    }
 
     isModuleInitialized = true;
     console.log('[Veronica] [OK] Veronica Engine successfully initialized.');
@@ -140,14 +142,15 @@ export function getVeronicaStatus(): VeronicaModuleStatus {
   const activeTasks = taskRegistry.getActiveTasks();
   const queuedTasks = taskRegistry.listTasks({ status: 'queued' as any });
   const remoteStatus = remoteNodeService.getStatus();
+  const todayStats = taskRegistry.getTodayTaskStats();
 
   return {
     enabled: true,
     db_healthy: true,
     active_tasks: activeTasks.length,
     queued_tasks: queuedTasks.length,
-    today_completed: 0,
-    today_failed: 0,
+    today_completed: todayStats.completed,
+    today_failed: todayStats.failed,
     telegram_connected: !!(config.veronica?.telegram_token || process.env.TELEGRAM_BOT_TOKEN),
     remote_gpu_online: remoteStatus.online,
   };

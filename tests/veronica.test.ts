@@ -314,9 +314,35 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
 
   describe('7. Remote Node Service & LAN Health Probe', () => {
     it('should return offline status gracefully when host is unreachable without crashing', async () => {
-      const status = await remoteNodeService.checkHealth('127.0.0.1', 59999);
-      assert.equal(status.online, false);
-      assert.ok(status.error);
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = async () => {
+        throw new Error('connect ECONNREFUSED 127.0.0.1:59999');
+      };
+      try {
+        const status = await remoteNodeService.checkHealth('127.0.0.1', 59999);
+        assert.equal(status.online, false);
+        assert.ok(status.error);
+      } finally {
+        globalThis.fetch = origFetch;
+      }
+    });
+
+    it('should return online status when remote node endpoint responds successfully', async () => {
+      const origFetch = globalThis.fetch;
+      globalThis.fetch = async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ slots_total: 4, slots_idle: 4, model: 'qwen2.5-coder' }),
+      } as any);
+      try {
+        const status = await remoteNodeService.checkHealth('127.0.0.1', 11434);
+        assert.equal(status.online, true);
+        assert.equal(status.slotsTotal, 4);
+        assert.equal(status.slotsIdle, 4);
+        assert.equal(status.model, 'qwen2.5-coder');
+      } finally {
+        globalThis.fetch = origFetch;
+      }
     });
   });
 
@@ -687,6 +713,16 @@ gpt-oss-120b-medium\tGPT-OSS 120B (Medium)
       const status = getVeronicaStatus();
       assert.equal(status.enabled, true);
       assert.equal(status.db_healthy, true);
+      assert.equal(typeof status.today_completed, 'number');
+      assert.equal(typeof status.today_failed, 'number');
+      assert.ok(status.today_completed >= 0);
+      assert.ok(status.today_failed >= 0);
+
+      const stats = taskRegistry.getTodayTaskStats();
+      assert.equal(typeof stats.completed, 'number');
+      assert.equal(typeof stats.failed, 'number');
+      assert.equal(status.today_completed, stats.completed);
+      assert.equal(status.today_failed, stats.failed);
     });
 
     it('should create valid router with createVeronicaRouter', () => {

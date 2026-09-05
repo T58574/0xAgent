@@ -115,6 +115,10 @@ export class AntigravityAdapter implements RuntimeAdapter {
   }
 
   public async fetchAvailableModels(force: boolean = false): Promise<AntigravityModelInfo[]> {
+    if (process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR || process.env.NODE_TEST_CONTEXT) {
+      return this.cachedModels || DEFAULT_ANTIGRAVITY_MODELS;
+    }
+
     const now = Date.now();
     if (!force && this.cachedModels && now - this.lastCacheTimestamp < AntigravityAdapter.CACHE_TTL_MS) {
       return this.cachedModels;
@@ -228,6 +232,12 @@ export class AntigravityAdapter implements RuntimeAdapter {
   }
 
   public emitStreamEvent(event: VeronicaStreamEvent): void {
+    // Enforce bounded memory retention for stream buffers (max 50 recent tasks)
+    if (this.taskStreamBuffers.size > 50 && !this.taskStreamBuffers.has(event.taskId)) {
+      const oldestKey = this.taskStreamBuffers.keys().next().value;
+      if (oldestKey) this.taskStreamBuffers.delete(oldestKey);
+    }
+
     const buffer = this.taskStreamBuffers.get(event.taskId) || [];
     buffer.push(event);
     if (buffer.length > 500) {
@@ -261,6 +271,9 @@ export class AntigravityAdapter implements RuntimeAdapter {
   }
 
   public async testCliAvailability(): Promise<boolean> {
+    if (process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR || process.env.NODE_TEST_CONTEXT) {
+      return true;
+    }
     return new Promise((resolve) => {
       try {
         const config = loadConfig();

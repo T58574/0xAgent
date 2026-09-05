@@ -17,14 +17,20 @@ test('Web Search Multi-Engine & Tools Architecture Test Suite', async (t) => {
   };
 
   await t.test('1. Search Engine Registry Initialization & Available Providers', async () => {
-    const list = await searchEngineRegistry.getEngineInfoList(baseMockConfig);
-    const ids = list.map((e) => e.id);
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: false } as any);
+    try {
+      const list = await searchEngineRegistry.getEngineInfoList(baseMockConfig);
+      const ids = list.map((e) => e.id);
 
-    assert.ok(ids.includes('auto'), 'Should include auto cascade');
-    assert.ok(ids.includes('firecrawl'), 'Should include firecrawl provider');
-    assert.ok(ids.includes('searxng'), 'Should include searxng provider');
-    assert.ok(ids.includes('duckduckgo'), 'Should include duckduckgo provider');
-    assert.ok(ids.includes('wikipedia'), 'Should include wikipedia provider');
+      assert.ok(ids.includes('auto'), 'Should include auto cascade');
+      assert.ok(ids.includes('firecrawl'), 'Should include firecrawl provider');
+      assert.ok(ids.includes('searxng'), 'Should include searxng provider');
+      assert.ok(ids.includes('duckduckgo'), 'Should include duckduckgo provider');
+      assert.ok(ids.includes('wikipedia'), 'Should include wikipedia provider');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 
   await t.test('2. Dynamic Custom Search Engine Registration', async () => {
@@ -48,22 +54,40 @@ test('Web Search Multi-Engine & Tools Architecture Test Suite', async (t) => {
 
     registerSearchEngineProvider(mockCustomEngine);
 
-    const list = await searchEngineRegistry.getEngineInfoList(baseMockConfig);
-    const hasCustom = list.some((e) => e.id === 'custom_arxiv');
-    assert.strictEqual(hasCustom, true, 'Custom search engine should be listed dynamically');
+    const origFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({ ok: false } as any);
+    try {
+      const list = await searchEngineRegistry.getEngineInfoList(baseMockConfig);
+      const hasCustom = list.some((e) => e.id === 'custom_arxiv');
+      assert.strictEqual(hasCustom, true, 'Custom search engine should be listed dynamically');
 
-    const searchRes = await searchEngineRegistry.search('Quantum Computing', 3, {
-      ...baseMockConfig,
-      web_search_provider: 'custom_arxiv',
-    });
+      const searchRes = await searchEngineRegistry.search('Quantum Computing', 3, {
+        ...baseMockConfig,
+        web_search_provider: 'custom_arxiv',
+      });
 
-    assert.strictEqual(searchRes.engineUsed, 'arXiv Research Index');
-    assert.strictEqual(searchRes.results.length, 1);
-    assert.strictEqual(searchRes.results[0].engine, 'custom_arxiv');
+      assert.strictEqual(searchRes.engineUsed, 'arXiv Research Index');
+      assert.strictEqual(searchRes.results.length, 1);
+      assert.strictEqual(searchRes.results[0].engine, 'custom_arxiv');
+    } finally {
+      globalThis.fetch = origFetch;
+    }
   });
 
   await t.test('3. Auto Cascade Fallback Mechanism', async () => {
-    // Isolate network call with fast local stub
+    // Isolate network calls with fast local stubs to eliminate real HTTP requests
+    const origFirecrawlSearch = searchEngineRegistry.get('firecrawl')?.search;
+    const firecrawlProvider = searchEngineRegistry.get('firecrawl');
+    if (firecrawlProvider) {
+      firecrawlProvider.search = async () => [];
+    }
+
+    const origSearxngSearch = searchEngineRegistry.get('searxng')?.search;
+    const searxngProvider = searchEngineRegistry.get('searxng');
+    if (searxngProvider) {
+      searxngProvider.search = async () => [];
+    }
+
     const origSearch = searchEngineRegistry.get('duckduckgo')?.search;
     const ddgProvider = searchEngineRegistry.get('duckduckgo');
     if (ddgProvider) {
@@ -78,12 +102,16 @@ test('Web Search Multi-Engine & Tools Architecture Test Suite', async (t) => {
         web_search_provider: 'auto',
       });
 
-      assert.ok(outcome.results.length >= 0, 'Should return results or handled empty response');
-      assert.ok(outcome.cascadeTrail && outcome.cascadeTrail.length > 0, 'Cascade trail should be populated');
+      assert.ok(outcome.results.length > 0, 'Should return fallback results');
+      assert.strictEqual(outcome.engineUsed, 'DuckDuckGo');
+      assert.ok(outcome.cascadeTrail && outcome.cascadeTrail.length >= 3, 'Cascade trail should be populated');
+      assert.ok(outcome.cascadeTrail?.includes('Firecrawl'));
+      assert.ok(outcome.cascadeTrail?.includes('SearXNG'));
+      assert.ok(outcome.cascadeTrail?.includes('DuckDuckGo'));
     } finally {
-      if (ddgProvider && origSearch) {
-        ddgProvider.search = origSearch;
-      }
+      if (firecrawlProvider && origFirecrawlSearch) firecrawlProvider.search = origFirecrawlSearch;
+      if (searxngProvider && origSearxngSearch) searxngProvider.search = origSearxngSearch;
+      if (ddgProvider && origSearch) ddgProvider.search = origSearch;
     }
   });
 

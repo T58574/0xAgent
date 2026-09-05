@@ -492,6 +492,29 @@ export class TaskRegistry {
   public getActiveTasks(): AgentTask[] {
     return this.listTasks({ status: 'running' as TaskStatus });
   }
+
+  /**
+   * Get real-time daily stats for completed and failed tasks
+   */
+  public getTodayTaskStats(): { completed: number; failed: number } {
+    const db = getVeronicaDb();
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const startTimestamp = startOfDay.getTime();
+
+    const compRow: any = db.prepare(
+      "SELECT COUNT(*) as count FROM agent_tasks WHERE status = 'completed' AND started_at >= ?"
+    ).get(startTimestamp);
+
+    const failRow: any = db.prepare(
+      "SELECT COUNT(*) as count FROM agent_tasks WHERE status IN ('failed', 'crashed', 'timeout') AND started_at >= ?"
+    ).get(startTimestamp);
+
+    return {
+      completed: compRow?.count || 0,
+      failed: failRow?.count || 0,
+    };
+  }
 }
 
 export const taskRegistry = TaskRegistry.getInstance();
