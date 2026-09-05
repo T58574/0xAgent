@@ -929,4 +929,18 @@ export const ru: Translations = {
     high: 'Высокая',
     xhigh: 'Максимальная',
   },
+
+  veronica: {
+    title: 'Вероника :: AI Assistant',
+    subtitle: 'Автономный персональный ассистент, аудит проектов и управление фоновыми агентами',
+    telegram: 'Telegram:',
+    telegramConnected: 'Подключен',
+    telegramNotSet: 'Не задан',
+    activeTasks: 'В работе:',
+    todayCompleted: 'Завершено сегодня:',
+    todayFailed: 'Сбоев:',
+    tabTasks: 'Задачи & Журнал',
+    tabProjects: 'Проекты & Контекст',
+    tabSettings: 'Настройки Вероники',
+  },
 };

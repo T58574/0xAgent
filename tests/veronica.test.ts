@@ -472,6 +472,18 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
       const jobsAfter = veronicaScheduler.listCronJobs();
       assert.equal(jobsAfter.some((j: any) => j.id === 'job_daily_audit'), false);
     });
+
+    it('should parse various schedule formats correctly via parseSimpleSchedule', () => {
+      assert.equal(veronicaScheduler.parseSimpleSchedule('@hourly'), 3600000);
+      assert.equal(veronicaScheduler.parseSimpleSchedule('@daily'), 86400000);
+      assert.equal(veronicaScheduler.parseSimpleSchedule('@weekly'), 604800000);
+      assert.equal(veronicaScheduler.parseSimpleSchedule('@monthly'), 2592000000);
+      assert.equal(veronicaScheduler.parseSimpleSchedule('every_15m'), 900000);
+      assert.equal(veronicaScheduler.parseSimpleSchedule('every_2h'), 7200000);
+      assert.equal(veronicaScheduler.parseSimpleSchedule('30 mins'), 1800000);
+      assert.equal(veronicaScheduler.parseSimpleSchedule('4 hours'), 14400000);
+      assert.equal(veronicaScheduler.parseSimpleSchedule('*/20 * * * *'), 1200000);
+    });
   });
 
   describe('12. Veronica Persona Integration', () => {

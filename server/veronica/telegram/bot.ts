@@ -86,3 +86,7 @@ export function restartTelegramBot(): Bot | null {
   stopTelegramBot();
   return initTelegramBot();
 }
+
+export function isTelegramBotRunning(): boolean {
+  return botInstance !== null;
+}

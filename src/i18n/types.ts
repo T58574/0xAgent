@@ -941,4 +941,19 @@ export interface Translations {
     high: string;
     xhigh: string;
   };
+
+  // Veronica Subsystem & Web-IDE
+  veronica: {
+    title: string;
+    subtitle: string;
+    telegram: string;
+    telegramConnected: string;
+    telegramNotSet: string;
+    activeTasks: string;
+    todayCompleted: string;
+    todayFailed: string;
+    tabTasks: string;
+    tabProjects: string;
+    tabSettings: string;
+  };
 }

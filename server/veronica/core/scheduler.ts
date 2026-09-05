@@ -169,12 +169,42 @@ export class VeronicaScheduler {
   }
 
   public parseSimpleSchedule(schedule: string): number {
-    if (schedule === '@hourly' || schedule === 'hourly') return 60 * 60 * 1000;
-    if (schedule === '@daily' || schedule === 'daily') return 24 * 60 * 60 * 1000;
-    if (schedule.startsWith('every_')) {
-      const mins = parseInt(schedule.replace('every_', '').replace('m', ''), 10);
+    const s = (schedule || '').trim().toLowerCase();
+    if (s === '@hourly' || s === 'hourly') return 60 * 60 * 1000;
+    if (s === '@daily' || s === 'daily') return 24 * 60 * 60 * 1000;
+    if (s === '@weekly' || s === 'weekly') return 7 * 24 * 60 * 60 * 1000;
+    if (s === '@monthly' || s === 'monthly') return 30 * 24 * 60 * 60 * 1000;
+
+    // e.g. "every_15m", "every_2h", "every_1d"
+    if (s.startsWith('every_')) {
+      const clean = s.replace('every_', '').trim();
+      const match = clean.match(/^(\d+)\s*(m|h|d)?$/);
+      if (match) {
+        const val = parseInt(match[1], 10);
+        const unit = match[2] || 'm';
+        if (unit === 'h') return val * 60 * 60 * 1000;
+        if (unit === 'd') return val * 24 * 60 * 60 * 1000;
+        return val * 60 * 1000;
+      }
+    }
+
+    // e.g. "15m", "30 mins", "2h", "3 hours", "1 day"
+    const unitMatch = s.match(/^(\d+)\s*(m|min|mins|minute|minutes|h|hr|hrs|hour|hours|d|day|days)$/);
+    if (unitMatch) {
+      const val = parseInt(unitMatch[1], 10);
+      const unit = unitMatch[2];
+      if (unit.startsWith('h')) return val * 60 * 60 * 1000;
+      if (unit.startsWith('d')) return val * 24 * 60 * 60 * 1000;
+      return val * 60 * 1000;
+    }
+
+    // Cron step pattern like */15 * * * * or */30 * * * *
+    const cronStepMatch = s.match(/^\*\/(\d+)/);
+    if (cronStepMatch) {
+      const mins = parseInt(cronStepMatch[1], 10);
       if (!isNaN(mins) && mins > 0) return mins * 60 * 1000;
     }
+
     // Default fallback: 1 hour
     return 60 * 60 * 1000;
   }

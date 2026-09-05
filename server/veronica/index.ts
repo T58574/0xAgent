@@ -2,7 +2,7 @@ import { initVeronicaDatabase, closeVeronicaDatabase, createDatabaseBackup, runR
 import { RecoveryService } from './watchdog/recoveryService';
 import { processWatchdog } from './watchdog/processWatchdog';
 import { veronicaScheduler } from './core/scheduler';
-import { initTelegramBot, stopTelegramBot } from './telegram/bot';
+import { initTelegramBot, stopTelegramBot, isTelegramBotRunning } from './telegram/bot';
 import { loadConfig } from '../config';
 import { VeronicaModuleStatus } from './types';
 import { taskRegistry } from './core/taskRegistry';
@@ -151,7 +151,7 @@ export function getVeronicaStatus(): VeronicaModuleStatus {
     queued_tasks: queuedTasks.length,
     today_completed: todayStats.completed,
     today_failed: todayStats.failed,
-    telegram_connected: !!(config.veronica?.telegram_token || process.env.TELEGRAM_BOT_TOKEN),
+    telegram_connected: isTelegramBotRunning() || !!(config.veronica?.telegram_token || process.env.TELEGRAM_BOT_TOKEN),
     remote_gpu_online: remoteStatus.online,
   };
 }

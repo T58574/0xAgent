@@ -929,4 +929,18 @@ export const en: Translations = {
     high: 'High',
     xhigh: 'Extra High',
   },
+
+  veronica: {
+    title: 'Veronica :: AI Assistant',
+    subtitle: 'Autonomous personal AI assistant, project audit and background agent orchestrator',
+    telegram: 'Telegram:',
+    telegramConnected: 'Connected',
+    telegramNotSet: 'Not configured',
+    activeTasks: 'Active Tasks:',
+    todayCompleted: 'Completed Today:',
+    todayFailed: 'Failed:',
+    tabTasks: 'Tasks & Journal',
+    tabProjects: 'Projects & Context',
+    tabSettings: 'Veronica Settings',
+  },
 };

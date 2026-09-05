@@ -5,6 +5,7 @@ import { VeronicaProjectsTab } from './VeronicaProjectsTab';
 import { VeronicaSettingsTab } from './VeronicaSettingsTab';
 import { AppConfig } from '../../types';
 import * as api from '../../services/api';
+import { useI18n } from '../../i18n';
 
 interface VeronicaPageProps {
   config: AppConfig | null;
@@ -17,6 +18,7 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
   config,
   onSaveConfig,
 }) => {
+  const { t } = useI18n();
   const [activeSubTab, setActiveSubTab] = useState<VeronicaSubTab>('tasks');
   const [status, setStatus] = useState<any | null>(null);
 
@@ -36,9 +38,9 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
   }, []);
 
   const subTabs = [
-    { id: 'tasks', label: 'Задачи & Журнал', icon: Layers, count: status?.active_tasks },
-    { id: 'projects', label: 'Проекты & Контекст', icon: FolderGit2 },
-    { id: 'settings', label: 'Настройки Вероники', icon: SettingsIcon },
+    { id: 'tasks', label: t.veronica.tabTasks, icon: Layers, count: status?.active_tasks },
+    { id: 'projects', label: t.veronica.tabProjects, icon: FolderGit2 },
+    { id: 'settings', label: t.veronica.tabSettings, icon: SettingsIcon },
   ];
 
   return (
@@ -54,14 +56,14 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg sm:text-xl font-black text-[var(--theme-text)] tracking-tight">
-                  Вероника :: AI Assistant
+                  {t.veronica.title}
                 </h1>
                 <span className="px-2 py-0.5 text-[10px] font-bold font-mono rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
                   v1.0
                 </span>
               </div>
               <p className="text-xs text-[var(--theme-text-muted)] mt-0.5">
-                Автономный персональный ассистент, аудит проектов и управление фоновыми агентами
+                {t.veronica.subtitle}
               </p>
             </div>
           </div>
@@ -69,21 +71,21 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
           {/* Quick Telemetry Badges & Hot Reload */}
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs">
-              <span className="text-[var(--theme-text-muted)]">Telegram:</span>
+              <span className="text-[var(--theme-text-muted)]">{t.veronica.telegram}</span>
               <strong className={status?.telegram_connected ? 'text-emerald-400' : 'text-amber-400'}>
-                {status?.telegram_connected ? 'Подключен' : 'Не задан'}
+                {status?.telegram_connected ? t.veronica.telegramConnected : t.veronica.telegramNotSet}
               </strong>
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs">
-              <span className="text-[var(--theme-text-muted)]">В работе:</span>
+              <span className="text-[var(--theme-text-muted)]">{t.veronica.activeTasks}</span>
               <span className="font-mono font-bold text-[var(--theme-accent)]">
                 {status?.active_tasks ?? 0}
               </span>
             </div>
 
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)] text-xs">
-              <span className="text-[var(--theme-text-muted)]">Завершено сегодня:</span>
+              <span className="text-[var(--theme-text-muted)]">{t.veronica.todayCompleted}</span>
               <span className="font-mono font-bold text-emerald-400">
                 {status?.today_completed ?? 0}
               </span>
@@ -91,7 +93,7 @@ export const VeronicaPage: React.FC<VeronicaPageProps> = ({
 
             {typeof status?.today_failed === 'number' && status.today_failed > 0 && (
               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs">
-                <span className="text-red-400 font-medium">Сбоев:</span>
+                <span className="text-red-400 font-medium">{t.veronica.todayFailed}</span>
                 <span className="font-mono font-bold text-red-400">
                   {status.today_failed}
                 </span>
