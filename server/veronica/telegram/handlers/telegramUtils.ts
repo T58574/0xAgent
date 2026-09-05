@@ -21,7 +21,7 @@ export function markdownToTelegramHtml(markdown: string): string {
   const codeBlocks: string[] = [];
   let text = markdown.replace(/```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)```/g, (_match, lang, code) => {
     const escapedCode = escapeHtml(code.trimEnd());
-    const placeholder = `___TG_CODE_BLOCK_${codeBlocks.length}___`;
+    const placeholder = `@@TGCODEBLOCK${codeBlocks.length}@@`;
     if (lang) {
       codeBlocks.push(`<pre><code class="language-${escapeHtml(lang)}">${escapedCode}</code></pre>`);
     } else {
@@ -33,7 +33,7 @@ export function markdownToTelegramHtml(markdown: string): string {
   // 2. Extract and preserve inline code (`...`)
   const inlineCodes: string[] = [];
   text = text.replace(/`([^`\n]+)`/g, (_match, code) => {
-    const placeholder = `___TG_INLINE_CODE_${inlineCodes.length}___`;
+    const placeholder = `@@TGINLINECODE${inlineCodes.length}@@`;
     inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
     return placeholder;
   });
@@ -77,10 +77,10 @@ export function markdownToTelegramHtml(markdown: string): string {
   text = text.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2">$1</a>');
 
   // 11. Restore inline codes
-  text = text.replace(/___TG_INLINE_CODE_(\d+)___/g, (_match, idx) => inlineCodes[Number(idx)] || '');
+  text = text.replace(/@@TGINLINECODE(\d+)@@/g, (_match, idx) => inlineCodes[Number(idx)] || '');
 
   // 12. Restore code blocks
-  text = text.replace(/___TG_CODE_BLOCK_(\d+)___/g, (_match, idx) => codeBlocks[Number(idx)] || '');
+  text = text.replace(/@@TGCODEBLOCK(\d+)@@/g, (_match, idx) => codeBlocks[Number(idx)] || '');
 
   return text;
 }
