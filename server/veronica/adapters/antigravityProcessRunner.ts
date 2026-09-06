@@ -1,3 +1,6 @@
+import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import { spawn, ChildProcess } from 'node:child_process';
 import { loadConfig } from '../../config';
 import { proxyService } from '../../proxyService';
@@ -79,6 +82,16 @@ export class AntigravityProcessRunner {
     const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
     const args = this.buildProcessArgs(options, resolvedProjectPath);
     const env = this.buildProcessEnv(task, resolvedProjectPath);
+
+    // Clean up any stale presence lock from previous interrupted or crashed run
+    if (options.conversation_id) {
+      try {
+        const lockPath = path.join(os.homedir(), '.gemini', 'antigravity-cli', 'presence', `${options.conversation_id}.lock`);
+        if (fs.existsSync(lockPath)) {
+          fs.unlinkSync(lockPath);
+        }
+      } catch {}
+    }
 
     const child = spawn(cliPath, args, {
       cwd: resolvedProjectPath,

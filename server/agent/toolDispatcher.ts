@@ -29,8 +29,21 @@ import { isCoreSystemPath } from './permissionGuard';
 import { createStagedProposal, verifyStagedProposal } from './selfPatchEngine';
 import { createApprovalTicket } from './approvalManager';
 import { RequestApprovalPayload } from '../../src/types';
+import { handleOutputSpill } from './outputSpiller';
 
 export async function dispatchToolExecution(
+  tc: { name: string; arguments: any; id?: string },
+  config: AppConfig,
+  userResponseOrApproved: boolean | string,
+  sessionId?: string,
+  broadcast?: (event: string, payload: any) => void
+): Promise<string> {
+  const rawOutput = await executeToolCallInternal(tc, config, userResponseOrApproved, sessionId, broadcast);
+  const spillResult = await handleOutputSpill(rawOutput, tc.name);
+  return spillResult.output;
+}
+
+async function executeToolCallInternal(
   tc: { name: string; arguments: any; id?: string },
   config: AppConfig,
   userResponseOrApproved: boolean | string,

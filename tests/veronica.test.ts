@@ -27,6 +27,7 @@ import { getDefaultConfig } from '../server/config';
 import { voiceThoughtService } from '../server/veronica/telegram/voiceThoughtService';
 import { markdownToTelegramHtml, extractButtonsToInlineKeyboard, handleResponseAttachments, splitHtmlIntoBalancedChunks } from '../server/veronica/telegram/handlers/telegramUtils';
 import { notificationService } from '../server/veronica/telegram/notificationService';
+import { StreamingOutputCollector } from '../server/agent/outputSpiller';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -932,6 +933,92 @@ const answer = 42;
 
       notificationService.resetTaskNotification(testTaskId);
       assert.equal(notificationService.isTaskNotified(testTaskId), false);
+    });
+  });
+
+  describe('17. Task Checkpoints, Granular Resume & Streaming Spiller Invariants', () => {
+    it('should build a granular resume prompt that bypasses Phase 1 reconnaissance', () => {
+      const resumePrompt = taskPromptBuilder.buildResumeTaskPrompt({
+        project: '0xAgent',
+        task_id: 'abc-123-uuid',
+        custom_prompt: 'Исправить баг в парсере',
+        previous_summary: 'Найдена причина сбоя в строке 42',
+        checkpoint_info: 'Выполнено 5 шагов',
+      });
+
+      assert.ok(resumePrompt.includes('[VERONICA TASK RESUMPTION PROTOCOL]'), 'Header missing');
+      assert.ok(resumePrompt.includes('Task ID: abc-123-uuid'), 'Task ID missing');
+      assert.ok(resumePrompt.includes('DO NOT RESTART FROM SCRATCH'), 'Continuation directive missing');
+      assert.ok(resumePrompt.includes('Prior Progress: Найдена причина сбоя в строке 42'), 'Previous progress missing');
+      assert.ok(!resumePrompt.includes('PHASE 1: RECONNAISSANCE'), 'Should not contain initial reconnaissance phase');
+    });
+
+    it('should format Cyrillic italics with typography punctuation and model thoughts', () => {
+      const input = `Параметры:
+*курсив*: значение;
+«*цитата*» и [*ссылка*]
+<think>Внутренние размышления модели</think>
+\`\`\`ts const x = 1;\`\`\``;
+
+      const html = markdownToTelegramHtml(input);
+      assert.ok(html.includes('<i>курсив</i>:'), 'Italic before colon failed');
+      assert.ok(html.includes('«<i>цитата</i>»'), 'Italic in Cyrillic quotes failed');
+      assert.ok(html.includes('[<i>ссылка</i>]'), 'Italic in brackets failed');
+      assert.ok(html.includes('<blockquote expandable>'), 'Model thought blockquote missing');
+      assert.ok(html.includes('💭 Внутренние размышления модели'), 'Thought text missing');
+      assert.ok(html.includes('<pre><code class="language-ts">const x = 1;</code></pre>'), 'Single-line code block failed');
+    });
+
+    it('should stream large output and automatically spill to disk when exceeding 10 KB threshold', async () => {
+      const collector = new StreamingOutputCollector('test_tool', 10 * 1024);
+
+      // Generate 25 KB of line data
+      for (let i = 0; i < 500; i++) {
+        collector.append(`Line ${i}: Some detailed operational telemetry log entry with extra details\n`);
+      }
+
+      const result = await collector.finalize();
+      assert.equal(result.spilled, true, 'Output exceeding 10 KB should be spilled');
+      assert.ok(result.originalSize > 10 * 1024, 'Original size should exceed 10 KB');
+      assert.ok(result.filePath && fs.existsSync(result.filePath), 'Spill file should exist on disk');
+      assert.ok(result.output.includes('ВЫВОД СОКРАЩЕН'), 'Omission marker should be present');
+      assert.ok(result.output.includes('ПОЛНЫЙ ЛОГ СОХРАНЕН В:'), 'Path marker should be present');
+      assert.ok(result.output.includes('Line 0:'), 'Head lines should be preserved');
+      assert.ok(result.output.includes('Line 499:'), 'Tail lines should be preserved');
+
+      // Cleanup
+      if (result.filePath) {
+        try { fs.unlinkSync(result.filePath); } catch {}
+      }
+    });
+
+    it('should handle <continue> user command by resuming last task context', async () => {
+      const orchestrator = VeronicaOrchestrator.getInstance();
+      const testUser = 999888;
+      orchestrator.resetSession(testUser);
+
+      // 1. Sending <continue> without prior task informs the user cleanly
+      const noTaskReply = await orchestrator.handleUserMessage(testUser, '<continue>');
+      assert.ok(noTaskReply.includes('Нет предыдущей задачи для продолжения'), 'Should report no task');
+
+      // 2. Mock a previous task in session
+      const testTask = await taskRegistry.createTask({
+        project: '0xAgent',
+        skill: 'custom_task',
+        custom_prompt: 'Исходная задача',
+      });
+      await taskRegistry.checkpointConversationId(testTask.id, 'convo-checkpoint-xyz');
+
+      const session = orchestrator.getUserSession(testUser);
+      session.lastTaskId = testTask.id;
+      session.lastTaskProject = '0xAgent';
+      orchestrator.persistSessionMeta(session);
+
+      // 3. User sends <continue>
+      const continueReply = await orchestrator.handleUserMessage(testUser, '<continue>');
+      assert.ok(continueReply.includes('Возобновляю задачу'), 'Should report resuming task');
+      assert.ok(continueReply.includes(testTask.id.substring(0, 8)), 'Should include task ID');
+      assert.ok(continueReply.includes('Контекст и чекпоинт диалога Antigravity сохранены'), 'Checkpoint notice missing');
     });
   });
 });

@@ -111,6 +111,40 @@ CRITICAL OPERATIONAL CONSTRAINTS:
 
 Begin execution now.`;
   }
+
+  /**
+   * Builds a compact, granular continuation prompt for interrupted/resumed tasks.
+   * Leverages the existing Antigravity conversation history without restarting reconnaissance from scratch.
+   */
+  public buildResumeTaskPrompt(options: {
+    project: string;
+    task_id: string;
+    custom_prompt?: string;
+    previous_summary?: string;
+    checkpoint_info?: string;
+  }): string {
+    const { project, task_id, custom_prompt, previous_summary, checkpoint_info } = options;
+
+    return `[VERONICA TASK RESUMPTION PROTOCOL]
+Execution interrupted due to CLI / network reset. Active conversation context is preserved.
+
+# RESUME CONTEXT:
+- Project: ${project}
+- Task ID: ${task_id}
+- Original Objective: ${custom_prompt || 'Complete pending task requirements.'}
+${previous_summary ? `- Prior Progress: ${previous_summary}` : ''}
+${checkpoint_info ? `- Checkpoint Details: ${checkpoint_info}` : ''}
+
+# CONTINUATION DIRECTIVES:
+1. DO NOT RESTART FROM SCRATCH. Do NOT repeat initial file reconnaissance, workspace scanning, or duplicate code changes that were already completed.
+2. Inspect current workspace state directly. Verify what has already been done in the repository.
+3. Complete remaining work to fulfill the objective with surgical precision.
+4. Run tests or build verification once to ensure zero regressions.
+5. Conclude by reporting completion in Russian:
+   \`0xagent veronica report --task ${task_id} --status completed --summary "<Что сделано на русском>" --changes "<Изменение 1>; <Изменение 2>" --important\`
+
+Proceed immediately with remaining work.`;
+  }
 }
 
 export const taskPromptBuilder = TaskPromptBuilder.getInstance();

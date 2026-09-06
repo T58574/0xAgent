@@ -43,6 +43,54 @@ export function registerCallbackQueries(bot: Bot): void {
     );
   });
 
+  bot.callbackQuery(/^veronica:resume:(.+)$/, async (ctx) => {
+    const taskId = ctx.match[1];
+    const task = taskRegistry.getTask(taskId);
+    await ctx.answerCallbackQuery({ text: 'Возобновляю задачу...' });
+
+    if (!task) {
+      await ctx.reply(`⚠️ Задача не найдена в реестре.`, { parse_mode: 'HTML' });
+      return;
+    }
+
+    let resumeConvoId: string | undefined = undefined;
+    if (task.result_json) {
+      try {
+        const parsed = JSON.parse(task.result_json);
+        resumeConvoId = parsed.conversation_id;
+      } catch {}
+    }
+
+    try {
+      const resumedTask = await antigravityAdapter.spawnTask({
+        project: task.project,
+        skill: task.skill || 'custom_task',
+        custom_prompt: task.custom_prompt || 'Продолжить выполнение и завершить задачу.',
+        conversation_id: resumeConvoId,
+        continue_recent: !resumeConvoId,
+        existing_task_id: task.id,
+      });
+
+      const userId = ctx.from?.id;
+      if (userId) {
+        const session = veronicaOrchestrator.getUserSession(userId);
+        session.lastTaskId = resumedTask.id;
+        session.lastTaskProject = task.project;
+        session.lastTaskSummary = task.summary || undefined;
+        veronicaOrchestrator.persistSessionMeta(session);
+      }
+
+      await ctx.reply(
+        `🔄 <b>Задача <code>${task.id.substring(0, 8)}</code> возобновлена!</b>\n\n` +
+          `📁 <b>Проект:</b> <code>${escapeHtml(task.project)}</code>\n` +
+          `<i>Агент продолжает выполнение с сохраненным чекпоинтом без потери контекста.</i>`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (err: any) {
+      await ctx.reply(`❌ Ошибка возобновления задачи: ${escapeHtml(err?.message || err)}`, { parse_mode: 'HTML' });
+    }
+  });
+
   // Sessions callbacks
   bot.callbackQuery('veronica:menu:sessions', async (ctx) => {
     const userId = ctx.from?.id;

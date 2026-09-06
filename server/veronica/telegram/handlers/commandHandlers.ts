@@ -99,6 +99,64 @@ export function registerBotCommands(bot: Bot): void {
     }
   });
 
+  // /continue [prompt]
+  bot.command('continue', async (ctx) => {
+    const userId = ctx.from?.id;
+    if (!userId) return;
+    const session = veronicaOrchestrator.getUserSession(userId);
+
+    if (!session.lastTaskId) {
+      await ctx.reply(
+        '⚠️ <b>Нет предыдущей задачи для продолжения.</b>\n<i>Выберите проект в меню или запустите новую задачу.</i>',
+        { parse_mode: 'HTML' }
+      );
+      return;
+    }
+
+    const prevTask = taskRegistry.getTask(session.lastTaskId);
+    if (!prevTask) {
+      await ctx.reply(`⚠️ Задача <code>${session.lastTaskId.substring(0, 8)}</code> не найдена в реестре.`, {
+        parse_mode: 'HTML',
+      });
+      return;
+    }
+
+    const text = ctx.message?.text || '';
+    const customPrompt = text.replace(/^\/continue\s*/i, '').trim() || prevTask.custom_prompt || 'Продолжить выполнение.';
+
+    let resumeConvoId: string | undefined = undefined;
+    if (prevTask.result_json) {
+      try {
+        const parsed = JSON.parse(prevTask.result_json);
+        resumeConvoId = parsed.conversation_id;
+      } catch {}
+    }
+
+    try {
+      const task = await antigravityAdapter.spawnTask({
+        project: prevTask.project,
+        skill: prevTask.skill || 'custom_task',
+        custom_prompt: customPrompt,
+        conversation_id: resumeConvoId,
+        continue_recent: !resumeConvoId,
+        existing_task_id: prevTask.id,
+      });
+
+      session.lastTaskId = task.id;
+      session.lastTaskProject = prevTask.project;
+      session.lastTaskSummary = customPrompt;
+      veronicaOrchestrator.persistSessionMeta(session);
+
+      await ctx.reply(
+        `🔄 <b>Возобновляю задачу <code>${task.id.substring(0, 8)}</code> (${prevTask.project})</b>\n\n` +
+          `<i>Агент продолжает выполнение с сохраненным чекпоинтом без потери контекста.</i>`,
+        { parse_mode: 'HTML' }
+      );
+    } catch (err: any) {
+      await ctx.reply(`❌ Ошибка возобновления задачи: ${escapeHtml(err?.message || err)}`, { parse_mode: 'HTML' });
+    }
+  });
+
   // /kill <task_id>
   bot.command('kill', async (ctx) => {
     const text = ctx.message?.text || '';

@@ -84,13 +84,21 @@ export function escapeUnsafeHtmlEntities(html: string): string {
 export function markdownToTelegramHtml(markdown: string): string {
   if (!markdown) return '';
 
-  // 1. Extract and preserve code blocks (fenced ```...```)
+  // 0. Extract and format model thoughts (<think>...</think> or <thought>...</thought>) as expandable quotes
+  let text = markdown.replace(/<(?:think|thought)>([\s\S]*?)<\/(?:think|thought)>/gi, (_match, thoughtContent) => {
+    const cleanThought = thoughtContent.trim();
+    if (!cleanThought) return '';
+    return `\n**> 💭 ${cleanThought.replace(/\n/g, '\n**> ')}\n\n`;
+  });
+
+  // 1. Extract and preserve code blocks (fenced ```...``` multi-line and single-line)
   const codeBlocks: string[] = [];
-  let text = markdown.replace(/```([a-zA-Z0-9_-]*)\s*\n([\s\S]*?)```/g, (_match, lang, code) => {
-    const escapedCode = escapeHtml(code.trimEnd());
+  text = text.replace(/```([a-zA-Z0-9_-]*)[ \t]*(?:\r?\n([\s\S]*?)|[ \t]+([^\n`]+?))```/g, (_match, lang, codeMulti, codeSingle) => {
+    const rawCode = codeMulti !== undefined ? codeMulti : codeSingle || '';
+    const escapedCode = escapeHtml(rawCode.trimEnd());
     const placeholder = `@@TGCODEBLOCK${codeBlocks.length}@@`;
-    if (lang) {
-      codeBlocks.push(`<pre><code class="language-${escapeHtml(lang)}">${escapedCode}</code></pre>`);
+    if (lang && lang.trim()) {
+      codeBlocks.push(`<pre><code class="language-${escapeHtml(lang.trim())}">${escapedCode}</code></pre>`);
     } else {
       codeBlocks.push(`<pre>${escapedCode}</pre>`);
     }
@@ -140,11 +148,11 @@ export function markdownToTelegramHtml(markdown: string): string {
 
   // 9. Bold: **text** or __text__
   text = text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-  text = text.replace(/(?<=^|[\s(])__(.+?)__(?=$|[\s),.!?])/g, '<b>$1</b>');
+  text = text.replace(/(?<=^|[\s(\[{«"„'—–<])__(.+?)__(?=$|[\s),.!?;:—–»"”'\]}>])/g, '<b>$1</b>');
 
-  // 10. Italic: *text* or _text_ (excluding inside identifiers)
-  text = text.replace(/(?<=^|[\s(])\*([^*\n]+?)\*(?=$|[\s),.!?])/g, '<i>$1</i>');
-  text = text.replace(/(?<=^|[\s(])_([^_\n]+?)_(?=$|[\s),.!?])/g, '<i>$1</i>');
+  // 10. Italic: *text* or _text_ (supporting full Cyrillic typography: colons, semicolons, dashes, quotes)
+  text = text.replace(/(?<=^|[\s(\[{«"„'—–<])\*([^*\n]+?)\*(?=$|[\s),.!?;:—–»"”'\]}>])/g, '<i>$1</i>');
+  text = text.replace(/(?<=^|[\s(\[{«"„'—–<])_([^_\n]+?)_(?=$|[\s),.!?;:—–»"”'\]}>])/g, '<i>$1</i>');
 
   // 11. Strikethrough: ~~text~~
   text = text.replace(/~~(.+?)~~/g, '<s>$1</s>');
@@ -500,7 +508,15 @@ export async function deliverWithStatusTransition(
 
   const formatted = options?.parse_mode === 'HTML' ? markdownToTelegramHtml(rawText) : rawText;
 
-  if (statusMsg && formatted.length <= MAX_CHUNK && !formatted.includes('<tg-button')) {
+  // Telegram API invariant: editMessageText only accepts InlineKeyboardMarkup in reply_markup.
+  // If reply_markup is a ReplyKeyboardMarkup (e.g. getMainReplyKeyboard), delete status bubble and send clean fresh reply.
+  const hasReplyKeyboard = Boolean(
+    options?.reply_markup &&
+      (options.reply_markup.keyboard ||
+        (!(options.reply_markup instanceof InlineKeyboard) && !options.reply_markup.inline_keyboard))
+  );
+
+  if (statusMsg && !hasReplyKeyboard && formatted.length <= MAX_CHUNK && !formatted.includes('<tg-button')) {
     try {
       return await ctx.api.editMessageText(
         ctx.chat.id,

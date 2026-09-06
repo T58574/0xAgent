@@ -138,11 +138,24 @@ export class VeronicaOrchestrator {
       const targetProj = session.awaitingPromptForProject;
       session.awaitingPromptForProject = undefined;
 
+      let resumeConvoId: string | undefined = undefined;
+      if (session.lastTaskId) {
+        const prevTask = taskRegistry.getTask(session.lastTaskId);
+        if (prevTask && prevTask.project === targetProj && prevTask.result_json) {
+          try {
+            const parsed = JSON.parse(prevTask.result_json);
+            resumeConvoId = parsed.conversation_id;
+          } catch {}
+        }
+      }
+
       try {
         const task = await antigravityAdapter.spawnTask({
           project: targetProj,
           skill: 'custom_task',
           custom_prompt: cleanText,
+          conversation_id: resumeConvoId,
+          continue_recent: !resumeConvoId && Boolean(session.lastTaskId),
         });
 
         session.lastTaskId = task.id;
@@ -171,6 +184,65 @@ export class VeronicaOrchestrator {
     let stripped = cleanText.replace(/^(?:вероника|ника|бот|ассистент)[\s,!:—-]+/i, '').trim();
     if (!stripped) stripped = cleanText;
     const lower = stripped.toLowerCase();
+
+    // Direct Task Continuation heuristic: "<continue>", "/continue", "продолжи", "продолжай", "возобнови"
+    if (
+      lower === '<continue>' ||
+      lower === '/continue' ||
+      lower === 'продолжи' ||
+      lower === 'продолжай' ||
+      lower === 'возобнови' ||
+      lower === 'continue' ||
+      lower.startsWith('продолжи задачу') ||
+      lower.startsWith('возобнови задачу')
+    ) {
+      if (!session.lastTaskId) {
+        const reply = `⚠️ <b>Нет предыдущей задачи для продолжения.</b>\n<i>Выберите проект в «📁 Проекты» или поставьте новую задачу.</i>`;
+        this.persistMessage(userId, 'assistant', reply);
+        return reply;
+      }
+
+      const prevTask = taskRegistry.getTask(session.lastTaskId);
+      if (!prevTask) {
+        const reply = `⚠️ <b>Задача <code>${session.lastTaskId.substring(0, 8)}</code> не найдена в реестре.</b>`;
+        this.persistMessage(userId, 'assistant', reply);
+        return reply;
+      }
+
+      let resumeConvoId: string | undefined = undefined;
+      if (prevTask.result_json) {
+        try {
+          const parsed = JSON.parse(prevTask.result_json);
+          resumeConvoId = parsed.conversation_id;
+        } catch {}
+      }
+
+      try {
+        const task = await antigravityAdapter.spawnTask({
+          project: prevTask.project,
+          skill: prevTask.skill || 'custom_task',
+          custom_prompt: prevTask.custom_prompt || 'Продолжить выполнение и завершить задачу.',
+          conversation_id: resumeConvoId,
+          continue_recent: !resumeConvoId,
+          existing_task_id: prevTask.id,
+        });
+
+        session.lastTaskId = task.id;
+        session.lastTaskProject = prevTask.project;
+        session.lastTaskSummary = prevTask.summary || undefined;
+
+        const reply =
+          `🔄 <b>Возобновляю задачу <code>${task.id.substring(0, 8)}</code> (${prevTask.project})</b>\n\n` +
+          `<i>Контекст и чекпоинт диалога Antigravity сохранены. Агент продолжает выполнение с текущего состояния без повторного сканирования.</i>`;
+
+        this.persistMessage(userId, 'assistant', reply);
+        return reply;
+      } catch (err: any) {
+        const errReply = `❌ Не удалось возобновить задачу <b>${prevTask.project}</b>: ${this.escapeHtml(err?.message || err)}`;
+        this.persistMessage(userId, 'assistant', errReply);
+        return errReply;
+      }
+    }
 
     // Session reset shortcuts
     if (lower === '/reset' || lower === '/new' || lower === '/clear' || lower === 'новая сессия' || lower === 'сброс') {

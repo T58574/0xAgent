@@ -16,6 +16,7 @@ import { AntigravityLogParser, isNetworkError } from './antigravityLogParser';
 import { AntigravityWatchdog } from './antigravityWatchdog';
 import { AntigravityProcessRunner } from './antigravityProcessRunner';
 import { AntigravityUsage } from '../../../src/types';
+import { StreamingOutputCollector } from '../../agent/outputSpiller';
 
 // Re-export Model info, defaults, resolution & CLI path from modular antigravityModels
 export type { AntigravityModelInfo } from './antigravityModels';
@@ -356,20 +357,28 @@ export class AntigravityAdapter implements RuntimeAdapter {
     const config = loadConfig();
     const resolvedProjectPath = (await projectDiscovery.resolveProjectPath(options.project)) || process.cwd();
 
-    const prompt = await taskPromptBuilder.buildAutonomousTaskPrompt({
-      project: options.project,
-      skill: options.skill,
-      custom_prompt: options.custom_prompt,
-      task_id: task.id,
-      autonomy_level: options.autonomy_level,
-      project_path: resolvedProjectPath,
-    });
+    const isResume = Boolean(options.conversation_id || options.continue_recent);
+    const prompt = isResume
+      ? taskPromptBuilder.buildResumeTaskPrompt({
+          project: options.project,
+          task_id: task.id,
+          custom_prompt: options.custom_prompt,
+          previous_summary: task.summary || undefined,
+        })
+      : await taskPromptBuilder.buildAutonomousTaskPrompt({
+          project: options.project,
+          skill: options.skill,
+          custom_prompt: options.custom_prompt,
+          task_id: task.id,
+          autonomy_level: options.autonomy_level,
+          project_path: resolvedProjectPath,
+        });
 
     const maxToolCalls = options.max_tool_calls || config.veronica?.max_task_tool_calls || 120;
 
     VeronicaLogger.log(
       'TASK',
-      `Spawning agy task for project '${options.project}' [skill: ${options.skill}, max_tool_calls: ${maxToolCalls}]`,
+      `Spawning agy task for project '${options.project}' [skill: ${options.skill}, is_resume: ${isResume}, max_tool_calls: ${maxToolCalls}]`,
       task.id
     );
 
@@ -393,7 +402,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
           timestamp: Date.now(),
         });
 
-        let stdoutAccumulator = '';
+        const outputCollector = new StreamingOutputCollector(`task_${task.id.substring(0, 8)}`, 10 * 1024);
         let lastOutputSnippet = '';
         let lineBuffer = '';
         let detectedNetworkError = '';
@@ -415,7 +424,7 @@ export class AntigravityAdapter implements RuntimeAdapter {
         child.stdout?.on('data', (data) => {
           watchdog.resetTimer();
           const chunkStr = data.toString();
-          stdoutAccumulator += '\n' + chunkStr;
+          outputCollector.append(chunkStr);
           lineBuffer += chunkStr;
 
           const lines = lineBuffer.split('\n');
@@ -637,6 +646,8 @@ export class AntigravityAdapter implements RuntimeAdapter {
 
             VeronicaLogger.log(code === 0 && !circuitBreakerTriggered && !detectedNetworkError ? 'INFO' : 'WARN', `Task finished with status '${finalStatus}' (exit code ${code})`, task.id);
 
+            const spillResult = await outputCollector.finalize();
+
             await taskRegistry.updateTaskStatus(task.id, finalStatus, {
               summary: cleanSummary,
               skip_retry: circuitBreakerTriggered || !!detectedNetworkError,
@@ -645,7 +656,9 @@ export class AntigravityAdapter implements RuntimeAdapter {
                 tool_call_count: toolCallCount,
                 duration_seconds: capturedDurationSeconds,
                 usage: capturedUsage,
-                raw: stdoutAccumulator.length > 0 ? stdoutAccumulator.substring(0, 10000) : undefined,
+                raw: spillResult.output,
+                spilled: spillResult.spilled,
+                spill_file: spillResult.filePath,
               }),
             });
 

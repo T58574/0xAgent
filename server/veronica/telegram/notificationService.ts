@@ -2,7 +2,7 @@ import { Bot, InlineKeyboard } from 'grammy';
 import { AgentTask } from '../types';
 import { loadConfig } from '../../config';
 import { veronicaOrchestrator } from './veronicaOrchestrator';
-import { extractButtonsToInlineKeyboard } from './handlers/telegramUtils';
+import { extractButtonsToInlineKeyboard, markdownToTelegramHtml } from './handlers/telegramUtils';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -51,18 +51,20 @@ export class NotificationService {
     const config = loadConfig();
     const whitelist = config.veronica?.telegram_whitelist || [];
 
+    const formattedMessage = markdownToTelegramHtml(message);
+
     for (const chatId of whitelist) {
       try {
-        if (message.includes('<tg-button') && typeof (this.botInstance.api.raw as any)?.sendRichMessage === 'function') {
+        if (formattedMessage.includes('<tg-button') && typeof (this.botInstance.api.raw as any)?.sendRichMessage === 'function') {
           try {
             await (this.botInstance.api.raw as any).sendRichMessage({
               chat_id: chatId,
-              rich_message: { html: message },
+              rich_message: { html: formattedMessage },
             });
             continue;
           } catch {}
         }
-        const extracted = extractButtonsToInlineKeyboard(message);
+        const extracted = extractButtonsToInlineKeyboard(formattedMessage);
         const effectiveMarkup = replyMarkup || extracted.keyboard;
         await this.botInstance.api.sendMessage(chatId, extracted.cleanedHtml, {
           parse_mode: 'HTML',
@@ -104,14 +106,14 @@ export class NotificationService {
 
     if (task.summary) {
       lines.push(`📝 <b>Что сделано:</b>`);
-      lines.push(`${escapeHtml(task.summary)}`);
+      lines.push(markdownToTelegramHtml(task.summary));
       lines.push('');
     }
 
     if (changes.length > 0) {
       lines.push(`🛠 <b>Внесённые изменения:</b>`);
       for (const ch of changes) {
-        lines.push(`• ${escapeHtml(ch)}`);
+        lines.push(`• ${markdownToTelegramHtml(ch)}`);
       }
       lines.push('');
     }
@@ -154,25 +156,45 @@ export class NotificationService {
   }
 
   public async notifyTaskCrashed(task: AgentTask, reason: string): Promise<void> {
+    const keyboard = new InlineKeyboard()
+      .text('🔄 Возобновить задачу', `veronica:resume:${task.id}`)
+      .text('📁 Меню проектов', 'veronica:projects_menu');
+
     const msg = [
       `🚨 <b>АВАРИЯ АГЕНТА:</b> <code>${task.id.substring(0, 8)}</code>`,
       `📁 <b>Проект:</b> ${escapeHtml(task.project)}`,
       `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
       `💥 <b>Причина:</b> ${escapeHtml(reason)}`,
+      '',
+      `<i>Вы можете возобновить выполнение с сохранением контекста и чекпоинта.</i>`,
+      '',
+      `<tg-button-row align="center">` +
+        `<tg-button type="callback_data" data="veronica:resume:${task.id}">🔄 Возобновить задачу</tg-button>` +
+        `<tg-button type="callback_data" data="veronica:projects_menu">📁 Меню проектов</tg-button>` +
+      `</tg-button-row>`,
     ].join('\n');
 
-    await this.broadcastToWhitelist(msg);
+    await this.broadcastToWhitelist(msg, keyboard);
   }
 
   public async notifyTaskTimeout(task: AgentTask, timeoutSec: number): Promise<void> {
+    const keyboard = new InlineKeyboard()
+      .text('🔄 Возобновить задачу', `veronica:resume:${task.id}`)
+      .text('📁 Меню проектов', 'veronica:projects_menu');
+
     const msg = [
       `⏱️ <b>WATCHDOG TIMEOUT:</b> <code>${task.id.substring(0, 8)}</code>`,
       `📁 <b>Проект:</b> ${escapeHtml(task.project)}`,
       `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
       `⚠️ <b>Причина:</b> Нет активности более ${timeoutSec}с. Процесс принудительно остановлен.`,
+      '',
+      `<tg-button-row align="center">` +
+        `<tg-button type="callback_data" data="veronica:resume:${task.id}">🔄 Возобновить задачу</tg-button>` +
+        `<tg-button type="callback_data" data="veronica:projects_menu">📁 Меню проектов</tg-button>` +
+      `</tg-button-row>`,
     ].join('\n');
 
-    await this.broadcastToWhitelist(msg);
+    await this.broadcastToWhitelist(msg, keyboard);
   }
 
   public async notifyApprovalRequired(task: AgentTask, payload: { action: string; details?: string }): Promise<void> {
