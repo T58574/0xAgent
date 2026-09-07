@@ -22,6 +22,9 @@ import {
   ProxyHealthCheckResult,
   ProxyExportConfig,
   ProxyRoutingConfig,
+  BenchmarkTaskInfo,
+  BenchmarkSuiteReport,
+  RunBenchmarkRequest,
 } from '../types';
 
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
@@ -340,3 +343,13 @@ export * from './api/telemetry';
 
 // Veronica Subsystem APIs
 export * from './api/veronica';
+
+// Benchmark APIs
+export const get_benchmark_tasks = () =>
+  get<{ success: boolean; tasks: BenchmarkTaskInfo[] }>('/benchmark/tasks');
+
+export const get_benchmark_status = () =>
+  get<{ success: boolean; isRunning: boolean; lastReport: BenchmarkSuiteReport | null }>('/benchmark/status');
+
+export const run_benchmark = (params: RunBenchmarkRequest) =>
+  post<{ success: boolean; report: BenchmarkSuiteReport }>('/benchmark/run', params);

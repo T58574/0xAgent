@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { getVeronicaDb, getVeronicaDataDir } from '../db/veronicaDb';
 import { writeQueue } from '../db/writeQueue';
@@ -65,6 +66,31 @@ export class VeronicaScheduler {
       const db = getVeronicaDb();
       db.prepare('UPDATE cron_jobs SET last_run = ?, next_run = ? WHERE id = ?').run(now, nextRun, job.id);
     });
+
+    // Direct notification alert if job is flagged as missile/notification alert
+    if (job.skill === 'missile_alert' || job.skill === 'notification_alert') {
+      try {
+        const { notificationService } = await import('../telegram/notificationService');
+        await notificationService.sendMissilePriorityAlert({
+          targetName: job.project || 'КАТЯ ТАРАБАЕВА',
+          instruction: job.custom_prompt || undefined,
+        });
+      } catch (alertErr) {
+        console.error(`[Veronica Scheduler] Failed to fire missile alert for job ${job.id}:`, alertErr);
+      }
+      return;
+    }
+
+    // Direct runner for morning briefing & daily trending news + AGY release checker
+    if (job.skill === 'morning_briefing' || job.skill === 'oss_trending' || job.skill === 'daily_trending') {
+      try {
+        await this.executeTrendingDigestJob(job);
+      } catch (digestErr) {
+        console.error(`[Veronica Scheduler] Failed to run trending digest job ${job.id}:`, digestErr);
+      }
+      return;
+    }
+
 
     // Guard: prevent overlapping executions if project already has an active or queued task
     const db = getVeronicaDb();
@@ -207,6 +233,92 @@ export class VeronicaScheduler {
 
     // Default fallback: 1 hour
     return 60 * 60 * 1000;
+  }
+
+  public async executeTrendingDigestJob(_job?: any): Promise<{ success: boolean; message: string }> {
+    const candidateDirs = [
+      path.join(process.env.USERPROFILE || process.env.HOME || '', 'Documents', 'dev', 'T58574', 'oss-daily-trending'),
+      path.resolve(process.cwd(), '..', 'T58574', 'oss-daily-trending'),
+      path.resolve(process.cwd(), '..', 'oss-daily-trending'),
+    ];
+
+    let trendingDir: string | null = null;
+    for (const d of candidateDirs) {
+      if (fs.existsSync(path.join(d, 'run.py'))) {
+        trendingDir = d;
+        break;
+      }
+    }
+
+    if (!trendingDir) {
+      const errMsg = 'Директория oss-daily-trending с run.py не найдена';
+      console.error(`[Veronica Scheduler] ${errMsg}`);
+      return { success: false, message: errMsg };
+    }
+
+    console.log(`[Veronica Scheduler] Запуск дайджеста oss-daily-trending из ${trendingDir}...`);
+
+    return new Promise((resolve) => {
+      const pyProcess = spawn('python', ['run.py'], {
+        cwd: trendingDir,
+        env: {
+          ...process.env,
+          PYTHONIOENCODING: 'utf-8',
+          PYTHONUTF8: '1',
+        },
+        windowsHide: true,
+        shell: false,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      pyProcess.stdout.on('data', (d) => {
+        stdout += d.toString();
+      });
+
+      pyProcess.stderr.on('data', (d) => {
+        stderr += d.toString();
+      });
+
+      pyProcess.on('close', async (code) => {
+        if (code === 0) {
+          console.log('[Veronica Scheduler] [OK] Дайджест и чекер AGY CLI успешно выполнены.');
+          try {
+            const { OperationalJournalService } = await import('./operationalJournal');
+            await OperationalJournalService.getInstance().logEntry({
+              project: 'oss-daily-trending',
+              agent: 'veronica',
+              operation_type: 'morning_briefing',
+              status: 'completed',
+              summary: 'Утренний брифинг, мировые новости и чекер релизов AGY CLI успешно отправлены в Telegram',
+              important: true,
+            });
+          } catch {}
+          resolve({ success: true, message: 'Дайджест и проверка релизов успешно отправлены в Telegram' });
+        } else {
+          const errDetail = (stderr || stdout || `Код завершения ${code}`).trim();
+          console.error(`[Veronica Scheduler] Ошибка выполнения run.py (код ${code}):`, errDetail);
+          try {
+            const { OperationalJournalService } = await import('./operationalJournal');
+            await OperationalJournalService.getInstance().logEntry({
+              project: 'oss-daily-trending',
+              agent: 'veronica',
+              operation_type: 'morning_briefing',
+              status: 'failed',
+              summary: `Ошибка сборки дайджеста: ${errDetail.slice(0, 200)}`,
+              important: true,
+            });
+          } catch {}
+          resolve({ success: false, message: `Ошибка выполнения скрипта: ${errDetail.slice(0, 200)}` });
+        }
+      });
+
+      pyProcess.on('error', (err) => {
+        console.error('[Veronica Scheduler] Ошибка запуска python run.py:', err);
+        resolve({ success: false, message: `Ошибка запуска процесса: ${err.message}` });
+      });
+    });
   }
 }
 

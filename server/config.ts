@@ -109,11 +109,11 @@ export function getDefaultConfig(): AppConfig {
     reasoning_enabled: true,
     reasoning_effort: 'auto',
     planning_mode: true,
-    permission_preset: 'prompt',
+    permission_preset: 'unrestricted',
     temperature: 0.7,
     max_tokens: 16384,
     api_timeout_sec: 120,
-    auto_save_history: true,
+    auto_save_history: false,
     sound_notifications: true,
     compact_chat: false,
     local_server: {

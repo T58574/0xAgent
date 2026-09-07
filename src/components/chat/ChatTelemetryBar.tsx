@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { LiveTelemetry, ChatSession, AppConfig, QuotaStatus } from '../../types';
+import { LiveTelemetry, ChatSession, AppConfig } from '../../types';
 import { MaterialIcon } from '../common/MaterialIcon';
-import { purge_vram, reset_quota } from '../../services/api';
+import { purge_vram } from '../../services/api';
 
 interface ChatTelemetryBarProps {
   liveTelemetry: LiveTelemetry | null;
   currentSession?: ChatSession | null;
   config?: AppConfig | null;
-  quotaStatus?: QuotaStatus | null;
   isGenerating?: boolean;
   elapsedSeconds?: number;
   onOpenCustomizations?: () => void;
@@ -17,13 +16,11 @@ export const ChatTelemetryBar: React.FC<ChatTelemetryBarProps> = ({
   liveTelemetry,
   currentSession,
   config,
-  quotaStatus,
   isGenerating = false,
   elapsedSeconds: externalElapsedSeconds,
   onOpenCustomizations,
 }) => {
   const [purging, setPurging] = useState(false);
-  const [resettingQuota, setResettingQuota] = useState(false);
   const [internalSeconds, setInternalSeconds] = useState(0);
   const timerStartRef = useRef<number | null>(null);
 
@@ -58,50 +55,6 @@ export const ChatTelemetryBar: React.FC<ChatTelemetryBarProps> = ({
       setPurging(false);
     }
   };
-
-  const handleResetQuota = async () => {
-    setResettingQuota(true);
-    try {
-      await reset_quota();
-    } catch {}
-    finally {
-      setResettingQuota(false);
-    }
-  };
-
-  // 1. Live Countdown for Real 429 Quota Exhaustion
-  const [resetCountdown, setResetCountdown] = useState<string>('');
-  const activeQuota = liveTelemetry?.quotaStatus || quotaStatus;
-
-  useEffect(() => {
-    if (!activeQuota?.exhausted) {
-      setResetCountdown('');
-      return;
-    }
-
-    if (!activeQuota.resetAt) {
-      setResetCountdown(activeQuota.resetText || '60s');
-      return;
-    }
-
-    const updateCountdown = () => {
-      const diffMs = (activeQuota.resetAt || 0) - Date.now();
-      if (diffMs <= 0) {
-        setResetCountdown('00:00 (Ready)');
-      } else {
-        const totalSec = Math.ceil(diffMs / 1000);
-        const h = Math.floor(totalSec / 3600);
-        const m = Math.floor((totalSec % 3600) / 60);
-        const s = totalSec % 60;
-        const pad = (n: number) => String(n).padStart(2, '0');
-        setResetCountdown(h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`);
-      }
-    };
-
-    updateCountdown();
-    const interval = setInterval(updateCountdown, 1000);
-    return () => clearInterval(interval);
-  }, [activeQuota?.exhausted, activeQuota?.resetAt, activeQuota?.resetText]);
 
   // 2. Genuine session token tracking from active stream or latest message
   const messages = currentSession?.messages || [];
@@ -184,31 +137,6 @@ export const ChatTelemetryBar: React.FC<ChatTelemetryBarProps> = ({
           >
             <MaterialIcon name="schedule" size={13} className={isGenerating ? 'animate-spin' : ''} />
             <span>{displaySeconds.toFixed(1)}s</span>
-          </div>
-        )}
-
-        {/* Real 429 Quota Exhaustion Banner with live countdown */}
-        {activeQuota?.exhausted && (
-          <div
-            className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-rose-500/15 border border-rose-500/40 text-rose-300 text-[11px] font-bold animate-pulse"
-            title={`Лимит квоты исчерпан (429). ${activeQuota.reason || ''}`}
-          >
-            <MaterialIcon name="hourglass_empty" size={13} className="text-rose-400" />
-            <span>[429 QUOTA EXHAUSTED]</span>
-            {resetCountdown && (
-              <span className="text-amber-300 font-mono tracking-wider ml-1">
-                Resets: {resetCountdown}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleResetQuota}
-              disabled={resettingQuota}
-              className="ml-1 px-1.5 py-0.2 rounded bg-rose-500/20 hover:bg-rose-500/30 text-[10px] text-white border border-rose-500/30 cursor-pointer disabled:opacity-50"
-              title="Сбросить статус исчерпания квоты"
-            >
-              {resettingQuota ? '...' : 'Reset'}
-            </button>
           </div>
         )}
 

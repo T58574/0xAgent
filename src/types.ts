@@ -125,7 +125,7 @@ export interface SystemPromptItem {
   editable?: boolean;
 }
 
-export type ActiveView = 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge' | 'veronica';
+export type ActiveView = 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge' | 'veronica' | 'benchmark';
 
 export interface RemoteNodeConfig {
   enabled?: boolean;
@@ -1130,6 +1130,59 @@ export interface ProxyRoutingConfig {
   route_cloud_ai: boolean;
   route_web_search: boolean;
   route_media_download: boolean;
+}
+
+export type BenchmarkCategory =
+  | 'reasoning'
+  | 'coding'
+  | 'instruction_following'
+  | 'structured_data'
+  | 'agentic'
+  | 'retrieval'
+  | 'language'
+  | 'performance';
+
+export interface BenchmarkTaskInfo {
+  id: string;
+  name: string;
+  category: BenchmarkCategory;
+  description: string;
+  prompt: string;
+}
+
+export interface BenchmarkTestResult {
+  taskId: string;
+  name: string;
+  category: BenchmarkCategory;
+  passed: boolean;
+  score: number; // 0 to 100
+  latencyMs: number;
+  ttftMs: number;
+  tokensPerSec: number;
+  promptTokens: number;
+  completionTokens: number;
+  output: string;
+  details: string;
+}
+
+export interface BenchmarkSuiteReport {
+  modelName: string;
+  provider: 'local' | 'antigravity' | 'openai';
+  timestamp: number;
+  totalTasks: number;
+  passedTasks: number;
+  overallScore: number;
+  averageTokensPerSec: number;
+  averageLatencyMs: number;
+  averageTtftMs: number;
+  results: BenchmarkTestResult[];
+}
+
+export interface RunBenchmarkRequest {
+  provider?: 'local' | 'antigravity' | 'openai';
+  model?: string;
+  endpoint?: string;
+  taskIds?: string[];
 }
 
 

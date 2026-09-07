@@ -23,6 +23,7 @@ import { proxyService } from './proxyService';
 import { closeProxyDb } from './proxyDb';
 import { quotaRouter } from './routes/quotaRoutes';
 import { quotaManager } from './agent/quotaManager';
+import { createBenchmarkRouter } from './routes/benchmarkRoutes';
 
 
 import path from 'node:path';
@@ -171,6 +172,7 @@ app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/veronica', createVeronicaRouter(broadcast));
 app.use('/api', createProxyRouter(broadcast));
+app.use('/api/benchmark', createBenchmarkRouter(broadcast));
 app.use('/api', systemRouter);
 
 
@@ -256,8 +258,8 @@ server.listen(Number(PORT), HOST, () => {
   // Start continuous memory decay & conflict hygiene scheduler
   startMemoryDecayScheduler();
 
-  // Start periodic polling of agy CLI quota limits
-  quotaManager.startPeriodicPolling();
+  // Note: Background timer polling of agy -p /usage is disabled.
+  // Quota queries via CLI are strictly restricted to direct manual user invocation.
 
   // Start Remote Node probe if configured
   const cfg = loadConfig();

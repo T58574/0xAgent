@@ -447,6 +447,42 @@ export async function safeReplyWithDocument(
 }
 
 /**
+ * Safely send a photo into the chat with optional formatted caption and buttons.
+ */
+export async function safeReplyWithPhoto(
+  ctx: any,
+  fileInput: string | Buffer,
+  options: {
+    caption?: string;
+    parse_mode?: 'HTML';
+    reply_markup?: any;
+  } = {}
+): Promise<any> {
+  let inputFile: InputFile;
+  if (typeof fileInput === 'string') {
+    if (!fs.existsSync(fileInput)) {
+      throw new Error(`Photo not found on disk: ${fileInput}`);
+    }
+    inputFile = new InputFile(fileInput, path.basename(fileInput));
+  } else {
+    inputFile = new InputFile(fileInput, 'photo.jpg');
+  }
+
+  const formattedCaption = options.caption ? markdownToTelegramHtml(options.caption) : undefined;
+  const replyOpts: any = {
+    caption: formattedCaption,
+    parse_mode: options.parse_mode || (formattedCaption ? 'HTML' : undefined),
+    reply_markup: options.reply_markup,
+  };
+
+  if (typeof ctx.replyWithPhoto === 'function') {
+    return await ctx.replyWithPhoto(inputFile, replyOpts);
+  } else if (ctx.api?.sendPhoto && ctx.chat?.id) {
+    return await ctx.api.sendPhoto(ctx.chat.id, inputFile, replyOpts);
+  }
+}
+
+/**
  * Scans Veronica response text for file attachment directives:
  * [file: path/to/file.ext] or [document: path/to/file.ext]
  * Resolves paths (including project relative), sends them as documents, and replaces the tag with a badge.

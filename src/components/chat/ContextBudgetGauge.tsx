@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Layers, Database, MessageSquare, ShieldCheck, Cpu, AlertTriangle } from 'lucide-react';
-import { LiveTelemetry, MessageMetrics, AppConfig, ChatSession, QuotaStatus } from '../../types';
+import { Layers, Database, MessageSquare, ShieldCheck, Cpu } from 'lucide-react';
+import { LiveTelemetry, MessageMetrics, AppConfig, ChatSession } from '../../types';
 import { useI18n } from '../../i18n';
 
 interface ContextBudgetGaugeProps {
@@ -8,7 +8,6 @@ interface ContextBudgetGaugeProps {
   lastMessageMetrics?: MessageMetrics | null;
   currentSession?: ChatSession | null;
   config?: AppConfig | null;
-  quotaStatus?: QuotaStatus | null;
 }
 
 export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(({
@@ -16,7 +15,6 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
   lastMessageMetrics,
   currentSession,
   config,
-  quotaStatus,
 }) => {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
@@ -109,8 +107,6 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
   const freeTokens = Math.max(0, maxTokens - usedTokens);
   const compactionTier = breakdown?.compactionTier ?? (pct > 85 ? 2 : pct > 70 ? 1 : 0);
 
-  const activeQuota = liveTelemetry?.quotaStatus || quotaStatus;
-
   const getTierLabel = (tier: number) => {
     switch (tier) {
       case 1:
@@ -169,11 +165,6 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
         >
           {pct}%
         </span>
-
-        {/* Quota Exhaustion Alert dot */}
-        {activeQuota?.exhausted && (
-          <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-0.5" title="Квота исчерпана (429)" />
-        )}
       </button>
 
       {/* Breakdown Hover / Click Popover */}
@@ -191,19 +182,6 @@ export const ContextBudgetGauge: React.FC<ContextBudgetGaugeProps> = React.memo(
               {pct}% used
             </span>
           </div>
-
-          {/* Quota Exhaustion Alert Row */}
-          {activeQuota?.exhausted && (
-            <div className="p-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[11px] flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-[10px] uppercase tracking-wider">Квота исчерпана (429)</div>
-                {activeQuota.resetText && (
-                  <div className="text-[10px] text-rose-200">Сброс через: {activeQuota.resetText}</div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Breakdown Items */}
           <div className="space-y-1.5 text-[11px]">

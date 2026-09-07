@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as api from '../services/api';
 import { sounds } from '../services/soundEffects';
-import { ChatSession, ChatMessage, LiveTelemetry, ToolCallInfo, PersonaMetadata, TodoItem, AppConfig, QuotaStatus } from '../types';
+import { ChatSession, ChatMessage, LiveTelemetry, ToolCallInfo, PersonaMetadata, TodoItem, AppConfig } from '../types';
 
 interface UseAppWebSocketParams {
   currentSessionIdRef: React.MutableRefObject<string | null>;
@@ -18,7 +18,6 @@ interface UseAppWebSocketParams {
   loadWorkspaceTree: (dir: string) => void;
   addLog: (msg: string) => void;
   workspaceDir?: string;
-  setQuotaStatus?: React.Dispatch<React.SetStateAction<QuotaStatus | null>>;
 }
 
 export function useAppWebSocket({
@@ -36,7 +35,6 @@ export function useAppWebSocket({
   loadWorkspaceTree,
   addLog,
   workspaceDir,
-  setQuotaStatus,
 }: UseAppWebSocketParams) {
   const pendingTokensRef = useRef<
     Map<string, { sessionId: string; messageId: string; tokens: string[]; telemetry?: any }>
@@ -146,11 +144,7 @@ export function useAppWebSocket({
           contextMax: event.payload.contextMax,
           modelName: event.payload.modelName,
           contextBreakdown: event.payload.contextBreakdown,
-          quotaStatus: event.payload.quotaStatus,
         };
-        if (event.payload.quotaStatus && setQuotaStatus) {
-          setQuotaStatus(event.payload.quotaStatus);
-        }
       }
 
       if (!streamThrottleTimerRef.current) {
@@ -194,11 +188,7 @@ export function useAppWebSocket({
                   contextMax: lastAssistant.metrics.contextMax,
                   modelName: lastAssistant.metrics.modelName,
                   contextBreakdown: lastAssistant.metrics.contextBreakdown,
-                  quotaStatus: lastAssistant.metrics.quotaStatus,
                 });
-                if (lastAssistant.metrics.quotaStatus && setQuotaStatus) {
-                  setQuotaStatus(lastAssistant.metrics.quotaStatus);
-                }
               }
             }
           } catch (err) {
@@ -347,23 +337,6 @@ export function useAppWebSocket({
       }
     });
 
-    const unQuota = api.listen<QuotaStatus>('quota-status-changed', (event) => {
-      if (setQuotaStatus) {
-        setQuotaStatus(event.payload);
-      }
-      if (event.payload?.exhausted) {
-        sounds.playError();
-        addLog(`[QUOTA] Лимит исчерпан: ${event.payload.reason || 'Rate limit'}. Сброс через: ${event.payload.resetText || '60s'}`);
-      }
-    });
-
-    // Fetch initial quota status on hook initialization
-    api.get_quota_status().then((q) => {
-      if (q && setQuotaStatus) {
-        setQuotaStatus(q);
-      }
-    }).catch(() => {});
-
     return () => {
       if (streamThrottleTimerRef.current) {
         clearTimeout(streamThrottleTimerRef.current);
@@ -379,7 +352,6 @@ export function useAppWebSocket({
       unPersona();
       unTodos();
       unConfig();
-      unQuota();
       window.removeEventListener('0xagent-ws-reconnected', onWsReconnected);
     };
   }, [workspaceDir]);

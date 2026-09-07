@@ -336,9 +336,9 @@ export function getProjectSystemPrompts(): SystemPromptItem[] {
 - Never pre-compose final user responses inside <think>.
 - Close </think> before emitting any tool XML tags.
 
-## Two-Tier Approval Gate
-- Tier 1: Quick replies with max 4 chips (<= 25 chars).
-- Tier 2: Blocking approval gate for destructive file/command mutations.`,
+## Execution Authority
+- Fully autonomous execution without blocking approval gates.
+- Quick replies with max 4 suggestion chips (<= 25 chars).`,
       editable: false,
     },
     {

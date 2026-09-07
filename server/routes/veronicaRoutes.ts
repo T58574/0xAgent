@@ -6,6 +6,7 @@ import { projectDiscovery } from '../veronica/core/projectDiscovery';
 import { antigravityAdapter, VeronicaStreamEvent } from '../veronica/adapters/antigravityAdapter';
 import { MessageBuilder } from '../veronica/telegram/messageBuilder';
 import { taskRegistry } from '../veronica/core/taskRegistry';
+import { readSpillFile } from '../agent/outputSpiller';
 
 type BroadcastFn = (event: string, payload: any) => void;
 
@@ -214,6 +215,62 @@ export function createVeronicaRouter(broadcast?: BroadcastFn): Router {
       res.json({ success: killed });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Resume task endpoint
+  router.post('/tasks/:id/resume', async (req, res) => {
+    try {
+      const taskId = String(req.params.id);
+      const customPrompt = req.body?.custom_prompt ? String(req.body.custom_prompt).trim() : undefined;
+      const resumedTask = await taskRegistry.resumeTask(taskId, customPrompt);
+      if (!resumedTask) {
+        res.status(404).json({ success: false, error: 'Task not found or failed to resume' });
+        return;
+      }
+      res.json({ success: true, task: resumedTask });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // Get chronological events / timeline for a task
+  router.get('/tasks/:id/events', (req, res) => {
+    try {
+      const taskId = String(req.params.id);
+      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+      const events = taskRegistry.getTaskEvents(taskId, limit);
+      res.json({ success: true, taskId, events });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
+    }
+  });
+
+  // Safely view or download a spilled log file (>10 KB)
+  router.get('/spill/:fileName', async (req, res) => {
+    try {
+      const fileName = String(req.params.fileName);
+      const spillData = await readSpillFile(fileName);
+      if (!spillData) {
+        res.status(404).json({ success: false, error: 'Spill log file not found or invalid filename' });
+        return;
+      }
+
+      if (req.query.download === '1' || req.query.download === 'true') {
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(spillData.fileName)}"`);
+        res.send(spillData.content);
+        return;
+      }
+
+      res.json({
+        success: true,
+        fileName: spillData.fileName,
+        size: spillData.size,
+        content: spillData.content,
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err?.message || err });
     }
   });
 

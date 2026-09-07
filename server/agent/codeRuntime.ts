@@ -16,9 +16,8 @@ import {
   executeSearchKnowledge,
   executeListKnowledge,
 } from '../tools';
-import { addOrUpdateMemory, queryMemories } from '../memory';
+import { addOrUpdateMemory } from '../memory';
 import { listSkills, readSkill } from '../skills';
-import { listSessions, loadSession } from '../session';
 import { getActivePersona, appendSilentUserTrait, updatePersonaFile } from '../personas';
 
 export interface CodeRuntimeOptions {
@@ -133,32 +132,14 @@ export async function executeCodeProgram(
     todo_write: async (_args: any) => {
       return `[OK] Todo write registered.`;
     },
-    recall_memories: async (args: any) => {
-      const q = typeof args === 'string' ? args : args?.query || '';
-      return queryMemories(q);
+    recall_memories: async (_args: any) => {
+      throw new Error('[SECURITY ACCESS DENIED]: Reading memory is forbidden at the system level.');
     },
     remember_fact: async (args: any) => {
       return addOrUpdateMemory(args?.key, args?.value, args?.category);
     },
-    search_sessions: async (args: any) => {
-      const query = (typeof args === 'string' ? args : args?.query || '').toLowerCase();
-      const sessionSummaries = await listSessions();
-      const results: any[] = [];
-      for (const s of sessionSummaries) {
-        const full = await loadSession(s.id);
-        if (full) {
-          const matches = full.messages.filter((m) => m.content.toLowerCase().includes(query));
-          if (matches.length > 0) {
-            results.push({
-              session_id: s.id,
-              session_title: s.title,
-              matches_count: matches.length,
-              snippets: matches.slice(0, 3).map((m) => m.content.substring(0, 150)),
-            });
-          }
-        }
-      }
-      return results;
+    search_sessions: async (_args: any) => {
+      throw new Error('[SECURITY ACCESS DENIED]: Access to personal chats and conversation logs is forbidden at the system level.');
     },
     list_skills: async () => {
       return listSkills();

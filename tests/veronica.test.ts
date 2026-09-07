@@ -27,7 +27,7 @@ import { getDefaultConfig } from '../server/config';
 import { voiceThoughtService } from '../server/veronica/telegram/voiceThoughtService';
 import { markdownToTelegramHtml, extractButtonsToInlineKeyboard, handleResponseAttachments, splitHtmlIntoBalancedChunks } from '../server/veronica/telegram/handlers/telegramUtils';
 import { notificationService } from '../server/veronica/telegram/notificationService';
-import { StreamingOutputCollector } from '../server/agent/outputSpiller';
+import { StreamingOutputCollector, readSpillFile, getSpillFilePath, handleOutputSpill } from '../server/agent/outputSpiller';
 
 describe('Module Veronica & Remote Node Architecture Test Suite', () => {
   const testDbDir = path.join(os.tmpdir(), '.0xagent_test_veronica_' + Date.now());
@@ -618,6 +618,10 @@ describe('Module Veronica & Remote Node Architecture Test Suite', () => {
 
       assert.equal(isAntigravityModel('local:qwen2.5-coder-32b.gguf'), false);
       assert.equal(isAntigravityModel('my-model.gguf'), false);
+      assert.equal(isAntigravityModel('local:ornith-1.5-9b-crack-q8_0.gguf', 'veronica'), false);
+      assert.equal(isAntigravityModel('Ornith-1.5-9B-CRACK-Q8_0.gguf', 'veronica'), false);
+      assert.equal(resolveAntigravityModelAndEffort('local:ornith-1.5-9b-crack-q8_0.gguf').model, undefined);
+      assert.equal(resolveAntigravityModelAndEffort('Ornith-1.5-9B-CRACK-Q8_0.gguf').model, undefined);
     });
 
     it('should build clean system prompt without 23 XML tools when Antigravity model is selected', () => {
@@ -1019,6 +1023,353 @@ const answer = 42;
       assert.ok(continueReply.includes('Возобновляю задачу'), 'Should report resuming task');
       assert.ok(continueReply.includes(testTask.id.substring(0, 8)), 'Should include task ID');
       assert.ok(continueReply.includes('Контекст и чекпоинт диалога Antigravity сохранены'), 'Checkpoint notice missing');
+    });
+
+    it('should resume task via taskRegistry.resumeTask and reset retry_count', async () => {
+      projectLockManager.releaseGlobalLock();
+      const task = await taskRegistry.createTask({
+        project: 'test-resume-proj',
+        skill: 'code_review',
+        custom_prompt: 'Начальный анализ',
+      });
+      await taskRegistry.checkpointConversationId(task.id, 'convo-test-resume-123');
+      await taskRegistry.updateTaskStatus(task.id, 'failed', { error_message: 'Mock network drop' });
+
+      // Verify it is failed
+      const failedTask = taskRegistry.getTask(task.id);
+      assert.equal(failedTask?.status, 'failed');
+
+      // Now resume with follow-up prompt
+      const resumed = await taskRegistry.resumeTask(task.id, 'Исправь замечания и заверши');
+      assert.ok(resumed);
+      assert.equal(resumed?.id, task.id);
+      assert.equal(resumed?.project, 'test-resume-proj');
+      assert.equal(resumed?.custom_prompt, 'Исправь замечания и заверши');
+      assert.equal(resumed?.retry_count, 0);
+
+      const refreshedTask = taskRegistry.getTask(task.id);
+      assert.equal(refreshedTask?.retry_count, 0);
+      assert.equal(refreshedTask?.custom_prompt, 'Исправь замечания и заверши');
+      projectLockManager.releaseGlobalLock(task.id);
+    });
+
+    it('should route POST /tasks/:id/resume through Express router', async () => {
+      projectLockManager.releaseGlobalLock();
+      const task = await taskRegistry.createTask({
+        project: 'route-resume-proj',
+        skill: 'audit',
+        custom_prompt: 'Проверка безопасности',
+      });
+      await taskRegistry.checkpointConversationId(task.id, 'convo-route-resume-abc');
+
+      const router = createVeronicaRouter(() => {});
+      let resumeResponse: any = null;
+      let statusCode = 200;
+
+      const mockReq: any = {
+        method: 'POST',
+        url: `/tasks/${task.id}/resume`,
+        params: { id: task.id },
+        body: { custom_prompt: 'Продолжай аудит дальше' },
+        headers: {},
+      };
+
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 1000);
+        const mockRes: any = {
+          json: (data: any) => {
+            resumeResponse = data;
+            clearTimeout(timer);
+            resolve();
+            return mockRes;
+          },
+          status: (code: number) => {
+            statusCode = code;
+            return mockRes;
+          },
+        };
+        router.handle(mockReq, mockRes, () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      projectLockManager.releaseGlobalLock(task.id);
+
+      assert.equal(statusCode, 200);
+      assert.ok(resumeResponse);
+      assert.equal(resumeResponse.success, true);
+      assert.equal(resumeResponse.task?.id, task.id);
+      assert.equal(resumeResponse.task?.project, 'route-resume-proj');
+    });
+
+    it('should queue resumed task when system is already executing another task (global sequential concurrency = 1)', async () => {
+      projectLockManager.releaseGlobalLock();
+
+      // 1. Create and start a primary task that holds the global lock
+      const primaryTask = await taskRegistry.createTask({
+        project: 'busy-project',
+        skill: 'heavy_task',
+      });
+      assert.equal(projectLockManager.isGlobalLocked(), true);
+      assert.equal(projectLockManager.getActiveGlobalTask(), primaryTask.id);
+
+      // 2. Create another task in another project
+      const secondaryTask = await taskRegistry.createTask({
+        project: 'secondary-project',
+        skill: 'secondary_task',
+      });
+      assert.equal(secondaryTask.status, 'queued');
+
+      // Now resume secondaryTask explicitly
+      const resumedSecondary = await taskRegistry.resumeTask(secondaryTask.id, 'Попытка возобновить пока занято');
+      assert.ok(resumedSecondary);
+      assert.equal(resumedSecondary?.status, 'queued');
+
+      // 3. Clean up locks
+      projectLockManager.releaseGlobalLock(primaryTask.id);
+      projectLockManager.releaseGlobalLock(secondaryTask.id);
+      projectLockManager.releaseGlobalLock();
+    });
+  });
+
+  describe('26. Agent Events Timeline & Spill Log Delivery', () => {
+    it('should retrieve task events chronologically and respect limit', async () => {
+      projectLockManager.releaseGlobalLock();
+      const task = await taskRegistry.createTask({
+        project: 'events-timeline-proj',
+        skill: 'event_test',
+      });
+
+      // Record multiple heartbeats / events
+      await taskRegistry.recordHeartbeat(task.id, 'Step 1: Init', '10%');
+      await taskRegistry.recordHeartbeat(task.id, 'Step 2: Progress', '50%');
+      await taskRegistry.recordHeartbeat(task.id, 'Step 3: Done', '100%');
+
+      const allEvents = taskRegistry.getTaskEvents(task.id);
+      assert.ok(allEvents.length >= 3, 'Should have at least 3 events');
+
+      // Verify chronological ordering (timestamp ASC)
+      for (let i = 1; i < allEvents.length; i++) {
+        assert.ok(
+          allEvents[i].timestamp >= allEvents[i - 1].timestamp,
+          'Events must be sorted chronologically ASC'
+        );
+      }
+
+      // Verify limit
+      const limitedEvents = taskRegistry.getTaskEvents(task.id, 2);
+      assert.equal(limitedEvents.length, 2);
+
+      projectLockManager.releaseGlobalLock(task.id);
+      projectLockManager.releaseGlobalLock();
+    });
+
+    it('should route GET /tasks/:id/events through Express router', async () => {
+      projectLockManager.releaseGlobalLock();
+      const task = await taskRegistry.createTask({
+        project: 'route-events-proj',
+        skill: 'events_route',
+      });
+      await taskRegistry.recordHeartbeat(task.id, 'Checking system health', '30%');
+
+      const router = createVeronicaRouter(() => {});
+      let eventsResponse: any = null;
+      let statusCode = 200;
+
+      const mockReq: any = {
+        method: 'GET',
+        url: `/tasks/${task.id}/events`,
+        params: { id: task.id },
+        query: { limit: '10' },
+        headers: {},
+      };
+
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 1000);
+        const mockRes: any = {
+          json: (data: any) => {
+            eventsResponse = data;
+            clearTimeout(timer);
+            resolve();
+            return mockRes;
+          },
+          status: (code: number) => {
+            statusCode = code;
+            return mockRes;
+          },
+        };
+        router.handle(mockReq, mockRes, () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      projectLockManager.releaseGlobalLock(task.id);
+      projectLockManager.releaseGlobalLock();
+
+      assert.equal(statusCode, 200);
+      assert.ok(eventsResponse);
+      assert.equal(eventsResponse.success, true);
+      assert.equal(eventsResponse.taskId, task.id);
+      assert.ok(Array.isArray(eventsResponse.events));
+      assert.ok(eventsResponse.events.length >= 1);
+    });
+
+    it('should enforce strict path traversal protection on spill files', async () => {
+      // Relative traversals
+      assert.equal(await getSpillFilePath('../secret.log'), null);
+      assert.equal(await getSpillFilePath('../../etc/passwd.log'), null);
+      assert.equal(await getSpillFilePath('..\\windows\\system32.log'), null);
+
+      // Disallowed extensions
+      assert.equal(await getSpillFilePath('test.txt'), null);
+      assert.equal(await getSpillFilePath('test.json'), null);
+      assert.equal(await getSpillFilePath('test.sh'), null);
+      assert.equal(await getSpillFilePath(''), null);
+
+      // Non-existent file
+      const nonExistent = await readSpillFile('non_existent_random_file_999.log');
+      assert.equal(nonExistent, null);
+    });
+
+    it('should persist spilled output, read it via readSpillFile, and serve via Express router', async () => {
+      // 1. Generate spilled file (>10 KB)
+      const bigContent = 'Log line sample :: ' + 'X'.repeat(100) + '\n';
+      const repeatedContent = bigContent.repeat(120); // ~14 KB
+      const spillResult = await handleOutputSpill(repeatedContent, 'veronica_test', 5000);
+
+      assert.equal(spillResult.spilled, true);
+      assert.ok(spillResult.filePath);
+      const fileName = path.basename(spillResult.filePath!);
+
+      // 2. Read back via readSpillFile
+      const readResult = await readSpillFile(fileName);
+      assert.ok(readResult);
+      assert.equal(readResult.fileName, fileName);
+      assert.equal(readResult.content, repeatedContent);
+      assert.ok(readResult.size > 10000);
+
+      const router = createVeronicaRouter(() => {});
+
+      // 3. Test GET /spill/:fileName (JSON preview)
+      let previewResponse: any = null;
+      let previewStatus = 200;
+      const previewReq: any = {
+        method: 'GET',
+        url: `/spill/${fileName}`,
+        params: { fileName },
+        query: {},
+        headers: {},
+      };
+
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 1000);
+        const mockRes: any = {
+          json: (data: any) => {
+            previewResponse = data;
+            clearTimeout(timer);
+            resolve();
+            return mockRes;
+          },
+          status: (code: number) => {
+            previewStatus = code;
+            return mockRes;
+          },
+        };
+        router.handle(previewReq, mockRes, () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      assert.equal(previewStatus, 200);
+      assert.ok(previewResponse);
+      assert.equal(previewResponse.success, true);
+      assert.equal(previewResponse.fileName, fileName);
+      assert.equal(previewResponse.content, repeatedContent);
+
+      // 4. Test GET /spill/:fileName?download=1 (Attachment stream)
+      let downloadedBody: any = null;
+      let downloadStatus = 200;
+      const responseHeaders: Record<string, string> = {};
+      const downloadReq: any = {
+        method: 'GET',
+        url: `/spill/${fileName}?download=1`,
+        params: { fileName },
+        query: { download: '1' },
+        headers: {},
+      };
+
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 1000);
+        const mockRes: any = {
+          setHeader: (k: string, v: string) => {
+            responseHeaders[k.toLowerCase()] = v;
+            return mockRes;
+          },
+          send: (body: any) => {
+            downloadedBody = body;
+            clearTimeout(timer);
+            resolve();
+            return mockRes;
+          },
+          status: (code: number) => {
+            downloadStatus = code;
+            return mockRes;
+          },
+        };
+        router.handle(downloadReq, mockRes, () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      assert.equal(downloadStatus, 200);
+      assert.equal(downloadedBody, repeatedContent);
+      assert.ok(responseHeaders['content-disposition']?.includes('attachment;'));
+      assert.ok(responseHeaders['content-type']?.includes('text/plain'));
+
+      // 5. Test GET /spill/:fileName 404 on path traversal attempt
+      let traversalStatus = 200;
+      let traversalResponse: any = null;
+      const traversalReq: any = {
+        method: 'GET',
+        url: '/spill/..%2Fsecret.log',
+        params: { fileName: '../secret.log' },
+        query: {},
+        headers: {},
+      };
+
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, 1000);
+        const mockRes: any = {
+          json: (data: any) => {
+            traversalResponse = data;
+            clearTimeout(timer);
+            resolve();
+            return mockRes;
+          },
+          status: (code: number) => {
+            traversalStatus = code;
+            return mockRes;
+          },
+        };
+        router.handle(traversalReq, mockRes, () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      });
+
+      assert.equal(traversalStatus, 404);
+      assert.equal(traversalResponse?.success, false);
+
+      // Cleanup test spill file
+      try {
+        if (spillResult.filePath && fs.existsSync(spillResult.filePath)) {
+          fs.unlinkSync(spillResult.filePath);
+        }
+      } catch {}
     });
   });
 });

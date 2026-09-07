@@ -255,6 +255,46 @@ export class TaskRegistry {
   }
 
   /**
+   * Resumes an existing task reusing its conversation checkpoint and context.
+   * Resets retry count and clears previous errors.
+   */
+  public async resumeTask(taskId: string, customPrompt?: string): Promise<AgentTask | null> {
+    const task = this.getTask(taskId);
+    if (!task) return null;
+
+    let resumeConvoId: string | undefined = undefined;
+    if (task.result_json) {
+      try {
+        const parsed = JSON.parse(task.result_json);
+        resumeConvoId = parsed.conversation_id;
+      } catch {}
+    }
+
+    const effectivePrompt = customPrompt || task.custom_prompt || 'Продолжить выполнение и завершить задачу.';
+
+    await writeQueue.enqueue(() => {
+      const db = getVeronicaDb();
+      db.prepare('UPDATE agent_tasks SET retry_count = 0, error_message = NULL, custom_prompt = ? WHERE id = ?')
+        .run(effectivePrompt, taskId);
+      db.prepare(`
+        INSERT INTO agent_events (task_id, event_type, timestamp, message)
+        VALUES (?, 'system', ?, ?)
+      `).run(taskId, Date.now(), `Task resumed: ${effectivePrompt.substring(0, 100)}`);
+    });
+
+    return await antigravityAdapter.spawnTask({
+      project: task.project,
+      skill: task.skill || 'custom_task',
+      runtime_profile: task.runtime_profile,
+      autonomy_level: task.autonomy_level,
+      custom_prompt: effectivePrompt,
+      existing_task_id: taskId,
+      conversation_id: resumeConvoId,
+      continue_recent: !resumeConvoId,
+    });
+  }
+
+  /**
    * Put task into awaiting_approval state and alert Telegram
    */
   public async requestApproval(taskId: string, payload: { action: string; details: string }): Promise<void> {
@@ -403,6 +443,29 @@ export class TaskRegistry {
         VALUES (?, ?, ?, ?, ?)
       `).run(event.task_id, event.event_type, event.timestamp, event.message, event.data_json || null);
     });
+  }
+
+  /**
+   * Get all chronological events for a specific task
+   */
+  public getTaskEvents(taskId: string, limit: number = 100): AgentEvent[] {
+    const db = getVeronicaDb();
+    const stmt = db.prepare(`
+      SELECT id, task_id, event_type, timestamp, message, data_json
+      FROM agent_events
+      WHERE task_id = ?
+      ORDER BY timestamp ASC
+      LIMIT ?
+    `);
+    const rows = stmt.all(taskId, limit) as any[];
+    return rows.map((r) => ({
+      id: r.id,
+      task_id: r.task_id,
+      event_type: r.event_type,
+      timestamp: Number(r.timestamp),
+      message: r.message,
+      data_json: r.data_json || undefined,
+    }));
   }
 
   /**

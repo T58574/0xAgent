@@ -12,25 +12,10 @@ export interface MemoryConversationEvent {
 class MemoryEventQueue {
   private queue: MemoryConversationEvent[] = [];
   private debounceTimer: NodeJS.Timeout | null = null;
-  private readonly IDLE_DEBOUNCE_MS = 20000; // 20s of silence
-  private readonly MAX_BATCH_SIZE = 5;
 
-  public pushEvent(event: MemoryConversationEvent): void {
-    this.queue.push(event);
-
-    // If max batch reached, process immediately
-    if (this.queue.length >= this.MAX_BATCH_SIZE) {
-      this.flushQueue();
-      return;
-    }
-
-    // Reset debounce timer
-    if (this.debounceTimer) {
-      clearTimeout(this.debounceTimer);
-    }
-    this.debounceTimer = setTimeout(() => {
-      this.flushQueue();
-    }, this.IDLE_DEBOUNCE_MS);
+  public pushEvent(_event: MemoryConversationEvent): void {
+    // Memory extraction completely disabled
+    return;
   }
 
   public flushSession(sessionId: string): void {

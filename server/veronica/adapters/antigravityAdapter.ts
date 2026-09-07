@@ -4,6 +4,7 @@ import { spawn, ChildProcess } from 'node:child_process';
 import { RuntimeAdapter, SpawnTaskOptions } from './runtimeAdapter';
 import { AgentTask, TaskStatus } from '../types';
 import { taskRegistry } from '../core/taskRegistry';
+import { projectLockManager } from '../core/projectLockManager';
 import { loadConfig } from '../../config';
 import { VeronicaLogger } from '../core/logger';
 import { projectDiscovery } from '../core/projectDiscovery';
@@ -331,6 +332,17 @@ export class AntigravityAdapter implements RuntimeAdapter {
           autonomy_level: options.autonomy_level,
           custom_prompt: options.custom_prompt,
         });
+
+    if (options.existing_task_id) {
+      if (!projectLockManager.acquireGlobalLock(task.id, options.project)) {
+        await taskRegistry.updateTaskStatus(task.id, 'queued', {
+          summary: 'Task queued for resumption while another task is active',
+        });
+        VeronicaLogger.log('INFO', `Resumed task ${task.id} queued for project ${options.project} (locked by active task ${projectLockManager.getActiveGlobalTask()})`, task.id);
+        const queuedTask = taskRegistry.getTask(task.id);
+        return queuedTask || task;
+      }
+    }
 
     if (task.status === 'queued') {
       VeronicaLogger.log('INFO', `Task queued for project ${options.project} (locked by another task)`, task.id);

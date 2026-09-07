@@ -278,7 +278,7 @@ export class InferenceGateway {
       }
 
       // Engine 2: Local llama-server
-      const timeoutMs = 8000;
+      const timeoutMs = Math.max((config.api_timeout_sec || 120) * 1000, 120000);
       const localHost = config.local_server?.host || '127.0.0.1';
       const localPort = config.local_server?.port || 11434;
 
@@ -290,14 +290,17 @@ export class InferenceGateway {
             model: activeModel.replace(/^local:/, '') || 'local',
             messages,
             temperature: 0.4,
-            max_tokens: 2048,
+            max_tokens: config.max_tokens || 4096,
           }),
           signal: AbortSignal.timeout(timeoutMs),
         });
 
         if (localRes.ok) {
           const localJson: any = await localRes.json();
-          const text = localJson.choices?.[0]?.message?.content;
+          const msg = localJson.choices?.[0]?.message;
+          const content = msg?.content?.trim();
+          const reasoning = msg?.reasoning_content?.trim();
+          const text = content || reasoning;
           if (text) return text;
         }
         throw new Error(`Local LLM HTTP ${localRes.status}`);

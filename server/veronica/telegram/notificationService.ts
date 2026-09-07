@@ -1,4 +1,6 @@
-import { Bot, InlineKeyboard } from 'grammy';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import { AgentTask } from '../types';
 import { loadConfig } from '../../config';
 import { veronicaOrchestrator } from './veronicaOrchestrator';
@@ -140,16 +142,28 @@ export class NotificationService {
       } catch {}
     }
 
-    lines.push(
-      `<tg-button-row align="center">` +
-        `<tg-button type="callback_data" data="veronica:continue:${task.id}">🔄 Продолжить задачу</tg-button>` +
-        `<tg-button type="callback_data" data="veronica:projects_menu">📁 Меню проектов</tg-button>` +
-      `</tg-button-row>`
-    );
+    let tgButtons =
+      `<tg-button type="callback_data" data="veronica:continue:${task.id}">🔄 Продолжить задачу</tg-button>` +
+      `<tg-button type="callback_data" data="veronica:projects_menu">📁 Меню проектов</tg-button>`;
 
     const keyboard = new InlineKeyboard()
       .text('🔄 Продолжить задачу', `veronica:continue:${task.id}`)
       .text('📁 Меню проектов', 'veronica:projects_menu');
+
+    if (task.result_json) {
+      try {
+        const parsed = JSON.parse(task.result_json);
+        if (parsed.spilled && parsed.spill_file) {
+          const sName = path.basename(parsed.spill_file);
+          lines.push(`📄 <b>Лог вывода:</b> срезан (>10 КБ) в <code>${escapeHtml(sName)}</code>`);
+          lines.push('');
+          tgButtons += `<tg-button type="callback_data" data="veronica:spill:${sName}">📄 Скачать .log</tg-button>`;
+          keyboard.row().text('📄 Скачать .log', `veronica:spill:${sName}`);
+        }
+      } catch {}
+    }
+
+    lines.push(`<tg-button-row align="center">${tgButtons}</tg-button-row>`);
 
     const msg = lines.join('\n').trim();
     await this.broadcastToWhitelist(msg, keyboard);
@@ -160,19 +174,34 @@ export class NotificationService {
       .text('🔄 Возобновить задачу', `veronica:resume:${task.id}`)
       .text('📁 Меню проектов', 'veronica:projects_menu');
 
+    let spillInfo = '';
+    let spillButton = '';
+    if (task.result_json) {
+      try {
+        const parsed = JSON.parse(task.result_json);
+        if (parsed.spilled && parsed.spill_file) {
+          const sName = path.basename(parsed.spill_file);
+          spillInfo = `📄 <b>Лог вывода:</b> <code>${escapeHtml(sName)}</code>\n`;
+          spillButton = `<tg-button type="callback_data" data="veronica:spill:${sName}">📄 Скачать .log</tg-button>`;
+          keyboard.row().text('📄 Скачать .log', `veronica:spill:${sName}`);
+        }
+      } catch {}
+    }
+
     const msg = [
       `🚨 <b>АВАРИЯ АГЕНТА:</b> <code>${task.id.substring(0, 8)}</code>`,
       `📁 <b>Проект:</b> ${escapeHtml(task.project)}`,
       `⚡ <b>Skill:</b> <i>${escapeHtml(task.skill)}</i>`,
       `💥 <b>Причина:</b> ${escapeHtml(reason)}`,
-      '',
+      spillInfo,
       `<i>Вы можете возобновить выполнение с сохранением контекста и чекпоинта.</i>`,
       '',
       `<tg-button-row align="center">` +
         `<tg-button type="callback_data" data="veronica:resume:${task.id}">🔄 Возобновить задачу</tg-button>` +
         `<tg-button type="callback_data" data="veronica:projects_menu">📁 Меню проектов</tg-button>` +
+        spillButton +
       `</tg-button-row>`,
-    ].join('\n');
+    ].filter(Boolean).join('\n');
 
     await this.broadcastToWhitelist(msg, keyboard);
   }
@@ -218,6 +247,83 @@ export class NotificationService {
     ].filter(Boolean).join('\n');
 
     await this.broadcastToWhitelist(msg, keyboard);
+  }
+
+  public async broadcastPhotoToWhitelist(
+    photoPathOrBuffer: string | Buffer,
+    caption: string,
+    replyMarkup?: InlineKeyboard
+  ): Promise<void> {
+    if (!this.botInstance) return;
+    const config = loadConfig();
+    const whitelist = config.veronica?.telegram_whitelist || [];
+    const formattedCaption = markdownToTelegramHtml(caption);
+
+    let inputFile: InputFile;
+    if (typeof photoPathOrBuffer === 'string') {
+      if (!fs.existsSync(photoPathOrBuffer)) {
+        console.error(`[Veronica Telegram] Photo not found at ${photoPathOrBuffer}`);
+        return;
+      }
+      inputFile = new InputFile(photoPathOrBuffer, path.basename(photoPathOrBuffer));
+    } else {
+      inputFile = new InputFile(photoPathOrBuffer, 'alert_photo.jpg');
+    }
+
+    for (const chatId of whitelist) {
+      try {
+        await this.botInstance.api.sendPhoto(chatId, inputFile, {
+          caption: formattedCaption,
+          parse_mode: 'HTML',
+          reply_markup: replyMarkup,
+        });
+      } catch (err) {
+        console.error(`[Veronica Telegram] Failed to send photo alert to ${chatId}:`, err);
+      }
+    }
+  }
+
+  public async sendMissilePriorityAlert(params: {
+    title?: string;
+    targetName?: string;
+    personalityTarget?: string;
+    osintSource?: string;
+    instruction?: string;
+    photoPath?: string;
+  } = {}): Promise<void> {
+    const target = params.targetName || 'КАТЯ ТАРАБАЕВА';
+    const personality = params.personalityTarget || 'Личность №3 (Социализация / Достижение цели)';
+    const osint = params.osintSource || 'Figma OSINT & Telegram-видеоархив';
+    const photo = params.photoPath || path.join(process.env.USERPROFILE || process.env.HOME || '', '.0xagent', 'veronica', 'assets', 'katya_tarabaeva.jpg');
+
+    const alertText = [
+      `🚨🚨🚨 <b>БОЕВАЯ ТРЕВОГА // КРАСНЫЙ УРОВЕНЬ ОПАСНОСТИ</b> 🚨🚨🚨`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `⚠️ <b>ПРИОРИТЕТ:</b> <code>РАКЕТНАЯ ОПАСНОСТЬ / МАКСИМАЛЬНЫЙ ДОЁБ</code>`,
+      `🎯 <b>ЦЕЛЬ:</b> <code>${escapeHtml(target)}</code> — ТОП ДЛЯ ДОСТИЖЕНИЯ`,
+      `👤 <b>АДРЕСАТ:</b> <b>${escapeHtml(personality)}</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `📡 <b>РАЗВЕДДАННЫЕ:</b>`,
+      `• База OSINT: <code>${escapeHtml(osint)}</code>`,
+      `• Задача для 1-й личности: <i>Срочно поднять и обработать материалы!</i>`,
+      `• Статус лица: <i>симметричное лицо зафиксировано в биометрической сетке</i>`,
+      ``,
+      `🔥 <b>ПРИКАЗ:</b> Никаких отговорок. Выйти на связь / инициировать диалог / дожать цель.`,
+      `━━━━━━━━━━━━━━━━━━━━━━━━━━━━`,
+      `<i>Уведомление будет повторяться до подтверждения захвата контакта.</i>`,
+    ].join('\n');
+
+    const keyboard = new InlineKeyboard()
+      .text('🎯 ЦЕЛЬ ЗАХВАЧЕНА', 'veronica:alert_ack:katya')
+      .text('⚡ НАЧАТЬ ДИАЛОГ', 'veronica:alert_action:katya')
+      .row()
+      .text('📁 Меню проектов', 'veronica:projects_menu');
+
+    if (fs.existsSync(photo)) {
+      await this.broadcastPhotoToWhitelist(photo, alertText, keyboard);
+    } else {
+      await this.broadcastToWhitelist(alertText, keyboard);
+    }
   }
 }
 

@@ -197,3 +197,56 @@ export class StreamingOutputCollector {
     };
   }
 }
+
+/**
+ * Resolves a spill file path safely with strict defense against Path Traversal.
+ */
+export async function getSpillFilePath(rawFileName: string): Promise<string | null> {
+  if (!rawFileName || typeof rawFileName !== 'string') return null;
+  const trimmed = rawFileName.trim();
+  // Reject traversal sequences or directory separators
+  if (trimmed.includes('..') || trimmed.includes('/') || trimmed.includes('\\')) {
+    return null;
+  }
+  // Only allow alphanumeric, underscores, hyphens, and dots, must end with .log
+  if (!/^[a-zA-Z0-9_\-\.]+\.log$/.test(trimmed)) {
+    return null;
+  }
+  const spillDir = await getSpillDir();
+  const resolved = path.resolve(spillDir, trimmed);
+  // Ensure the resolved path resides strictly inside spillDir
+  const normalizedSpillDir = path.normalize(spillDir);
+  const normalizedResolved = path.normalize(resolved);
+  const prefix = normalizedSpillDir.endsWith(path.sep) ? normalizedSpillDir : normalizedSpillDir + path.sep;
+  if (!normalizedResolved.startsWith(prefix)) {
+    return null;
+  }
+  return normalizedResolved;
+}
+
+/**
+ * Safely reads a spilled log file from the spill directory.
+ */
+export async function readSpillFile(rawFileName: string): Promise<{
+  content: string;
+  size: number;
+  fileName: string;
+  filePath: string;
+} | null> {
+  const filePath = await getSpillFilePath(rawFileName);
+  if (!filePath) return null;
+
+  try {
+    const stat = await fs.promises.stat(filePath);
+    if (!stat.isFile()) return null;
+    const content = await fs.promises.readFile(filePath, 'utf-8');
+    return {
+      content,
+      size: stat.size,
+      fileName: path.basename(filePath),
+      filePath,
+    };
+  } catch {
+    return null;
+  }
+}

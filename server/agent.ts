@@ -10,7 +10,6 @@ import { loopBreaker } from './agent/loopBreaker';
 import { handleOutputSpill } from './agent/outputSpiller';
 import { evaluateToolPermission, READONLY_TOOLS } from './agent/permissionGuard';
 import { runCompactionPipeline } from './agent/compactionPipeline';
-import { memoryWorker } from './agent/memoryWorker';
 import { cancelPendingApprovalsForSession } from './agent/approvalManager';
 import { fetchLlmResponse, readLlmStream, resolveModelContextMax, PRIMARY_TEXT_MODEL, DEFAULT_FALLBACK_CHAIN, GEMMA_MODEL, FAST_LITE_MODEL, NATIVE_AUDIO_MODEL } from './agent/llmClient';
 import { quotaManager } from './agent/quotaManager';
@@ -257,15 +256,6 @@ export async function runAgentLoop(
             continue;
           }
         }
-
-        // Async debounced background memory ingestion
-        memoryWorker.pushEvent({
-          sessionId,
-          userMessage: latestUserQuery,
-          assistantMessage: assistantMessage.content,
-          personaId: sessionConfig.active_persona_id || 'default',
-          timestamp: Date.now(),
-        });
 
         broadcast('agent-status-changed', { sessionId, status: 'idle' });
         break;

@@ -12,7 +12,6 @@ import { antigravityAdapter } from '../adapters/antigravityAdapter';
 import type { UserSessionState } from './veronicaOrchestrator';
 import { loadConfig } from '../../config';
 import { proxyService } from '../../proxyService';
-import { quotaManager } from '../../agent/quotaManager';
 
 function escapeHtml(text: string): string {
   return (text || '')
@@ -199,20 +198,6 @@ export class MessageBuilder {
     lines.push(`🔹 <b>Завершено сегодня:</b> ${todayStats.completed}`);
     if (todayStats.failed > 0) {
       lines.push(`⚠️ <b>Сбоев сегодня:</b> ${todayStats.failed}`);
-    }
-
-    // Add Antigravity Quota Indicators
-    const quota = quotaManager.getQuotaStatus();
-    if (quota.limits && quota.limits.length > 0) {
-      lines.push(`\n📊 <b>Квоты Antigravity CLI:</b>`);
-      for (const lim of quota.limits) {
-        const filled = Math.max(0, Math.min(10, Math.round(lim.remainingPercentage / 10)));
-        const empty = 10 - filled;
-        const bar = `[${'●'.repeat(filled)}${'○'.repeat(empty)}]`;
-        lines.push(`• <b>${escapeHtml(lim.modelGroup)}</b> (${escapeHtml(lim.limitType)}): <code>${bar} ${lim.remainingPercentage}%</code>`);
-      }
-    } else if (quota.exhausted) {
-      lines.push(`\n⚠️ <b>Квота:</b> <code>[○○○○○○○○○○] 0% (429 Исчерпана)</code>${quota.resetText ? ` — сброс через ${quota.resetText}` : ''}`);
     }
 
     if (activeTasks.length > 0) {
@@ -613,7 +598,7 @@ export class MessageBuilder {
   }
 
   /**
-   * Settings & Quota Dashboard
+   * Settings Dashboard
    */
   public static buildSettingsDashboard(): { text: string; keyboard: InlineKeyboard } {
     const config = loadConfig();
@@ -631,13 +616,12 @@ export class MessageBuilder {
     };
 
     const lines: string[] = [
-      `⚙️ <b>Панель Настроек & Квоты Вероники:</b>`,
+      `⚙️ <b>Панель Настроек Вероники:</b>`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
       `🧠 <b>Активная модель:</b> <code>${escapeHtml(cleanModel)}</code>`,
       `⚡ <b>Движок инференса:</b> ${isAgy ? '⚡ Antigravity CLI (Headless)' : '🖥️ Local llama-server (GGUF)'}`,
       `🎙️ <b>Движок STT:</b> <code>${escapeHtml(sttNames[stt] || stt)}</code>`,
       `👤 <b>Аккаунт CLI:</b> <code>Google AI / Antigravity Pro</code>`,
-      `📊 <b>Статус квоты:</b> 🟢 <i>Активна / В норме</i>`,
       `🛡️ <b>Прокси-шлюз:</b> ${proxyEnabled ? '🟢 Включен' : '⚪ Прямое подключение'}`,
       ``,
       `💡 <i>Для переключения или смены аккаунта выполните <code>agy auth</code> в консоли.</i>`,
@@ -647,9 +631,7 @@ export class MessageBuilder {
       .text('🧠 Сменить LLM модель', 'veronica:menu:model')
       .text('🎙️ Сменить STT модель', 'veronica:menu:stt')
       .row()
-      .text('🔄 Проверить квоту', 'veronica:settings:check_quota')
       .text('⚙️ Полный статус (/status)', 'veronica:menu:status')
-      .row()
       .text('📁 Каталог проектов', 'veronica:projects_menu');
 
     return { text: lines.join('\n'), keyboard };
@@ -667,7 +649,6 @@ export class MessageBuilder {
       `• /new — начать новый чистый диалог`,
       ``,
       `🔹 <b>Инференс и система:</b>`,
-      `• /quota — подробный статус квот инференса agy CLI (5h, Weekly)`,
       `• /model — меню выбора активной модели (Gemini, Claude, GGUF, STT)`,
       `• /stt — выбор модели распознавания речи (Groq / Local Qwen3 / Auto)`,
       `• /status — системная телеметрия, статус GPU Node, порты`,

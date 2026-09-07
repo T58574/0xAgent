@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LiveTelemetry, QuotaStatus } from '../../types';
+import { LiveTelemetry } from '../../types';
 import { MaterialIcon } from '../common/MaterialIcon';
 import { useI18n } from '../../i18n';
 
@@ -7,7 +7,6 @@ const ASCII_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '�
 
 interface TelemetryHUDProps {
   liveTelemetry?: LiveTelemetry | null;
-  quotaStatus?: QuotaStatus | null;
   agentStatus: 'idle' | 'thinking' | 'waiting_approval' | 'executing_tool';
   thinkingSeconds?: number;
   asciiFrame?: string;
@@ -17,7 +16,6 @@ interface TelemetryHUDProps {
 
 export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
   liveTelemetry,
-  quotaStatus,
   agentStatus,
   thinkingSeconds: externalThinkingSeconds,
   asciiFrame: externalAsciiFrame,
@@ -79,19 +77,6 @@ export const TelemetryHUD: React.FC<TelemetryHUDProps> = ({
                 <MaterialIcon name="memory" size={11} />
                 <span>{liveTelemetry.tokenCount} tok</span>
               </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Quota Exhaustion Alert during Generation/Thinking */}
-      {quotaStatus?.exhausted && (
-        <div className="flex justify-start max-w-3xl mx-auto w-full my-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/40 text-[11px] font-mono text-rose-300 shadow-sm animate-pulse">
-            <MaterialIcon name="hourglass_empty" size={12} className="text-rose-400" />
-            <span>[429 QUOTA EXHAUSTED]</span>
-            {quotaStatus.resetText && (
-              <span className="text-amber-300 font-mono ml-1">Resets: {quotaStatus.resetText}</span>
             )}
           </div>
         </div>

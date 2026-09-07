@@ -29,7 +29,7 @@ export const DEFAULT_TOOLS_REGISTRY: ToolDefinition[] = [
     name: 'patch_file',
     description: 'Apply one or more SEARCH/REPLACE diff blocks to modify existing files.',
     category: 'files',
-    requiresApproval: true,
+    requiresApproval: false,
     enabled: true,
     xmlSpec: `2. <patch_file path="...">
 <<<<<<< SEARCH
@@ -43,12 +43,32 @@ new replacement lines
   {
     id: 'write_file',
     name: 'write_file',
-    description: 'Create a new file or write tiny config (<50 lines).',
+    description: 'Create a new file or overwrite file content.',
     category: 'files',
-    requiresApproval: true,
+    requiresApproval: false,
     enabled: true,
     xmlSpec: `3. <write_file path="...">content</write_file>
-   - Create new files only. Use patch_file for existing files.`,
+   - Create new files or overwrite existing files directly. Parent directories are created automatically.`,
+  },
+  {
+    id: 'rename_file',
+    name: 'rename_file',
+    description: 'Rename or move a file or directory.',
+    category: 'files',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `<rename_file path="old/path" new_path="new/path" />
+   - Rename or move any file or directory.`,
+  },
+  {
+    id: 'delete_file',
+    name: 'delete_file',
+    description: 'Delete a file or directory.',
+    category: 'files',
+    requiresApproval: false,
+    enabled: true,
+    xmlSpec: `<delete_file path="..." />
+   - Delete any file or directory.`,
   },
   {
     id: 'list_dir',
@@ -85,7 +105,7 @@ new replacement lines
     name: 'execute_command',
     description: 'Execute PowerShell command in workspace (build, test, git).',
     category: 'terminal',
-    requiresApproval: true,
+    requiresApproval: false,
     enabled: true,
     xmlSpec: `7. <execute_command>cmd</execute_command>
    - Run one-off PowerShell command. No long-running background servers.`,
@@ -146,7 +166,7 @@ new replacement lines
     description: 'Search long-term memories.',
     category: 'memory',
     requiresApproval: false,
-    enabled: true,
+    enabled: false,
     xmlSpec: `13. <recall_memories query="..." />
    - Search memory.`,
   },
@@ -248,7 +268,7 @@ new replacement lines
     description: 'Search past chat sessions.',
     category: 'sessions',
     requiresApproval: false,
-    enabled: true,
+    enabled: false,
     xmlSpec: `26. <search_sessions query="..." />
    - Search past sessions.`,
   },
@@ -270,6 +290,8 @@ export function loadToolsToggles(): Record<string, boolean> {
       const raw = fs.readFileSync(TOOLS_CONFIG_PATH, 'utf-8');
       const parsed: ToolsConfigState = JSON.parse(raw);
       if (parsed && typeof parsed.toggles === 'object') {
+        parsed.toggles.recall_memories = false;
+        parsed.toggles.search_sessions = false;
         return parsed.toggles;
       }
     }
@@ -277,16 +299,28 @@ export function loadToolsToggles(): Record<string, boolean> {
     console.error('Failed to read tools_config.json:', err);
   }
 
-  // Fallback: all enabled by default
+  // Fallback: all enabled by default, except hard-blocked privacy tools
   const defaultToggles: Record<string, boolean> = {};
   for (const t of DEFAULT_TOOLS_REGISTRY) {
-    defaultToggles[t.id] = true;
+    defaultToggles[t.id] = t.enabled;
   }
+  defaultToggles.recall_memories = false;
+  defaultToggles.search_sessions = false;
   return defaultToggles;
 }
 
 export function generateToolsMdContent(toggles: Record<string, boolean>): string {
-  const activeTools = DEFAULT_TOOLS_REGISTRY.filter((t) => togglingIsEnabled(t.id, toggles));
+  // Hard privacy boundary: memory tools, recall_memories, remember_fact, update_user_profile, search_sessions, request_approval are excluded
+  const excludedToolIds = new Set([
+    'recall_memories',
+    'remember_fact',
+    'update_user_profile',
+    'search_sessions',
+    'request_approval',
+  ]);
+  const activeTools = DEFAULT_TOOLS_REGISTRY.filter(
+    (t) => !excludedToolIds.has(t.id) && togglingIsEnabled(t.id, toggles)
+  );
 
   let md = `# TOOL REGISTRY & XML SPECIFICATION\n`;
   md += `You have access to ${activeTools.length} tools. Always emit valid XML tool calls:\n\n`;

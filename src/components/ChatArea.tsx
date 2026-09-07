@@ -7,7 +7,6 @@ import {
   PersonaMetadata,
   JarvisSparkProposal,
   ChatSession,
-  QuotaStatus,
 } from '../types';
 import { isSameDay, extractQuickResponses } from '../utils/helpers';
 import { FloatingCommandBar } from './chat/FloatingCommandBar';
@@ -36,7 +35,6 @@ interface ChatAreaProps {
   onRollbackSession?: (targetMessageId: string, mode: 'to_user_edit' | 'to_assistant') => Promise<string>;
   reasoningEnabled?: boolean;
   liveTelemetry?: LiveTelemetry | null;
-  quotaStatus?: QuotaStatus | null;
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
   onConfigChanged?: (newConfig: AppConfig) => void;
@@ -61,7 +59,6 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
   onAcceptSpark,
   reasoningEnabled = true,
   liveTelemetry,
-  quotaStatus,
   config,
   onModelChanged,
   onConfigChanged,
@@ -443,7 +440,6 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
             {/* Live Telemetry & Thinking Indicator via TelemetryHUD */}
             <TelemetryHUD
               liveTelemetry={liveTelemetry}
-              quotaStatus={quotaStatus}
               agentStatus={agentStatus}
               showThinkingBanner={
                 agentStatus === 'thinking' &&

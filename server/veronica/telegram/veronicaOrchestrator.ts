@@ -209,23 +209,11 @@ export class VeronicaOrchestrator {
         return reply;
       }
 
-      let resumeConvoId: string | undefined = undefined;
-      if (prevTask.result_json) {
-        try {
-          const parsed = JSON.parse(prevTask.result_json);
-          resumeConvoId = parsed.conversation_id;
-        } catch {}
-      }
-
       try {
-        const task = await antigravityAdapter.spawnTask({
-          project: prevTask.project,
-          skill: prevTask.skill || 'custom_task',
-          custom_prompt: prevTask.custom_prompt || 'Продолжить выполнение и завершить задачу.',
-          conversation_id: resumeConvoId,
-          continue_recent: !resumeConvoId,
-          existing_task_id: prevTask.id,
-        });
+        const task = await taskRegistry.resumeTask(prevTask.id, prevTask.custom_prompt || 'Продолжить выполнение и завершить задачу.');
+        if (!task) {
+          throw new Error('Не удалось возобновить задачу');
+        }
 
         session.lastTaskId = task.id;
         session.lastTaskProject = prevTask.project;

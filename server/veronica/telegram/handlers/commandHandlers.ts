@@ -4,8 +4,9 @@ import { antigravityAdapter } from '../../adapters/antigravityAdapter';
 import { taskRegistry } from '../../core/taskRegistry';
 import { projectDocManager } from '../../core/projectDocManager';
 import { veronicaOrchestrator } from '../veronicaOrchestrator';
+import { notificationService } from '../notificationService';
 import { escapeHtml } from './telegramUtils';
-import { sendProjectsMenu, sendModelMenu, sendQuotaStatus } from './menuHandlers';
+import { sendProjectsMenu, sendModelMenu } from './menuHandlers';
 
 export function registerBotCommands(bot: Bot): void {
   // /start & /help
@@ -30,11 +31,6 @@ export function registerBotCommands(bot: Bot): void {
   bot.command('status', async (ctx) => {
     const msg = MessageBuilder.buildStatusMessage();
     await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
-  });
-
-  // /quota
-  bot.command('quota', async (ctx) => {
-    await sendQuotaStatus(ctx);
   });
 
   // /model
@@ -124,23 +120,12 @@ export function registerBotCommands(bot: Bot): void {
     const text = ctx.message?.text || '';
     const customPrompt = text.replace(/^\/continue\s*/i, '').trim() || prevTask.custom_prompt || 'Продолжить выполнение.';
 
-    let resumeConvoId: string | undefined = undefined;
-    if (prevTask.result_json) {
-      try {
-        const parsed = JSON.parse(prevTask.result_json);
-        resumeConvoId = parsed.conversation_id;
-      } catch {}
-    }
-
     try {
-      const task = await antigravityAdapter.spawnTask({
-        project: prevTask.project,
-        skill: prevTask.skill || 'custom_task',
-        custom_prompt: customPrompt,
-        conversation_id: resumeConvoId,
-        continue_recent: !resumeConvoId,
-        existing_task_id: prevTask.id,
-      });
+      const task = await taskRegistry.resumeTask(prevTask.id, customPrompt);
+      if (!task) {
+        await ctx.reply(`⚠️ Не удалось возобновить задачу <code>${prevTask.id.substring(0, 8)}</code>.`, { parse_mode: 'HTML' });
+        return;
+      }
 
       session.lastTaskId = task.id;
       session.lastTaskProject = prevTask.project;
@@ -241,5 +226,32 @@ export function registerBotCommands(bot: Bot): void {
         reply_markup: MessageBuilder.buildProjectActionsKeyboard(targetProject),
       }
     );
+  });
+
+  // /alert [target] — trigger missile priority notification immediately
+  bot.command('alert', async (ctx) => {
+    const text = ctx.message?.text || '';
+    const customTarget = text.replace(/^\/alert\s*/i, '').trim() || 'КАТЯ ТАРАБАЕВА';
+    await ctx.reply('🚀 <i>Запускаю боевое оповещение наивысшего приоритета...</i>', { parse_mode: 'HTML' });
+    await notificationService.sendMissilePriorityAlert({ targetName: customTarget });
+  });
+
+  // /briefing & /news — trigger morning briefing and AGY CLI releases check immediately
+  bot.command(['briefing', 'news'], async (ctx) => {
+    await ctx.reply('☕ <b>Формирую дайджест новостей и проверяю релизы AGY CLI...</b>', {
+      parse_mode: 'HTML',
+    });
+
+    try {
+      const { veronicaScheduler } = await import('../../core/scheduler');
+      const result = await veronicaScheduler.executeTrendingDigestJob();
+      if (result.success) {
+        await ctx.reply(`✅ <b>${escapeHtml(result.message)}</b>`, { parse_mode: 'HTML' });
+      } else {
+        await ctx.reply(`❌ <b>Не удалось собрать дайджест:</b> ${escapeHtml(result.message)}`, { parse_mode: 'HTML' });
+      }
+    } catch (err: any) {
+      await ctx.reply(`❌ Ошибка выполнения дайджеста: ${escapeHtml(err?.message || err)}`, { parse_mode: 'HTML' });
+    }
   });
 }

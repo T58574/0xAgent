@@ -8,6 +8,7 @@ export interface Translations {
     analytics: string;
     knowledge: string;
     veronica: string;
+    benchmark: string;
     newChat: string;
     switchLanguage: string;
     lanShare: string;
@@ -127,16 +128,6 @@ export interface Translations {
     rollbackHere: string;
     forkSession: string;
     editAndResend: string;
-    quotaExhausted: string;
-    resetsIn: string;
-    resetQuota: string;
-    quotaReady: string;
-    quotaLimitsTitle: string;
-    quotaWeekly: string;
-    quota5Hour: string;
-    quotaRemaining: string;
-    quotaResetAt: string;
-    quotaNoLimits: string;
   };
 
   // Code Editor & Workspace
@@ -955,5 +946,21 @@ export interface Translations {
     tabTasks: string;
     tabProjects: string;
     tabSettings: string;
+    resume: string;
+    resuming: string;
+    resumeTask: string;
+    resumeTaskDesc: string;
+    resumeModalTitle: string;
+    resumePromptLabel: string;
+    resumePromptPlaceholder: string;
+    resumeSuccess: string;
+    resumeError: string;
+    spillLog: string;
+    spillModalTitle: string;
+    downloadLog: string;
+    eventsTimeline: string;
+    tabConsole: string;
+    tabEvents: string;
+    noEvents: string;
   };
 }

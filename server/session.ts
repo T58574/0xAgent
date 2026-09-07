@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import { ChatSession } from '../src/types';
-import { getAppDir } from './config';
+import { getAppDir, loadConfig } from './config';
 
 async function ensureSessionsDir(): Promise<string> {
   const dir = path.join(getAppDir(), 'sessions');
@@ -80,6 +80,12 @@ export async function loadSession(id: string): Promise<ChatSession> {
 }
 
 export async function saveSession(session: ChatSession): Promise<void> {
+  try {
+    const cfg = loadConfig();
+    if (cfg?.auto_save_history === false) {
+      return;
+    }
+  } catch {}
   const dir = await ensureSessionsDir();
   const filePath = path.join(dir, `${session.id}.json`);
   await fs.promises.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');

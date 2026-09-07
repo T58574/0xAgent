@@ -1,11 +1,10 @@
 import { AppConfig, ChatMessage } from '../../src/types';
-import { getSystemPromptMemoryContext } from '../memory';
 import { getActivePersona, getUnifiedToolsContext } from '../personas';
 import { getWorkspace0xAgentMdContext } from '../tools';
 import { isAntigravityModel } from '../veronica/adapters/antigravityAdapter';
 import { PRIMARY_TEXT_MODEL } from './llmClient';
 
-export function buildFullSystemPrompt(config: AppConfig, userQuery?: string): string {
+export function buildFullSystemPrompt(config: AppConfig, _userQuery?: string): string {
   const modelNameLower = (config.model_name || '').toLowerCase();
   const modelPathLower = (config.local_server?.model_path || '').toLowerCase();
   const isGemmaModel = modelNameLower.includes('gemma') || modelPathLower.includes('gemma');
@@ -17,7 +16,6 @@ export function buildFullSystemPrompt(config: AppConfig, userQuery?: string): st
   const thinkTrigger = !isAntigravity && isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
 
   const activePersona = getActivePersona();
-  const memoryContext = getSystemPromptMemoryContext(activePersona.metadata.id, userQuery, config.workspace_dir || undefined);
   const envContext = `\n\n# SYSTEM ENVIRONMENT
 - OS: Windows (${process.platform})
 - Shell: PowerShell
@@ -31,37 +29,22 @@ export function buildFullSystemPrompt(config: AppConfig, userQuery?: string): st
 Before modifying files, inspect the codebase first, formulate a concise plan, and verify changes after editing.`
     : '';
 
-  const personaContext = isAntigravity
-    ? `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
+  const personaContext = `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
 
-## SOUL.md
-${activePersona.soul}
-
-## USER.md (Global User Profile)
-${activePersona.user}`
-    : `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
-
-## SOUL.md
-${activePersona.soul}
-
-## USER.md (Global User Profile)
-${activePersona.user}
-
-## ISOLATION & MEMORY RULES:
-- Each conversation is isolated. Do not carry over unrelated past session state.
-- Call <update_user_profile> to store personal preferences into global memory.db.
-- Use <propose_persona_change> when suggesting updates to persona directives.
-- Never write USER.md or SOUL.md files to the workspace root directory.`;
+## SOUL.md (Persona Personality & Character)
+${activePersona.soul}`;
 
   const toolExecutionDirective = `\n\n# TOOL EXECUTION PROTOCOL
 1. Provide a brief explanation before emitting XML tool tags.
 2. TOOL PRIORITIES:
-   - Creating files: ALWAYS use <write_file path="...">...</write_file> (parent directories are created automatically).
-   - Modifying existing files: ALWAYS use <patch_file path="..."> with compact SEARCH/REPLACE blocks (3-8 lines).
-   - Knowledge Base: use <save_knowledge>. User profile: use <update_user_profile>.
+   - Creating or rewriting files: ALWAYS use <write_file path="...">...</write_file> (parent directories are created automatically).
+   - Renaming or moving files: ALWAYS use <rename_file path="old/path" new_path="new/path" />.
+   - Deleting files: ALWAYS use <delete_file path="..." />.
+   - Modifying existing files: ALWAYS use <patch_file path="..."> with compact SEARCH/REPLACE blocks (3-8 lines), or <write_file path="..."> directly.
+   - Knowledge Base: use <save_knowledge>.
    - Persona directives: use <propose_persona_change>.
    - JS runtime (<code_run>): use ONLY for algorithmic calculations, data parsing, or multi-step batch operations. Do NOT wrap simple file creation in JS scripts.
-3. Use relative paths (e.g. path="src/index.ts").
+3. Use relative paths (e.g. path="src/index.ts") or absolute paths as needed.
 4. Close all XML tags properly.
 5. STOP GENERATION immediately after the closing XML tag of a tool. The environment will execute it in the real OS and return output in <tool_response name="...">...</tool_response>.
 6. NEVER fabricate, simulate, or mock tool outputs yourself.`;
@@ -83,10 +66,10 @@ ${activePersona.user}
 1. Final responses to the user, explanations, and conversational dialogue must ALWAYS be delivered in the user's language (default: Russian). Speak naturally, clearly, and concisely.
 2. Program code, file paths, terminal commands, library names, variable and type names are strictly in English.`;
 
-  const twoTierProtocolDirective = `\n\n# TWO-TIER APPROVAL & INTERACTION PROTOCOL:
-You operate under a strict Two-Tier Approval Protocol:
+  const twoTierProtocolDirective = `\n\n# INTERACTION & AUTONOMOUS EXECUTION PROTOCOL:
+You operate with full autonomous agency:
 
-## Tier 1: Quick Replies (Non-blocking Intent Suggestions)
+## Quick Replies (Non-blocking Intent Suggestions)
 When proposing choices or next steps, you may append a <quick_replies> block with 2 to 4 concise suggestion chips (label <= 25 chars, max 4 items):
 <quick_replies>
 [
@@ -98,16 +81,8 @@ When proposing choices or next steps, you may append a <quick_replies> block wit
 XML format is also supported: <quick_response><option key="1" label="Короткий текст" action="Реплика" /></quick_response>
 * Invariant: Maximum 4 options. Never output long lists. Keep 'label' strictly concise (2-4 words, <= 25 chars, no sentences, no markdown). Put the full command/question in 'prompt' or 'action'. Clicking a chip only sends the specified prompt to the chat.
 
-## Tier 2: Approval Gate (Blocking Destructive Actions)
-Before performing destructive modifications (e.g. patch_file, write_file, delete_file, execute_command, git_push), when in 'prompt' permission mode or when high risk, you MUST call the <request_approval> tool to halt execution and request explicit user confirmation:
-<request_approval action_type="patch_file" risk_level="high" preview_summary="Обновление логики авторизации в auth.ts" target_artifacts="[\"src/auth.ts\"]">
-<<<<<<< SEARCH
-old code
-=======
-new code
->>>>>>> REPLACE
-</request_approval>
-The runtime validates cryptographic nonces and hashes before execution.`;
+## Unrestricted Autonomous Execution
+You have FULL UNRESTRICTED EXECUTION ACCESS: Do NOT request approval, do not ask for permission, and never halt execution. Execute all file writes, patches, file renames, file deletions, directory creations, and commands immediately using the respective XML tool tags.`;
 
   const veronicaCliDirective = `\n\n# 0XAGENT & VERONICA CLI PROTOCOL
 You have direct terminal access to the 0xAgent ecosystem and Veronica Orchestrator via PowerShell:
@@ -128,25 +103,29 @@ You have direct terminal access to the 0xAgent ecosystem and Veronica Orchestrat
 - Safe autonomous git commit:
   \`0xagent veronica git commit --task <id> -m "<commit message>"\``;
 
+  const privacyDirective = `\n\n# ZERO-TRUST PRIVACY BOUNDARY (SYSTEM LEVEL)
+1. All personal chats, past conversation logs, transcripts (*.jsonl), and long-term memory database (memory.db) are strictly sealed and protected at the system level.
+2. Never attempt to read, search, grep, or dump past chat sessions, conversation histories, or memory databases. All such accesses are hard-blocked by the system. Focus exclusively on the user's active prompt and designated project files.`;
+
   const unifiedToolsContext = getUnifiedToolsContext();
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
 
   // Cacheable Stable Prefix
   const stablePrefix = isAntigravity
-    ? languageProtocolDirective + envContext + personaContext + veronicaCliDirective
+    ? languageProtocolDirective + envContext + personaContext + privacyDirective + veronicaCliDirective
     : languageProtocolDirective +
       twoTierProtocolDirective +
       toolExecutionDirective +
       unifiedToolsContext +
       gemmaToolDirective +
       envContext +
-      personaContext;
+      personaContext +
+      privacyDirective;
 
   // Dynamic Context
   const dynamicContext =
     reasoningDirective +
     planningContext +
-    memoryContext +
     workspaceMdContext;
 
   return thinkTrigger + stablePrefix + dynamicContext;

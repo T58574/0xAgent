@@ -187,18 +187,9 @@ export async function runMemoryDecayCycle(): Promise<MemoryDecayStats> {
 
 let schedulerTimer: NodeJS.Timeout | null = null;
 
-/**
- * Starts periodic background scheduler (every 6 hours).
- */
-export function startMemoryDecayScheduler(intervalMs: number = 6 * 60 * 60 * 1000): void {
-  if (schedulerTimer) return;
-  schedulerTimer = setInterval(async () => {
-    try {
-      await runMemoryDecayCycle();
-    } catch (err) {
-      console.error('[memoryDecayScheduler] Error during scheduled decay cycle:', err);
-    }
-  }, intervalMs);
+export function startMemoryDecayScheduler(_intervalMs?: number): void {
+  // Memory decay scheduler disabled
+  return;
 }
 
 export function stopMemoryDecayScheduler(): void {

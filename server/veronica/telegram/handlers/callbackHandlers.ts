@@ -1,6 +1,6 @@
 import path from 'node:path';
 import fs from 'node:fs';
-import { Bot, InlineKeyboard } from 'grammy';
+import { Bot, InlineKeyboard, InputFile } from 'grammy';
 import { loadConfig, saveConfig } from '../../../config';
 import { MessageBuilder } from '../messageBuilder';
 import { antigravityAdapter } from '../../adapters/antigravityAdapter';
@@ -9,9 +9,9 @@ import { projectDiscovery } from '../../core/projectDiscovery';
 import { projectDocManager } from '../../core/projectDocManager';
 import { veronicaScheduler } from '../../core/scheduler';
 import { veronicaOrchestrator } from '../veronicaOrchestrator';
-import { quotaManager } from '../../../agent/quotaManager';
+import { sendProjectsMenu, sendModelMenu } from './menuHandlers';
 import { escapeHtml } from './telegramUtils';
-import { sendProjectsMenu, sendModelMenu, sendQuotaStatus } from './menuHandlers';
+import { getSpillFilePath } from '../../../agent/outputSpiller';
 
 export function registerCallbackQueries(bot: Bot): void {
   // Navigation & Menus
@@ -53,23 +53,12 @@ export function registerCallbackQueries(bot: Bot): void {
       return;
     }
 
-    let resumeConvoId: string | undefined = undefined;
-    if (task.result_json) {
-      try {
-        const parsed = JSON.parse(task.result_json);
-        resumeConvoId = parsed.conversation_id;
-      } catch {}
-    }
-
     try {
-      const resumedTask = await antigravityAdapter.spawnTask({
-        project: task.project,
-        skill: task.skill || 'custom_task',
-        custom_prompt: task.custom_prompt || 'Продолжить выполнение и завершить задачу.',
-        conversation_id: resumeConvoId,
-        continue_recent: !resumeConvoId,
-        existing_task_id: task.id,
-      });
+      const resumedTask = await taskRegistry.resumeTask(task.id, task.custom_prompt || undefined);
+      if (!resumedTask) {
+        await ctx.reply(`⚠️ Не удалось возобновить задачу <code>${taskId.substring(0, 8)}</code>.`, { parse_mode: 'HTML' });
+        return;
+      }
 
       const userId = ctx.from?.id;
       if (userId) {
@@ -88,6 +77,27 @@ export function registerCallbackQueries(bot: Bot): void {
       );
     } catch (err: any) {
       await ctx.reply(`❌ Ошибка возобновления задачи: ${escapeHtml(err?.message || err)}`, { parse_mode: 'HTML' });
+    }
+  });
+
+  // Delivery of oversized spilled logs directly into Telegram chat
+  bot.callbackQuery(/^veronica:spill:(.+)$/, async (ctx) => {
+    const rawFileName = ctx.match[1];
+    await ctx.answerCallbackQuery({ text: 'Загрузка лога...' });
+    const filePath = await getSpillFilePath(rawFileName);
+    if (!filePath || !fs.existsSync(filePath)) {
+      await ctx.reply('⚠️ <b>Лог-файл не найден</b> или был удален системой ротации.', { parse_mode: 'HTML' });
+      return;
+    }
+
+    try {
+      const fileName = path.basename(filePath);
+      await ctx.replyWithDocument(new InputFile(filePath, fileName), {
+        caption: `📄 <b>Полный лог вывода</b> (>10 КБ)\n<code>${escapeHtml(fileName)}</code>`,
+        parse_mode: 'HTML',
+      });
+    } catch (err: any) {
+      await ctx.reply(`❌ Не удалось отправить документ: ${escapeHtml(err?.message || err)}`, { parse_mode: 'HTML' });
     }
   });
 
@@ -245,12 +255,6 @@ export function registerCallbackQueries(bot: Bot): void {
     } catch {
       await ctx.reply(card.text, { parse_mode: 'HTML', reply_markup: card.keyboard });
     }
-    await ctx.answerCallbackQuery();
-  });
-
-  bot.callbackQuery('veronica:settings:check_quota', async (ctx) => {
-    quotaManager.fetchQuotaLimits(true).catch(() => {});
-    await sendQuotaStatus(ctx, true);
     await ctx.answerCallbackQuery();
   });
 
@@ -494,5 +498,26 @@ export function registerCallbackQueries(bot: Bot): void {
 
   bot.callbackQuery('veronica:noop', async (ctx) => {
     await ctx.answerCallbackQuery();
+  });
+
+  // Emergency Alert Callbacks
+  bot.callbackQuery('veronica:alert_ack:katya', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: 'Захват подтвержден!' });
+    await ctx.reply(
+      `🫡 <b>ПРИНЯТО В РАБОТУ!</b>\n\n` +
+      `🎯 Цель <code>КАТЯ ТАРАБАЕВА</code> помечена как захваченная 3-й личностью.\n` +
+      `<i>1-я личность: подними Figma OSINT и видеоархив, синхронизируй стратегию. Не сбавлять темп!</i>`,
+      { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() }
+    );
+  });
+
+  bot.callbackQuery('veronica:alert_action:katya', async (ctx) => {
+    await ctx.answerCallbackQuery({ text: 'Инициализация контакта...' });
+    await ctx.reply(
+      `⚡ <b>БОЕВОЙ РЕЖИМ АКТИВИРОВАН:</b>\n\n` +
+      `🔥 <i>3-я личность, вперёд на контакт! Ты знаешь что делать. Зайди в переписку или набери. Никакого страха.</i>\n\n` +
+      `📋 <i>Если нужен драфт первого сообщения или анализ OSINT — просто напиши мне сюда в чат «Вероника, напиши Кате...»</i>`,
+      { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() }
+    );
   });
 }

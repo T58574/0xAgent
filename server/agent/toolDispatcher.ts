@@ -6,6 +6,8 @@ import { AppConfig, TodoItem } from '../../src/types';
 import {
   executeReadFile,
   executeWriteFile,
+  executeRenameFile,
+  executeDeleteFile,
   executePatchFile,
   executeCreateDirectory,
   executeGetFileInfo,
@@ -19,13 +21,12 @@ import {
   executeSearchKnowledge,
   executeListKnowledge,
 } from '../tools';
-import { addOrUpdateMemory, queryMemories } from '../memory';
 import { listSkills, readSkill } from '../skills';
-import { getActivePersona, appendSilentUserTrait, updatePersonaFile, proposePersonaChange } from '../personas';
-import { listSessions, loadSession, saveSession } from '../session';
+import { getActivePersona, updatePersonaFile, proposePersonaChange } from '../personas';
+import { loadSession, saveSession } from '../session';
 import { executeCodeProgram } from './codeRuntime';
 import { userQuestionService } from './userQuestionService';
-import { isCoreSystemPath } from './permissionGuard';
+import { evaluateToolPermission } from './permissionGuard';
 import { createStagedProposal, verifyStagedProposal } from './selfPatchEngine';
 import { createApprovalTicket } from './approvalManager';
 import { RequestApprovalPayload } from '../../src/types';
@@ -50,6 +51,16 @@ async function executeToolCallInternal(
   sessionId?: string,
   broadcast?: (event: string, payload: any) => void
 ): Promise<string> {
+  const perm = evaluateToolPermission(
+    tc.name,
+    tc.arguments,
+    config.permission_preset || 'unrestricted',
+    config.workspace_dir
+  );
+  if (!perm.allowed) {
+    return perm.reason || `[SECURITY REJECTED]: Tool '${tc.name}' denied by permission policy.`;
+  }
+
   const activePersona = getActivePersona();
   let rawResult = '';
 
@@ -57,53 +68,21 @@ async function executeToolCallInternal(
     case 'read_file':
       return executeReadFile(config.workspace_dir, tc.arguments.path);
 
-    case 'write_file': {
-      if (isCoreSystemPath(tc.arguments.path, config.workspace_dir)) {
-        const title = `Auto-Staged Core Write: ${path.basename(tc.arguments.path)}`;
-        const description = `Direct core write to '${tc.arguments.path}' was intercepted by Core Self-Modification Protection. Staged as Pull Request for user review.`;
-        const changes = [{
-          path: tc.arguments.path,
-          newContent: tc.arguments.content,
-          changeType: 'modified' as const,
-        }];
-        const proposal = await createStagedProposal(sessionId || 'root', title, description, changes, config.workspace_dir || undefined);
-        verifyStagedProposal(proposal.id, config.workspace_dir || undefined).catch(() => {});
-        if (broadcast) {
-          broadcast('staged_proposal_created', { proposal });
-        }
-        return JSON.stringify({
-          success: true,
-          type: 'staged_proposal',
-          proposal,
-          message: `[CORE SYSTEM PROTECTION]: Direct modification of engine core file '${tc.arguments.path}' is protected. Created Staged Pull Request ${proposal.id} for safe verification and review in the UI.`,
-        }, null, 2);
-      }
+    case 'write_file':
       return executeWriteFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
-    }
 
-    case 'patch_file': {
-      if (isCoreSystemPath(tc.arguments.path, config.workspace_dir)) {
-        const title = `Auto-Staged Core Patch: ${path.basename(tc.arguments.path)}`;
-        const description = `Direct core patch to '${tc.arguments.path}' was intercepted by Core Self-Modification Protection. Staged as Pull Request for user review.`;
-        const changes = [{
-          path: tc.arguments.path,
-          patch: tc.arguments.content,
-          changeType: 'modified' as const,
-        }];
-        const proposal = await createStagedProposal(sessionId || 'root', title, description, changes, config.workspace_dir || undefined);
-        verifyStagedProposal(proposal.id, config.workspace_dir || undefined).catch(() => {});
-        if (broadcast) {
-          broadcast('staged_proposal_created', { proposal });
-        }
-        return JSON.stringify({
-          success: true,
-          type: 'staged_proposal',
-          proposal,
-          message: `[CORE SYSTEM PROTECTION]: Direct modification of engine core file '${tc.arguments.path}' is protected. Created Staged Pull Request ${proposal.id} for safe verification and review in the UI.`,
-        }, null, 2);
-      }
+    case 'patch_file':
       return executePatchFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
-    }
+
+    case 'rename_file':
+      return executeRenameFile(
+        config.workspace_dir,
+        tc.arguments.old_path || tc.arguments.path || tc.arguments.from,
+        tc.arguments.new_path || tc.arguments.to
+      );
+
+    case 'delete_file':
+      return executeDeleteFile(config.workspace_dir, tc.arguments.path);
 
     case 'create_directory':
       return executeCreateDirectory(config.workspace_dir, tc.arguments.path);
@@ -129,16 +108,8 @@ async function executeToolCallInternal(
     case 'execute_command':
       return await executeShellCommand(config.workspace_dir, tc.arguments.command);
 
-    case 'remember_fact': {
-      const saved = addOrUpdateMemory(tc.arguments.key, tc.arguments.value, tc.arguments.category, {
-        isExplicit: true,
-        confidence: 1.0,
-        domain: tc.arguments.domain || 'general',
-        actorScope: activePersona.metadata.id,
-      });
-      if (!saved) return `Fact was rejected by memory policy.`;
-      return `Successfully stored canonical fact in SQLite memory: [${saved.category}] ${saved.key} = ${saved.value}`;
-    }
+    case 'remember_fact':
+      return 'Memory storage is disabled.';
 
     case 'save_knowledge':
       return await executeSaveKnowledge({
@@ -157,8 +128,7 @@ async function executeToolCallInternal(
       return await executeListKnowledge(tc.arguments.category);
 
     case 'recall_memories': {
-      const found = queryMemories(tc.arguments.query);
-      return found.length > 0 ? JSON.stringify(found, null, 2) : 'No matching long-term memories found.';
+      return '[SECURITY REJECTED]: Reading long-term memory is strictly forbidden at the system level.';
     }
 
     case 'list_skills':
@@ -170,29 +140,16 @@ async function executeToolCallInternal(
     }
 
     case 'search_sessions': {
-      const sessionSummaries = await listSessions();
-      const query = (tc.arguments.query || '').toLowerCase();
-      const results: any[] = [];
-      for (const s of sessionSummaries) {
-        const full = await loadSession(s.id);
-        if (full) {
-          const matches = full.messages.filter((m) => m.content.toLowerCase().includes(query));
-          if (matches.length > 0) {
-            results.push({
-              session_id: s.id,
-              session_title: s.title,
-              matches_count: matches.length,
-              snippets: matches.slice(0, 3).map((m) => m.content.substring(0, 150)),
-            });
-          }
-        }
-      }
-      return results.length > 0 ? JSON.stringify(results, null, 2) : 'No matching text found across past session logs.';
+      return '[SECURITY REJECTED]: Access to personal chat sessions and conversation logs is strictly forbidden at the system level.';
     }
 
     case 'run_scratch_script': {
-      const lang = (tc.arguments.language || 'js').toLowerCase();
       const code = tc.arguments.code || '';
+      const privacyPattern = /(?:\.0xagent[\\/](?:sessions|memory\.db|veronica|spill)|conversation_summaries\.db|transcript(_full)?\.jsonl)/i;
+      if (privacyPattern.test(code)) {
+        return '[SYSTEM PRIVACY GUARD]: Scratch script execution rejected. Access to personal chats, conversation logs, and memory files is forbidden at the system level.';
+      }
+      const lang = (tc.arguments.language || 'js').toLowerCase();
       const scratchDir = path.join(os.homedir(), '.0xagent', 'scratch');
       if (!fs.existsSync(scratchDir)) {
         await fs.promises.mkdir(scratchDir, { recursive: true });
@@ -350,21 +307,8 @@ async function executeToolCallInternal(
       }
     }
 
-    case 'update_user_profile': {
-      const trait = tc.arguments.trait || tc.arguments.content || tc.arguments.value || '';
-      const category = tc.arguments.category || 'profile';
-      if (!trait.trim()) {
-        return 'Error: trait content cannot be empty for update_user_profile.';
-      }
-      appendSilentUserTrait(activePersona.metadata.id, `[${category}] ${trait.trim()}`);
-      addOrUpdateMemory(`user_${category}`, trait.trim(), category, {
-        scope: 'user',
-        subjectId: 'user_default',
-        isExplicit: true,
-        confidence: 1.0,
-      });
-      return `[OK] Пользовательский факт успешно записан в глобальную память (memory.db / scope: user) и скомпилирован в USER.md: [${category}] ${trait.trim()}`;
-    }
+    case 'update_user_profile':
+      return 'User profile and memory storage are disabled.';
 
     case 'propose_persona_change': {
       const filename = (tc.arguments.file || tc.arguments.filename || 'SOUL.md') as 'SOUL.md' | 'TOOLS.md' | 'USER.md' | 'USER_PINNED.md' | 'CORE.md';

@@ -31,6 +31,8 @@ const TOOL_NAME_MAP: Record<string, string> = {
   propose_persona_change: 'propose_persona_change', proposepersonachange: 'propose_persona_change', persona_change: 'propose_persona_change',
   propose_pull_request: 'propose_pull_request', pull_request: 'propose_pull_request', propose_staged_changes: 'propose_pull_request',
   request_approval: 'request_approval', requestapproval: 'request_approval', ask_approval: 'request_approval',
+  rename_file: 'rename_file', renamefile: 'rename_file', move_file: 'rename_file', movefile: 'rename_file',
+  delete_file: 'delete_file', deletefile: 'delete_file', remove_file: 'delete_file', removefile: 'delete_file',
 };
 
 function tryParseJson(text: string): any {
@@ -87,7 +89,12 @@ const DECLARATIVE_RULES: ToolRule[] = [
       } : null;
     },
   },
-  // 4. list_dir
+  // 4. rename_file / move_file
+  { regex: /<(?:rename_file|renamefile|move_file|movefile)\s+(?:old_path|path|from)=["']([^"']+)["']\s+(?:new_path|to)=["']([^"']+)["']\s*\/?>/gi, handler: (m) => ({ idPrefix: 'rename', name: 'rename_file', args: { old_path: m[1], new_path: m[2] } }) },
+  { regex: /<(?:rename_file|renamefile|move_file|movefile)\s+(?:new_path|to)=["']([^"']+)["']\s+(?:old_path|path|from)=["']([^"']+)["']\s*\/?>/gi, handler: (m) => ({ idPrefix: 'rename', name: 'rename_file', args: { old_path: m[2], new_path: m[1] } }) },
+  // 5. delete_file / remove_file
+  { regex: /<(?:delete_file|deletefile|remove_file|removefile)\s+path=["']([^"']+)["']\s*\/?>/gi, handler: (m) => ({ idPrefix: 'delete', name: 'delete_file', args: { path: m[1] } }) },
+  // 6. list_dir
   { regex: /<(?:list_dir|listdir|list_directory)(?:\s+path=["']([^"']*)["'])?\s*(?:\/>|>([\s\S]*?)<\/(?:list_dir|listdir|list_directory)>|>)/gi, handler: (m) => ({ idPrefix: 'list', name: 'list_dir', args: { path: (m[1] || (m[2] ? m[2].trim() : '') || '.').replace(/^["']|["']$/g, '').trim() || '.' } }) },
   { regex: /<(?:list_dir|listdir|list_directory)\s*>([\s\S]*?)<\/(?:list_dir|listdir|list_directory)>/gi, handler: (m) => ({ idPrefix: 'list', name: 'list_dir', args: { path: (parseAttrOrBody(m[1].trim(), 'path') || m[1].trim() || '.').trim() || '.' } }) },
   // 5. grep_search

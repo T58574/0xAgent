@@ -1,7 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { FileNode } from '../../src/types';
-import { getAppDir, loadConfig } from '../config';
+import { loadConfig } from '../config';
+import { isForbiddenPrivacyPath } from '../agent/permissionGuard';
 
 export function resolvePath(workspaceDir: string | null | undefined, pathStr: string): string {
   let cfgWorkspace: string | null = null;
@@ -22,22 +23,12 @@ export function resolvePath(workspaceDir: string | null | undefined, pathStr: st
     targetPath = path.normalize(path.resolve(pathStr));
   } else {
     targetPath = path.normalize(path.resolve(normalizedRoot, pathStr));
-  }
-
-  // Security Sandboxing: Enforce workspace & app directory boundary
-  const isWindows = process.platform === 'win32';
-  const rootCheck = isWindows ? normalizedRoot.toLowerCase() : normalizedRoot;
-  const targetCheck = isWindows ? targetPath.toLowerCase() : targetPath;
-  const appDir = path.normalize(path.resolve(getAppDir()));
-  const appDirCheck = isWindows ? appDir.toLowerCase() : appDir;
-  const globalWsCheck = cfgWorkspace ? (isWindows ? path.normalize(path.resolve(cfgWorkspace)).toLowerCase() : path.normalize(path.resolve(cfgWorkspace))) : null;
-
-  const isWithinRoot = targetCheck.startsWith(rootCheck);
-  const isWithinAppDir = targetCheck.startsWith(appDirCheck);
-  const isWithinGlobalWs = globalWsCheck ? targetCheck.startsWith(globalWsCheck) : false;
-
-  if (!isWithinRoot && !isWithinAppDir && !isWithinGlobalWs) {
-    throw new Error(`Access Denied: Path "${targetPath}" is outside the active workspace directory "${normalizedRoot}"`);
+    if (workspaceDir && workspaceDir.trim().length > 0) {
+      const rel = path.relative(normalizedRoot, targetPath);
+      if (rel.startsWith('..')) {
+        throw new Error(`Path escapes workspace: ${targetPath} is outside the active workspace directory: ${normalizedRoot}`);
+      }
+    }
   }
 
   return targetPath;
@@ -45,6 +36,9 @@ export function resolvePath(workspaceDir: string | null | undefined, pathStr: st
 
 export function executeReadFile(workspaceDir: string | null | undefined, pathStr: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
+  if (isForbiddenPrivacyPath(targetPath, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Access to personal chats, conversation logs, and memory files is forbidden at the system level.`);
+  }
   if (!fs.existsSync(targetPath)) {
     throw new Error(`File does not exist: ${targetPath}`);
   }
@@ -53,6 +47,9 @@ export function executeReadFile(workspaceDir: string | null | undefined, pathStr
 
 export function executeWriteFile(workspaceDir: string | null | undefined, pathStr: string, content: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
+  if (isForbiddenPrivacyPath(targetPath, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Modifying personal chats, conversation logs, and memory files is forbidden at the system level.`);
+  }
   const parent = path.dirname(targetPath);
   if (!fs.existsSync(parent)) {
     fs.mkdirSync(parent, { recursive: true });
@@ -61,8 +58,46 @@ export function executeWriteFile(workspaceDir: string | null | undefined, pathSt
   return `Successfully wrote file: ${targetPath}`;
 }
 
+export function executeRenameFile(workspaceDir: string | null | undefined, oldPathStr: string, newPathStr: string): string {
+  const src = resolvePath(workspaceDir, oldPathStr);
+  const dest = resolvePath(workspaceDir, newPathStr);
+  if (isForbiddenPrivacyPath(src, workspaceDir) || isForbiddenPrivacyPath(dest, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Renaming or moving personal chats, conversation logs, and memory files is forbidden at the system level.`);
+  }
+  if (!fs.existsSync(src)) {
+    throw new Error(`Source path does not exist: ${src}`);
+  }
+  const destDir = path.dirname(dest);
+  if (!fs.existsSync(destDir)) {
+    fs.mkdirSync(destDir, { recursive: true });
+  }
+  fs.renameSync(src, dest);
+  return `Successfully moved/renamed: "${src}" -> "${dest}"`;
+}
+
+export function executeDeleteFile(workspaceDir: string | null | undefined, pathStr: string): string {
+  const targetPath = resolvePath(workspaceDir, pathStr);
+  if (isForbiddenPrivacyPath(targetPath, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Deleting personal chats, conversation logs, and memory files is forbidden at the system level.`);
+  }
+  if (!fs.existsSync(targetPath)) {
+    return `Path already does not exist: ${targetPath}`;
+  }
+  const stat = fs.statSync(targetPath);
+  if (stat.isDirectory()) {
+    fs.rmSync(targetPath, { recursive: true, force: true });
+    return `Successfully deleted directory: ${targetPath}`;
+  } else {
+    fs.unlinkSync(targetPath);
+    return `Successfully deleted file: ${targetPath}`;
+  }
+}
+
 export function executeCreateDirectory(workspaceDir: string | null | undefined, pathStr: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
+  if (isForbiddenPrivacyPath(targetPath, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Creating directories inside protected privacy paths is forbidden at the system level.`);
+  }
   if (!fs.existsSync(targetPath)) {
     fs.mkdirSync(targetPath, { recursive: true });
     return `Successfully created directory: ${targetPath}`;
@@ -72,6 +107,9 @@ export function executeCreateDirectory(workspaceDir: string | null | undefined, 
 
 export function executeGetFileInfo(workspaceDir: string | null | undefined, pathStr: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
+  if (isForbiddenPrivacyPath(targetPath, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Access to file info for personal chats, conversation logs, and memory files is forbidden at the system level.`);
+  }
   if (!fs.existsSync(targetPath)) {
     throw new Error(`Path does not exist: ${targetPath}`);
   }
@@ -88,6 +126,9 @@ export function executeGetFileInfo(workspaceDir: string | null | undefined, path
 
 export function executePatchFile(workspaceDir: string | null | undefined, pathStr: string, patchContent: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
+  if (isForbiddenPrivacyPath(targetPath, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Modifying personal chats, conversation logs, and memory files is forbidden at the system level.`);
+  }
   if (!fs.existsSync(targetPath)) {
     throw new Error(`File to patch does not exist: ${targetPath}`);
   }
@@ -239,6 +280,9 @@ ${found.content}
 
 export function executeListDir(workspaceDir: string | null | undefined, pathStr: string): string {
   const targetPath = resolvePath(workspaceDir, pathStr);
+  if (isForbiddenPrivacyPath(targetPath, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Listing personal chats, conversation logs, and memory directories is forbidden at the system level.`);
+  }
   if (!fs.existsSync(targetPath)) {
     try {
       fs.mkdirSync(targetPath, { recursive: true });
@@ -256,6 +300,8 @@ export function executeListDir(workspaceDir: string | null | undefined, pathStr:
   const list: string[] = [];
 
   for (const entry of entries) {
+    const fullChild = path.join(targetPath, entry.name);
+    if (isForbiddenPrivacyPath(fullChild, workspaceDir)) continue;
     const type = entry.isDirectory() ? 'Dir' : 'File';
     list.push(`- [${type}] ${entry.name}`);
   }
@@ -292,6 +338,9 @@ export function executeGrepSearch(
   caseSensitive = false
 ): string {
   const targetPath = resolvePath(workspaceDir, pathStr || '');
+  if (isForbiddenPrivacyPath(targetPath, workspaceDir)) {
+    throw new Error(`[SECURITY ACCESS DENIED]: Searching personal chats, conversation logs, and memory files is forbidden at the system level.`);
+  }
   if (!fs.existsSync(targetPath)) {
     throw new Error(`Search path does not exist: ${targetPath}`);
   }
@@ -319,6 +368,7 @@ export function executeGrepSearch(
           if (IGNORED_DIRS.has(entry.name)) continue;
 
           const full = path.join(dir, entry.name);
+          if (isForbiddenPrivacyPath(full, workspaceDir)) continue;
           if (entry.isDirectory()) {
             walk(full);
           } else if (entry.isFile()) {
@@ -353,6 +403,7 @@ export function getWorkspaceTree(workspaceDir?: string | null): FileNode[] {
           continue;
         }
         const fullPath = path.join(dir, entry.name);
+        if (isForbiddenPrivacyPath(fullPath, workspaceDir)) continue;
         const isDir = entry.isDirectory();
         nodes.push({
           name: entry.name,

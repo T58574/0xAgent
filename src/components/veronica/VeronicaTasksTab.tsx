@@ -15,10 +15,15 @@ import {
   Copy,
   Trash2,
   Radio,
+  RotateCcw,
+  FileText,
+  Download,
+  Activity,
 } from 'lucide-react';
 import { Button, Card, Badge, Input, Select, Modal } from '../ui';
 import * as api from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { useI18n } from '../../i18n';
 import { VeronicaStreamEvent } from '../../types';
 
 interface VeronicaTasksTabProps {
@@ -26,6 +31,7 @@ interface VeronicaTasksTabProps {
 }
 
 export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh }) => {
+  const { t } = useI18n();
   const { showToast } = useToast();
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,11 +47,36 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
   const [availableAgents, setAvailableAgents] = useState<{ slug: string; name: string; description?: string }[]>([]);
   const [spawning, setSpawning] = useState(false);
 
+  // Task Resumption State
+  const [resumingTaskId, setResumingTaskId] = useState<string | null>(null);
+  const [resumePrompt, setResumePrompt] = useState<string>('');
+  const [isResumeModalOpen, setIsResumeModalOpen] = useState<boolean>(false);
+  const [resuming, setResuming] = useState<boolean>(false);
+
   // Live Stream Console State
   const [streamActiveTaskId, setStreamActiveTaskId] = useState<string | null>(null);
   const [streamLogs, setStreamLogs] = useState<VeronicaStreamEvent[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  // Drawer Tabs & Events Timeline
+  const [activeDrawerTab, setActiveDrawerTab] = useState<'console' | 'events'>('console');
+  const [taskEvents, setTaskEvents] = useState<any[]>([]);
+  const [eventsLoading, setEventsLoading] = useState<boolean>(false);
+
+  // Spill Log Viewer State
+  const [spillModal, setSpillModal] = useState<{
+    isOpen: boolean;
+    fileName: string;
+    content: string;
+    loading: boolean;
+    size?: number;
+  }>({
+    isOpen: false,
+    fileName: '',
+    content: '',
+    loading: false,
+  });
 
   const fetchTasksAndMeta = async () => {
     try {
@@ -91,8 +122,11 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
   useEffect(() => {
     if (!streamActiveTaskId) {
       setStreamLogs([]);
+      setTaskEvents([]);
       return;
     }
+
+    fetchTaskEvents(streamActiveTaskId);
 
     // Subscribe via SSE
     const unsubscribe = api.stream_veronica_task(
@@ -174,6 +208,76 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
       }
     } catch (err: any) {
       showToast(`Ошибка остановки: ${err?.message || err}`, 'error');
+    }
+  };
+
+  const handleOpenResumeModal = (taskId: string) => {
+    setResumingTaskId(taskId);
+    setResumePrompt('');
+    setIsResumeModalOpen(true);
+  };
+
+  const handleExecuteResume = async () => {
+    if (!resumingTaskId) return;
+    setResuming(true);
+    try {
+      const res = await api.resume_veronica_task(resumingTaskId, {
+        custom_prompt: resumePrompt.trim() || undefined,
+      });
+      if (res.success) {
+        showToast(t.veronica.resumeSuccess, 'success');
+        setIsResumeModalOpen(false);
+        setResumingTaskId(null);
+        setResumePrompt('');
+        fetchTasksAndMeta();
+      } else {
+        showToast(t.veronica.resumeError, 'error');
+      }
+    } catch (err: any) {
+      showToast(`${t.veronica.resumeError}: ${err?.message || err}`, 'error');
+    } finally {
+      setResuming(false);
+    }
+  };
+
+  const fetchTaskEvents = async (taskId: string) => {
+    try {
+      setEventsLoading(true);
+      const res = await api.get_veronica_task_events(taskId);
+      if (res.success && res.events) {
+        setTaskEvents(res.events);
+      }
+    } catch (err) {
+      console.error('Failed to load task events:', err);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
+  const handleOpenSpillModal = async (fileName: string) => {
+    setSpillModal({
+      isOpen: true,
+      fileName,
+      content: '',
+      loading: true,
+    });
+    try {
+      const res = await api.get_veronica_spill_log(fileName);
+      if (res.success) {
+        setSpillModal({
+          isOpen: true,
+          fileName: res.fileName,
+          content: res.content,
+          size: res.size,
+          loading: false,
+        });
+      } else {
+        showToast('Не удалось загрузить лог-файл', 'error');
+        setSpillModal((prev) => ({ ...prev, loading: false }));
+      }
+    } catch (err: any) {
+      showToast(`Ошибка загрузки лога: ${err?.message || err}`, 'error');
+      setSpillModal((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -296,6 +400,28 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
               </div>
 
               <div className="flex items-center gap-2">
+                {(() => {
+                  let spillName: string | null = null;
+                  if (task.result_json) {
+                    try {
+                      const parsed = JSON.parse(task.result_json);
+                      if (parsed.spilled && parsed.spill_file) {
+                        spillName = parsed.spill_file.split(/[\\/]/).pop() || null;
+                      }
+                    } catch {}
+                  }
+                  if (!spillName) return null;
+                  return (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleOpenSpillModal(spillName!)}
+                      icon={<FileText size={13} className="text-amber-400" />}
+                    >
+                      {t.veronica.spillLog}
+                    </Button>
+                  );
+                })()}
                 <Button
                   variant="secondary"
                   size="sm"
@@ -304,9 +430,18 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
                 >
                   Live Стрим
                 </Button>
-                {task.status === 'running' && (
+                {task.status === 'running' ? (
                   <Button variant="danger" size="sm" onClick={() => handleKillTask(task.id)}>
                     Остановить
+                  </Button>
+                ) : task.status !== 'queued' && (
+                  <Button
+                    variant="accent"
+                    size="sm"
+                    onClick={() => handleOpenResumeModal(task.id)}
+                    icon={<RotateCcw size={13} />}
+                  >
+                    {t.veronica.resume}
                   </Button>
                 )}
               </div>
@@ -323,81 +458,206 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
           title={`Live SSE/WS Console :: Task ${streamActiveTaskId.substring(0, 8)}`}
         >
           <div className="space-y-3">
-            <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-[var(--theme-border)] text-xs">
-              <div className="flex items-center gap-2">
-                <Radio size={14} className="text-emerald-400 animate-pulse" />
-                <span className="font-mono text-emerald-400 font-bold">SSE / WebSocket Stream Active</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAutoScroll(!autoScroll)}
-                  className={`px-2 py-1 rounded text-[10px] font-mono cursor-pointer border ${
-                    autoScroll ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-white/5 text-[var(--theme-text-muted)] border-transparent'
-                  }`}
-                >
-                  Auto-Scroll: {autoScroll ? 'ON' : 'OFF'}
-                </button>
-                <button
-                  type="button"
-                  onClick={copyLogsToClipboard}
-                  className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
-                  title="Копировать логи"
-                >
-                  <Copy size={13} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStreamLogs([])}
-                  className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
-                  title="Очистить"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
+            {/* Sub-Navigation: Console Stream vs Events Timeline */}
+            <div className="flex items-center gap-2 border-b border-[var(--theme-border)] pb-2.5">
+              <button
+                type="button"
+                onClick={() => setActiveDrawerTab('console')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+                  activeDrawerTab === 'console'
+                    ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] ring-1 ring-[var(--theme-accent)]/30 font-bold'
+                    : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+                }`}
+              >
+                <Terminal size={13} />
+                <span>{t.veronica.tabConsole}</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-blue-500/10 text-blue-400">
+                  {streamLogs.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveDrawerTab('events');
+                  if (streamActiveTaskId) fetchTaskEvents(streamActiveTaskId);
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+                  activeDrawerTab === 'events'
+                    ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] ring-1 ring-[var(--theme-accent)]/30 font-bold'
+                    : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+                }`}
+              >
+                <Activity size={13} />
+                <span>{t.veronica.tabEvents}</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-purple-500/10 text-purple-400">
+                  {taskEvents.length}
+                </span>
+              </button>
             </div>
 
-            {/* Terminal Log Viewport */}
-            <div className="bg-[#0c0d12] border border-[var(--theme-border)] rounded-2xl p-4 font-mono text-xs text-zinc-300 h-96 overflow-y-auto space-y-1 scrollbar-thin">
-              {streamLogs.length === 0 ? (
-                <div className="text-zinc-500 italic flex items-center justify-center h-full">
-                  Ожидание потока данных от процесса Antigravity...
-                </div>
-              ) : (
-                streamLogs.map((log, idx) => (
-                  <div key={idx} className="flex items-start gap-2 leading-relaxed">
-                    <span className="text-zinc-600 select-none text-[10px] shrink-0 pt-0.5">
-                      {new Date(log.timestamp).toLocaleTimeString()}
-                    </span>
-                    <span
-                      className={`font-semibold shrink-0 text-[10px] uppercase px-1 rounded ${
-                        log.type === 'stderr' || log.status === 'failed'
-                          ? 'bg-rose-500/20 text-rose-400'
-                          : log.type === 'stdout'
-                          ? 'bg-sky-500/10 text-sky-300'
-                          : log.type === 'heartbeat'
-                          ? 'bg-amber-500/20 text-amber-300'
-                          : 'bg-emerald-500/20 text-emerald-300'
+            {activeDrawerTab === 'console' ? (
+              <>
+                <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-[var(--theme-border)] text-xs">
+                  <div className="flex items-center gap-2">
+                    <Radio size={14} className="text-emerald-400 animate-pulse" />
+                    <span className="font-mono text-emerald-400 font-bold">SSE / WebSocket Stream Active</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAutoScroll(!autoScroll)}
+                      className={`px-2 py-1 rounded text-[10px] font-mono cursor-pointer border ${
+                        autoScroll ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-white/5 text-[var(--theme-text-muted)] border-transparent'
                       }`}
                     >
-                      {log.type}
-                    </span>
-                    <span className={`break-all whitespace-pre-wrap ${log.type === 'stderr' ? 'text-rose-300' : 'text-zinc-200'}`}>
-                      {log.chunk || log.summary || JSON.stringify(log.metadata || '')}
-                    </span>
+                      Auto-Scroll: {autoScroll ? 'ON' : 'OFF'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={copyLogsToClipboard}
+                      className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
+                      title="Копировать логи"
+                    >
+                      <Copy size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStreamLogs([])}
+                      className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-white/10 cursor-pointer"
+                      title="Очистить"
+                    >
+                      <Trash2 size={13} />
+                    </button>
                   </div>
-                ))
-              )}
-              <div ref={terminalEndRef} />
-            </div>
+                </div>
+
+                {/* Terminal Log Viewport */}
+                <div className="bg-[#0c0d12] border border-[var(--theme-border)] rounded-2xl p-4 font-mono text-xs text-zinc-300 h-96 overflow-y-auto space-y-1 scrollbar-thin">
+                  {streamLogs.length === 0 ? (
+                    <div className="text-zinc-500 italic flex items-center justify-center h-full">
+                      Ожидание потока данных от процесса Antigravity...
+                    </div>
+                  ) : (
+                    streamLogs.map((log, idx) => (
+                      <div key={idx} className="flex items-start gap-2 leading-relaxed">
+                        <span className="text-zinc-600 select-none text-[10px] shrink-0 pt-0.5">
+                          {new Date(log.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span
+                          className={`font-semibold shrink-0 text-[10px] uppercase px-1 rounded ${
+                            log.type === 'stderr' || log.status === 'failed'
+                              ? 'bg-rose-500/20 text-rose-400'
+                              : log.type === 'stdout'
+                              ? 'bg-sky-500/10 text-sky-300'
+                              : log.type === 'heartbeat'
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-emerald-500/20 text-emerald-300'
+                          }`}
+                        >
+                          {log.type}
+                        </span>
+                        <span className={`break-all whitespace-pre-wrap ${log.type === 'stderr' ? 'text-rose-300' : 'text-zinc-200'}`}>
+                          {log.chunk || log.summary || JSON.stringify(log.metadata || '')}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                  <div ref={terminalEndRef} />
+                </div>
+              </>
+            ) : (
+              /* Events Timeline Viewport */
+              <div className="bg-[#0c0d12] border border-[var(--theme-border)] rounded-2xl p-4 font-mono text-xs text-zinc-300 h-96 overflow-y-auto space-y-2 scrollbar-thin">
+                {eventsLoading ? (
+                  <div className="flex items-center justify-center h-full text-zinc-500">
+                    <RefreshCw size={16} className="animate-spin mr-2" /> Загрузка событий...
+                  </div>
+                ) : taskEvents.length === 0 ? (
+                  <div className="text-zinc-500 italic flex items-center justify-center h-full">
+                    {t.veronica.noEvents}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {taskEvents.map((evt, idx) => (
+                      <div key={evt.id || idx} className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white/[0.03] border border-white/5">
+                        <span className="text-zinc-500 select-none text-[10px] shrink-0 pt-0.5 font-mono">
+                          {new Date(evt.timestamp).toLocaleTimeString()}
+                        </span>
+                        <span
+                          className={`font-semibold shrink-0 text-[10px] uppercase px-1.5 py-0.5 rounded ${
+                            evt.event_type === 'error'
+                              ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                              : evt.event_type === 'warning'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : evt.event_type === 'heartbeat'
+                              ? 'bg-sky-500/10 text-sky-300 border border-sky-500/20'
+                              : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                          }`}
+                        >
+                          {evt.event_type}
+                        </span>
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <p className="text-zinc-200 text-xs break-all leading-relaxed">{evt.message}</p>
+                          {evt.data_json && (
+                            <pre className="text-[10px] text-zinc-400 bg-black/50 p-1.5 rounded-lg overflow-x-auto border border-white/5 font-mono">
+                              {evt.data_json}
+                            </pre>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex justify-between items-center pt-2">
               <span className="text-[11px] text-[var(--theme-text-muted)] font-mono">
-                Всего событий: {streamLogs.length}
+                {activeDrawerTab === 'console'
+                  ? `Всего логов: ${streamLogs.length}`
+                  : `Всего событий: ${taskEvents.length}`}
               </span>
-              <Button variant="ghost" size="sm" onClick={() => setStreamActiveTaskId(null)}>
-                Закрыть
-              </Button>
+              <div className="flex items-center gap-2">
+                {(() => {
+                  const currTask = tasks.find((t) => t.id === streamActiveTaskId);
+                  let sName: string | null = null;
+                  if (currTask?.result_json) {
+                    try {
+                      const p = JSON.parse(currTask.result_json);
+                      if (p.spilled && p.spill_file) {
+                        sName = p.spill_file.split(/[\\/]/).pop() || null;
+                      }
+                    } catch {}
+                  }
+                  if (!sName) return null;
+                  return (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleOpenSpillModal(sName!)}
+                      icon={<FileText size={13} className="text-amber-400" />}
+                    >
+                      {t.veronica.spillLog}
+                    </Button>
+                  );
+                })()}
+
+                {tasks.find((t) => t.id === streamActiveTaskId)?.status !== 'running' &&
+                  tasks.find((t) => t.id === streamActiveTaskId)?.status !== 'queued' && (
+                    <Button
+                      variant="accent"
+                      size="sm"
+                      onClick={() => streamActiveTaskId && handleOpenResumeModal(streamActiveTaskId)}
+                      icon={<RotateCcw size={13} />}
+                    >
+                      {t.veronica.resume}
+                    </Button>
+                  )}
+                <Button variant="ghost" size="sm" onClick={() => setStreamActiveTaskId(null)}>
+                  Закрыть
+                </Button>
+              </div>
             </div>
           </div>
         </Modal>
@@ -485,6 +745,118 @@ export const VeronicaTasksTab: React.FC<VeronicaTasksTabProps> = ({ onRefresh })
               </Button>
               <Button variant="primary" size="sm" onClick={handleSpawnTask} disabled={spawning} icon={<Play size={13} />}>
                 {spawning ? 'Запуск...' : 'Запустить задачу'}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Resume Task Modal */}
+      {isResumeModalOpen && resumingTaskId && (
+        <Modal
+          isOpen={isResumeModalOpen}
+          onClose={() => setIsResumeModalOpen(false)}
+          title={`${t.veronica.resumeModalTitle} :: ${resumingTaskId.substring(0, 8)}`}
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed">
+              {t.veronica.resumeTaskDesc}
+            </p>
+
+            <div>
+              <label className="block text-xs font-bold text-[var(--theme-text-muted)] mb-1.5">
+                {t.veronica.resumePromptLabel}
+              </label>
+              <textarea
+                className="w-full bg-[var(--theme-input-bg)] border border-[var(--theme-border)] rounded-xl p-3 text-xs text-[var(--theme-text)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-accent)] resize-none h-24 font-sans"
+                placeholder={t.veronica.resumePromptPlaceholder}
+                value={resumePrompt}
+                onChange={(e) => setResumePrompt(e.target.value)}
+                autoFocus
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-[var(--theme-border)]">
+              <Button variant="ghost" size="sm" onClick={() => setIsResumeModalOpen(false)}>
+                Отмена
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleExecuteResume}
+                disabled={resuming}
+                icon={<RotateCcw size={13} className={resuming ? 'animate-spin' : ''} />}
+              >
+                {resuming ? t.veronica.resuming : t.veronica.resumeTask}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Spill Log Modal */}
+      {spillModal.isOpen && (
+        <Modal
+          isOpen={spillModal.isOpen}
+          onClose={() => setSpillModal((prev) => ({ ...prev, isOpen: false }))}
+          title={`${t.veronica.spillModalTitle} :: ${spillModal.fileName}`}
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-black/40 px-3 py-2 rounded-xl border border-[var(--theme-border)] text-xs">
+              <div className="flex items-center gap-2">
+                <FileText size={14} className="text-amber-400" />
+                <span className="font-mono text-zinc-300 font-semibold">{spillModal.fileName}</span>
+                {spillModal.size !== undefined && (
+                  <span className="text-zinc-500 font-mono text-[11px]">
+                    ({(spillModal.size / 1024).toFixed(1)} KB)
+                  </span>
+                )}
+              </div>
+              <Button
+                variant="secondary"
+                size="xs"
+                icon={<Copy size={12} />}
+                onClick={() => {
+                  navigator.clipboard.writeText(spillModal.content);
+                  showToast('Лог скопирован в буфер обмена', 'info');
+                }}
+              >
+                Копировать
+              </Button>
+            </div>
+
+            {spillModal.loading ? (
+              <div className="flex items-center justify-center h-64 text-zinc-500">
+                <RefreshCw size={18} className="animate-spin mr-2" /> Загрузка содержимого лога...
+              </div>
+            ) : (
+              <div className="bg-[#0c0d12] border border-[var(--theme-border)] rounded-2xl p-4 font-mono text-xs text-zinc-300 h-96 overflow-y-auto whitespace-pre-wrap break-all scrollbar-thin">
+                {spillModal.content || 'Файл пуст или не содержит текстовых данных.'}
+              </div>
+            )}
+
+            <div className="flex justify-between items-center pt-2 border-t border-[var(--theme-border)]">
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Download size={13} />}
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = api.get_veronica_spill_download_url(spillModal.fileName);
+                  link.download = spillModal.fileName;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }}
+              >
+                {t.veronica.downloadLog}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSpillModal((prev) => ({ ...prev, isOpen: false }))}
+              >
+                Закрыть
               </Button>
             </div>
           </div>

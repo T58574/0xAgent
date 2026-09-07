@@ -1,6 +1,7 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { FileFinder } from '@ff-labs/fff-node';
+import { isForbiddenPrivacyPath } from './agent/permissionGuard';
 
 interface FinderInstance {
   finder: any;
@@ -66,10 +67,13 @@ class FffService {
     try {
       const searchRes = instance.finder.fileSearch(query);
       if (searchRes.ok && searchRes.value && Array.isArray(searchRes.value.items)) {
-        return searchRes.value.items.slice(0, maxResults).map((item: any) => ({
-          relativePath: item.relativePath || item.path || '',
-          fullPath: path.join(workspaceDir, item.relativePath || item.path || ''),
-        }));
+        return searchRes.value.items
+          .map((item: any) => ({
+            relativePath: item.relativePath || item.path || '',
+            fullPath: path.join(workspaceDir, item.relativePath || item.path || ''),
+          }))
+          .filter((item: any) => !isForbiddenPrivacyPath(item.fullPath, workspaceDir))
+          .slice(0, maxResults);
       }
     } catch (err) {
       console.warn('[fffService] FFF fileSearch failed, using fallback:', err);
@@ -91,7 +95,12 @@ class FffService {
       if (typeof instance.finder.grep === 'function') {
         const grepRes = instance.finder.grep(query);
         if (grepRes.ok && grepRes.value && Array.isArray(grepRes.value.items)) {
-          const items = grepRes.value.items.slice(0, maxResults);
+          const items = grepRes.value.items
+            .filter((m: any) => {
+              const full = path.join(workspaceDir, m.relativePath || m.path || '');
+              return !isForbiddenPrivacyPath(full, workspaceDir);
+            })
+            .slice(0, maxResults);
           return items.map((m: any) => `${m.relativePath || m.path}:${m.line || 1} -> ${m.lineContent || m.content || ''}`).join('\n');
         }
       }
@@ -118,6 +127,7 @@ class FffService {
           if (entry.name === 'node_modules' || entry.name === '.git' || entry.name === 'dist') continue;
 
           const full = path.join(currentDir, entry.name);
+          if (isForbiddenPrivacyPath(full, dir)) continue;
           const rel = path.relative(dir, full);
 
           if (entry.isDirectory()) {

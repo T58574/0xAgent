@@ -10,7 +10,8 @@ import { videoIngestionService } from '../videoIngestionService';
 import { factCheckingService } from '../factCheckingService';
 import { escapeHtml, safeReply, handleResponseAttachments, deliverWithStatusTransition } from './telegramUtils';
 import { projectDiscovery } from '../../core/projectDiscovery';
-import { sendProjectsMenu, sendModelMenu, sendQuotaStatus } from './menuHandlers';
+import { notificationService } from '../notificationService';
+import { sendProjectsMenu, sendModelMenu } from './menuHandlers';
 
 export function registerMessageHandlers(bot: Bot, token: string): void {
   const cleanToken = token.trim();
@@ -90,10 +91,6 @@ export function registerMessageHandlers(bot: Bot, token: string): void {
       await sendModelMenu(ctx);
       return;
     }
-    if (text === '📊 Квота' || text === 'Квота' || text === '🔄 Квота') {
-      await sendQuotaStatus(ctx);
-      return;
-    }
     if (text === '⚙️ Статус') {
       const msg = MessageBuilder.buildStatusMessage();
       await ctx.reply(msg, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
@@ -106,10 +103,19 @@ export function registerMessageHandlers(bot: Bot, token: string): void {
         `1️⃣ <b>Управление проектами:</b> Нажмите «📁 Проекты» для перехода к каталогу.`,
         `2️⃣ <b>Сессии диалога:</b> Нажмите «💬 Сессии» для проверки текущей сессии или переключения на прошлые.`,
         `3️⃣ <b>Аналитика и геймификация:</b> Нажмите «📈 Аналитика» для просмотра своего ранга, XP, времени и задач.`,
-        `4️⃣ <b>Настройки:</b> Нажмите «⚙️ Настройки» для выбора модели и проверки квоты.`,
+        `4️⃣ <b>Настройки:</b> Настройки модели и STT.`,
         `5️⃣ <b>Быстрые команды:</b> Нажмите «⌨️ Команды /» для просмотра всех слэш-команд.`,
+        `🚨 <b>Боевая тревога:</b> <code>/alert</code> — вызов ракетного оповещения наивысшего приоритета.`,
       ].join('\n');
       await ctx.reply(helpText, { parse_mode: 'HTML', reply_markup: MessageBuilder.getMainReplyKeyboard() });
+      return;
+    }
+    if (/^(?:🚨\s*(?:тревога|алерт|alert)|(?:боевая\s+тревога|ракетная\s+опасность)|(?:напомни\s+про\s+катю|катя\s+тарабаева))/i.test(text)) {
+      await ctx.reply('🚀 <i>Запускаю боевую тревогу наивысшего приоритета...</i>', { parse_mode: 'HTML' });
+      await notificationService.sendMissilePriorityAlert({
+        targetName: 'КАТЯ ТАРАБАЕВА',
+        personalityTarget: 'Личность №3 (Социализация / Достижение цели)',
+      });
       return;
     }
 

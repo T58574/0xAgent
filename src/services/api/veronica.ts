@@ -40,6 +40,26 @@ export const get_veronica_task = (taskId: string) =>
 export const kill_veronica_task = (taskId: string) =>
   post<{ success: boolean }>(`/veronica/tasks/${encodeURIComponent(taskId)}/kill`, {});
 
+export const resume_veronica_task = (taskId: string, params?: { custom_prompt?: string }) =>
+  post<{ success: boolean; task: any }>(`/veronica/tasks/${encodeURIComponent(taskId)}/resume`, params || {});
+
+export const get_veronica_task_events = (taskId: string, limit?: number) =>
+  get<{ success: boolean; taskId: string; events: any[] }>(
+    `/veronica/tasks/${encodeURIComponent(taskId)}/events${limit ? `?limit=${limit}` : ''}`
+  );
+
+export const get_veronica_spill_log = (fileName: string) =>
+  get<{ success: boolean; fileName: string; size: number; content: string }>(
+    `/veronica/spill/${encodeURIComponent(fileName)}`
+  );
+
+export const get_veronica_spill_download_url = (fileName: string) => {
+  const token = getStoredToken();
+  return `${API_BASE}/veronica/spill/${encodeURIComponent(fileName)}?download=1${
+    token ? `&token=${encodeURIComponent(token)}` : ''
+  }`;
+};
+
 export const reload_veronica_module = () =>
   post<{ success: boolean; status: VeronicaModuleStatus; timestamp: number }>('/veronica/reload', {});
 

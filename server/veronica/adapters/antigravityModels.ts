@@ -170,11 +170,15 @@ export function getSafeCliPath(customPath?: string | null): string {
 }
 
 export function isAntigravityModel(rawModel?: string | null, activePersonaId?: string | null): boolean {
-  if (activePersonaId === 'veronica') return true;
-  if (!rawModel) return false;
+  if (!rawModel) {
+    return activePersonaId === 'veronica';
+  }
   const selectedModel = rawModel.toLowerCase().trim();
   if (selectedModel.startsWith('local:') || selectedModel.endsWith('.gguf')) {
     return false;
+  }
+  if (activePersonaId === 'veronica') {
+    return true;
   }
   return (
     selectedModel.startsWith('gemini-') ||
@@ -197,6 +201,10 @@ export function resolveAntigravityModelAndEffort(rawModel?: string | null, rawEf
   }
 
   const clean = rawModel.toLowerCase().trim().replace(/^antigravity:/, '');
+
+  if (clean.startsWith('local:') || clean.endsWith('.gguf')) {
+    return { model: undefined, effort: undefined };
+  }
 
   // 1. Claude and GPT-OSS models NEVER support --effort flag
   if (

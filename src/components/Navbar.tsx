@@ -5,14 +5,14 @@ import {
   BarChart2,
   BookOpen,
   Bot,
+  Activity,
   Menu,
   Plus,
   ArrowUpCircle,
 } from 'lucide-react';
-import { AppConfig, ChatSession, LiveTelemetry, ActiveView, UpdateCheckResult, SystemVersionInfo, QuotaStatus } from '../types';
+import { AppConfig, ChatSession, LiveTelemetry, ActiveView, UpdateCheckResult, SystemVersionInfo } from '../types';
 import { useI18n } from '../i18n';
 import { ContextBudgetGauge } from './chat/ContextBudgetGauge';
-import { QuotaGaugePill } from './chat/QuotaGaugePill';
 import { UpdateModal } from './UpdateModal';
 import { check_for_updates, get_system_version } from '../services/api';
 
@@ -29,7 +29,6 @@ interface NavbarProps {
   onStartServer?: () => Promise<void>;
   onNewChat?: () => void;
   liveTelemetry?: LiveTelemetry | null;
-  quotaStatus?: QuotaStatus | null;
 }
 
 export const Navbar: React.FC<NavbarProps> = React.memo(({
@@ -42,7 +41,6 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
   onStartServer,
   onNewChat,
   liveTelemetry,
-  quotaStatus,
 }) => {
   const { t } = useI18n();
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
@@ -93,6 +91,7 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
               { id: 'chat', label: t.nav.chat, icon: MessageSquare },
               { id: 'knowledge', label: t.nav.knowledge, icon: BookOpen },
               { id: 'veronica', label: t.nav.veronica, icon: Bot },
+              { id: 'benchmark', label: t.nav.benchmark, icon: Activity },
               { id: 'analytics', label: t.nav.analytics, icon: BarChart2 },
               { id: 'settings', label: t.nav.settings, icon: SettingsIcon },
             ].map((tab) => {
@@ -170,13 +169,9 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
           {/* Real-time Context Budget Gauge */}
           <ContextBudgetGauge
             liveTelemetry={liveTelemetry}
-            quotaStatus={quotaStatus}
             currentSession={currentSession}
             config={config}
           />
-
-          {/* Real-time Antigravity CLI Quota Gauge */}
-          <QuotaGaugePill quotaStatus={quotaStatus} />
         </div>
 
       </header>

@@ -1,7 +1,4 @@
-import { spawn, execSync } from 'node:child_process';
 import { QuotaStatus, AgyQuotaLimit, QuotaLimitsState } from '../../src/types';
-import { loadConfig } from '../config';
-import { getSafeCliPath } from '../veronica/adapters/antigravityModels';
 
 export type EventBroadcaster = (event: string, payload: any) => void;
 
@@ -16,9 +13,6 @@ class QuotaManager {
 
   private cachedLimits: AgyQuotaLimit[] = [];
   private lastLimitsFetchTime: number = 0;
-  private limitsCacheTtlMs: number = 60 * 1000; // 1 minute cache
-  private isFetchingLimits: boolean = false;
-  private pollingIntervalTimer: NodeJS.Timeout | null = null;
 
   private constructor() {}
 
@@ -292,104 +286,14 @@ class QuotaManager {
   }
 
   /**
-   * Fetches real quotas via 'agy -p /usage' with caching.
+   * Returns cached quota limits.
+   * Execution of external 'agy -p /usage' CLI process is permanently removed.
    */
-  public async fetchQuotaLimits(force: boolean = false): Promise<QuotaLimitsState> {
-    if (process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR || process.env.NODE_TEST_CONTEXT) {
-      return {
-        limits: this.cachedLimits,
-        lastUpdated: this.lastLimitsFetchTime,
-      };
-    }
-
-    const now = Date.now();
-    if (!force && this.cachedLimits.length > 0 && now - this.lastLimitsFetchTime < this.limitsCacheTtlMs) {
-      return {
-        limits: this.cachedLimits,
-        lastUpdated: this.lastLimitsFetchTime,
-      };
-    }
-
-    if (this.isFetchingLimits) {
-      return {
-        limits: this.cachedLimits,
-        lastUpdated: this.lastLimitsFetchTime,
-      };
-    }
-
-    this.isFetchingLimits = true;
-    try {
-      const config = loadConfig();
-      const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
-
-      const stdout = await new Promise<string>((resolve, reject) => {
-        const proc = spawn(cliPath, ['-p', '/usage'], {
-          shell: false,
-          windowsHide: true,
-          stdio: ['ignore', 'pipe', 'pipe'],
-        });
-        let out = '';
-        let err = '';
-
-        proc.stdout?.on('data', (d: Buffer | string) => (out += d.toString()));
-        proc.stderr?.on('data', (d: Buffer | string) => (err += d.toString()));
-
-        const timer = setTimeout(() => {
-          try {
-            if (proc.pid) {
-              if (process.platform === 'win32') {
-                execSync(`taskkill /F /T /PID ${proc.pid}`, { stdio: 'ignore', windowsHide: true });
-              } else {
-                proc.kill('SIGKILL');
-              }
-            }
-          } catch {}
-          reject(new Error('Timeout querying agy -p /usage'));
-        }, 12000);
-
-        proc.on('close', (code: number | null) => {
-          clearTimeout(timer);
-          if (code === 0) {
-            resolve(out);
-          } else {
-            reject(new Error(`agy -p /usage failed with code ${code}: ${err || out}`));
-          }
-        });
-
-        proc.on('error', (err: Error) => {
-          clearTimeout(timer);
-          reject(err);
-        });
-      });
-
-      const parsed = this.parseAgyUsageOutput(stdout);
-      if (parsed.length > 0) {
-        this.cachedLimits = parsed;
-        this.lastLimitsFetchTime = Date.now();
-        this.currentStatus.limits = parsed;
-
-        if (this.broadcaster) {
-          this.broadcaster('quota-limits-updated', {
-            limits: parsed,
-            lastUpdated: this.lastLimitsFetchTime,
-          });
-          this.broadcaster('quota-status-changed', this.getQuotaStatus());
-        }
-      }
-
-      return {
-        limits: this.cachedLimits,
-        lastUpdated: this.lastLimitsFetchTime,
-      };
-    } catch (err: any) {
-      return {
-        limits: this.cachedLimits,
-        lastUpdated: this.lastLimitsFetchTime,
-        error: err.message || 'Failed to query agy limits',
-      };
-    } finally {
-      this.isFetchingLimits = false;
-    }
+  public async fetchQuotaLimits(_force: boolean = false): Promise<QuotaLimitsState> {
+    return {
+      limits: this.cachedLimits,
+      lastUpdated: this.lastLimitsFetchTime,
+    };
   }
 
   public getCachedLimits(): QuotaLimitsState {
@@ -400,22 +304,11 @@ class QuotaManager {
   }
 
   /**
-   * Starts periodic polling of quota limits (default every 15 minutes).
+   * Periodic polling is permanently disabled.
    */
-  public startPeriodicPolling(intervalMs: number = 15 * 60 * 1000): void {
-    if (this.pollingIntervalTimer) return;
+  public startPeriodicPolling(_intervalMs?: number): void {}
 
-    this.pollingIntervalTimer = setInterval(() => {
-      this.fetchQuotaLimits(true).catch(() => {});
-    }, intervalMs);
-  }
-
-  public stopPeriodicPolling(): void {
-    if (this.pollingIntervalTimer) {
-      clearInterval(this.pollingIntervalTimer);
-      this.pollingIntervalTimer = null;
-    }
-  }
+  public stopPeriodicPolling(): void {}
 }
 
 export const quotaManager = QuotaManager.getInstance();

@@ -63,7 +63,13 @@ export function executeShellCommand(
   const root = workspaceDir && workspaceDir.trim().length > 0 ? workspaceDir : process.cwd();
   const normalizedRoot = path.normalize(path.resolve(root));
 
-  // Destructive pattern safety blocker
+  // 1. System Privacy Target Blocker (personal chats, conversation logs, memory database)
+  const privacyPattern = /(?:\.0xagent[\\/](?:sessions|memory\.db|veronica|spill)|conversation_summaries\.db|transcript(_full)?\.jsonl)/i;
+  if (privacyPattern.test(command)) {
+    return Promise.resolve(`[SYSTEM BLOCKED: PRIVACY GUARD]: Command rejected. Access to personal chats, conversation logs, and memory files is forbidden at the system level.`);
+  }
+
+  // 2. Destructive pattern safety blocker
   const forbiddenPatterns = [
     /\bdel\s+\/s\s+\/q\s+[c-z]:\\/i,
     /\bformat\s+[c-z]:/i,
