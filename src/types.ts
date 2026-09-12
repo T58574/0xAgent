@@ -191,6 +191,7 @@ export interface AppConfig {
   max_tokens?: number | null;
   api_timeout_sec?: number | null;
   auto_save_history?: boolean | null;
+  auto_open_browser?: boolean | null;
   sound_notifications?: boolean | null;
   compact_chat?: boolean | null;
   local_server?: LocalServerConfig | null;

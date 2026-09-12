@@ -13,9 +13,10 @@ class MemoryEventQueue {
   private queue: MemoryConversationEvent[] = [];
   private debounceTimer: NodeJS.Timeout | null = null;
 
-  public pushEvent(_event: MemoryConversationEvent): void {
-    // Memory extraction completely disabled
-    return;
+  public pushEvent(event: MemoryConversationEvent): void {
+    this.queue.push(event);
+    if (this.debounceTimer) clearTimeout(this.debounceTimer);
+    this.debounceTimer = setTimeout(() => this.flushQueue(), 1500);
   }
 
   public flushSession(sessionId: string): void {

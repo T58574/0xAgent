@@ -289,6 +289,8 @@ export interface Translations {
       reasoningDesc: string;
       autoSaveTitle: string;
       autoSaveDesc: string;
+      autoOpenBrowserTitle: string;
+      autoOpenBrowserDesc: string;
       soundTitle: string;
       soundDesc: string;
       compactTitle: string;

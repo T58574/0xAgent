@@ -185,9 +185,40 @@ export function routeAndRankMemories(options: {
   };
 }
 
-export function getSystemPromptMemoryContext(_activePersonaId: string = 'default', _userQuery?: string, _workspaceDir?: string): string {
-  // Memory context completely disabled by user policy: only persona and system prompt
-  return '';
+export function getSystemPromptMemoryContext(activePersonaId: string = 'default', userQuery?: string, workspaceDir?: string): string {
+  const result = routeAndRankMemories({ activePersonaId, userQuery, workspaceDir });
+  const lines: string[] = [];
+
+  if (result.relationship.relationship_summary && result.relationship.interaction_count > 0) {
+    lines.push(`## Relationship Dynamics with User:`);
+    lines.push(`- Dynamics: ${result.relationship.relationship_summary}`);
+    if (result.relationship.preferred_address) {
+      lines.push(`- Preferred Address: ${result.relationship.preferred_address}`);
+    }
+    if (result.relationship.shared_references && result.relationship.shared_references.length > 0) {
+      lines.push(`- Shared References: ${result.relationship.shared_references.join(', ')}`);
+    }
+  }
+
+  if (result.injectedFacts.length > 0) {
+    lines.push(`## Known Facts & Preferences:`);
+    for (const f of result.injectedFacts) {
+      lines.push(`- [${f.category.toUpperCase()}] ${f.key}: ${f.value}`);
+    }
+  }
+
+  if (result.injectedEpisodes.length > 0) {
+    lines.push(`## Relevant Past Episodes:`);
+    for (const ep of result.injectedEpisodes) {
+      lines.push(`- [${ep.title}]: ${ep.summary}`);
+    }
+  }
+
+  if (lines.length === 0) {
+    return '';
+  }
+
+  return `\n\n# Dynamic Persona & User Memory View\n${lines.join('\n')}`;
 }
 
 function estimateTokens(text: string): number {

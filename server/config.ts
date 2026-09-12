@@ -114,6 +114,7 @@ export function getDefaultConfig(): AppConfig {
     max_tokens: 16384,
     api_timeout_sec: 120,
     auto_save_history: true,
+    auto_open_browser: false,
     sound_notifications: true,
     compact_chat: false,
     local_server: {

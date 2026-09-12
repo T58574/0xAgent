@@ -41,40 +41,70 @@ curl -fsSL https://raw.githubusercontent.com/T58574/0xAgent/main/install.sh | ba
 
 ---
 
-## 🎮 CLI Supervisor & Tray Hub
+## 🎮 Terminal CUI & CLI Agent
 
-0xAgent runs quietly in your **System Tray** (`0xAgent.exe`, ~15 KB, ~8 MB RAM) without cluttering your terminal with open console windows, freeing 100% of GPU VRAM and CPU for inference.
-
-Manage the entire platform from any terminal via the unified `0xagent` CLI:
+0xAgent provides a complete, rich **Terminal CUI (Character User Interface)** and CLI execution runner (similar to Claude Code, Antigravity CLI, Codex CLI, and OpenCode CLI) that can be invoked from **any directory** or automated from scripts:
 
 ```bash
-# Launch platform in silent background Tray Mode (default)
+# Launch full interactive CUI REPL session in the current directory:
 0xagent
 
-# Launch interactive CLI settings, API keys & models manager
-0xagent config
+# Interactive Settings TUI (toggle Auto-Open Browser, Permissions, Themes, etc.):
+0xagent settings
 
-# Pull latest releases & updates from GitHub with 1-click rebuild
-0xagent update
+# Interactive Model TUI (with horizontal reasoning effort slider and GGUF scanning):
+0xagent model
 
-# Inspect live backend health, port bindings & telemetry
-0xagent status
+# Interactive Persona Switcher:
+0xagent persona
 
-# Veronica Personal AI Assistant CLI protocol
-0xagent veronica context <project>    # Fetch dense token-efficient project context
-0xagent veronica heartbeat --task <id> # Send alive signal & progress
-0xagent veronica report --task <id>   # Finalize task and send Telegram alert
-0xagent veronica git commit -m <msg>  # Safe unified git commit (L3+ autonomy)
+# One-shot prompt execution directly in your terminal:
+0xagent "Analyze this project and suggest architectural improvements"
+0xagent -p "Fix type errors in server/agent.ts"
 
-# Probe remote GPU Compute Node on LAN workstation
-0xagent node probe 192.168.1.100 11434
+# Quiet output for script automation & piping (e.g. Veron / CI):
+0xagent -p "Summarize git diff" --quiet
+git diff | 0xagent "Explain these changes"
 
-# Force purge GPU VRAM and terminate background inference workers
-0xagent purge-vram
+# Manage local llama-server:
+0xagent server status
+0xagent server start
+0xagent server stop
+0xagent server logs
+0xagent server purge
 
-# Stop all background processes cleanly
-0xagent stop
+# View and update configuration:
+0xagent config show
+0xagent config set permission_preset unrestricted
+0xagent config set auto_open_browser true
+
+# Service supervision:
+0xagent start           # Launch background System Tray host (Windows)
+0xagent status          # Check backend health & telemetry
+0xagent purge-vram      # Force release GPU VRAM
+0xagent update          # Pull latest releases & rebuild
+0xagent stop            # Terminate all processes
 ```
+
+### ⌨️ In-CUI Slash Commands & Interactive Modals
+
+When running `0xagent`, type `/` to bring up the command picker or use slash commands directly:
+
+| Slash Command | Description |
+|---|---|
+| `/settings` | Open interactive 2-column settings table with search filter (`Auto Open Browser`, `Permission Preset`, `Reasoning Effort`, `Theme`, etc.) |
+| `/model` | Open model picker with horizontal **Effort Slider** (`low` / `medium` / `high` / `auto`), local GGUF scan, and cloud models |
+| `/persona` | Open interactive persona profile selector |
+| `/server [action]` | Manage local `llama-server` (`start`, `stop`, `status`, `logs`, `purge`) |
+| `/status` | View system hardware, GPU VRAM usage, and active session telemetry |
+| `/compact` | Trigger 4-tier context compaction and token pruning on demand |
+| `/config [key] [val]` | Inspect or update configuration key inline |
+| `/clear`, `/reset` | Clear conversation history and reset context checkpoint |
+| `/help` | Display command guide and keybindings |
+| `/exit`, `/quit` | Exit the CUI session |
+
+> [!TIP]
+> **No Browser Popups on Startup**: By default, `auto_open_browser` is set to `false`. Starting 0xAgent never interrupts your workflow with an unwanted browser tab. You can toggle this anytime in `/settings`, the Web IDE settings, or via `0xagent config set auto_open_browser true`.
 
 ---
 

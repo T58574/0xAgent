@@ -19,6 +19,8 @@ interface GeneralTabProps {
   setReasoningEnabled: (val: boolean) => void;
   autoSaveHistory: boolean;
   setAutoSaveHistory: (val: boolean) => void;
+  autoOpenBrowser?: boolean;
+  setAutoOpenBrowser?: (val: boolean) => void;
   soundNotifications: boolean;
   setSoundNotifications: (val: boolean) => void;
   compactChat: boolean;
@@ -42,6 +44,8 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   setReasoningEnabled,
   autoSaveHistory,
   setAutoSaveHistory,
+  autoOpenBrowser = false,
+  setAutoOpenBrowser,
   soundNotifications,
   setSoundNotifications,
   compactChat,
@@ -191,6 +195,8 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
           setReasoningEnabled={setReasoningEnabled}
           autoSaveHistory={autoSaveHistory}
           setAutoSaveHistory={setAutoSaveHistory}
+          autoOpenBrowser={autoOpenBrowser}
+          setAutoOpenBrowser={setAutoOpenBrowser}
           soundNotifications={soundNotifications}
           setSoundNotifications={setSoundNotifications}
           compactChat={compactChat}

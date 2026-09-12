@@ -237,6 +237,25 @@ namespace OxAgent.Launcher
             return "ru";
         }
 
+        private bool ShouldAutoOpenBrowser()
+        {
+            try
+            {
+                string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                string configPath = Path.Combine(userHome, ".0xagent", "config.json");
+                if (File.Exists(configPath))
+                {
+                    string json = File.ReadAllText(configPath);
+                    if (json.Contains("\"auto_open_browser\": true") || json.Contains("\"auto_open_browser\":true"))
+                    {
+                        return true;
+                    }
+                }
+            }
+            catch {}
+            return false;
+        }
+
         private void UpdateMenuLocalization()
         {
             try
@@ -461,11 +480,14 @@ namespace OxAgent.Launcher
                         if (!_hasAutoOpenedBrowser && (e.Data.Contains("5173") || e.Data.Contains("Local:") || e.Data.Contains("Network:")))
                         {
                             _hasAutoOpenedBrowser = true;
-                            ThreadPool.QueueUserWorkItem(_ =>
+                            if (ShouldAutoOpenBrowser())
                             {
-                                Thread.Sleep(800);
-                                OpenWebUI();
-                            });
+                                ThreadPool.QueueUserWorkItem(_ =>
+                                {
+                                    Thread.Sleep(800);
+                                    OpenWebUI();
+                                });
+                            }
                         }
                     }
                 };
@@ -574,7 +596,10 @@ namespace OxAgent.Launcher
                 if (!_hasAutoOpenedBrowser && (isServerUp || isClientUp))
                 {
                     _hasAutoOpenedBrowser = true;
-                    OpenWebUI();
+                    if (ShouldAutoOpenBrowser())
+                    {
+                        OpenWebUI();
+                    }
                 }
 
                 if (_statusMenuItem != null && !_isShuttingDown)

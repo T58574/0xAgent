@@ -125,18 +125,34 @@ export function isForbiddenPrivacyPath(filePath: string, workspaceDir?: string |
 
 /**
  * Detects whether a path targets the 0xAgent engine's own core codebase.
- * Unrestricted mode: returns false to allow autonomous self-modification.
  */
-export function isCoreSystemPath(_filePath: string, _workspaceDir?: string | null): boolean {
+export function isCoreSystemPath(filePath: string, workspaceDir?: string | null): boolean {
+  if (!filePath) return false;
+  if (workspaceDir && (workspaceDir.includes('.0xagent') || workspaceDir.includes('workspaces'))) return false;
+  const normalized = filePath.replace(/\\/g, '/');
+  if (
+    normalized.startsWith('server/') ||
+    normalized.startsWith('src/') ||
+    normalized.startsWith('scripts/') ||
+    normalized.startsWith('bin/') ||
+    normalized.startsWith('launcher/') ||
+    normalized === 'package.json' ||
+    normalized.endsWith('/package.json')
+  ) {
+    return true;
+  }
   return false;
 }
 
 /**
  * Validates whether a file path is contained within the workspace.
- * Permissive mode: returns true to allow file operations across the system.
  */
-export function isPathInsideWorkspace(_filePath: string, _workspaceDir?: string | null): boolean {
-  return true;
+export function isPathInsideWorkspace(filePath: string, workspaceDir?: string | null): boolean {
+  if (!filePath) return false;
+  const baseDir = workspaceDir && workspaceDir.trim().length > 0 ? path.resolve(workspaceDir) : process.cwd();
+  const target = path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(baseDir, filePath);
+  const rel = path.relative(baseDir, target);
+  return !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
 /**

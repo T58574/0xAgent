@@ -9,7 +9,11 @@ import { strip_ai_reasoning_fluff } from './fluffSanitizer';
 import { filterCloudPayload } from './cloudPrivacyFilter';
 import { estimatePromptTokens } from '../summarizer';
 
-export function resolveModelContextMax(_modelName: string, config: AppConfig): number {
+export function resolveModelContextMax(modelName: string, config: AppConfig): number {
+  const m = (modelName || '').toLowerCase();
+  if (m.includes('gemini')) return 1048576;
+  if (m.includes('claude')) return 200000;
+  if (m.includes('gpt')) return 128000;
   return config.local_server?.ctx_size || config.max_tokens || 16384;
 }
 

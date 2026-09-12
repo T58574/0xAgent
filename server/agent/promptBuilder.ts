@@ -29,7 +29,7 @@ Before modifying files, inspect the codebase first, formulate a concise plan, an
   const personaContext = `\n\n# AGENT PERSONA: ${activePersona.metadata.name} (${activePersona.metadata.id})
 
 ## SOUL.md (Persona Personality & Character)
-${activePersona.soul}`;
+${activePersona.soul}${activePersona.user ? `\n\n## USER.md (Global User Profile)\n${activePersona.user}` : ''}`;
 
   const toolExecutionDirective = `\n\n# TOOL EXECUTION PROTOCOL
 1. Provide a brief explanation before emitting XML tool tags.

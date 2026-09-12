@@ -285,6 +285,8 @@ export const ru: Translations = {
       reasoningDesc: 'Отображать блок мыслей <think> в ответах',
       autoSaveTitle: 'Автосохранение истории',
       autoSaveDesc: 'Синхронизация истории диалогов на диск',
+      autoOpenBrowserTitle: 'Автоматически открывать браузер',
+      autoOpenBrowserDesc: 'Автоматически запускать Web-IDE в браузере по умолчанию при старте 0xAgent',
       soundTitle: 'Звуковые сигналы',
       soundDesc: 'Звук по завершению генерации ответа',
       compactTitle: 'Компактный вид чата',

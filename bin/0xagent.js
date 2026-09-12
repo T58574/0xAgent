@@ -13,6 +13,7 @@ import { spawn, execSync } from 'node:child_process';
 import readline from 'node:readline';
 import https from 'node:https';
 import http from 'node:http';
+import { CuiClient, TerminalCui, runCliPrompt, SettingsTui, ModelTui, PersonaTui, CommandPickerTui } from './cui.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -163,6 +164,7 @@ async function cmdStop() {
   }
 
   console.log(`${c.green}[OK] All 0xAgent processes terminated cleanly.${c.reset}\n`);
+  process.exit(0);
 }
 
 async function cmdStatus() {
@@ -179,6 +181,7 @@ async function cmdStatus() {
   console.log(`  Model                  : ${c.cyan}${cfg.selectedModel || 'None / Not Selected'}${c.reset}`);
   console.log(`  Config Location        : ${c.gray}${CONFIG_PATH}${c.reset}`);
   console.log(`  Models Directory       : ${c.gray}${path.join(CONFIG_DIR, 'models')}${c.reset}\n`);
+  process.exit(0);
 }
 
 async function cmdPurgeVram() {
@@ -194,6 +197,7 @@ async function cmdPurgeVram() {
     } catch {}
   }
   console.log(`${c.green}[OK] GPU VRAM released successfully.${c.reset}\n`);
+  process.exit(0);
 }
 
 async function cmdUpdate() {
@@ -270,74 +274,9 @@ async function cmdUpdate() {
 
 
 async function cmdConfig() {
-  banner();
-  const cfg = loadConfig();
-
-  console.log(`${c.bold}0xAgent Interactive Configuration Manager${c.reset}\n`);
-  console.log(`  1. Set Interface Language [current: ${cfg.language || 'ru'}]`);
-  console.log(`  2. Set Security Permission Preset [current: ${cfg.permissionPreset || 'prompt'}]`);
-  console.log(`  3. Set Groq API Key (Whisper STT) [current: ${cfg.groqApiKey ? '***' + cfg.groqApiKey.slice(-4) : 'none'}]`);
-  console.log(`  4. Open Models Folder in File Explorer`);
-  console.log(`  5. Purge GPU VRAM & Reset Services`);
-  console.log(`  6. Check for Updates (GitHub)`);
-  console.log(`  0. Exit\n`);
-
-  const choice = await promptQuestion(`${c.cyan}Select option (0-6): ${c.reset}`);
-
-  switch (choice) {
-    case '1': {
-      const lang = await promptQuestion(`${c.yellow}Enter language ('en' or 'ru'): ${c.reset}`);
-      if (lang === 'en' || lang === 'ru') {
-        cfg.language = lang;
-        saveConfig(cfg);
-        console.log(`${c.green}[OK] Language updated to ${lang}.${c.reset}`);
-      } else {
-        console.log(`${c.red}[!] Invalid language selection.${c.reset}`);
-      }
-      break;
-    }
-    case '2': {
-      console.log(`Available presets: prompt (Partial Automation), unrestricted (Full Automation)`);
-      const preset = await promptQuestion(`${c.yellow}Enter preset ('prompt' or 'unrestricted'): ${c.reset}`);
-      if (['prompt', 'unrestricted'].includes(preset)) {
-        cfg.permissionPreset = preset;
-        saveConfig(cfg);
-        console.log(`${c.green}[OK] Security preset updated to ${preset}.${c.reset}`);
-      } else {
-        console.log(`${c.red}[!] Invalid preset.${c.reset}`);
-      }
-      break;
-    }
-    case '3': {
-      const key = await promptQuestion(`${c.yellow}Enter Groq API Key (or empty to clear): ${c.reset}`);
-      cfg.groqApiKey = key.trim();
-      saveConfig(cfg);
-      console.log(`${c.green}[OK] Groq API key updated.${c.reset}`);
-      break;
-    }
-    case '4': {
-      const modelsDir = path.join(CONFIG_DIR, 'models');
-      if (!fs.existsSync(modelsDir)) fs.mkdirSync(modelsDir, { recursive: true });
-      if (process.platform === 'win32') {
-        execSync(`explorer "${modelsDir}"`);
-      } else {
-        console.log(`${c.cyan}Models directory:${c.reset} ${modelsDir}`);
-      }
-      break;
-    }
-    case '5': {
-      await cmdPurgeVram();
-      break;
-    }
-    case '6': {
-      await cmdUpdate();
-      break;
-    }
-    case '0':
-    default:
-      console.log(`${c.gray}Exiting config manager.${c.reset}`);
-      break;
-  }
+  const client = new CuiClient({ workspaceDir: process.cwd() });
+  const tui = new SettingsTui(client, () => process.exit(0));
+  tui.start();
 }
 
 
@@ -378,66 +317,326 @@ async function cmdNode(nodeArgs) {
 // CLI Routing
 // -------------------------------------------------------------
 
-const args = process.argv.slice(2);
-const command = args[0] || 'start';
+async function getPipedStdin() {
+  if (process.stdin.isTTY) return null;
+  return new Promise((resolve) => {
+    let data = '';
+    const onData = (chunk) => (data += chunk);
+    const onEnd = () => {
+      cleanup();
+      resolve(data.trim() || null);
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      resolve(data.trim() || null);
+    }, 150);
 
-switch (command.toLowerCase()) {
-  case 'start':
-    cmdStart({ foreground: args.includes('--foreground') || args.includes('-f') });
-    break;
-  case 'stop':
-    cmdStop();
-    break;
-  case 'status':
-    cmdStatus();
-    break;
-  case 'node':
-    cmdNode(args.slice(1));
-    break;
-  case 'config':
-    cmdConfig();
-    break;
-  case 'update':
-  case 'upgrade':
-    cmdUpdate();
-    break;
-  case 'release': {
-    const releaseScript = path.join(PROJECT_ROOT, 'scripts', 'release.cjs');
-    if (fs.existsSync(releaseScript)) {
-      const relProc = spawn('node', [releaseScript, ...args.slice(1)], { cwd: PROJECT_ROOT, stdio: 'inherit' });
-      relProc.on('close', (code) => process.exit(code || 0));
-    } else {
-      console.error(`${c.red}[ERR] Release script not found at ${releaseScript}${c.reset}`);
+    const cleanup = () => {
+      clearTimeout(timer);
+      try { process.stdin.removeListener('data', onData); } catch {}
+      try { process.stdin.removeListener('end', onEnd); } catch {}
+      try { process.stdin.pause(); } catch {}
+    };
+
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', onData);
+    process.stdin.on('end', onEnd);
+    process.stdin.resume();
+  });
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  const first = (args[0] || '').toLowerCase();
+
+  const EXPLICIT_COMMANDS = new Set([
+    'start', 'stop', 'status', 'node', 'config', 'settings', 'update', 'upgrade',
+    'release', 'purge-vram', 'purge', 'help', '--help', '-h', 'model', 'persona', 'server', 'chat'
+  ]);
+
+  const piped = !EXPLICIT_COMMANDS.has(first) ? await getPipedStdin() : null;
+
+  // No arguments provided
+  if (args.length === 0) {
+    if (piped) {
+      await runCliPrompt(piped, { quiet: false });
+      return;
     }
-    break;
+    // Default in TTY: Launch full interactive CUI
+    const client = new CuiClient({ workspaceDir: process.cwd() });
+    const cui = new TerminalCui(client);
+    await cui.startRepl();
+    return;
   }
-  case 'purge-vram':
-  case 'purge':
-    cmdPurgeVram();
-    break;
-  case '--help':
-  case '-h':
-  case 'help':
-    banner();
-    console.log(`${c.bold}Usage:${c.reset} 0xagent [command] [options]
 
-${c.bold}Commands:${c.reset}
-  0xagent                      Start 0xAgent in background system tray (default)
-  0xagent start -f             Start in foreground console mode
+  // One-shot execution shortcuts: 0xagent -p "..." or 0xagent --prompt "..." or 0xagent exec "..."
+  if (first === '-p' || first === '--prompt' || first === 'exec') {
+    const promptArgs = args.slice(1).filter((a) => !a.startsWith('-'));
+    let prompt = promptArgs.join(' ');
+    if (piped) prompt = prompt ? `${prompt}\n\n${piped}` : piped;
+    const quiet = args.includes('--quiet') || args.includes('-q');
+    const json = args.includes('--json');
+    if (!prompt) {
+      console.error(`${c.red}[!] No prompt provided. Usage: 0xagent -p "your prompt"${c.reset}`);
+      process.exit(1);
+    }
+    await runCliPrompt(prompt, { quiet, json });
+    return;
+  }
+
+  // Explicit interactive CUI mode: 0xagent chat or 0xagent -i
+  if (first === 'chat' || first === '-i' || first === '--interactive') {
+    const client = new CuiClient({ workspaceDir: process.cwd() });
+    const cui = new TerminalCui(client);
+    await cui.startRepl();
+    return;
+  }
+
+  // Server management from CLI: 0xagent server <start|stop|status|logs|purge>
+  if (first === 'server' || first === 'llm') {
+    const sub = (args[1] || 'status').toLowerCase();
+    const client = new CuiClient();
+    await client.ensureBackendRunning();
+    if (sub === 'start') {
+      console.log(`${c.yellow}[*] Starting local inference server...${c.reset}`);
+      try {
+        await client.api('/api/start-local-server', 'POST', {});
+        console.log(`${c.green}[✓] Server start initiated successfully.${c.reset}`);
+      } catch (err) {
+        console.error(`${c.red}[!] Start failed:${c.reset}`, err.message);
+      }
+    } else if (sub === 'stop') {
+      console.log(`${c.yellow}[*] Stopping local inference server...${c.reset}`);
+      await client.api('/api/stop-local-server', 'POST', {}).catch(() => {});
+      console.log(`${c.green}[✓] Server stopped.${c.reset}`);
+    } else if (sub === 'purge') {
+      await cmdPurgeVram();
+    } else if (sub === 'logs') {
+      const logsData = await client.api('/api/server-logs').catch(() => ({ logs: [] }));
+      (logsData.logs || []).slice(-30).forEach((l) => console.log(l));
+    } else {
+      const st = await client.api('/api/server-status').catch(() => ({ running: false }));
+      console.log(`\nLocal Inference Server: ${st.running ? `${c.green}[ONLINE]${c.reset} (Port ${st.port}, Model: ${st.modelName})` : `${c.yellow}[OFFLINE]${c.reset}`}\n`);
+    }
+    return;
+  }
+
+  // Model command from CLI: 0xagent model [name]
+  if (first === 'model') {
+    const client = new CuiClient({ workspaceDir: process.cwd() });
+    if (args.length === 1) {
+      const tui = new ModelTui(client, () => process.exit(0));
+      tui.start();
+      return;
+    }
+
+    const probe = await client.probeServer();
+    const target = args.slice(1).join(' ').trim();
+    const cfg = client.loadConfig();
+    const tui = new ModelTui(client);
+    const matched = tui.models.find(
+      (m) =>
+        m.name.toLowerCase() === target.toLowerCase() ||
+        m.id.toLowerCase() === target.toLowerCase() ||
+        m.name.toLowerCase().includes(target.toLowerCase())
+    );
+
+    const chosenId = matched ? matched.id : (target.startsWith('local:') ? target : `local:${target}`);
+    const chosenName = matched ? matched.name : target;
+    cfg.selectedModel = chosenId;
+    cfg.model_name = chosenId;
+
+    if (matched?.fullPath) {
+      if (!cfg.local_server) cfg.local_server = {};
+      cfg.local_server.model_path = matched.fullPath;
+    }
+
+    client.saveConfig(cfg);
+
+    if (probe.ok) {
+      if (matched?.fullPath) {
+        await client.api('/api/start-local-server', 'POST', {
+          modelPath: matched.fullPath,
+          host: cfg.local_server?.host || '127.0.0.1',
+          port: cfg.local_server?.port || 11434,
+        }).catch(() => {});
+      }
+      await client.api('/api/update-config', 'POST', {
+        selectedModel: chosenId,
+        model_name: chosenId,
+        local_server: cfg.local_server,
+      }).catch(() => {});
+    }
+
+    console.log(`${c.green}[✓] Model switched to: ${chosenName}${c.reset}`);
+    if (matched?.fullPath) {
+      console.log(`    ${c.gray}Loaded into local llama-server (:11434).${c.reset}`);
+    }
+    process.exit(0);
+  }
+
+  // Persona command from CLI: 0xagent persona [name]
+  if (first === 'persona') {
+    const client = new CuiClient({ workspaceDir: process.cwd() });
+    if (args.length === 1) {
+      const tui = new PersonaTui(client, () => process.exit(0));
+      tui.start();
+      return;
+    }
+
+    const probe = await client.probeServer();
+    const query = args.slice(1).join(' ').trim();
+    const tui = new PersonaTui(client);
+    const matched = tui.personas.find(
+      (p) =>
+        p.id.toLowerCase() === query.toLowerCase() ||
+        p.name.toLowerCase() === query.toLowerCase() ||
+        p.name.toLowerCase().includes(query.toLowerCase()) ||
+        p.id.toLowerCase().includes(query.toLowerCase())
+    );
+
+    const targetId = matched ? matched.id : query;
+    const targetName = matched ? matched.name : query;
+    const cfg = client.loadConfig();
+    cfg.active_persona_id = targetId;
+    client.saveConfig(cfg);
+
+    // Update disk metadata.json for personas
+    const personasDir = path.join(CONFIG_DIR, 'personas');
+    if (fs.existsSync(personasDir)) {
+      for (const sub of fs.readdirSync(personasDir)) {
+        const metaPath = path.join(personasDir, sub, 'metadata.json');
+        if (fs.existsSync(metaPath)) {
+          try {
+            const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+            meta.is_active = (meta.id === targetId || sub === targetId);
+            fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf8');
+          } catch {}
+        }
+      }
+    }
+
+    if (probe.ok) {
+      await client.api(`/api/personas/${targetId}/activate`, 'POST').catch(() => {});
+    }
+    console.log(`${c.green}[✓] Persona switched to: ${targetName} (${targetId})${c.reset}`);
+    process.exit(0);
+  }
+
+  // Known subcommands
+  switch (first) {
+    case 'start':
+      cmdStart({ foreground: args.includes('--foreground') || args.includes('-f') });
+      break;
+    case 'stop':
+      cmdStop();
+      break;
+    case 'status':
+      cmdStatus();
+      break;
+    case 'node':
+      cmdNode(args.slice(1));
+      break;
+    case 'config': {
+      const subArgs = args.slice(1);
+      const cfg = loadConfig();
+      if (subArgs.length === 0) {
+        if (process.stdin.isTTY) {
+          await cmdConfig();
+        } else {
+          console.log(JSON.stringify(cfg, null, 2));
+          process.exit(0);
+        }
+      } else {
+        const action = subArgs[0].toLowerCase();
+        if (action === 'show' || action === 'list') {
+          console.log(JSON.stringify(cfg, null, 2));
+        } else if (action === 'get' && subArgs[1]) {
+          console.log(JSON.stringify(cfg[subArgs[1]]));
+        } else if ((action === 'set' && subArgs[1]) || subArgs.length >= 2) {
+          const key = action === 'set' ? subArgs[1] : subArgs[0];
+          let val = (action === 'set' ? subArgs.slice(2) : subArgs.slice(1)).join(' ');
+          if (val === 'true') val = true;
+          else if (val === 'false') val = false;
+          else if (!isNaN(Number(val))) val = Number(val);
+
+          cfg[key] = val;
+          saveConfig(cfg);
+          console.log(`${c.green}[✓] Updated config: ${key} = ${JSON.stringify(val)}${c.reset}`);
+        } else {
+          console.log(`Usage: 0xagent config [show | get <key> | set <key> <val>]`);
+        }
+        process.exit(0);
+      }
+      break;
+    }
+    case 'update':
+    case 'upgrade':
+      cmdUpdate();
+      break;
+    case 'release': {
+      const releaseScript = path.join(PROJECT_ROOT, 'scripts', 'release.cjs');
+      if (fs.existsSync(releaseScript)) {
+        const relProc = spawn('node', [releaseScript, ...args.slice(1)], { cwd: PROJECT_ROOT, stdio: 'inherit' });
+        relProc.on('close', (code) => process.exit(code || 0));
+      } else {
+        console.error(`${c.red}[ERR] Release script not found at ${releaseScript}${c.reset}`);
+      }
+      break;
+    }
+    case 'purge-vram':
+    case 'purge':
+      cmdPurgeVram();
+      break;
+    case 'settings': {
+      await cmdConfig();
+      break;
+    }
+    case '--help':
+    case '-h':
+    case 'help':
+      banner();
+      console.log(`${c.bold}Usage:${c.reset} 0xagent [command|prompt] [options]
+
+${c.bold}Interactive & Agent Commands:${c.reset}
+  0xagent                      Launch interactive CUI session (default)
+  0xagent settings             Open interactive Settings menu (auto-open browser, theme, etc.)
+  0xagent model [name]         Open model & reasoning effort picker or switch active model
+  0xagent persona [id]         Open persona selector or switch active persona profile
+  0xagent chat                 Launch interactive CUI session
+  0xagent "your prompt"        Execute prompt directly in current directory
+  0xagent -p "..." [--quiet]   One-shot execution for scripts & Veron (--quiet, --json)
+  0xagent server [action]      Manage llama-server (start, stop, status, logs, purge)
+
+${c.bold}System & Service Commands:${c.reset}
+  0xagent start                Start 0xAgent platform in System Tray (background)
+  0xagent start -f             Start 0xAgent dev server in foreground
+  0xagent status               Show health, telemetry & active model
+  0xagent config [key] [val]   Terminal configuration manager
   0xagent node probe [host]    Probe remote GPU Compute Node in LAN
-  0xagent config               Interactive settings & models manager
-  0xagent status               Show backend health, telemetry & active model
+  0xagent purge-vram           Force release GPU VRAM & stop workers
   0xagent update               Pull latest releases from GitHub & rebuild
-  0xagent release [patch|min]  Automated version bump, test pass & GitHub release
-  0xagent stop                 Terminate all running processes & free ports
-  0xagent purge-vram           Force purge GPU VRAM and terminate inference servers
+  0xagent release [patch|min]  Automated release bump
+  0xagent stop                 Terminate all running 0xAgent processes
   0xagent help                 Show this help manual
 `);
-    break;
+      break;
 
-  default:
-    console.log(`${c.red}[!] Unknown command: ${command}${c.reset}. Run '0xagent help' for usage.`);
-    break;
+    default: {
+      // Default fallback: any string is treated as a prompt to execute in current workspace!
+      let prompt = args.filter((a) => !a.startsWith('-')).join(' ');
+      if (piped) prompt = prompt ? `${prompt}\n\n${piped}` : piped;
+      const quiet = args.includes('--quiet') || args.includes('-q');
+      const json = args.includes('--json');
+      await runCliPrompt(prompt, { quiet, json });
+      break;
+    }
+  }
 }
+
+main().catch((err) => {
+  console.error(`${c.red}[ERR] Fatal CLI error:${c.reset}`, err);
+  process.exit(1);
+});
 
 

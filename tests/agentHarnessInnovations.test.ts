@@ -118,7 +118,7 @@ describe('Agent Harness Innovations Subsystem Test Suite', () => {
       assert.equal(checkSearch.allowed, true);
       assert.equal(checkSearch.requiresApproval, false);
 
-      const checkMem = evaluateToolPermission('recall_memories', { query: 'user' }, 'prompt');
+      const checkMem = evaluateToolPermission('search_knowledge', { query: 'user' }, 'prompt');
       assert.equal(checkMem.allowed, true);
       assert.equal(checkMem.requiresApproval, false);
 

@@ -285,6 +285,8 @@ export const en: Translations = {
       reasoningDesc: 'Display reasoning block in model responses',
       autoSaveTitle: 'Auto-save dialogue history',
       autoSaveDesc: 'Automatically persist session dialogues to disk',
+      autoOpenBrowserTitle: 'Auto-open browser on launch',
+      autoOpenBrowserDesc: 'Automatically launch Web-IDE in your default browser on startup',
       soundTitle: 'Sound notifications',
       soundDesc: 'Play audio chime when generation completes',
       compactTitle: 'Compact chat density',

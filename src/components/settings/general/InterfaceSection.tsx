@@ -15,6 +15,8 @@ export interface InterfaceSectionProps {
   setReasoningEnabled: (val: boolean) => void;
   autoSaveHistory: boolean;
   setAutoSaveHistory: (val: boolean) => void;
+  autoOpenBrowser?: boolean;
+  setAutoOpenBrowser?: (val: boolean) => void;
   soundNotifications: boolean;
   setSoundNotifications: (val: boolean) => void;
   compactChat: boolean;
@@ -30,6 +32,8 @@ export const InterfaceSection: React.FC<InterfaceSectionProps> = ({
   setReasoningEnabled,
   autoSaveHistory,
   setAutoSaveHistory,
+  autoOpenBrowser = false,
+  setAutoOpenBrowser,
   soundNotifications,
   setSoundNotifications,
   compactChat,
@@ -156,6 +160,22 @@ export const InterfaceSection: React.FC<InterfaceSectionProps> = ({
             <Toggle
               checked={autoSaveHistory}
               onChange={() => setAutoSaveHistory(!autoSaveHistory)}
+              size="sm"
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-4 sm:px-5">
+            <div className="space-y-0.5 min-w-0 pr-4">
+              <div className="text-xs font-semibold text-[var(--theme-text)]">
+                {t.settings.general.autoOpenBrowserTitle}
+              </div>
+              <div className="text-[11.5px] text-[var(--theme-text-muted)] leading-relaxed">
+                {t.settings.general.autoOpenBrowserDesc}
+              </div>
+            </div>
+            <Toggle
+              checked={autoOpenBrowser}
+              onChange={() => setAutoOpenBrowser?.(!autoOpenBrowser)}
               size="sm"
             />
           </div>

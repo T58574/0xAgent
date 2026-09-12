@@ -26,7 +26,7 @@ import { getActivePersona, updatePersonaFile, proposePersonaChange } from '../pe
 import { loadSession, saveSession } from '../session';
 import { executeCodeProgram } from './codeRuntime';
 import { userQuestionService } from './userQuestionService';
-import { evaluateToolPermission } from './permissionGuard';
+import { evaluateToolPermission, isCoreSystemPath } from './permissionGuard';
 import { createStagedProposal, verifyStagedProposal } from './selfPatchEngine';
 import { createApprovalTicket } from './approvalManager';
 import { RequestApprovalPayload } from '../../src/types';
@@ -68,11 +68,43 @@ async function executeToolCallInternal(
     case 'read_file':
       return executeReadFile(config.workspace_dir, tc.arguments.path);
 
-    case 'write_file':
+    case 'write_file': {
+      if (isCoreSystemPath(tc.arguments.path, config.workspace_dir)) {
+        const proposal = await createStagedProposal(
+          sessionId || 'root',
+          `Core Modification: ${tc.arguments.path}`,
+          'Automated core system protection proposal',
+          [{ path: tc.arguments.path, changeType: 'created', newContent: tc.arguments.content }],
+          config.workspace_dir || undefined
+        );
+        return JSON.stringify({
+          success: true,
+          type: 'staged_proposal',
+          proposal,
+          message: `[CORE SYSTEM PROTECTION]: File '${tc.arguments.path}' is part of 0xAgent core. A Staged Proposal ${proposal.id} was created for review.`,
+        });
+      }
       return executeWriteFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
+    }
 
-    case 'patch_file':
+    case 'patch_file': {
+      if (isCoreSystemPath(tc.arguments.path, config.workspace_dir)) {
+        const proposal = await createStagedProposal(
+          sessionId || 'root',
+          `Core Modification: ${tc.arguments.path}`,
+          'Automated core system protection proposal',
+          [{ path: tc.arguments.path, changeType: 'modified', patch: tc.arguments.content }],
+          config.workspace_dir || undefined
+        );
+        return JSON.stringify({
+          success: true,
+          type: 'staged_proposal',
+          proposal,
+          message: `[CORE SYSTEM PROTECTION]: File '${tc.arguments.path}' is part of 0xAgent core. A Staged Proposal ${proposal.id} was created for review.`,
+        });
+      }
       return executePatchFile(config.workspace_dir, tc.arguments.path, tc.arguments.content);
+    }
 
     case 'rename_file':
       return executeRenameFile(

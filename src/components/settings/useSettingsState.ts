@@ -36,6 +36,7 @@ export function useSettingsState(
   const [maxTokens, setMaxTokens] = useState(8192);
   const [apiTimeoutSec, setApiTimeoutSec] = useState(120);
   const [autoSaveHistory, setAutoSaveHistory] = useState(true);
+  const [autoOpenBrowser, setAutoOpenBrowser] = useState(false);
   const [soundNotifications, setSoundNotifications] = useState(true);
   const [compactChat, setCompactChat] = useState(false);
 
@@ -125,6 +126,7 @@ export function useSettingsState(
     if (config.max_tokens) setMaxTokens(config.max_tokens);
     if (config.api_timeout_sec) setApiTimeoutSec(config.api_timeout_sec);
     if (config.auto_save_history !== undefined && config.auto_save_history !== null) setAutoSaveHistory(config.auto_save_history);
+    if (config.auto_open_browser !== undefined && config.auto_open_browser !== null) setAutoOpenBrowser(config.auto_open_browser);
     if (config.sound_notifications !== undefined && config.sound_notifications !== null) setSoundNotifications(config.sound_notifications);
     if (config.compact_chat !== undefined && config.compact_chat !== null) setCompactChat(config.compact_chat);
 
@@ -212,6 +214,7 @@ export function useSettingsState(
           max_tokens: maxTokens,
           api_timeout_sec: apiTimeoutSec,
           auto_save_history: autoSaveHistory,
+          auto_open_browser: autoOpenBrowser,
           sound_notifications: soundNotifications,
           compact_chat: compactChat,
           telegram: {
@@ -284,6 +287,7 @@ export function useSettingsState(
     maxTokens,
     apiTimeoutSec,
     autoSaveHistory,
+    autoOpenBrowser,
     soundNotifications,
     compactChat,
     activeTheme,
@@ -356,6 +360,8 @@ export function useSettingsState(
     setApiTimeoutSec,
     autoSaveHistory,
     setAutoSaveHistory,
+    autoOpenBrowser,
+    setAutoOpenBrowser,
     soundNotifications,
     setSoundNotifications,
     compactChat,
