@@ -1,6 +1,6 @@
 {
   "name": "0xagent",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "description": "Autonomous AI Coding Agent & Web-IDE platform powered by local llama.cpp (100% local-first & private)",
   "type": "module",
   "bin": {
