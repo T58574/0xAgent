@@ -9,7 +9,6 @@ import {
   AvailableModelsResponse,
   KnowledgeEntry,
   KnowledgeQueryOptions,
-  JarvisState,
   StagedProposal,
   SearchEngineInfo,
   WebSearchProvider,
@@ -22,9 +21,6 @@ import {
   ProxyHealthCheckResult,
   ProxyExportConfig,
   ProxyRoutingConfig,
-  BenchmarkTaskInfo,
-  BenchmarkSuiteReport,
-  RunBenchmarkRequest,
 } from '../types';
 
 import { getStoredToken, setStoredToken, clearStoredToken, reconnectWebSocket, listen } from './wsService';
@@ -166,8 +162,11 @@ export const set_active_model = (modelId: string) =>
 export * from './api/telemetry';
 
 
-// Re-export Veronica & Remote Node API from modular domain
-export * from './api/veronica';
+// Telegram Bot API
+export const get_telegram_status = () =>
+  get<{ running: boolean; username: string | null }>('/telegram/status');
+export const restart_telegram_bot = () =>
+  post<{ success: boolean; running: boolean; username: string | null }>('/telegram/restart');
 
 
 // Memories & Skills
@@ -266,27 +265,6 @@ export const save_knowledge_entry = (entry: {
 }) => post<KnowledgeEntry>('/knowledge', entry);
 export const delete_knowledge_entry = (id: string) => del<void>(`/knowledge/${encodeURIComponent(id)}`);
 
-// Jarvis & Voice
-export const get_jarvis_workspace = () => get<{ workspaceDir: string }>('/jarvis/workspace');
-export const get_jarvis_state = () => get<JarvisState>('/jarvis/status');
-export const speak_text = (
-  text: string,
-  options?: { voice?: string; rate?: string; pitch?: string; playOnSpeaker?: boolean; category?: string }
-) => post<{ success: boolean; audioBase64?: string; cached: boolean }>('/jarvis/speak', { text, ...options });
-export const speak_category = (category: string) =>
-  post<{ success: boolean; phrase: string | null }>('/jarvis/speak-category', { category });
-export const stop_voice = () => post<void>('/jarvis/stop-voice');
-export const generate_spark = () => post<{ success: boolean; spark: any }>('/jarvis/spark/generate');
-export const accept_spark = (id: string) => post<{ success: boolean; spark: any }>(`/jarvis/spark/${encodeURIComponent(id)}/accept`);
-export const dismiss_spark = (id: string) => post<void>(`/jarvis/spark/${encodeURIComponent(id)}/dismiss`);
-export const get_voice_daemon_status = () => get<{ running: boolean }>('/jarvis/voice-daemon/status');
-export const toggle_voice_daemon = (enable: boolean) =>
-  post<{ success: boolean; running: boolean }>('/jarvis/voice-daemon/toggle', { enable });
-export const toggle_voice_daemon_recording = () => post<{ success: boolean }>('/jarvis/voice-record/toggle');
-export const start_voice_daemon_recording = () => post<{ success: boolean; state: string }>('/jarvis/voice-record/start');
-export const stop_voice_daemon_recording = () => post<{ success: boolean; state: string }>('/jarvis/voice-record/stop');
-export const send_voice_input = (audioBase64: string, mimeType?: string) =>
-  post<{ success: boolean; text: string; macro?: string }>('/jarvis/voice-input', { audioBase64, mimeType });
 
 
 // Self-Improvement & Pull Request Proposals API
@@ -341,15 +319,3 @@ export const update_proxy_routing = (config: Partial<ProxyRoutingConfig>) =>
 // Telemetry & Quota APIs
 export * from './api/telemetry';
 
-// Veronica Subsystem APIs
-export * from './api/veronica';
-
-// Benchmark APIs
-export const get_benchmark_tasks = () =>
-  get<{ success: boolean; tasks: BenchmarkTaskInfo[] }>('/benchmark/tasks');
-
-export const get_benchmark_status = () =>
-  get<{ success: boolean; isRunning: boolean; lastReport: BenchmarkSuiteReport | null }>('/benchmark/status');
-
-export const run_benchmark = (params: RunBenchmarkRequest) =>
-  post<{ success: boolean; report: BenchmarkSuiteReport }>('/benchmark/run', params);

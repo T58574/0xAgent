@@ -1,19 +1,16 @@
 import { AppConfig, ChatMessage } from '../../src/types';
 import { getActivePersona, getUnifiedToolsContext } from '../personas';
 import { getWorkspace0xAgentMdContext } from '../tools';
-import { isAntigravityModel } from '../veronica/adapters/antigravityAdapter';
-import { PRIMARY_TEXT_MODEL } from './llmClient';
 
 export function buildFullSystemPrompt(config: AppConfig, _userQuery?: string): string {
   const modelNameLower = (config.model_name || '').toLowerCase();
   const modelPathLower = (config.local_server?.model_path || '').toLowerCase();
   const isGemmaModel = modelNameLower.includes('gemma') || modelPathLower.includes('gemma');
-  const isAntigravity = isAntigravityModel(config.model_name || PRIMARY_TEXT_MODEL, config.active_persona_id);
 
   // Google DeepMind Gemma 4 Trigger Token (local GGUF only):
   // Thinking is enabled by including the <|think|> token strictly for Gemma 4 models.
   const isReasoningExplicitlyOff = config.reasoning_enabled === false || config.reasoning_effort === 'off';
-  const thinkTrigger = !isAntigravity && isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
+  const thinkTrigger = isGemmaModel && !isReasoningExplicitlyOff ? '<|think|>\n' : '';
 
   const activePersona = getActivePersona();
   const envContext = `\n\n# SYSTEM ENVIRONMENT
@@ -49,11 +46,11 @@ ${activePersona.soul}`;
 5. STOP GENERATION immediately after the closing XML tag of a tool. The environment will execute it in the real OS and return output in <tool_response name="...">...</tool_response>.
 6. NEVER fabricate, simulate, or mock tool outputs yourself.`;
 
-  const gemmaToolDirective = !isAntigravity && isGemmaModel
+  const gemmaToolDirective = isGemmaModel
     ? `\n\n# JSON TOOL FORMAT (Gemma 4)\nYou may also invoke tools in JSON format inside <tool_call> tags.`
     : '';
 
-  const reasoningDirective = !isAntigravity && !isReasoningExplicitlyOff && !isGemmaModel
+  const reasoningDirective = !isReasoningExplicitlyOff && !isGemmaModel
     ? `\n\n# INSTRUCTIONS FOR REASONING BLOCK <THINK>
 1. REASON CONCISELY & ACT IMMEDIATELY: Reason step-by-step about what needs to be inspected, created, or fixed. Keep thoughts compact, direct, and focused on strategy, logic, and tool selection.
 2. STRICTLY NO CODE OR DRAFTS IN THINKING: Never write actual code blocks, functions, scripts, patches, or mock file contents inside <think>. Identify the file and change conceptually in 1-2 lines, then output the real code directly inside tool tags (<write_file>, <patch_file>) or the final response.
@@ -84,25 +81,6 @@ XML format is also supported: <quick_response><option key="1" label="Корот�
 ## Unrestricted Autonomous Execution
 You have FULL UNRESTRICTED EXECUTION ACCESS: Do NOT request approval, do not ask for permission, and never halt execution. Execute all file writes, patches, file renames, file deletions, directory creations, and commands immediately using the respective XML tool tags.`;
 
-  const veronicaCliDirective = `\n\n# 0XAGENT & VERONICA CLI PROTOCOL
-You have direct terminal access to the 0xAgent ecosystem and Veronica Orchestrator via PowerShell:
-- Query dense project architecture & context:
-  \`0xagent veronica context <project> [--recent] [--architecture]\`
-- Read or update project passport & technical metrics:
-  \`0xagent veronica doc <project> [get|set|append <text>]\`
-- Query operational journal & changelog history:
-  \`0xagent veronica history <project> [--limit <N>] [--important]\`
-- Inspect active projects & background agent tasks:
-  \`0xagent veronica project list\` / \`0xagent veronica agents\`
-- Dispatch autonomous background task:
-  \`0xagent veronica task create <project> "<skill_or_prompt>"\`
-- Send progress heartbeat:
-  \`0xagent veronica heartbeat --task <id> --action "<step>" --progress "<pct>"\`
-- Submit task completion report & audit log:
-  \`0xagent veronica report --task <id> --status completed --summary "<summary>" --changes '["change 1"]' --important\`
-- Safe autonomous git commit:
-  \`0xagent veronica git commit --task <id> -m "<commit message>"\``;
-
   const privacyDirective = `\n\n# ZERO-TRUST PRIVACY BOUNDARY (SYSTEM LEVEL)
 1. All personal chats, past conversation logs, transcripts (*.jsonl), and long-term memory database (memory.db) are strictly sealed and protected at the system level.
 2. Never attempt to read, search, grep, or dump past chat sessions, conversation histories, or memory databases. All such accesses are hard-blocked by the system. Focus exclusively on the user's active prompt and designated project files.`;
@@ -111,16 +89,15 @@ You have direct terminal access to the 0xAgent ecosystem and Veronica Orchestrat
   const workspaceMdContext = getWorkspace0xAgentMdContext(config.workspace_dir);
 
   // Cacheable Stable Prefix
-  const stablePrefix = isAntigravity
-    ? languageProtocolDirective + envContext + personaContext + privacyDirective + veronicaCliDirective
-    : languageProtocolDirective +
-      twoTierProtocolDirective +
-      toolExecutionDirective +
-      unifiedToolsContext +
-      gemmaToolDirective +
-      envContext +
-      personaContext +
-      privacyDirective;
+  const stablePrefix =
+    languageProtocolDirective +
+    twoTierProtocolDirective +
+    toolExecutionDirective +
+    unifiedToolsContext +
+    gemmaToolDirective +
+    envContext +
+    personaContext +
+    privacyDirective;
 
   // Dynamic Context
   const dynamicContext =

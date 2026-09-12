@@ -340,250 +340,7 @@ async function cmdConfig() {
   }
 }
 
-async function cmdVeronica(veronicaArgs) {
-  const subCmd = veronicaArgs[0];
-  if (!subCmd || subCmd === '--help' || subCmd === '-h') {
-    console.log(`
-${c.cyan}${c.bold}Veronica CLI Protocol & Orchestrator Interface${c.reset}
-Usage: 0xagent veronica <command> [options]
 
-Commands:
-  context <project> [--task <id>] [--recent] [--architecture]  Fetch dense token-efficient project context
-  report --task <id> [--status <s>] [--summary <m>] [--changes <c>] [--important] Submit final report & audit event
-  history <project> [--limit <N>] [--important]                Query operational journal history
-  task create <project> <skill|prompt>                         Launch autonomous task via Antigravity (agy)
-  task get <task_id>                                           Inspect agent task status and logs
-  task update --task <id> [--status <s>] [--summary <m>]       Update live task state
-  project [list|status <project>|info <project>]               Inspect project status, metrics & overview
-  state update <project> [--summary <m>] [--changes <c>]       Record state modification to journal
-  doc <project> [get|set|append <text>]                        Read or update project passport & metrics
-  heartbeat --task <id> [--action <a>] [--progress <p>]        Update agent heartbeat & progress
-  error --task <id> --message <m> [--fatal]                    Log error or record incident
-  git commit --task <id> -m <msg>                              Safe unified git commit (L3+ autonomy)
-  git rollback --task <id>                                     Rollback commit created by task
-  agents                                                       List active background agents
-`);
-    return;
-  }
-
-  // Parse arguments into CLI payload
-  let payload = { command: subCmd };
-
-  if (subCmd === 'doc') {
-    const project = veronicaArgs[1];
-    const action = veronicaArgs[2] || 'get';
-    if (!project) {
-      console.error(`${c.red}[ERR] Project name is required. Usage: 0xagent veronica doc <project> [get|set|append <text>]${c.reset}`);
-      return;
-    }
-    if (action === 'get') {
-      payload.command = 'doc_get';
-      payload.project = project;
-    } else if (action === 'append') {
-      payload.command = 'doc_append';
-      payload.project = project;
-      payload.message = veronicaArgs.slice(3).join(' ');
-    } else if (action === 'set') {
-      payload.command = 'doc_update';
-      payload.project = project;
-      payload.content = veronicaArgs.slice(3).join(' ');
-    }
-  } else if (subCmd === 'project' || subCmd === 'projects') {
-    const action = veronicaArgs[1] || 'list';
-    if (action === 'list') {
-      payload.command = 'projects_list';
-    } else if (action === 'status' || action === 'info') {
-      payload.command = 'project_status';
-      payload.project = veronicaArgs[2];
-    } else {
-      payload.command = 'project_status';
-      payload.project = action;
-    }
-  } else if (subCmd === 'history') {
-    payload.command = 'history';
-    payload.project = veronicaArgs[1];
-    const limitIdx = veronicaArgs.indexOf('--limit');
-    if (limitIdx !== -1 && veronicaArgs[limitIdx + 1]) {
-      payload.limit = parseInt(veronicaArgs[limitIdx + 1], 10);
-    }
-    payload.important = veronicaArgs.includes('--important');
-  } else if (subCmd === 'state') {
-    const action = veronicaArgs[1] || 'update';
-    if (action === 'update') {
-      payload.command = 'state_update';
-      payload.project = veronicaArgs[2];
-      const sumIdx = veronicaArgs.indexOf('--summary');
-      if (sumIdx !== -1) payload.summary = veronicaArgs.slice(sumIdx + 1).join(' ');
-      const chgIdx = veronicaArgs.indexOf('--changes');
-      if (chgIdx !== -1) {
-        try {
-          payload.changes = JSON.parse(veronicaArgs[chgIdx + 1]);
-        } catch {
-          payload.changes = [veronicaArgs[chgIdx + 1]];
-        }
-      }
-      payload.important = veronicaArgs.includes('--important');
-    }
-  } else if (subCmd === 'task' || subCmd === 'run') {
-    const action = veronicaArgs[1];
-    if (action === 'get') {
-      payload.command = 'task_get';
-      payload.task_id = veronicaArgs[2];
-    } else if (action === 'update') {
-      payload.command = 'task_update';
-      const taskIdx = veronicaArgs.indexOf('--task');
-      payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
-      const statusIdx = veronicaArgs.indexOf('--status');
-      if (statusIdx !== -1) payload.status = veronicaArgs[statusIdx + 1];
-      const sumIdx = veronicaArgs.indexOf('--summary');
-      if (sumIdx !== -1) payload.summary = veronicaArgs.slice(sumIdx + 1).join(' ');
-    } else if (action === 'create' || !['list', 'get', 'update'].includes(action)) {
-      const project = action === 'create' ? veronicaArgs[2] : veronicaArgs[1];
-      const taskPrompt = action === 'create' ? veronicaArgs.slice(3).join(' ') : veronicaArgs.slice(2).join(' ');
-      if (!project || !taskPrompt) {
-        console.error(`${c.red}[ERR] Usage: 0xagent veronica task create <project> <skill_or_prompt>${c.reset}`);
-        return;
-      }
-      payload.command = 'task_create';
-      payload.project = project;
-      payload.custom_prompt = taskPrompt;
-    } else if (action === 'list') {
-      payload.command = 'agents_list';
-    }
-  } else if (subCmd === 'context') {
-    payload.project = veronicaArgs[1];
-    const taskIdx = veronicaArgs.indexOf('--task');
-    if (taskIdx !== -1 && veronicaArgs[taskIdx + 1]) {
-      payload.task_id = veronicaArgs[taskIdx + 1];
-    }
-    payload.recent = veronicaArgs.includes('--recent');
-    payload.architecture = veronicaArgs.includes('--architecture');
-  } else if (subCmd === 'heartbeat') {
-    const taskIdx = veronicaArgs.indexOf('--task');
-    payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
-    const actionIdx = veronicaArgs.indexOf('--action');
-    if (actionIdx !== -1) payload.action = veronicaArgs[actionIdx + 1];
-    const progIdx = veronicaArgs.indexOf('--progress');
-    if (progIdx !== -1) payload.progress = veronicaArgs[progIdx + 1];
-  } else if (subCmd === 'report') {
-    const taskIdx = veronicaArgs.indexOf('--task');
-    payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
-    const projIdx = veronicaArgs.indexOf('--project');
-    if (projIdx !== -1) payload.project = veronicaArgs[projIdx + 1];
-    const statusIdx = veronicaArgs.indexOf('--status');
-    if (statusIdx !== -1) payload.status = veronicaArgs[statusIdx + 1];
-    const sumIdx = veronicaArgs.indexOf('--summary');
-    if (sumIdx !== -1) {
-      let endIdx = veronicaArgs.length;
-      for (let i = sumIdx + 1; i < veronicaArgs.length; i++) {
-        if (veronicaArgs[i].startsWith('--')) {
-          endIdx = i;
-          break;
-        }
-      }
-      payload.summary = veronicaArgs.slice(sumIdx + 1, endIdx).join(' ').replace(/^["']|["']$/g, '').trim();
-    }
-    const chgIdx = veronicaArgs.indexOf('--changes');
-    if (chgIdx !== -1) {
-      let endIdx = veronicaArgs.length;
-      for (let i = chgIdx + 1; i < veronicaArgs.length; i++) {
-        if (veronicaArgs[i].startsWith('--')) {
-          endIdx = i;
-          break;
-        }
-      }
-      const rawChg = veronicaArgs.slice(chgIdx + 1, endIdx).join(' ').replace(/^["']|["']$/g, '').trim();
-      try {
-        payload.changes = JSON.parse(rawChg);
-      } catch {
-        // Fallback: clean list syntax like "[item 1, item 2]" or "item 1; item 2"
-        const cleaned = rawChg.replace(/^\[|\]$/g, '').split(/[,;]/).map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
-        payload.changes = cleaned.length > 0 ? cleaned : [rawChg];
-      }
-    }
-    payload.important = veronicaArgs.includes('--important');
-    const commitIdx = veronicaArgs.indexOf('--commit');
-    if (commitIdx !== -1) payload.commit_hash = veronicaArgs[commitIdx + 1];
-  } else if (subCmd === 'error') {
-    const taskIdx = veronicaArgs.indexOf('--task');
-    payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
-    const msgIdx = veronicaArgs.indexOf('--message');
-    if (msgIdx !== -1) payload.message = veronicaArgs.slice(msgIdx + 1).join(' ');
-    payload.fatal = veronicaArgs.includes('--fatal');
-  } else if (subCmd === 'git') {
-    const gitAction = veronicaArgs[1];
-    if (gitAction === 'commit') {
-      payload.command = 'git_commit';
-      const taskIdx = veronicaArgs.indexOf('--task');
-      payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
-      const mIdx = veronicaArgs.indexOf('-m');
-      if (mIdx !== -1) payload.message = veronicaArgs.slice(mIdx + 1).join(' ');
-    } else if (gitAction === 'rollback') {
-      payload.command = 'git_rollback';
-      const taskIdx = veronicaArgs.indexOf('--task');
-      payload.task_id = taskIdx !== -1 ? veronicaArgs[taskIdx + 1] : process.env.VERONICA_TASK_ID;
-    }
-  } else if (subCmd === 'agents' || subCmd === 'list') {
-    payload.command = 'agents_list';
-  }
-
-  // Send HTTPS/HTTP request to local 0xAgent server
-  const port = process.env.PORT || 3001;
-  const postData = JSON.stringify(payload);
-
-  function executeRequest(protocolMod, isHttps) {
-    const req = protocolMod.request(
-      {
-        hostname: '127.0.0.1',
-        port,
-        path: '/api/veronica/cli',
-        method: 'POST',
-        rejectUnauthorized: false,
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(postData),
-        },
-        timeout: 10000,
-      },
-      (res) => {
-        let body = '';
-        res.on('data', (chunk) => (body += chunk));
-        res.on('end', () => {
-          try {
-            const json = JSON.parse(body);
-            if (json.success) {
-              if (typeof json.data === 'string') {
-                console.log(json.data);
-              } else {
-                console.log(JSON.stringify(json.data, null, 2));
-              }
-            } else {
-              console.error(`${c.red}[Veronica CLI Error]${c.reset} ${json.error || 'Command failed'}`);
-              process.exit(1);
-            }
-          } catch {
-            console.log(body);
-          }
-        });
-      }
-    );
-
-    req.on('error', (err) => {
-      if (isHttps) {
-        // Fallback to HTTP
-        executeRequest(http, false);
-      } else {
-        console.error(`${c.red}[Veronica CLI Error]${c.reset} Cannot connect to 0xAgent server on port ${port}: ${err.message}`);
-        process.exit(1);
-      }
-    });
-
-    req.write(postData);
-    req.end();
-  }
-
-  executeRequest(https, true);
-}
 
 async function cmdNode(nodeArgs) {
   const subCmd = nodeArgs[0] || 'status';
@@ -622,75 +379,51 @@ async function cmdNode(nodeArgs) {
 // -------------------------------------------------------------
 
 const args = process.argv.slice(2);
-const invokedAs = path.basename(process.argv[1] || '').toLowerCase();
-const isVeronicaBinary = invokedAs.includes('veronica');
+const command = args[0] || 'start';
 
-if (isVeronicaBinary) {
-  cmdVeronica(args);
-} else {
-  const command = args[0] || 'start';
-
-  // Support direct subcommands without explicit 'veronica' prefix
-  const directVeronicaCmds = ['doc', 'project', 'projects', 'task', 'context', 'heartbeat', 'report', 'agents', 'history', 'state'];
-  if (directVeronicaCmds.includes(command.toLowerCase())) {
-    cmdVeronica(args);
-  } else {
-    switch (command.toLowerCase()) {
-      case 'start':
-        cmdStart({ foreground: args.includes('--foreground') || args.includes('-f') });
-        break;
-      case 'stop':
-        cmdStop();
-        break;
-      case 'status':
-        cmdStatus();
-        break;
-      case 'mcp': {
-        const mcpScript = path.join(__dirname, 'veronica-mcp.js');
-        const mcpProc = spawn(process.execPath, [mcpScript, ...args.slice(1)], { stdio: 'inherit' });
-        mcpProc.on('close', (code) => process.exit(code || 0));
-        break;
-      }
-      case 'veronica':
-        cmdVeronica(args.slice(1));
-        break;
-      case 'node':
-        cmdNode(args.slice(1));
-        break;
-      case 'config':
-        cmdConfig();
-        break;
-      case 'update':
-      case 'upgrade':
-        cmdUpdate();
-        break;
-      case 'release': {
-        const releaseScript = path.join(PROJECT_ROOT, 'scripts', 'release.cjs');
-        if (fs.existsSync(releaseScript)) {
-          const relProc = spawn('node', [releaseScript, ...args.slice(1)], { cwd: PROJECT_ROOT, stdio: 'inherit' });
-          relProc.on('close', (code) => process.exit(code || 0));
-        } else {
-          console.error(`${c.red}[ERR] Release script not found at ${releaseScript}${c.reset}`);
-        }
-        break;
-      }
-      case 'purge-vram':
-      case 'purge':
-        cmdPurgeVram();
-        break;
-      case '--help':
-      case '-h':
-      case 'help':
-        banner();
-        console.log(`${c.bold}Usage:${c.reset} 0xagent [command] [options]
+switch (command.toLowerCase()) {
+  case 'start':
+    cmdStart({ foreground: args.includes('--foreground') || args.includes('-f') });
+    break;
+  case 'stop':
+    cmdStop();
+    break;
+  case 'status':
+    cmdStatus();
+    break;
+  case 'node':
+    cmdNode(args.slice(1));
+    break;
+  case 'config':
+    cmdConfig();
+    break;
+  case 'update':
+  case 'upgrade':
+    cmdUpdate();
+    break;
+  case 'release': {
+    const releaseScript = path.join(PROJECT_ROOT, 'scripts', 'release.cjs');
+    if (fs.existsSync(releaseScript)) {
+      const relProc = spawn('node', [releaseScript, ...args.slice(1)], { cwd: PROJECT_ROOT, stdio: 'inherit' });
+      relProc.on('close', (code) => process.exit(code || 0));
+    } else {
+      console.error(`${c.red}[ERR] Release script not found at ${releaseScript}${c.reset}`);
+    }
+    break;
+  }
+  case 'purge-vram':
+  case 'purge':
+    cmdPurgeVram();
+    break;
+  case '--help':
+  case '-h':
+  case 'help':
+    banner();
+    console.log(`${c.bold}Usage:${c.reset} 0xagent [command] [options]
 
 ${c.bold}Commands:${c.reset}
   0xagent                      Start 0xAgent in background system tray (default)
   0xagent start -f             Start in foreground console mode
-  0xagent veronica <cmd>       Veronica assistant CLI (doc, project, task, context)
-  0xagent doc <project> ...    Direct project documentation manager
-  0xagent project list         List auto-discovered projects
-  0xagent task <project> <p>   Launch autonomous task via Antigravity (agy)
   0xagent node probe [host]    Probe remote GPU Compute Node in LAN
   0xagent config               Interactive settings & models manager
   0xagent status               Show backend health, telemetry & active model
@@ -700,12 +433,11 @@ ${c.bold}Commands:${c.reset}
   0xagent purge-vram           Force purge GPU VRAM and terminate inference servers
   0xagent help                 Show this help manual
 `);
-        break;
+    break;
 
-      default:
-        console.log(`${c.red}[!] Unknown command: ${command}${c.reset}. Run '0xagent help' for usage.`);
-        break;
-    }
-  }
+  default:
+    console.log(`${c.red}[!] Unknown command: ${command}${c.reset}. Run '0xagent help' for usage.`);
+    break;
 }
+
 

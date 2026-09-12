@@ -3,8 +3,7 @@
 0xAgent - Transcribe CLI Helper
 Transcribes an audio file (OGG/OPUS, WAV, MP3, etc.) using:
 1. Local Qwen3-ASR DirectML ONNX (from 0xVoice2Text)
-2. Fallback to Groq Whisper Cloud API
-3. Fallback to local Vosk
+2. Fallback to local offline Vosk
 Outputs JSON: { "success": true, "text": "...", "engine": "..." }
 """
 
@@ -160,52 +159,6 @@ def transcribe_with_qwen3_onnx(audio_path: str) -> dict:
     finally:
         adapter.unload()
 
-def transcribe_with_groq(audio_path: str, groq_api_key: str = None, proxy: str = None) -> dict:
-    """Fallback transcription via Groq Whisper with 0xProxy gateway routing."""
-    try:
-        from groq import Groq
-        import httpx
-    except ImportError:
-        return {"success": False, "error": "groq or httpx package not installed"}
-
-    if not groq_api_key:
-        config_path = os.path.expanduser(r"~\.0xagent\config.json")
-        if os.path.exists(config_path):
-            try:
-                with open(config_path, "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    groq_api_key = cfg.get("groq_api_key")
-            except Exception:
-                pass
-
-    if not groq_api_key:
-        groq_api_key = os.environ.get("GROQ_API_KEY")
-
-    if not groq_api_key:
-        return {"success": False, "error": "No Groq API key available"}
-
-    proxy_url = resolve_proxy(proxy)
-    http_client = httpx.Client(proxy=proxy_url, timeout=120.0) if proxy_url else None
-
-    filename = os.path.basename(audio_path)
-    base, ext = os.path.splitext(filename)
-    allowed_exts = {'.flac', '.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.ogg', '.opus', '.wav', '.webm'}
-    if ext.lower() not in allowed_exts:
-        filename = f"{base}.ogg"
-
-    with open(audio_path, "rb") as f:
-        audio_bytes = f.read()
-
-    client = Groq(api_key=groq_api_key, http_client=http_client)
-    res = client.audio.transcriptions.create(
-        file=(filename or "audio.ogg", audio_bytes),
-        model="whisper-large-v3-turbo",
-        language="ru"
-    )
-
-    proxy_tag = f" via {proxy_url}" if proxy_url else ""
-    return {"success": True, "text": (res.text or "").strip(), "engine": f"groq-whisper-large-v3-turbo{proxy_tag}"}
-
 def transcribe_with_vosk(audio_path: str) -> dict:
     """Offline Vosk fallback with chunked PCM streaming."""
     import soundfile as sf
@@ -247,9 +200,7 @@ def transcribe_with_vosk(audio_path: str) -> dict:
 def main():
     parser = argparse.ArgumentParser(description="0xAgent Audio Transcriber")
     parser.add_argument("file", help="Path to audio file")
-    parser.add_argument("--engine", default="auto", choices=["auto", "qwen3", "groq", "vosk", "local"])
-    parser.add_argument("--api-key", default=None, help="Groq API key")
-    parser.add_argument("--proxy", default=None, help="HTTP/SOCKS5 proxy URL for Cloud APIs")
+    parser.add_argument("--engine", default="auto", choices=["auto", "qwen3", "vosk", "local"])
     args = parser.parse_args()
 
     if not os.path.exists(args.file):
@@ -268,32 +219,19 @@ def main():
                 result = transcribe_with_vosk(args.file)
             except Exception as e:
                 result = {"success": False, "error": f"Local Vosk fallback failed: {e}"}
-    elif args.engine == "groq":
-        try:
-            result = transcribe_with_groq(args.file, args.api_key, args.proxy)
-        except Exception as e:
-            result = {"success": False, "error": f"Groq failed: {e}"}
     elif args.engine == "vosk":
         try:
             result = transcribe_with_vosk(args.file)
         except Exception as e:
             result = {"success": False, "error": f"Vosk failed: {e}"}
     else:
-        # Auto: Try Local Qwen3 DirectML first, fallback to Groq, fallback to Vosk
+        # Auto: Try Local Qwen3 DirectML first, fallback to offline Vosk
         try:
             res_qwen = transcribe_with_qwen3_onnx(args.file)
             if res_qwen.get("success") and res_qwen.get("text"):
                 result = res_qwen
         except Exception as e:
             print(f"[Transcribe] Qwen3 DirectML failed: {e}", file=sys.stderr)
-
-        if not result or not result.get("success") or not result.get("text"):
-            try:
-                res_groq = transcribe_with_groq(args.file, args.api_key, args.proxy)
-                if res_groq.get("success") and res_groq.get("text"):
-                    result = res_groq
-            except Exception as e:
-                print(f"[Transcribe] Groq fallback failed: {e}", file=sys.stderr)
 
         if not result or not result.get("success") or not result.get("text"):
             try:
@@ -304,7 +242,7 @@ def main():
                 print(f"[Transcribe] Vosk fallback failed: {e}", file=sys.stderr)
 
     if not result:
-        result = {"success": False, "error": "All STT engines failed"}
+        result = {"success": False, "error": "All local STT engines failed"}
 
     print(json.dumps(result, ensure_ascii=False))
 

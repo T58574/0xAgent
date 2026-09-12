@@ -27,11 +27,8 @@
   - `outputSpiller.ts` — Automatic spilling of massive tool outputs (>24 KB) to disk.
   - `codeRuntime.ts` — Sandboxed Node.js VM runtime for `<code_run>` batch operations.
   - `permissionGuard.ts` — Security presets (`prompt` - Partial Automation, `unrestricted` - Full Automation).
-  - `voiceDaemonManager.ts` / `voiceMacroService.ts` — Native voice spotting and zero-token OS macros.
 - `memory.ts` — Memory Engine v1.0 (CRUD, Write Policy, deterministic router, token budget allocator).
 - `memoryDb.ts` — Native `node:sqlite` connection manager, WAL mode, tables and FTS5 triggers.
-- `jarvisSupervisor.ts` / `proactiveCompanion.ts` — Voice companion orchestrator, sparks engine, and activity watcher.
-- `voice_daemon.py` — Native Python onnx speech recognizer daemon (sherpa-onnx / Moonshine).
 - `tools/` & `tools.ts` — Tool implementations (file system, patches, search, terminal execution).
 - `config.ts` — Application settings store (`~/.0xagent/config.json`).
 - `session.ts` — Multi-session storage, message history, and branching.
@@ -39,15 +36,12 @@
 - `ggufParser.ts` — Binary GGUF metadata parser.
 - `fffService.ts` — High-speed fuzzy file search (`@ff-labs/fff-node`).
 - `searxngService.ts` / `webReaderService.ts` — Privacy-first web search and HTML-to-Markdown reader.
-- `ttsService.ts` — Text-to-speech audio synthesis.
 
-### Module Veronica Subsystem (`server/veronica/`)
-- `telegram/` — Telegram bot gateway (`bot.ts`), multi-turn session orchestrator (`veronicaOrchestrator.ts`), and HTML card builder (`messageBuilder.ts`).
-- `core/` — Task registry (`taskRegistry.ts`), project discovery (`projectDiscovery.ts`), project passport documentation manager (`projectDocManager.ts`), 4-phase structured task prompt builder (`taskPromptBuilder.ts`), context engine (`contextEngine.ts`), operational journal (`operationalJournal.ts`), and project mutex lock manager (`projectLockManager.ts`).
-- `cli/` — CLI handler (`cliHandler.ts`) and safe git executor (`gitExecutor.ts`).
-- `adapters/` — Antigravity Headless CLI adapter (`antigravityAdapter.ts`), safe CLI path resolution (`getSafeCliPath`), and model/effort parameter validator (`resolveAntigravityModelAndEffort`).
-- `db/` — SQLite WAL connection (`veronicaDb.ts`), schema migrations (`migrations.ts`), and single-writer queue (`writeQueue.ts`).
-- `watchdog/` — Task recovery watchdog (`recoveryService.ts`) and process supervisor.
+### Standalone Telegram Bot Subsystem (`server/telegram/`)
+- `telegramBot.ts` — Lightweight GrammY-based Telegram bot querying local llama.cpp directly with multi-turn conversation memory, user whitelist, and `/start`, `/reset`, `/status`, `/help` commands.
+- `telegramUtils.ts` — Markdown-to-HTML parser, balanced chunk splitter, code block & table card formatters for Telegram.
+- `voiceService.ts` — Offline local STT bridge calling `scripts/transcribe_audio.py` (Vosk / Qwen-ASR) without external cloud APIs.
+- `index.ts` — Subsystem lifecycle controller (`initTelegramBot`, `stopTelegramBot`, `restartTelegramBot`, `isTelegramBotRunning`).
 
 ### Frontend (`src/`)
 - `App.tsx` — Root component, split-screen layout, and WebSocket subscriptions.
@@ -58,14 +52,13 @@
   - `Sidebar.tsx` — Session history, active workspaces, and file explorer.
   - `ChatArea.tsx` — Chat stream, tool cards, reasoning viewer (`<think>`), and live plan progress HUD.
   - `CodeEditor.tsx` — Multi-tab Monaco-style code viewer and editor.
-  - `chat/` — Chat components (`ReasoningViewer.tsx`, `FloatingCommandBar.tsx`, `PlanProgressStrip.tsx`, `VeronicaActionStrip.tsx`).
-  - `veronica/` — Veronica Web-IDE integration (`VeronicaTaskModal.tsx`, `VeronicaPage.tsx`).
+  - `chat/` — Chat components (`ReasoningViewer.tsx`, `FloatingCommandBar.tsx`, `PlanProgressStrip.tsx`, `QuickResponseStrip.tsx`).
   - `settings/` — Settings tabs (General, LLM Server, Personas, Themes, Security, Customizations).
+  - `settings/general/` — Modular general settings (`InterfaceSection.tsx`, `SecuritySection.tsx`, `TelegramSection.tsx`).
   - `settings/personas/` — Modular persona & memory subcomponents (`MemoryManagerSection.tsx`, `PersonaEditorSection.tsx`, `TokenTelemetrySection.tsx`).
   - `settings/common/` — Settings molecules (`SettingsHeader.tsx`, `SettingsSection.tsx`, `SettingToggleCard.tsx`, `SettingItemRow.tsx`, `SettingStatCard.tsx`).
   - `KnowledgeVault/` — Knowledge base manager, RAG retrieval index, and vector embeddings viewer.
-  - `JarvisSanctuary.tsx` / `JarvisWidget.tsx` — Voice companion floating HUD, audio visualizer, and active sparks.
-  - `MemorySkillsModal.tsx` — Long-term memory viewer and AGY skill inspector.
+  - `MemorySkillsModal.tsx` — Long-term memory viewer.
   - `AnalyticsPage.tsx` — Token analytics, telemetry benchmarks, and model performance metrics.
   - `common/` — Shared UI elements (`MaterialIcon.tsx`, `AsciiCanvasEngine.tsx`).
 - `i18n/` — Bilingual translation dictionaries (`en.ts`, `ru.ts`).
@@ -119,11 +112,9 @@
     - Corresponding unit test in `tests/`
 12. **Mandatory Automated Test Pass**: Before concluding any task or committing changes, run `npm test`. All 190+ tests must pass with 0 failures.
 13. **I18n Strict Parity**: When adding or modifying UI labels, placeholders, or settings keys, always synchronously update BOTH `src/i18n/translations/en.ts` AND `src/i18n/translations/ru.ts`. Never hardcode raw untranslated text strings directly into JSX templates.
-14. **Safe Process Spawning & Model Effort Resolution**:
-    - Never execute CLI processes with `{ shell: true }` when passing arguments (eliminates `DEP0190`). Always resolve full paths via `getSafeCliPath` and spawn with `{ shell: false }`.
-    - Always pass Antigravity models through `resolveAntigravityModelAndEffort`. Claude and GPT-OSS models must never receive `--effort` flags, while Gemini models default to `low` with optional `medium` and `high` levels.
-15. **Antigravity File Creation & Tool Invariants**:
-    - When creating new workspace source files with `write_to_file`, NEVER pass the `ArtifactMetadata` property. `ArtifactMetadata` is reserved exclusively for Antigravity Brain markdown artifacts (`.gemini/.../brain/`). Passing `ArtifactMetadata` on any project workspace file triggers a fatal Cortex permission rejection (`not a valid artifact path; artifacts must be in .../brain/...`).
+14. **Safe Process Spawning**: Never execute CLI processes with `{ shell: true }` when passing arguments (eliminates `DEP0190`). Always spawn processes directly with `{ shell: false }`.
+15. **Local File Creation & Tool Invariants**:
+    - When creating new workspace source files with `write_to_file`, NEVER pass the `ArtifactMetadata` property. Passing `ArtifactMetadata` on any project workspace file triggers a fatal Cortex permission rejection.
     - For new workspace files, pass ONLY `TargetFile`, `Overwrite: true`, `CodeContent`, and `Description`.
 
 ---

@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Sliders, Palette, Mic, ShieldCheck } from 'lucide-react';
+import { Sliders, Palette, ShieldCheck, Send } from 'lucide-react';
 import { AppTheme } from '../../types';
 import * as api from '../../services/api';
 import { useI18n } from '../../i18n';
 import { SettingsHeader } from './common';
 import { InterfaceSection } from './general/InterfaceSection';
-import { VoiceSection } from './general/VoiceSection';
 import { SecuritySection } from './general/SecuritySection';
+import { TelegramSection } from './general/TelegramSection';
 
 interface GeneralTabProps {
   onLanguageSelect?: (lang: 'en' | 'ru') => void;
@@ -23,23 +23,15 @@ interface GeneralTabProps {
   setSoundNotifications: (val: boolean) => void;
   compactChat: boolean;
   setCompactChat: (val: boolean) => void;
-  ttsVoiceEnabled?: boolean;
-  setTtsVoiceEnabled?: (val: boolean) => void;
-  ttsVoice?: string;
-  setTtsVoice?: (val: string) => void;
-  ttsRate?: string;
-  setTtsRate?: (val: string) => void;
-  ttsPlayOnSpeaker?: boolean;
-  setTtsPlayOnSpeaker?: (val: boolean) => void;
-  ttsPlayInBrowser?: boolean;
-  setTtsPlayInBrowser?: (val: boolean) => void;
-  wakeWordEnabled?: boolean;
-  setWakeWordEnabled?: (val: boolean) => void;
-  proactiveCompanionEnabled?: boolean;
-  setProactiveCompanionEnabled?: (val: boolean) => void;
+  telegramBotEnabled?: boolean;
+  setTelegramBotEnabled?: (val: boolean) => void;
+  telegramBotToken?: string;
+  setTelegramBotToken?: (val: string) => void;
+  telegramBotWhitelist?: string;
+  setTelegramBotWhitelist?: (val: string) => void;
 }
 
-type GeneralSubtab = 'interface' | 'voice' | 'security';
+type GeneralSubtab = 'interface' | 'security' | 'telegram';
 
 export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   onLanguageSelect,
@@ -54,22 +46,14 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   setSoundNotifications,
   compactChat,
   setCompactChat,
-  ttsVoiceEnabled = true,
-  setTtsVoiceEnabled,
-  ttsVoice = 'ru-RU-DmitryNeural',
-  setTtsVoice,
-  ttsRate = '+15%',
-  setTtsRate,
-  ttsPlayOnSpeaker = true,
-  setTtsPlayOnSpeaker,
-  ttsPlayInBrowser = true,
-  setTtsPlayInBrowser,
-  wakeWordEnabled = false,
-  setWakeWordEnabled,
-  proactiveCompanionEnabled = true,
-  setProactiveCompanionEnabled,
+  telegramBotEnabled = true,
+  setTelegramBotEnabled,
+  telegramBotToken = '',
+  setTelegramBotToken,
+  telegramBotWhitelist = '',
+  setTelegramBotWhitelist,
 }) => {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
 
   // Active Sub-Navigation Tab
   const [activeSubtab, setActiveSubtab] = useState<GeneralSubtab>('interface');
@@ -77,9 +61,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
   // Network State
   const [lanIp, setLanIp] = useState<string | null>(null);
   const [copiedLan, setCopiedLan] = useState(false);
-
-  // Voice test state
-  const [testingVoice, setTestingVoice] = useState(false);
 
   // Security & Password state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -110,24 +91,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
     navigator.clipboard.writeText(url);
     setCopiedLan(true);
     setTimeout(() => setCopiedLan(false), 2000);
-  };
-
-  const handleTestVoice = async () => {
-    if (testingVoice) return;
-    setTestingVoice(true);
-    try {
-      const testPhrase = language === 'ru' ? t.settings.general.voiceTestPhrase : 'Jarvis systems fully operational, sir.';
-      await api.speak_text(testPhrase, {
-        voice: ttsVoice,
-        rate: ttsRate,
-        playOnSpeaker: ttsPlayOnSpeaker,
-        category: 'greeting',
-      });
-    } catch (err) {
-      console.error('Voice test failed:', err);
-    } finally {
-      setTestingVoice(false);
-    }
   };
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -188,22 +151,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
 
         <button
           type="button"
-          onClick={() => setActiveSubtab('voice')}
-          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
-            activeSubtab === 'voice'
-              ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs ring-1 ring-[var(--theme-accent)]/30 font-bold'
-              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-          }`}
-        >
-          <Mic size={14} className={activeSubtab === 'voice' ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text-muted)]'} />
-          <span>{t.settings.general.subtabVoice}</span>
-          {ttsVoiceEnabled && (
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          )}
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveSubtab('security')}
           className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
             activeSubtab === 'security'
@@ -213,6 +160,22 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
         >
           <ShieldCheck size={14} className={activeSubtab === 'security' ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text-muted)]'} />
           <span>{t.settings.general.subtabSecurity}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveSubtab('telegram')}
+          className={`px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
+            activeSubtab === 'telegram'
+              ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs ring-1 ring-[var(--theme-accent)]/30 font-bold'
+              : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
+          }`}
+        >
+          <Send size={14} className={activeSubtab === 'telegram' ? 'text-[var(--theme-accent)]' : 'text-[var(--theme-text-muted)]'} />
+          <span>{t.settings.general.subtabTelegram || 'Telegram'}</span>
+          {telegramBotEnabled && (
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          )}
         </button>
       </div>
 
@@ -237,30 +200,6 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
       )}
 
       {/* ===================================================================== */}
-      {/* SUBTAB 2: VOICE & COMPANION                                           */}
-      {/* ===================================================================== */}
-      {activeSubtab === 'voice' && (
-        <VoiceSection
-          ttsVoiceEnabled={ttsVoiceEnabled}
-          setTtsVoiceEnabled={setTtsVoiceEnabled}
-          ttsVoice={ttsVoice}
-          setTtsVoice={setTtsVoice}
-          ttsRate={ttsRate}
-          setTtsRate={setTtsRate}
-          ttsPlayOnSpeaker={ttsPlayOnSpeaker}
-          setTtsPlayOnSpeaker={setTtsPlayOnSpeaker}
-          ttsPlayInBrowser={ttsPlayInBrowser}
-          setTtsPlayInBrowser={setTtsPlayInBrowser}
-          testingVoice={testingVoice}
-          handleTestVoice={handleTestVoice}
-          proactiveCompanionEnabled={proactiveCompanionEnabled}
-          setProactiveCompanionEnabled={setProactiveCompanionEnabled}
-          wakeWordEnabled={wakeWordEnabled}
-          setWakeWordEnabled={setWakeWordEnabled}
-        />
-      )}
-
-      {/* ===================================================================== */}
       {/* SUBTAB 3: SECURITY & NETWORK                                          */}
       {/* ===================================================================== */}
       {activeSubtab === 'security' && (
@@ -277,6 +216,20 @@ export const GeneralTab: React.FC<GeneralTabProps> = React.memo(({
           isChangingPassword={isChangingPassword}
           passwordStatus={passwordStatus}
           handleChangePassword={handleChangePassword}
+        />
+      )}
+
+      {/* ===================================================================== */}
+      {/* SUBTAB 4: TELEGRAM BOT INTEGRATION                                    */}
+      {/* ===================================================================== */}
+      {activeSubtab === 'telegram' && (
+        <TelegramSection
+          telegramBotEnabled={telegramBotEnabled}
+          setTelegramBotEnabled={setTelegramBotEnabled || (() => {})}
+          telegramBotToken={telegramBotToken}
+          setTelegramBotToken={setTelegramBotToken || (() => {})}
+          telegramBotWhitelist={telegramBotWhitelist}
+          setTelegramBotWhitelist={setTelegramBotWhitelist || (() => {})}
         />
       )}
     </div>

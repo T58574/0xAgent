@@ -27,11 +27,8 @@
   - `outputSpiller.ts` — Automatic spilling of massive tool outputs (>24 KB) to disk.
   - `codeRuntime.ts` — Sandboxed Node.js VM runtime for `<code_run>` batch operations.
   - `permissionGuard.ts` — Security presets (`prompt` - Partial Automation, `unrestricted` - Full Automation).
-  - `voiceDaemonManager.ts` / `voiceMacroService.ts` — Native voice spotting and zero-token OS macros.
 - `memory.ts` — Memory Engine v1.0 (CRUD, Write Policy, deterministic router, token budget allocator).
 - `memoryDb.ts` — Native `node:sqlite` connection manager, WAL mode, tables and FTS5 triggers.
-- `jarvisSupervisor.ts` / `proactiveCompanion.ts` — Voice companion orchestrator, sparks engine, and activity watcher.
-- `voice_daemon.py` — Native Python onnx speech recognizer daemon (sherpa-onnx / Moonshine).
 - `tools/` & `tools.ts` — Tool implementations (file system, patches, search, terminal execution).
 - `config.ts` — Application settings store (`~/.0xagent/config.json`).
 - `session.ts` — Multi-session storage, message history, and branching.
@@ -39,7 +36,6 @@
 - `ggufParser.ts` — Binary GGUF metadata parser.
 - `fffService.ts` — High-speed fuzzy file search (`@ff-labs/fff-node`).
 - `searxngService.ts` / `webReaderService.ts` — Privacy-first web search and HTML-to-Markdown reader.
-- `ttsService.ts` — Text-to-speech audio synthesis.
 
 ### Frontend (`src/`)
 - `App.tsx` — Root component, split-screen layout, and WebSocket subscriptions.
@@ -54,7 +50,6 @@
   - `settings/` — Settings tabs (General, LLM Server, Personas, Themes, Security, Customizations).
   - `settings/common/` — Settings molecules (`SettingsHeader.tsx`, `SettingsSection.tsx`, `SettingToggleCard.tsx`, `SettingItemRow.tsx`, `SettingStatCard.tsx`).
   - `KnowledgeVault/` — Knowledge base manager, RAG retrieval index, and vector embeddings viewer.
-  - `JarvisSanctuary.tsx` / `JarvisWidget.tsx` — Voice companion floating HUD, audio visualizer, and active sparks.
   - `MemorySkillsModal.tsx` — Long-term memory viewer and AGY skill inspector.
   - `AnalyticsPage.tsx` — Token analytics, telemetry benchmarks, and model performance metrics.
   - `common/` — Shared UI elements (`MaterialIcon.tsx`, `AsciiCanvasEngine.tsx`).

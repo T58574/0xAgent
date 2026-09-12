@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import * as api from '../services/api';
-import { AppConfig, ChatSession, ChatMessage, JarvisSparkProposal } from '../types';
+import { AppConfig, ChatSession, ChatMessage } from '../types';
 import { generateShortId } from '../utils/helpers';
-import { useI18n } from '../i18n';
 
 interface UseSessionManagerOptions {
   config: AppConfig | null;
@@ -10,9 +9,6 @@ interface UseSessionManagerOptions {
   setWorkspaceTree: React.Dispatch<React.SetStateAction<any[]>>;
   setHas0xAgentMd: React.Dispatch<React.SetStateAction<boolean>>;
   addLog: (msg: string) => void;
-  showToast: (msg: string, type: 'info' | 'success' | 'error' | 'warning') => void;
-  setActiveView: (view: 'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge') => void;
-  setIsJarvisOpen: (open: boolean) => void;
 }
 
 export function useSessionManager({
@@ -21,11 +17,7 @@ export function useSessionManager({
   setWorkspaceTree,
   setHas0xAgentMd,
   addLog,
-  showToast,
-  setActiveView,
-  setIsJarvisOpen,
 }: UseSessionManagerOptions) {
-  const { t, formatString } = useI18n();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [currentSession, setCurrentSession] = useState<ChatSession | null>(null);
@@ -212,48 +204,7 @@ export function useSessionManager({
     }
   };
 
-  const handleAcceptSpark = async (spark: JarvisSparkProposal) => {
-    try {
-      await api.accept_spark(spark.id);
 
-      const sparkTitle = `[Джарвис] ${spark.title}`;
-      const newSession = await api.create_session(sparkTitle, config?.workspace_dir);
-
-      setSessions((prev) => [newSession, ...prev]);
-      setCurrentSessionId(newSession.id);
-      currentSessionRef.current = newSession;
-      setCurrentSession(newSession);
-      activeSessionsMapRef.current.set(newSession.id, newSession);
-
-      setActiveView('chat');
-      setIsJarvisOpen(false);
-
-      const directive = spark.directivePrompt || spark.suggestedAction || spark.description;
-
-      const userMsg: ChatMessage = {
-        id: generateShortId(),
-        role: 'user',
-        content: directive,
-        timestamp: Date.now(),
-      };
-
-      const updatedSession: ChatSession = {
-        ...newSession,
-        messages: [userMsg],
-        updated_at: Date.now(),
-      };
-
-      updateSessionState(updatedSession);
-      await api.save_session(updatedSession);
-      await api.send_message(newSession.id);
-
-      showToast(formatString(t.toasts.sparkStarted, { title: spark.title }), 'success');
-      addLog(`Initiative dispatched in dedicated session ${newSession.id}`);
-    } catch (err: any) {
-      console.error('Failed to accept spark:', err);
-      showToast(formatString(t.toasts.launchError, { error: err.message || err }), 'error');
-    }
-  };
 
   const handleRollbackSession = async (
     targetMessageId: string,
@@ -290,7 +241,6 @@ export function useSessionManager({
     handleUpdateCurrentSessionWorkspace,
     handleDeleteSession,
     handleSendMessage,
-    handleAcceptSpark,
     handleRollbackSession,
   };
 }

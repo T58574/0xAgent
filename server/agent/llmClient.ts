@@ -8,13 +8,8 @@ import {
 import { strip_ai_reasoning_fluff } from './fluffSanitizer';
 import { filterCloudPayload } from './cloudPrivacyFilter';
 import { estimatePromptTokens } from '../summarizer';
-import { quotaManager } from './quotaManager';
 
-export function resolveModelContextMax(modelName: string, config: AppConfig): number {
-  const lower = (modelName || '').toLowerCase();
-  if (lower.includes('gemini')) return 1048576;
-  if (lower.includes('claude')) return 200000;
-  if (lower.includes('gpt') || lower.includes('o1') || lower.includes('o3')) return 128000;
+export function resolveModelContextMax(_modelName: string, config: AppConfig): number {
   return config.local_server?.ctx_size || config.max_tokens || 16384;
 }
 
@@ -63,257 +58,6 @@ async function fetchWithHeaderTimeout(
   }
 }
 
-import { spawn, execSync } from 'node:child_process';
-import { resolveAntigravityModelAndEffort, getSafeCliPath, isAntigravityModel } from '../veronica/adapters/antigravityAdapter';
-import { saveSession } from '../session';
-import { proxyService } from '../proxyService';
-
-async function spawnAgyStreamResponse(
-  config: AppConfig,
-  messages: { role: string; content: string | any[] }[],
-  selectedModel: string,
-  configuredEffort: string,
-  session?: any,
-  _sessionId?: string
-): Promise<Response> {
-  // HARD GUARD: Never call real CLI processes or spend tokens in test runner
-  if (process.env.NODE_ENV === 'test' || process.env.TEST_APP_DIR || process.env.NODE_TEST_CONTEXT) {
-    const sseMock = `data: ${JSON.stringify({ choices: [{ delta: { content: 'Mock response in test environment' } }] })}\n\ndata: [DONE]\n\n`;
-    return new Response(sseMock, {
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream' },
-    });
-  }
-
-  const cliPath = getSafeCliPath(config.veronica?.antigravity_cli_path);
-  const args = ['--dangerously-skip-permissions', '--output-format', 'stream-json'];
-
-  const resolved = resolveAntigravityModelAndEffort(selectedModel, configuredEffort);
-  if (resolved.model) {
-    args.push('--model', resolved.model);
-  }
-  if (resolved.effort) {
-    args.push('--effort', resolved.effort);
-  }
-  const agent = config.veronica?.agent;
-  if (agent && agent !== 'default' && agent !== 'none') {
-    args.push('--agent', agent);
-  }
-  if (config.workspace_dir) {
-    args.push('--add-dir', config.workspace_dir);
-  }
-
-  const isContinuing = Boolean(session?.antigravity_conversation_id);
-  if (isContinuing && session?.antigravity_conversation_id) {
-    args.push('--conversation', session.antigravity_conversation_id);
-  }
-
-  // Format messages into clean multi-turn prompt payload
-  let promptText = '';
-  if (isContinuing) {
-    let lastAssistantIdx = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === 'assistant') {
-        lastAssistantIdx = i;
-        break;
-      }
-    }
-    const newMessages = lastAssistantIdx !== -1 ? messages.slice(lastAssistantIdx + 1) : messages;
-    for (const m of newMessages) {
-      if (m.role === 'system') {
-        promptText += `[SYSTEM INSTRUCTIONS]\n${m.content}\n\n`;
-      } else if (m.role === 'user') {
-        promptText += `[USER]\n${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}\n\n`;
-      } else if (m.role === 'assistant') {
-        promptText += `[ASSISTANT]\n${m.content}\n\n`;
-      }
-    }
-  } else {
-    for (const m of messages) {
-      if (m.role === 'system') {
-        promptText += `[SYSTEM INSTRUCTIONS]\n${m.content}\n\n`;
-      } else if (m.role === 'user') {
-        promptText += `[USER]\n${typeof m.content === 'string' ? m.content : JSON.stringify(m.content)}\n\n`;
-      } else if (m.role === 'assistant') {
-        promptText += `[ASSISTANT]\n${m.content}\n\n`;
-      }
-    }
-  }
-
-  const proxyUrl = proxyService.getProxyUrlFor('cloud_ai');
-  const spawnEnv: NodeJS.ProcessEnv = { ...process.env };
-  if (proxyUrl) {
-    spawnEnv.HTTP_PROXY = proxyUrl;
-    spawnEnv.HTTPS_PROXY = proxyUrl;
-    spawnEnv.ALL_PROXY = proxyUrl;
-    spawnEnv.http_proxy = proxyUrl;
-    spawnEnv.https_proxy = proxyUrl;
-    spawnEnv.all_proxy = proxyUrl;
-  }
-
-  const child = spawn(cliPath, args, {
-    cwd: config.workspace_dir || process.cwd(),
-    env: spawnEnv,
-    shell: false,
-    windowsHide: true,
-    stdio: ['pipe', 'pipe', 'pipe'],
-  });
-
-  child.stdin?.write(promptText);
-  child.stdin?.end();
-
-  const stream = new ReadableStream({
-    start(controller) {
-      const encoder = new TextEncoder();
-      let lineBuffer = '';
-      let totalEmittedChars = 0;
-      let stderrAccumulator = '';
-      let lastResultError = '';
-
-      child.stdout?.on('data', (chunk) => {
-        lineBuffer += chunk.toString();
-        const lines = lineBuffer.split('\n');
-        lineBuffer = lines.pop() || '';
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-
-          // Check if stdout contains quota exhaustion error in plain text or JSON
-          if (quotaManager.isQuotaExhausted(trimmed)) {
-            const quota = quotaManager.recordQuotaExhaustion({
-              rawMessage: trimmed,
-              modelName: selectedModel,
-            });
-            if (totalEmittedChars === 0) {
-              const quotaNotice = `\n\n> [!WARNING]\n> **Квота Antigravity CLI исчерпана (429)**\n> ${quota.reason}\n> • **Автоматический сброс через:** \`${quota.resetText || '60s'}\`\n\n`;
-              totalEmittedChars += quotaNotice.length;
-              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: quotaNotice } }] })}\n\n`;
-              controller.enqueue(encoder.encode(sseLine));
-            }
-          }
-
-          try {
-            const event = JSON.parse(trimmed);
-            if (event.event === 'init' && event.conversation_id) {
-              const convId = event.conversation_id;
-              if (session && session.antigravity_conversation_id !== convId) {
-                session.antigravity_conversation_id = convId;
-                saveSession(session).catch((err) => console.warn('[agy session save error]', err));
-              }
-            } else if (event.event === 'step_update' && event.step_update?.text_delta) {
-              const textDelta = event.step_update.text_delta;
-              totalEmittedChars += textDelta.length;
-              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: textDelta } }] })}\n\n`;
-              controller.enqueue(encoder.encode(sseLine));
-            } else if (event.event === 'result') {
-              if (event.result?.conversation_id && session && session.antigravity_conversation_id !== event.result.conversation_id) {
-                session.antigravity_conversation_id = event.result.conversation_id;
-                saveSession(session).catch((err) => console.warn('[agy session save error]', err));
-              }
-              if (totalEmittedChars === 0 && event.result?.response) {
-                const fallbackText = event.result.response;
-                totalEmittedChars += fallbackText.length;
-                const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: fallbackText } }] })}\n\n`;
-                controller.enqueue(encoder.encode(sseLine));
-              }
-              if (event.result?.error) {
-                lastResultError = event.result.error;
-              }
-            }
-          } catch {
-            if (!trimmed.startsWith('{') && !trimmed.startsWith('warning:') && !trimmed.startsWith('jetski:')) {
-              totalEmittedChars += trimmed.length;
-              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: trimmed + '\n' } }] })}\n\n`;
-              controller.enqueue(encoder.encode(sseLine));
-            }
-          }
-        }
-      });
-
-      child.stderr?.on('data', (errChunk) => {
-        const errText = errChunk.toString().trim();
-        if (errText && !errText.includes('Debugger attached')) {
-          stderrAccumulator += errText + '\n';
-          console.warn('[agy stream stderr]', errText);
-          if (quotaManager.isQuotaExhausted(errText)) {
-            quotaManager.recordQuotaExhaustion({
-              rawMessage: errText,
-              modelName: selectedModel,
-            });
-          }
-        }
-      });
-
-      child.on('close', (code) => {
-        if (lineBuffer.trim()) {
-          try {
-            const event = JSON.parse(lineBuffer.trim());
-            if (event.step_update?.text_delta) {
-              const textDelta = event.step_update.text_delta;
-              totalEmittedChars += textDelta.length;
-              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: textDelta } }] })}\n\n`;
-              controller.enqueue(encoder.encode(sseLine));
-            } else if (totalEmittedChars === 0 && event.result?.response) {
-              const sseLine = `data: ${JSON.stringify({ choices: [{ delta: { content: event.result.response } }] })}\n\n`;
-              controller.enqueue(encoder.encode(sseLine));
-            }
-            if (event.result?.error) {
-              lastResultError = event.result.error;
-            }
-          } catch {}
-        }
-
-        // Handle case where process died without emitting tokens
-        const errorCandidate = (lastResultError || stderrAccumulator).trim();
-        if (totalEmittedChars === 0 && errorCandidate) {
-          if (quotaManager.isQuotaExhausted(errorCandidate)) {
-            const quota = quotaManager.recordQuotaExhaustion({
-              rawMessage: errorCandidate,
-              modelName: selectedModel,
-            });
-            const quotaNotice = `\n\n> [!WARNING]\n> **Квота Antigravity CLI исчерпана (429)**\n> ${quota.reason}\n> • **Автоматический сброс через:** \`${quota.resetText || '60s'}\`\n\n`;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: quotaNotice } }] })}\n\n`));
-          } else {
-            const isNet = /fetch failed|network error|econnreset|etimedout|enotfound|socket hang up|connection refused|unable to connect|502|503|504|tls handshake timeout|network is unreachable/i.test(errorCandidate);
-            const errTitle = isNet ? 'Сетевая ошибка связи с Antigravity / Google AI' : `Antigravity CLI завершился с ошибкой (код ${code})`;
-            const errNotice = `\n\n> [!CAUTION]\n> **${errTitle}**\n> \`\`\`\n> ${errorCandidate}\n> \`\`\`\n\n`;
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: errNotice } }] })}\n\n`));
-          }
-        }
-
-        const finishLine = `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: 'stop' }] })}\n\n`;
-        controller.enqueue(encoder.encode(finishLine));
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
-      });
-
-      child.on('error', (err) => {
-        controller.error(err);
-      });
-    },
-    cancel() {
-      try {
-        if (child.pid) {
-          if (process.platform === 'win32') {
-            execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore', windowsHide: true });
-          } else {
-            child.kill('SIGKILL');
-          }
-        }
-      } catch {}
-    },
-  });
-
-  return new Response(stream, {
-    status: 200,
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-    },
-  });
-}
-
 export async function fetchLlmResponse(
   config: AppConfig,
   messages: { role: string; content: string | any[] }[],
@@ -323,13 +67,11 @@ export async function fetchLlmResponse(
   broadcast: (event: string, payload: any) => void
 ): Promise<{ response: Response; activeModelName: string } | null> {
   const selectedModel = config.model_name || PRIMARY_TEXT_MODEL;
-  const isAntigravity = isAntigravityModel(selectedModel, config.active_persona_id);
 
   const isLocalModel =
-    !isAntigravity &&
-    (selectedModel.startsWith('local:') ||
-      selectedModel.endsWith('.gguf') ||
-      (!config.api_url && !selectedModel.includes('/')));
+    selectedModel.startsWith('local:') ||
+    selectedModel.endsWith('.gguf') ||
+    (!config.api_url && !selectedModel.includes('/'));
 
   let response: Response | null = null;
   let activeModelName = selectedModel;
@@ -338,18 +80,6 @@ export async function fetchLlmResponse(
 
   const configuredEffort = config.reasoning_effort || config.local_server?.reasoning_effort || 'auto';
   const isReasoningOff = config.reasoning_enabled === false || configuredEffort === 'off';
-
-  // 1. Antigravity Headless CLI Stream
-  if (isAntigravity) {
-    try {
-      response = await spawnAgyStreamResponse(config, messages, selectedModel, configuredEffort, session, sessionId);
-      return { response, activeModelName };
-    } catch (agyErr: any) {
-      const errMsg = `[!] **Antigravity Engine Error:**\n\`\`\`\n${agyErr.message || agyErr}\n\`\`\``;
-      handleAgentError(session, sessionId, broadcast, errMsg);
-      return null;
-    }
-  }
 
   // For large models (27B/32B GGUF) on local/LAN servers, allocate 300s-600s
   const baseTimeoutSec = config.api_timeout_sec || (isLocalModel ? 300 : 90);
@@ -465,25 +195,6 @@ export async function fetchLlmResponse(
       lastErrorText = await response.text().catch(() => '');
     }
 
-    // Check if error represents HTTP 429 or Quota Exhaustion
-    if (quotaManager.isQuotaExhausted(lastErrorText, lastStatusCode)) {
-      const retryAfter =
-        response?.headers?.get('retry-after') ||
-        response?.headers?.get('x-ratelimit-reset') ||
-        response?.headers?.get('x-ratelimit-reset-requests');
-      const quota = quotaManager.recordQuotaExhaustion({
-        statusCode: lastStatusCode,
-        rawMessage: lastErrorText,
-        retryAfterHeader: retryAfter,
-        modelName: activeModelName,
-        broadcast,
-      });
-
-      const errMsg = `⚠️ **Квота LLM API исчерпана (Ошибка ${lastStatusCode})**\nЛимит запросов к модели \`${activeModelName}\` временно исчерпан.\n\n• **Автоматический сброс через:** \`${quota.resetText || '60s'}\`\n• **Причина:** \`${quota.reason}\`\n\n[›] Переключите модель в Настройках или дождитесь окончания таймера сброса.`;
-      handleAgentError(session, sessionId, broadcast, errMsg);
-      return null;
-    }
-
     const errMsg = `[!] **LLM Сервер вернул ошибку (${lastStatusCode}):**\n\`\`\`\n${lastErrorText || 'No response from LLM server'}\n\`\`\``;
     handleAgentError(session, sessionId, broadcast, errMsg);
     return null;
@@ -551,7 +262,6 @@ export async function readLlmStream(
       contextMax,
       modelName,
       contextBreakdown,
-      quotaStatus: quotaManager.getQuotaStatus(),
     });
   };
 

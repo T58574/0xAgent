@@ -125,7 +125,7 @@ export interface SystemPromptItem {
   editable?: boolean;
 }
 
-export type ActiveView = 'chat' | 'workspace' | 'jarvis' | 'settings' | 'analytics' | 'knowledge' | 'veronica' | 'benchmark';
+export type ActiveView = 'chat' | 'workspace' | 'settings' | 'analytics' | 'knowledge';
 
 export interface RemoteNodeConfig {
   enabled?: boolean;
@@ -134,33 +134,22 @@ export interface RemoteNodeConfig {
   auto_probe?: boolean;
 }
 
+export interface TelegramBotConfig {
+  enabled?: boolean;
+  token?: string | null;
+  whitelist?: (string | number)[] | null;
+}
+
 export interface VeronicaConfig {
   enabled?: boolean;
+  telegram_enabled?: boolean;
   telegram_token?: string | null;
-  telegram_whitelist?: number[] | null;
-  antigravity_cli_path?: string | null;
+  telegram_whitelist?: (string | number)[] | null;
   default_autonomy_level?: 'L0' | 'L1' | 'L2' | 'L3' | 'L4' | 'L5';
   watchdog_interval_sec?: number;
   default_heartbeat_timeout_sec?: number;
   model?: string | null;
-  effort?: 'low' | 'medium' | 'high' | 'auto' | null;
-  agent?: string | null;
-  print_timeout?: string | null;
   max_task_tool_calls?: number;
-  stt_engine?: 'auto' | 'local' | 'groq' | 'vosk' | null;
-}
-
-export interface VeronicaModelInfo {
-  slug: string;
-  name: string;
-  description?: string;
-  effort?: string;
-}
-
-export interface VeronicaAgentInfo {
-  slug: string;
-  name: string;
-  description?: string;
 }
 
 export interface VeronicaStreamEvent {
@@ -206,48 +195,18 @@ export interface AppConfig {
   compact_chat?: boolean | null;
   local_server?: LocalServerConfig | null;
   remote_node?: RemoteNodeConfig | null;
+  telegram?: TelegramBotConfig | null;
   veronica?: VeronicaConfig | null;
   fallback_models?: string[] | null;
-  jarvis_model?: string | null;
-  tts_config?: TtsConfig | null;
-  proactive_companion_enabled?: boolean | null;
   permission_preset?: PermissionPreset | null;
   web_search_provider?: WebSearchProvider | null;
   firecrawl_api_key?: string | null;
   firecrawl_api_url?: string | null;
   searxng_url?: string | null;
-  groq_api_key?: string | null;
   tool_toggles?: Record<string, boolean> | null;
 }
 
 export type PermissionPreset = 'prompt' | 'unrestricted';
-
-export interface TtsConfig {
-  enabled: boolean;
-  voice: 'ru-RU-SvetlanaNeural' | 'ru-RU-DmitryNeural' | string;
-  rate: string; // e.g. "+20%", "+0%"
-  pitch: string; // e.g. "+0Hz", "-5Hz"
-  volume?: number; // 0-100
-  play_on_speaker?: boolean;
-  play_in_browser?: boolean;
-  wake_word_enabled?: boolean;
-}
-
-export interface JarvisSparkProposal {
-  id: string;
-  title: string;
-  category: 'feature_spark' | 'code_polish' | 'exploration' | 'friendly_checkin' | 'error_incident';
-  description: string;
-  suggestedAction?: string;
-  targetFiles?: string[];
-  contextSnippet?: string;
-  errorTrace?: string;
-  directivePrompt?: string;
-  previewDiff?: string;
-  voicePhrase?: string;
-  timestamp: number;
-  status: 'pending' | 'accepted' | 'dismissed';
-}
 
 export interface CloudModelItem {
   id: string;
@@ -889,33 +848,6 @@ export interface KnowledgeQueryOptions {
   endDate?: number;
 }
 
-export interface JarvisActivityLog {
-  id: string;
-  timestamp: number;
-  agent: 'Jarvis Supervisor' | 'Local Agent' | 'System';
-  message: string;
-  type: 'info' | 'success' | 'warning' | 'error';
-}
-
-export interface JarvisWorkerStatus {
-  id: string;
-  name: string;
-  type: 'supervisor' | 'local_agent' | 'indexer' | 'subagent';
-  status: 'idle' | 'running' | 'waiting_approval' | 'completed' | 'error';
-  currentTask?: string;
-  progressPercent?: number;
-  updatedAt: number;
-}
-
-export interface JarvisState {
-  isActive: boolean;
-  supervisorStatus: 'active' | 'idle' | 'analyzing' | 'error';
-  activeWorkers: JarvisWorkerStatus[];
-  recentActivities: JarvisActivityLog[];
-  activeSparks?: JarvisSparkProposal[];
-  isSpeaking?: boolean;
-  updatedAt: number;
-}
 
 export interface AskUserQuestionOption {
   label: string;
@@ -1132,58 +1064,7 @@ export interface ProxyRoutingConfig {
   route_media_download: boolean;
 }
 
-export type BenchmarkCategory =
-  | 'reasoning'
-  | 'coding'
-  | 'instruction_following'
-  | 'structured_data'
-  | 'agentic'
-  | 'retrieval'
-  | 'language'
-  | 'performance';
 
-export interface BenchmarkTaskInfo {
-  id: string;
-  name: string;
-  category: BenchmarkCategory;
-  description: string;
-  prompt: string;
-}
-
-export interface BenchmarkTestResult {
-  taskId: string;
-  name: string;
-  category: BenchmarkCategory;
-  passed: boolean;
-  score: number; // 0 to 100
-  latencyMs: number;
-  ttftMs: number;
-  tokensPerSec: number;
-  promptTokens: number;
-  completionTokens: number;
-  output: string;
-  details: string;
-}
-
-export interface BenchmarkSuiteReport {
-  modelName: string;
-  provider: 'local' | 'antigravity' | 'openai';
-  timestamp: number;
-  totalTasks: number;
-  passedTasks: number;
-  overallScore: number;
-  averageTokensPerSec: number;
-  averageLatencyMs: number;
-  averageTtftMs: number;
-  results: BenchmarkTestResult[];
-}
-
-export interface RunBenchmarkRequest {
-  provider?: 'local' | 'antigravity' | 'openai';
-  model?: string;
-  endpoint?: string;
-  taskIds?: string[];
-}
 
 
 

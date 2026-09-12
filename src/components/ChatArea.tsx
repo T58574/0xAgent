@@ -5,13 +5,11 @@ import {
   ChatMessage,
   LiveTelemetry,
   PersonaMetadata,
-  JarvisSparkProposal,
   ChatSession,
 } from '../types';
 import { isSameDay, extractQuickResponses } from '../utils/helpers';
 import { FloatingCommandBar } from './chat/FloatingCommandBar';
 import { ChatTimelineScrubber } from './chat/ChatTimelineScrubber';
-import { JarvisSparkCard } from './chat/JarvisSparkCard';
 import { PlanProgressStrip } from './chat/PlanProgressStrip';
 import { EmptyChatHero } from './chat/EmptyChatHero';
 import { TelemetryHUD } from './chat/TelemetryHUD';
@@ -38,7 +36,6 @@ interface ChatAreaProps {
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
   onConfigChanged?: (newConfig: AppConfig) => void;
-  onAcceptSpark?: (spark: JarvisSparkProposal) => void;
   personas?: PersonaMetadata[];
   activePersonaId?: string;
   onSelectPersona?: (id: string) => void;
@@ -56,7 +53,6 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
   onRespondToTool,
   onCancelAgent,
   onRollbackSession,
-  onAcceptSpark,
   reasoningEnabled = true,
   liveTelemetry,
   config,
@@ -86,9 +82,6 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
   // Personas
   const [localPersonas, setLocalPersonas] = useState<PersonaMetadata[]>([]);
 
-  // Jarvis Proactive Sparks
-  const [activeSparks, setActiveSparks] = useState<JarvisSparkProposal[]>([]);
-
   // Load fallback personas if not passed via props
   useEffect(() => {
     if (personasProp.length === 0) {
@@ -101,7 +94,7 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
   const personas = personasProp.length > 0 ? personasProp : localPersonas;
   const activePersonaId = activePersonaIdProp || config?.active_persona_id || 'default';
 
-  // Listeners for summarization, proactive sparks and audio
+  // Listeners for summarization
   useEffect(() => {
     const u1 = api.listen<{ promptTokens: number; estimatedNewTokens: number }>('agent-summarizing-start', (e) => {
       setIsSummarizing(true);
@@ -125,44 +118,13 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
       }, 3500);
     });
 
-    const u4 = api.listen<JarvisSparkProposal>('jarvis_spark_proposal', (e) => {
-      setActiveSparks((prev) => [e.payload, ...prev.filter((s) => s.id !== e.payload.id)]);
-    });
-
-    const u5 = api.listen<JarvisSparkProposal>('jarvis_spark_updated', (e) => {
-      if (e.payload.status !== 'pending') {
-        setActiveSparks((prev) => prev.filter((s) => s.id !== e.payload.id));
-      } else {
-        setActiveSparks((prev) => prev.map((s) => (s.id === e.payload.id ? e.payload : s)));
-      }
-    });
-
-    const u6 = api.listen<{ text: string; audioBase64?: string }>('jarvis_speak', (e) => {
-      if (config?.tts_config?.play_in_browser && !config?.tts_config?.play_on_speaker && e.payload.audioBase64) {
-        try {
-          const audio = new Audio(e.payload.audioBase64);
-          audio.volume = 0.6;
-          audio.play().catch(() => {});
-        } catch {}
-      }
-    });
-
-    api.get_jarvis_state().then((st) => {
-      if (st?.activeSparks) {
-        setActiveSparks(st.activeSparks.filter((s) => s.status === 'pending'));
-      }
-    }).catch(() => {});
-
     return () => {
       if (sumTimer) clearTimeout(sumTimer);
       u1();
       u2();
       u3();
-      u4();
-      u5();
-      u6();
     };
-  }, [config?.tts_config?.play_in_browser]);
+  }, []);
 
   const handleChatScroll = () => {
     if (!chatContainerRef.current) return;
@@ -254,40 +216,6 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
     }
   };
 
-  const handleAcceptSpark = async (spark: JarvisSparkProposal) => {
-    setActiveSparks((prev) => prev.filter((s) => s.id !== spark.id));
-    if (onAcceptSpark) {
-      onAcceptSpark(spark);
-      return;
-    }
-    try {
-      await api.accept_spark(spark.id);
-      const directive = spark.directivePrompt || spark.suggestedAction || spark.description;
-      onSendMessage(directive);
-    } catch (err: any) {
-      showToast(formatString(t.toasts.launchError, { error: err.message || err }), 'error');
-    }
-  };
-
-  const handleDismissSpark = async (sparkId: string) => {
-    try {
-      await api.dismiss_spark(sparkId);
-      setActiveSparks((prev) => prev.filter((s) => s.id !== sparkId));
-    } catch (err: any) {
-      console.error('Failed to dismiss spark:', err);
-    }
-  };
-
-  const handleSpeakPhrase = async (text: string) => {
-    try {
-      await api.speak_text(text, {
-        voice: config?.tts_config?.voice,
-        rate: config?.tts_config?.rate,
-      });
-    } catch (err: any) {
-      console.error('Failed to speak phrase:', err);
-    }
-  };
 
   const visibleMessages = React.useMemo(() => {
     return messages.filter((m) => m.role !== 'tool');
@@ -352,10 +280,6 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
             config={config}
             onModelChanged={onModelChanged}
             onConfigChanged={onConfigChanged}
-            activeSparks={activeSparks}
-            onAcceptSpark={handleAcceptSpark}
-            onDismissSpark={handleDismissSpark}
-            onSpeakPhrase={handleSpeakPhrase}
             currentSession={currentSession}
           />
         </div>
@@ -457,19 +381,6 @@ export const ChatArea: React.FC<ChatAreaProps> = React.memo(({
 
           {/* Bottom Floating Command Bar for Active Chat */}
           <div className="p-2 sm:p-4 shrink-0 max-w-3xl mx-auto w-full pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-            {config?.proactive_companion_enabled !== false && activeSparks.length > 0 && (
-              <div className="space-y-2 mb-3">
-                {activeSparks.map((spark) => (
-                  <JarvisSparkCard
-                    key={spark.id}
-                    spark={spark}
-                    onAccept={handleAcceptSpark}
-                    onDismiss={handleDismissSpark}
-                    onSpeak={handleSpeakPhrase}
-                  />
-                ))}
-              </div>
-            )}
 
             {currentSession?.active_todos && currentSession.active_todos.length > 0 && (
               <PlanProgressStrip todos={currentSession.active_todos} />

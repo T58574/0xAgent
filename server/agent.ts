@@ -12,7 +12,6 @@ import { evaluateToolPermission, READONLY_TOOLS } from './agent/permissionGuard'
 import { runCompactionPipeline } from './agent/compactionPipeline';
 import { cancelPendingApprovalsForSession } from './agent/approvalManager';
 import { fetchLlmResponse, readLlmStream, resolveModelContextMax, PRIMARY_TEXT_MODEL, DEFAULT_FALLBACK_CHAIN, GEMMA_MODEL, FAST_LITE_MODEL, NATIVE_AUDIO_MODEL } from './agent/llmClient';
-import { quotaManager } from './agent/quotaManager';
 import { getSystemPromptMemoryContext } from './memory';
 import { estimatePromptTokens } from './summarizer';
 import {
@@ -176,7 +175,6 @@ export async function runAgentLoop(
         evalDurationMs: streamResult.evalDurationMs,
         modelName: streamResult.modelName,
         contextBreakdown,
-        quotaStatus: quotaManager.getQuotaStatus(),
       };
 
       // Save assistant message to session

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import * as api from './services/api';
 import { sounds } from './services/soundEffects';
-import { AppConfig, LiveTelemetry, JarvisState, PersonaMetadata, ActiveView } from './types';
+import { AppConfig, LiveTelemetry, PersonaMetadata, ActiveView } from './types';
 import { getWorkspaceBaseName } from './utils/helpers';
 import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
@@ -9,7 +9,6 @@ import { ResizableSplitter } from './components/ResizableSplitter';
 import { ChatArea } from './components/ChatArea';
 import { LockScreen } from './components/LockScreen';
 import { InstallAppBanner } from './components/InstallAppBanner';
-import { JarvisIntercomHud } from './components/chat/JarvisIntercomHud';
 
 const SettingsPage = lazy(() => import('./components/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })));
 const CodeEditor = lazy(() => import('./components/CodeEditor').then((m) => ({ default: m.CodeEditor })));
@@ -17,10 +16,6 @@ const MemorySkillsModal = lazy(() => import('./components/MemorySkillsModal').th
 const WorkspacePickerModal = lazy(() => import('./components/WorkspacePickerModal').then((m) => ({ default: m.WorkspacePickerModal })));
 const AnalyticsPage = lazy(() => import('./components/analytics/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })));
 const KnowledgeVault = lazy(() => import('./components/KnowledgeVault').then((m) => ({ default: m.KnowledgeVault })));
-const JarvisSanctuary = lazy(() => import('./components/JarvisSanctuary').then((m) => ({ default: m.JarvisSanctuary })));
-const JarvisWidget = lazy(() => import('./components/JarvisWidget').then((m) => ({ default: m.JarvisWidget })));
-const VeronicaPage = lazy(() => import('./components/veronica/VeronicaPage').then((m) => ({ default: m.VeronicaPage })));
-const BenchmarkPage = lazy(() => import('./components/BenchmarkPage').then((m) => ({ default: m.BenchmarkPage })));
 import { FolderTree, Code, Terminal, X, ChevronRight } from 'lucide-react';
 import { useToast } from './context/ToastContext';
 import { useI18n } from './i18n';
@@ -54,8 +49,6 @@ export default function App() {
   // Modal Dialogs & Sub-views
   const [isMemorySkillsOpen, setIsMemorySkillsOpen] = useState<boolean>(false);
   const [isWorkspacePickerOpen, setIsWorkspacePickerOpen] = useState<boolean>(false);
-  const [isJarvisOpen, setIsJarvisOpen] = useState<boolean>(false);
-  const [jarvisState, setJarvisState] = useState<JarvisState | null>(null);
   const [settingsSubtab, setSettingsSubtab] = useState<'general' | 'personas' | 'customizations' | 'themes' | 'local_server' | undefined>(undefined);
 
   // Agent loop & telemetry state
@@ -93,7 +86,6 @@ export default function App() {
     handleUpdateCurrentSessionWorkspace,
     handleDeleteSession,
     handleSendMessage,
-    handleAcceptSpark,
     handleRollbackSession,
   } = useSessionManager({
     config,
@@ -101,9 +93,6 @@ export default function App() {
     setWorkspaceTree: (tree) => setWorkspaceTree(tree),
     setHas0xAgentMd: (has) => setHas0xAgentMd(has),
     addLog,
-    showToast,
-    setActiveView,
-    setIsJarvisOpen,
   });
 
   const activeSessionWorkspace = currentSession?.workspace_dir !== undefined ? currentSession.workspace_dir : config?.workspace_dir;
@@ -132,21 +121,6 @@ export default function App() {
     addLog,
     setActiveView,
   });
-
-  const fetchJarvisData = async () => {
-    try {
-      const jState = await api.get_jarvis_state();
-      setJarvisState(jState);
-    } catch {}
-  };
-
-  useEffect(() => {
-    fetchJarvisData();
-    const un1 = api.listen<JarvisState>('jarvis_state_update', (e) => {
-      setJarvisState(e.payload);
-    });
-    return () => { un1(); };
-  }, []);
 
   useEffect(() => {
     if (showLogsDrawer && drawerLogsRef.current) {
@@ -361,7 +335,6 @@ export default function App() {
       config={config}
       onModelChanged={(newModelId) => setConfig((prev) => (prev ? { ...prev, model_name: newModelId } : prev))}
       onConfigChanged={(updated) => setConfig(updated)}
-      onAcceptSpark={handleAcceptSpark}
       personas={personas}
       activePersonaId={activePersonaId}
       onSelectPersona={handleSelectPersona}
@@ -449,23 +422,6 @@ export default function App() {
               </div>
             )}
 
-            {/* VERONICA VIEW */}
-            {activeView === 'veronica' && (
-              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-2xl sm:rounded-[26px]">
-                <VeronicaPage
-                  config={config}
-                  onSaveConfig={handleSaveConfig}
-                />
-              </div>
-            )}
-
-            {/* BENCHMARK EVAL VIEW */}
-            {activeView === 'benchmark' && (
-              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-2xl sm:rounded-[26px]">
-                <BenchmarkPage config={config} />
-              </div>
-            )}
-
             {/* KNOWLEDGE VAULT VIEW */}
             {activeView === 'knowledge' && (
               <div className="w-full h-full overflow-hidden bg-theme-bg">
@@ -473,29 +429,6 @@ export default function App() {
               </div>
             )}
 
-            {/* JARVIS SANCTUARY VIEW */}
-            {activeView === 'jarvis' && (
-              <div className="w-full h-full overflow-hidden bg-[var(--theme-bg)] rounded-none sm:rounded-[26px]">
-                <JarvisSanctuary
-                  config={config}
-                  currentSession={currentSession}
-                  sessions={sessions}
-                  onSelectSession={handleSelectSession}
-                  onCreateSession={handleCreateSession}
-                  agentStatus={agentStatus}
-                  onSendMessage={handleSendMessage}
-                  onRespondToTool={handleRespondToTool}
-                  onCancelAgent={handleCancelAgent}
-                  onRollbackSession={handleRollbackSession}
-                  liveTelemetry={liveTelemetry}
-                  personas={personas}
-                  activePersonaId={activePersonaId}
-                  onSelectPersona={handleSelectPersona}
-                  isServerOffline={isServerOffline}
-                  onStartServer={handleStartServer}
-                />
-              </div>
-            )}
 
             {/* MAIN CHAT & SPLIT VIEW */}
             <div className={`w-full h-full ${activeView === 'chat' || activeView === 'workspace' ? 'flex flex-col overflow-hidden' : 'hidden'}`}>
@@ -626,28 +559,7 @@ export default function App() {
           />
         )}
 
-        {/* JARVIS MULTI-AGENT ORCHESTRATOR WIDGET */}
-        {isJarvisOpen && (
-          <JarvisWidget
-            isOpen={isJarvisOpen}
-            onClose={() => setIsJarvisOpen(false)}
-            jarvisState={jarvisState}
-            onRefresh={fetchJarvisData}
-            onAcceptSpark={handleAcceptSpark}
-            onDismissSpark={async (sparkId: string) => {
-              try {
-                await api.dismiss_spark(sparkId);
-                fetchJarvisData();
-              } catch (err: any) {
-                console.error('Failed to dismiss spark:', err);
-              }
-            }}
-          />
-        )}
       </Suspense>
-
-      {/* JARVIS OLED MORPHIZM ASCII INTERCOM HUD */}
-      <JarvisIntercomHud />
 
       {/* Mobile PWA "Add to Home Screen" prompt (after auth, never over lock screen) */}
       {isAuthenticated && isPasswordSet && <InstallAppBanner />}

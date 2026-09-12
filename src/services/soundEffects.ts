@@ -138,38 +138,7 @@ class SoundEffectsEngine {
     } catch {}
   }
 
-  /**
-   * 4. Jarvis Spark / Autonomous Shimmer (Arpeggio: D5 -> F#5 -> A5)
-   */
-  public playSpark() {
-    if (!this.enabled) return;
-    const ctx = this.getContext();
-    if (!ctx) return;
 
-    try {
-      const notes = [587.33, 739.99, 880.0];
-      const now = ctx.currentTime;
-
-      notes.forEach((freq, idx) => {
-        const start = now + idx * 0.05;
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(freq, start);
-
-        gain.gain.setValueAtTime(0.001, start);
-        gain.gain.linearRampToValueAtTime(0.1, start + 0.01);
-        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.16);
-
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-
-        osc.start(start);
-        osc.stop(start + 0.18);
-      });
-    } catch {}
-  }
 
   /**
    * 5. Discreet UI Click / Tab Switch

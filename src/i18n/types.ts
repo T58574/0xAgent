@@ -3,12 +3,9 @@ export interface Translations {
   nav: {
     chat: string;
     workspace: string;
-    jarvis: string;
     settings: string;
     analytics: string;
     knowledge: string;
-    veronica: string;
-    benchmark: string;
     newChat: string;
     switchLanguage: string;
     lanShare: string;
@@ -262,8 +259,8 @@ export interface Translations {
       title: string;
       subtitle: string;
       subtabInterface: string;
-      subtabVoice: string;
       subtabSecurity: string;
+      subtabTelegram: string;
       languageTitle: string;
       languageDesc: string;
       langEn: string;
@@ -284,7 +281,6 @@ export interface Translations {
       securityDesc: string;
       memorySkillsDesc: string;
       openSkillsHubBtn: string;
-      voiceTestPhrase: string;
       logoutLabel: string;
       connectionTitle: string;
       apiUrl: string;
@@ -297,17 +293,6 @@ export interface Translations {
       soundDesc: string;
       compactTitle: string;
       compactDesc: string;
-      jarvisVoiceTitle: string;
-      edgeTtsTitle: string;
-      edgeTtsDesc: string;
-      sparksTitle: string;
-      sparksDesc: string;
-      voiceLabel: string;
-      voiceRateLabel: string;
-      testVoiceBtn: string;
-      playSpeakerLabel: string;
-      playBrowserLabel: string;
-      wakeWordLabel: string;
       securityTitle: string;
       logoutBtn: string;
       currentPassword: string;
@@ -640,7 +625,6 @@ export interface Translations {
       openProjectNewChat: string;
       recentTitle: string;
       currentBadge: string;
-      jarvisCornerBadge: string;
       openTooltip: string;
     };
     memorySkills: {
@@ -707,63 +691,6 @@ export interface Translations {
     searchEntries: string;
   };
 
-  // Jarvis Companion & Sanctuary
-  jarvis: {
-    title: string;
-    status: string;
-    voiceIntercom: string;
-    sparks: string;
-    noSparks: string;
-    accept: string;
-    dismiss: string;
-    wakeWord: string;
-    telemetryTitle: string;
-    onlineBadge: string;
-    supervisorDesc: string;
-    sparksTab: string;
-    workersTab: string;
-    logTab: string;
-    noSparksPending: string;
-    targetLabel: string;
-    dismissBtn: string;
-    runTaskBtn: string;
-    idleMonitoring: string;
-    noActivities: string;
-    statusOperational: string;
-    autonomyLocal: string;
-    sanctuaryTitle: string;
-    sanctuaryBadge: string;
-    sanctuaryDesc: string;
-    newSessionBtn: string;
-    voiceStatusBtn: string;
-    refreshFiles: string;
-    consultationsTitle: string;
-    consult1Title: string;
-    consult1Prompt: string;
-    consult2Title: string;
-    consult2Prompt: string;
-    consult3Title: string;
-    consult3Prompt: string;
-    consult4Title: string;
-    consult4Prompt: string;
-    archivesTitle: string;
-    newNotePlaceholder: string;
-    createNoteBtn: string;
-    sanctuaryFsTitle: string;
-    noteCreated: string;
-    quickFocus: string;
-    quickArchive: string;
-    quickStrategic: string;
-    quickNote: string;
-    sanctuarySubtitle: string;
-    newSession: string;
-    voiceStatus: string;
-    archivesNotesTitle: string;
-    notePlaceholder: string;
-    cancel: string;
-    create: string;
-    fsTitle: string;
-  };
 
   // Lock Screen
   lockScreen: {
@@ -931,36 +858,5 @@ export interface Translations {
     medium: string;
     high: string;
     xhigh: string;
-  };
-
-  // Veronica Subsystem & Web-IDE
-  veronica: {
-    title: string;
-    subtitle: string;
-    telegram: string;
-    telegramConnected: string;
-    telegramNotSet: string;
-    activeTasks: string;
-    todayCompleted: string;
-    todayFailed: string;
-    tabTasks: string;
-    tabProjects: string;
-    tabSettings: string;
-    resume: string;
-    resuming: string;
-    resumeTask: string;
-    resumeTaskDesc: string;
-    resumeModalTitle: string;
-    resumePromptLabel: string;
-    resumePromptPlaceholder: string;
-    resumeSuccess: string;
-    resumeError: string;
-    spillLog: string;
-    spillModalTitle: string;
-    downloadLog: string;
-    eventsTimeline: string;
-    tabConsole: string;
-    tabEvents: string;
-    noEvents: string;
   };
 }

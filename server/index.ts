@@ -23,21 +23,16 @@ import { proxyService } from './proxyService';
 import { closeProxyDb } from './proxyDb';
 import { quotaRouter } from './routes/quotaRoutes';
 import { quotaManager } from './agent/quotaManager';
-import { createBenchmarkRouter } from './routes/benchmarkRoutes';
 
 
 import path from 'node:path';
 import fs from 'node:fs';
 import knowledgeRouter from './routes/knowledge';
-import { jarvisRouter } from './routes/jarvisRoutes';
-import { jarvisSupervisor } from './agent/jarvisSupervisor';
-import { voiceDaemonManager } from './agent/voiceDaemonManager';
 import { cleanupOrphanWorkspaces } from './session';
 import { reconcileInterruptedSessions } from './agent/selfPatchEngine';
 import { ensureEnvironmentHealth } from './envSanitizer';
 import { startMemoryDecayScheduler } from './agent/memoryDecayWorker';
-import { createVeronicaRouter } from './routes/veronicaRoutes';
-import { initVeronicaModule, shutdownVeronicaModule } from './veronica';
+import { initTelegramBot, stopTelegramBot } from './telegram';
 import { remoteNodeService } from './remoteNodeService';
 import { loadConfig } from './config';
 
@@ -65,14 +60,9 @@ app.use((req, res, next) => {
     '/api/auth/status',
     '/api/auth/setup',
     '/api/auth/login',
-    '/api/jarvis/voice-wake',
-    '/api/jarvis/voice-input',
-    '/api/jarvis/voice-state',
-    '/api/veronica/cli',
-    '/api/veronica/status',
   ];
 
-  if (!req.path.startsWith('/api/') || publicAuthPaths.includes(req.path) || req.path.startsWith('/api/jarvis/voice-')) {
+  if (!req.path.startsWith('/api/') || publicAuthPaths.includes(req.path)) {
     return next();
   }
 
@@ -149,10 +139,7 @@ function broadcast(event: string, payload: any): void {
   }
 }
 
-// Wire WS broadcaster to Jarvis & Voice Daemon & Proxy Service & Quota Manager
-jarvisSupervisor.setWsBroadcaster(broadcast);
-voiceDaemonManager.setWsBroadcaster(broadcast);
-voiceDaemonManager.autoStartIfEnabled();
+// Wire WS broadcaster to Proxy Service & Quota Manager
 proxyService.setBroadcaster(broadcast);
 quotaManager.setBroadcaster(broadcast);
 
@@ -168,11 +155,8 @@ app.use('/api', createLlamaRouter(broadcast));
 app.use('/api', createAgentRouter(broadcast));
 app.use('/api', contextRouter);
 app.use('/api', quotaRouter);
-app.use('/api', jarvisRouter);
 app.use('/api/knowledge', knowledgeRouter);
-app.use('/api/veronica', createVeronicaRouter(broadcast));
 app.use('/api', createProxyRouter(broadcast));
-app.use('/api/benchmark', createBenchmarkRouter(broadcast));
 app.use('/api', systemRouter);
 
 
@@ -199,11 +183,9 @@ app.use((err: any, _req: express.Request, res: express.Response, _next: express.
 
 // Graceful process exit handlers for 0xAgent backend node process
 const cleanupOnExit = () => {
-  voiceDaemonManager.stop();
-  jarvisSupervisor.stopLoop();
   stopLlamaServerProcess(broadcast);
   remoteNodeService.stopProbe();
-  shutdownVeronicaModule();
+  stopTelegramBot();
   closeProxyDb();
 };
 
@@ -267,8 +249,6 @@ server.listen(Number(PORT), HOST, () => {
     remoteNodeService.startProbe(cfg.remote_node.host, cfg.remote_node.port || 11434);
   }
 
-  // Initialize Veronica Module
-  initVeronicaModule().catch((err) => {
-    console.error('[Veronica] Startup initialization error:', err);
-  });
+  // Initialize 0xAgent Telegram Bot
+  initTelegramBot();
 });

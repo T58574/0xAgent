@@ -77,7 +77,6 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
   // Combine default & recent workspaces
   const defaultRecent = [
     ...(currentWorkspaceDir ? [currentWorkspaceDir] : []),
-    'c:\\Users\\user\\.0xagent\\workspaces\\Jarvis',
     ...recentWorkspaces,
   ];
 
@@ -198,7 +197,6 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                 {uniqueRecent.map((dir) => {
                   const isActive = currentWorkspaceDir && dir.toLowerCase() === currentWorkspaceDir.toLowerCase();
                   const baseName = getWorkspaceBaseName(dir);
-                  const isJarvisSanctuary = dir.toLowerCase().includes('jarvis');
 
                   return (
                     <div
@@ -217,17 +215,12 @@ export const WorkspacePickerModal: React.FC<WorkspacePickerModalProps> = ({
                         }}
                         className="flex-1 flex items-center gap-2.5 truncate cursor-pointer text-left"
                       >
-                        <div className={`p-1.5 rounded-lg shrink-0 ${isJarvisSanctuary ? 'bg-[var(--theme-accent)]/20 text-[var(--theme-accent)]' : 'bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)]'}`}>
-                          {isJarvisSanctuary ? <Sparkles size={13} /> : <Folder size={13} />}
+                        <div className="p-1.5 rounded-lg shrink-0 bg-[var(--theme-border-subtle)] text-[var(--theme-text-muted)]">
+                          <Folder size={13} />
                         </div>
                         <div className="truncate min-w-0">
                           <div className="text-xs font-bold text-[var(--theme-text)] truncate flex items-center gap-1.5">
                             <span>{baseName}</span>
-                            {isJarvisSanctuary && (
-                              <span className="text-[9.5px] px-1.5 py-0.2 rounded-md font-mono bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30">
-                                {t.modals.workspacePicker.jarvisCornerBadge}
-                              </span>
-                            )}
                           </div>
                           <div className="text-[11px] font-mono text-[var(--theme-text-muted)] truncate opacity-80">{dir}</div>
                         </div>

@@ -56,12 +56,7 @@
 - **Deterministic Router**: Emits 0 memories for casual chat; ranks relevant facts and FTS5 episodes within a dynamic token budget (0..400 tokens).
 - **Background Worker (`memoryWorker.ts`)**: Asynchronously ingests conversational facts on 20s debounce without delaying the main LLM response.
 
-### C. Jarvis Companion & Voice System (`server/jarvisSupervisor.ts`)
-- **Proactive Sparks Engine (`proactiveCompanion.ts`)**: Emits proactive suggestions and actions based on user activity and system events.
-- **Voice Intercom Daemon (`voiceDaemonManager.ts` / `voice_daemon.py`)**: Local Python speech recognition (sherpa-onnx / Moonshine / Whisper).
-- **TTS Audio Engine (`ttsService.ts`)**: Synthesizes and caches voice responses.
-
-### D. Speculative Decoding & FastMTP (`server/routes/llama/`)
+### C. Speculative Decoding & FastMTP (`server/routes/llama/`)
 - Supports loading draft models alongside primary 9B/27B models for accelerated speculative token generation in llama.cpp.
 
 ---

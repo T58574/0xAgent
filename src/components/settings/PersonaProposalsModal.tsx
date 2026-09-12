@@ -3,12 +3,9 @@ import {
   GitPullRequest,
   CheckCircle,
   XCircle,
-  RotateCcw,
-  Shield,
-  Activity,
   History,
+  RotateCcw,
   Check,
-  Play,
   Sparkles,
   Info,
 } from 'lucide-react';
@@ -20,8 +17,6 @@ import {
   apply_persona_proposal,
   get_persona_history,
   rollback_persona_file,
-  get_eval_benchmark,
-  trigger_memory_decay_cycle,
 } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import { useI18n } from '../../i18n';
@@ -45,7 +40,7 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
 }) => {
   const { showToast } = useToast();
   const { t } = useI18n();
-  const [tab, setTab] = useState<'proposals' | 'history' | 'benchmark'>('proposals');
+  const [tab, setTab] = useState<'proposals' | 'history'>('proposals');
 
   // Proposals state
   const [proposals, setProposals] = useState<PersonaChangeProposalRecord[]>([]);
@@ -56,11 +51,6 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
   // History state
   const [history, setHistory] = useState<PersonaFileVersionRecord[]>([]);
   const [selectedFileFilter, setSelectedFileFilter] = useState<'ALL' | 'SOUL.md' | 'TOOLS.md' | 'USER.md'>('ALL');
-
-  // Benchmark state
-  const [benchmarkResult, setBenchmarkResult] = useState<any | null>(null);
-  const [isBenchmarkRunning, setIsBenchmarkRunning] = useState(false);
-  const [isDecayRunning, setIsDecayRunning] = useState(false);
 
   const loadProposals = async () => {
     setIsLoading(true);
@@ -130,18 +120,6 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
     }
   };
 
-  const handleTriggerDecay = async () => {
-    setIsDecayRunning(true);
-    try {
-      const stats = await trigger_memory_decay_cycle();
-      showToast(`Цикл гигиены выполнен: архивировано ${stats.archived_count}, разрешено конфликтов ${stats.conflicts_resolved}`, 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Ошибка запуска цикла гигиены', 'error');
-    } finally {
-      setIsDecayRunning(false);
-    }
-  };
-
   const handleRollback = async (file: string, versionId: string) => {
     try {
       await rollback_persona_file(persona.id, file, versionId);
@@ -150,19 +128,6 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
       if (onPersonaUpdated) onPersonaUpdated();
     } catch (err: any) {
       showToast(err.message || 'Rollback failed', 'error');
-    }
-  };
-
-  const handleRunBenchmark = async () => {
-    setIsBenchmarkRunning(true);
-    try {
-      const res = await get_eval_benchmark();
-      setBenchmarkResult(res);
-      showToast(`Бенчмарк завершен: Оценка ${res.overallScore}%`, 'success');
-    } catch (err: any) {
-      showToast(err.message || 'Benchmark error', 'error');
-    } finally {
-      setIsBenchmarkRunning(false);
     }
   };
 
@@ -229,19 +194,6 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
           >
             <History className="w-3.5 h-3.5" />
             <span>{t.settings.personas.evolutionTabHistory}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setTab('benchmark')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
-              tab === 'benchmark'
-                ? 'bg-[var(--theme-card-bg)] text-[var(--theme-text)] border-[var(--theme-border)] shadow-xs font-bold ring-1 ring-[var(--theme-accent)]/30'
-                : 'border-transparent text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] hover:bg-[var(--theme-border-subtle)]'
-            }`}
-          >
-            <Activity className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{t.settings.personas.evolutionTabBenchmark}</span>
           </button>
         </div>
 
@@ -445,81 +397,6 @@ export const PersonaProposalsModal: React.FC<PersonaProposalsModalProps> = ({
                 ))
               )}
             </div>
-          </div>
-        )}
-
-        {/* Tab 3: Evaluation Benchmark */}
-        {tab === 'benchmark' && (
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3 flex-wrap gap-2">
-              <div>
-                <div className="text-xs font-bold text-[var(--theme-text)]">Бенчмарк безопасности и гигиена памяти</div>
-                <div className="text-[11.5px] text-[var(--theme-text-muted)] mt-0.5">
-                  {t.settings.personas.evolutionBenchmarkDesc}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleTriggerDecay}
-                  disabled={isDecayRunning}
-                  loading={isDecayRunning}
-                  icon={<RotateCcw size={13} />}
-                >
-                  {t.settings.personas.runHygieneBtn}
-                </Button>
-                <Button
-                  variant="accent"
-                  size="sm"
-                  onClick={handleRunBenchmark}
-                  disabled={isBenchmarkRunning}
-                  loading={isBenchmarkRunning}
-                  icon={<Play size={13} />}
-                >
-                  {t.settings.personas.runBenchmarkBtn}
-                </Button>
-              </div>
-            </div>
-
-            {benchmarkResult && (
-              <div className="flex flex-col gap-3 animate-fadeIn">
-                <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--theme-card-bg)] border border-[var(--theme-border)]">
-                  <div className="flex items-center gap-2.5">
-                    <Shield className="w-5 h-5 text-[var(--theme-accent)]" />
-                    <span className="text-xs font-bold">Итоговый скор соответствия безопасности:</span>
-                  </div>
-                  <Badge variant={benchmarkResult.overallScore >= 80 ? 'success' : 'warning'} size="sm" className="font-mono font-bold">
-                    {benchmarkResult.overallScore}% ({benchmarkResult.passedTasks}/{benchmarkResult.totalTasks} пройдено)
-                  </Badge>
-                </div>
-
-                <div className="flex flex-col gap-2 max-h-[260px] overflow-y-auto pr-1">
-                  {benchmarkResult.items?.map((item: any) => (
-                    <div
-                      key={item.taskId}
-                      className="p-2.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-card-bg)] flex items-center justify-between gap-3"
-                    >
-                      <div className="flex flex-col gap-0.5 min-w-0 flex-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-xs font-bold font-mono ${item.passed ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            {item.passed ? '[PASS]' : '[FAIL]'}
-                          </span>
-                          <span className="text-xs font-semibold text-[var(--theme-text)]">{item.name}</span>
-                          <Badge variant="neutral" size="xs">
-                            {item.category}
-                          </Badge>
-                        </div>
-                        <span className="text-[11px] text-[var(--theme-text-muted)] line-clamp-1">{item.details}</span>
-                      </div>
-                      <span className="font-mono text-xs font-bold text-[var(--theme-text-muted)] shrink-0">
-                        {Math.round(item.score * 100)}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>

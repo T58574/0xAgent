@@ -14,12 +14,10 @@ import {
 } from '../server/session';
 import { initPersonas, setActivePersona, listPersonas } from '../server/personas';
 import { isAutoWorkspace, getWorkspaceBaseName } from '../src/utils/helpers';
-import { ttsService } from '../server/ttsService';
 
 describe('Workspace & Persona Synchronization Test Suite', () => {
   before(() => {
     process.env.NODE_ENV = 'test';
-    ttsService.setMuted(true);
     initPersonas();
   });
 

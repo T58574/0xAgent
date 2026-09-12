@@ -12,33 +12,45 @@ async function ensureSessionsDir(): Promise<string> {
   return dir;
 }
 
+const inMemorySessions = new Map<string, ChatSession>();
+
 export async function listSessions(): Promise<ChatSession[]> {
   const dir = await ensureSessionsDir();
+  const sessionMap = new Map<string, ChatSession>();
+
+  // Add all in-memory sessions first
+  for (const [id, s] of inMemorySessions.entries()) {
+    sessionMap.set(id, s);
+  }
+
   try {
     const files = await fs.promises.readdir(dir);
-    const sessions: ChatSession[] = [];
-
     await Promise.all(
       files.map(async (file) => {
         if (file.endsWith('.json')) {
           try {
+            const id = file.replace(/\.json$/, '');
             const fullPath = path.join(dir, file);
             const data = await fs.promises.readFile(fullPath, 'utf-8');
             const session: ChatSession = JSON.parse(data);
-            sessions.push(session);
+            // In-memory version takes precedence if newer
+            const existing = sessionMap.get(id);
+            if (!existing || session.updated_at > existing.updated_at) {
+              sessionMap.set(id, session);
+            }
           } catch (err) {
             console.error(`Failed to read session file ${file}:`, err);
           }
         }
       })
     );
-
-    sessions.sort((a, b) => b.updated_at - a.updated_at);
-    return sessions;
   } catch (err) {
-    console.error('Failed to list sessions:', err);
-    return [];
+    console.error('Failed to list sessions from disk:', err);
   }
+
+  const sessions = Array.from(sessionMap.values());
+  sessions.sort((a, b) => b.updated_at - a.updated_at);
+  return sessions;
 }
 
 let activeStreamGetter: ((sessionId: string) => any) | null = null;
@@ -47,10 +59,34 @@ export function setActiveStreamGetter(fn: (sessionId: string) => any): void {
 }
 
 export async function loadSession(id: string): Promise<ChatSession> {
-  const dir = await ensureSessionsDir();
-  const filePath = path.join(dir, `${id}.json`);
-  const data = await fs.promises.readFile(filePath, 'utf-8');
-  const session = JSON.parse(data) as ChatSession;
+  let session = inMemorySessions.get(id);
+
+  if (!session) {
+    const dir = await ensureSessionsDir();
+    const filePath = path.join(dir, `${id}.json`);
+    try {
+      if (fs.existsSync(filePath)) {
+        const data = await fs.promises.readFile(filePath, 'utf-8');
+        session = JSON.parse(data) as ChatSession;
+        inMemorySessions.set(id, session);
+      }
+    } catch (err) {
+      console.warn(`[session] Could not read session ${id} from disk:`, err);
+    }
+  }
+
+  if (!session) {
+    // If session doesn't exist on disk or in memory, create a clean in-memory session to prevent ENOENT crashes
+    session = {
+      id,
+      title: 'Новый чат',
+      messages: [],
+      created_at: Date.now(),
+      updated_at: Date.now(),
+      workspace_dir: null,
+    };
+    inMemorySessions.set(id, session);
+  }
 
   if (activeStreamGetter) {
     const activeStream = activeStreamGetter(id);
@@ -80,15 +116,23 @@ export async function loadSession(id: string): Promise<ChatSession> {
 }
 
 export async function saveSession(session: ChatSession): Promise<void> {
+  // Always update in-memory cache so active requests and UI never encounter stale/missing sessions
+  inMemorySessions.set(session.id, session);
+
   try {
     const cfg = loadConfig();
     if (cfg?.auto_save_history === false) {
       return;
     }
   } catch {}
-  const dir = await ensureSessionsDir();
-  const filePath = path.join(dir, `${session.id}.json`);
-  await fs.promises.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');
+
+  try {
+    const dir = await ensureSessionsDir();
+    const filePath = path.join(dir, `${session.id}.json`);
+    await fs.promises.writeFile(filePath, JSON.stringify(session, null, 2), 'utf-8');
+  } catch (err) {
+    console.error(`Failed to save session ${session.id} to disk:`, err);
+  }
 }
 
 const ADJECTIVES = ['swift', 'quantum', 'amber', 'hyper', 'neon', 'stellar', 'cyber', 'nova', 'apex', 'nexus', 'vital', 'spectral', 'zenith', 'pulse', 'echo', 'prism', 'vortex'];
@@ -217,6 +261,7 @@ export async function cleanupOrphanWorkspaces(): Promise<{ removed: string[]; re
 }
 
 export async function deleteSession(id: string): Promise<void> {
+  inMemorySessions.delete(id);
   const dir = await ensureSessionsDir();
   const filePath = path.join(dir, `${id}.json`);
 

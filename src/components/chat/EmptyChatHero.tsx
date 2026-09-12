@@ -1,7 +1,6 @@
 import React from 'react';
-import { AppConfig, PersonaMetadata, JarvisSparkProposal, ChatSession } from '../../types';
+import { AppConfig, PersonaMetadata, ChatSession } from '../../types';
 import { AsciiCanvasEngine } from '../common/AsciiCanvasEngine';
-import { JarvisSparkCard } from './JarvisSparkCard';
 import { PlanProgressStrip } from './PlanProgressStrip';
 import { FloatingCommandBar } from './FloatingCommandBar';
 
@@ -20,10 +19,6 @@ interface EmptyChatHeroProps {
   config?: AppConfig | null;
   onModelChanged?: (newModelId: string) => void;
   onConfigChanged?: (newConfig: AppConfig) => void;
-  activeSparks: JarvisSparkProposal[];
-  onAcceptSpark: (spark: JarvisSparkProposal) => void;
-  onDismissSpark: (sparkId: string) => void;
-  onSpeakPhrase: (text: string) => void;
   currentSession?: ChatSession | null;
 }
 
@@ -42,10 +37,6 @@ export const EmptyChatHero: React.FC<EmptyChatHeroProps> = ({
   config,
   onModelChanged,
   onConfigChanged,
-  activeSparks,
-  onAcceptSpark,
-  onDismissSpark,
-  onSpeakPhrase,
   currentSession,
 }) => {
   return (
@@ -62,20 +53,6 @@ export const EmptyChatHero: React.FC<EmptyChatHeroProps> = ({
           />
         </div>
 
-        {/* Proactive Sparks in Empty State */}
-        {config?.proactive_companion_enabled !== false && activeSparks.length > 0 && (
-          <div className="w-full max-w-xl mx-auto space-y-2 text-left">
-            {activeSparks.map((spark) => (
-              <JarvisSparkCard
-                key={spark.id}
-                spark={spark}
-                onAccept={onAcceptSpark}
-                onDismiss={onDismissSpark}
-                onSpeak={onSpeakPhrase}
-              />
-            ))}
-          </div>
-        )}
 
         {/* Dynamic Plan & Todos HUD in Empty State */}
         {currentSession?.active_todos && currentSession.active_todos.length > 0 && (

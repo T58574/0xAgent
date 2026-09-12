@@ -4,10 +4,12 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { loadConfig, saveConfig } from '../config';
 import { parseGgufMetadata } from '../ggufParser';
-import { voiceDaemonManager } from '../agent/voiceDaemonManager';
 import { stopLlamaServerProcess } from './llamaRoutes';
-import { restartTelegramBot } from '../veronica/telegram/bot';
-import { antigravityAdapter } from '../veronica/adapters/antigravityAdapter';
+import {
+  restartTelegramBot,
+  isTelegramBotRunning,
+  getTelegramBotUsername,
+} from '../telegram';
 
 export const configRouter = Router();
 
@@ -24,12 +26,8 @@ configRouter.post('/config', (req, res) => {
   try {
     saveConfig(req.body);
 
-    if (req.body.veronica !== undefined) {
+    if (req.body.telegram !== undefined || req.body.veronica !== undefined) {
       restartTelegramBot();
-    }
-
-    if (req.body.tts_config && typeof req.body.tts_config.wake_word_enabled === 'boolean') {
-      voiceDaemonManager.syncWithConfig(req.body.tts_config.wake_word_enabled);
     }
 
     // Auto-Free GPU resources when switching to a cloud model (Rule 16)
@@ -55,14 +53,7 @@ configRouter.post('/config', (req, res) => {
 configRouter.get('/models', (_req, res) => {
   try {
     const cfg = loadConfig();
-    const agyModels = antigravityAdapter.getAvailableAntigravityModels();
-    const cloudModels: any[] = agyModels.map((m) => ({
-      id: m.slug,
-      name: m.name,
-      provider: 'antigravity',
-      supportedEfforts: m.supportedEfforts || [],
-      defaultEffort: m.defaultEffort || 'low',
-    }));
+    const cloudModels: any[] = [];
 
     const dirsToScan: string[] = [
       path.join(process.cwd(), 'models'),
@@ -156,6 +147,27 @@ configRouter.post('/web-search/test', async (req, res) => {
 
     const outcome = await searchEngineRegistry.search(query.trim(), 5, testConfig);
     res.json(outcome);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Telegram Bot Endpoints
+configRouter.get('/telegram/status', (_req, res) => {
+  res.json({
+    running: isTelegramBotRunning(),
+    username: getTelegramBotUsername(),
+  });
+});
+
+configRouter.post('/telegram/restart', async (_req, res) => {
+  try {
+    await restartTelegramBot();
+    res.json({
+      success: true,
+      running: isTelegramBotRunning(),
+      username: getTelegramBotUsername(),
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

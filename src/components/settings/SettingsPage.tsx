@@ -116,20 +116,12 @@ export const SettingsPage: React.FC<SettingsPageProps> = React.memo(({
               setSoundNotifications={s.setSoundNotifications}
               compactChat={s.compactChat}
               setCompactChat={s.setCompactChat}
-              ttsVoiceEnabled={s.ttsVoiceEnabled}
-              setTtsVoiceEnabled={s.setTtsVoiceEnabled}
-              ttsVoice={s.ttsVoice}
-              setTtsVoice={s.setTtsVoice}
-              ttsRate={s.ttsRate}
-              setTtsRate={s.setTtsRate}
-              ttsPlayOnSpeaker={s.ttsPlayOnSpeaker}
-              setTtsPlayOnSpeaker={s.setTtsPlayOnSpeaker}
-              ttsPlayInBrowser={s.ttsPlayInBrowser}
-              setTtsPlayInBrowser={s.setTtsPlayInBrowser}
-              wakeWordEnabled={s.wakeWordEnabled}
-              setWakeWordEnabled={s.setWakeWordEnabled}
-              proactiveCompanionEnabled={s.proactiveCompanionEnabled}
-              setProactiveCompanionEnabled={s.setProactiveCompanionEnabled}
+              telegramBotEnabled={s.telegramBotEnabled}
+              setTelegramBotEnabled={s.setTelegramBotEnabled}
+              telegramBotToken={s.telegramBotToken}
+              setTelegramBotToken={s.setTelegramBotToken}
+              telegramBotWhitelist={s.telegramBotWhitelist}
+              setTelegramBotWhitelist={s.setTelegramBotWhitelist}
             />
           )}
 

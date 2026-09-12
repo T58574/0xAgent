@@ -4,8 +4,6 @@ import {
   Settings as SettingsIcon,
   BarChart2,
   BookOpen,
-  Bot,
-  Activity,
   Menu,
   Plus,
   ArrowUpCircle,
@@ -90,8 +88,6 @@ export const Navbar: React.FC<NavbarProps> = React.memo(({
             {[
               { id: 'chat', label: t.nav.chat, icon: MessageSquare },
               { id: 'knowledge', label: t.nav.knowledge, icon: BookOpen },
-              { id: 'veronica', label: t.nav.veronica, icon: Bot },
-              { id: 'benchmark', label: t.nav.benchmark, icon: Activity },
               { id: 'analytics', label: t.nav.analytics, icon: BarChart2 },
               { id: 'settings', label: t.nav.settings, icon: SettingsIcon },
             ].map((tab) => {

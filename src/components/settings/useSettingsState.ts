@@ -38,14 +38,17 @@ export function useSettingsState(
   const [autoSaveHistory, setAutoSaveHistory] = useState(true);
   const [soundNotifications, setSoundNotifications] = useState(true);
   const [compactChat, setCompactChat] = useState(false);
-  const [ttsVoiceEnabled, setTtsVoiceEnabled] = useState(true);
-  const [ttsVoice, setTtsVoice] = useState('ru-RU-DmitryNeural');
-  const [ttsRate, setTtsRate] = useState('+15%');
-  const [ttsPitch, setTtsPitch] = useState('-5Hz');
-  const [ttsPlayOnSpeaker, setTtsPlayOnSpeaker] = useState(true);
-  const [ttsPlayInBrowser, setTtsPlayInBrowser] = useState(true);
-  const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
-  const [proactiveCompanionEnabled, setProactiveCompanionEnabled] = useState(true);
+
+  // Telegram Bot state
+  const [telegramBotEnabled, setTelegramBotEnabled] = useState(
+    config?.telegram?.enabled ?? (config?.veronica as any)?.telegram_enabled ?? true
+  );
+  const [telegramBotToken, setTelegramBotToken] = useState(
+    config?.telegram?.token || config?.veronica?.telegram_token || ''
+  );
+  const [telegramBotWhitelist, setTelegramBotWhitelist] = useState(
+    config?.telegram?.whitelist?.join(', ') || config?.veronica?.telegram_whitelist?.join(', ') || ''
+  );
 
   // Web Search & Tools state
   const [webSearchProvider, setWebSearchProvider] = useState<WebSearchProvider>('auto');
@@ -125,17 +128,15 @@ export function useSettingsState(
     if (config.sound_notifications !== undefined && config.sound_notifications !== null) setSoundNotifications(config.sound_notifications);
     if (config.compact_chat !== undefined && config.compact_chat !== null) setCompactChat(config.compact_chat);
 
-    if (config.tts_config) {
-      if (config.tts_config.enabled !== undefined && config.tts_config.enabled !== null) setTtsVoiceEnabled(config.tts_config.enabled);
-      if (config.tts_config.voice) setTtsVoice(config.tts_config.voice);
-      if (config.tts_config.rate) setTtsRate(config.tts_config.rate);
-      if (config.tts_config.pitch) setTtsPitch(config.tts_config.pitch);
-      if (config.tts_config.play_on_speaker !== undefined) setTtsPlayOnSpeaker(config.tts_config.play_on_speaker);
-      if (config.tts_config.play_in_browser !== undefined) setTtsPlayInBrowser(config.tts_config.play_in_browser);
-      if (config.tts_config.wake_word_enabled !== undefined) setWakeWordEnabled(config.tts_config.wake_word_enabled);
-    }
-    if (config.proactive_companion_enabled !== undefined && config.proactive_companion_enabled !== null) {
-      setProactiveCompanionEnabled(config.proactive_companion_enabled);
+
+    if (config.telegram) {
+      if (config.telegram.enabled !== undefined) setTelegramBotEnabled(config.telegram.enabled);
+      if (config.telegram.token !== undefined) setTelegramBotToken(config.telegram.token || '');
+      if (config.telegram.whitelist !== undefined) setTelegramBotWhitelist(config.telegram.whitelist ? config.telegram.whitelist.join(', ') : '');
+    } else if (config.veronica) {
+      if ((config.veronica as any).telegram_enabled !== undefined) setTelegramBotEnabled((config.veronica as any).telegram_enabled);
+      if (config.veronica.telegram_token !== undefined) setTelegramBotToken(config.veronica.telegram_token || '');
+      if (config.veronica.telegram_whitelist !== undefined) setTelegramBotWhitelist(config.veronica.telegram_whitelist ? config.veronica.telegram_whitelist.join(', ') : '');
     }
 
     if (config.web_search_provider) setWebSearchProvider(config.web_search_provider);
@@ -213,16 +214,15 @@ export function useSettingsState(
           auto_save_history: autoSaveHistory,
           sound_notifications: soundNotifications,
           compact_chat: compactChat,
-          tts_config: {
-            enabled: ttsVoiceEnabled,
-            voice: ttsVoice,
-            rate: ttsRate,
-            pitch: ttsPitch,
-            play_on_speaker: ttsPlayOnSpeaker,
-            play_in_browser: ttsPlayInBrowser,
-            wake_word_enabled: wakeWordEnabled,
+          telegram: {
+            enabled: telegramBotEnabled,
+            token: telegramBotToken.trim() || null,
+            whitelist: telegramBotWhitelist
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+              .map((s) => (isNaN(Number(s)) ? s : Number(s))),
           },
-          proactive_companion_enabled: proactiveCompanionEnabled,
           active_theme: activeTheme,
           web_search_provider: webSearchProvider,
           firecrawl_api_key: firecrawlApiKey.trim() || null,
@@ -286,14 +286,6 @@ export function useSettingsState(
     autoSaveHistory,
     soundNotifications,
     compactChat,
-    ttsVoiceEnabled,
-    ttsVoice,
-    ttsRate,
-    ttsPitch,
-    ttsPlayOnSpeaker,
-    ttsPlayInBrowser,
-    wakeWordEnabled,
-    proactiveCompanionEnabled,
     activeTheme,
     webSearchProvider,
     firecrawlApiKey,
@@ -368,22 +360,6 @@ export function useSettingsState(
     setSoundNotifications,
     compactChat,
     setCompactChat,
-    ttsVoiceEnabled,
-    setTtsVoiceEnabled,
-    ttsVoice,
-    setTtsVoice,
-    ttsRate,
-    setTtsRate,
-    ttsPitch,
-    setTtsPitch,
-    ttsPlayOnSpeaker,
-    setTtsPlayOnSpeaker,
-    ttsPlayInBrowser,
-    setTtsPlayInBrowser,
-    wakeWordEnabled,
-    setWakeWordEnabled,
-    proactiveCompanionEnabled,
-    setProactiveCompanionEnabled,
     activeTheme,
     handleSelectTheme,
     webSearchProvider,
@@ -469,5 +445,11 @@ export function useSettingsState(
     saveStatus,
     config,
     onSaveConfig,
+    telegramBotEnabled,
+    setTelegramBotEnabled,
+    telegramBotToken,
+    setTelegramBotToken,
+    telegramBotWhitelist,
+    setTelegramBotWhitelist,
   };
 }

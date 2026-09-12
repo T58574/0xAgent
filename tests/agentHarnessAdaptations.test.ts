@@ -18,13 +18,8 @@ import {
 import { dispatchToolExecution } from '../server/agent/toolDispatcher';
 import { createNewSession, loadSession, deleteSession } from '../server/session';
 import { ChatMessage, AppConfig } from '../src/types';
-import { ttsService } from '../server/ttsService';
 
 describe('Agent Harness Adaptations Test Suite', () => {
-  before(() => {
-    ttsService.setMuted(true);
-  });
-
   describe('1. Model-Free Tool-Result Pruning (toolResultPruner)', () => {
     it('should keep tool output under threshold completely intact', () => {
       const shortText = 'Lines of short command output\nAll OK.';

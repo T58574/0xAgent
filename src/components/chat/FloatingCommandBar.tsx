@@ -24,8 +24,6 @@ import {
 } from './popovers';
 import { useSlashAutocomplete } from './useSlashAutocomplete';
 import { QuickResponseStrip } from './QuickResponseStrip';
-import { VeronicaActionStrip } from './VeronicaActionStrip';
-import { VeronicaTaskModal } from '../veronica/VeronicaTaskModal';
 
 interface FloatingCommandBarProps {
   inputText: string;
@@ -146,7 +144,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
     isLocalActive,
     isStartingServer,
     fetchModelsAndStatus,
-    selectCloudModel,
     selectLocalModel,
     toggleServer,
     getDisplayTitle,
@@ -192,13 +189,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
 
   const isBusy = agentStatus === 'thinking' || agentStatus === 'executing_tool';
 
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-
-  const isVeronica =
-    activePersonaId === 'veronica' ||
-    currentPersona.id === 'veronica' ||
-    (currentPersona.name && currentPersona.name.toLowerCase().includes('верон')) ||
-    (currentPersona.name && currentPersona.name.toLowerCase().includes('veronica'));
 
   return (
     <div className="relative w-full max-w-3xl mx-auto select-none font-sans" ref={menuRef}>
@@ -212,7 +202,6 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
           serverStatus={serverStatus}
           activeModelId={activeModelId}
           isStartingServer={isStartingServer}
-          onSelectCloudModel={selectCloudModel}
           onSelectLocalModel={selectLocalModel}
           onToggleServer={toggleServer}
           onRefreshModels={() => fetchModelsAndStatus(true)}
@@ -236,29 +225,14 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
         </div>
       )}
 
-      {/* Veronica Orchestrator Action Strip */}
-      {isVeronica ? (
-        <VeronicaActionStrip
-          onSelectAction={(actionText) => onSelectQuickResponse?.(actionText)}
-          onOpenTaskModal={() => setIsTaskModalOpen(true)}
+      {onSelectQuickResponse && (
+        <QuickResponseStrip
+          options={quickResponses}
+          onSelectOption={onSelectQuickResponse}
           agentStatus={agentStatus}
+          isLastMessageAssistant={isLastMessageAssistant}
         />
-      ) : (
-        onSelectQuickResponse && (
-          <QuickResponseStrip
-            options={quickResponses}
-            onSelectOption={onSelectQuickResponse}
-            agentStatus={agentStatus}
-            isLastMessageAssistant={isLastMessageAssistant}
-          />
-        )
       )}
-
-      <VeronicaTaskModal
-        isOpen={isTaskModalOpen}
-        onClose={() => setIsTaskModalOpen(false)}
-        onTaskSpawned={() => onSelectQuickResponse?.('/tasks')}
-      />
 
       <form onSubmit={handleFormSubmit}>
         <div className={`bento-card rounded-3xl p-1.5 sm:p-2 px-3 sm:px-4 bg-[var(--theme-panel)]/95 backdrop-blur-2xl border border-[var(--theme-border)] focus-within:border-[var(--theme-accent)] transition-all duration-200 ease-out flex items-end gap-2 sm:gap-3 shadow-xl ${isExpanded ? 'ring-1 ring-[var(--theme-accent)]/30' : ''}`}>

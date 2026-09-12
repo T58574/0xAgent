@@ -3,7 +3,7 @@ import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
 import { Toggle } from '../../ui/Toggle';
 import { Badge } from '../../ui/Badge';
-import { Zap, Shield, Globe, Network, Cpu, Lock, HelpCircle } from 'lucide-react';
+import { Zap, Globe, Network, Cpu, Lock, HelpCircle } from 'lucide-react';
 import { ProxyRoutingConfig } from '../../../types';
 
 interface ProxyRoutingMatrixProps {
@@ -43,32 +43,6 @@ export const ProxyRoutingMatrix: React.FC<ProxyRoutingMatrixProps> = ({
 
       {/* Matrix Rows */}
       <div className="divide-y divide-[var(--theme-border)]">
-        {/* 1. Cloud AI & STT */}
-        <div className="py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-400">
-              <Shield size={16} />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-[var(--theme-text)]">
-                Облачные AI &amp; STT (Groq Whisper, OpenAI API, Anthropic)
-              </div>
-              <div className="text-[11px] text-[var(--theme-text-muted)]">
-                Обход геоблокировок Cloudflare (ошибки 403) для транскрибации речи и облачных моделей.
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge variant={routing.enabled && routing.route_cloud_ai ? 'success' : 'neutral'}>
-              {routing.enabled && routing.route_cloud_ai ? 'Через прокси' : 'Direct'}
-            </Badge>
-            <Toggle
-              checked={routing.route_cloud_ai}
-              onChange={() => onUpdateRouting({ route_cloud_ai: !routing.route_cloud_ai })}
-              size="sm"
-            />
-          </div>
-        </div>
 
         {/* 2. Web Search & Scraping */}
         <div className="py-3 flex items-center justify-between gap-4">
@@ -156,7 +130,7 @@ export const ProxyRoutingMatrix: React.FC<ProxyRoutingMatrixProps> = ({
           </div>
           <div className="text-[var(--theme-text-muted)] leading-relaxed space-y-1.5">
             <p>
-              • <b>Зачем нужен прокси:</b> Серверы Groq, OpenAI и некоторые поисковики блокируют прямые подключения из РФ (ошибка 403 Access Denied).
+              • <b>Зачем нужен прокси:</b> Поисковые сервисы и веб-скраперы могут блокировать частые запросы (Cloudflare 403, капчи). Прокси обеспечивает стабильный поиск.
             </p>
             <p>
               • <b>Как выбирается прокси:</b> Система в реальном времени мониторит задержку (ping) и автоматически направляет трафик на самую быструю живую ноду из пула (<i>Smart Auto-Rotation</i>).
