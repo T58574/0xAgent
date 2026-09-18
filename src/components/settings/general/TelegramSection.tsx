@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Send, RefreshCw, Eye, EyeOff, ExternalLink, Shield, Mic, MessageSquare } from 'lucide-react';
+import { Send, RefreshCw, Eye, EyeOff, ExternalLink, Shield, MessageSquare } from 'lucide-react';
 import { useI18n } from '../../../i18n';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
@@ -240,10 +240,10 @@ export const TelegramSection: React.FC<TelegramSectionProps> = ({
           </div>
           <div className="space-y-1">
             <div className="font-semibold text-[var(--theme-text)] flex items-center gap-1">
-              <Mic size={12} className="text-[var(--theme-accent)]" />
-              <span>{language === 'ru' ? 'Голосовые сообщения' : 'Voice Messages'}</span>
+              <span className="font-mono text-[var(--theme-accent)]">/model</span>
+              <span>— {language === 'ru' ? 'Активная модель' : 'Active Model'}</span>
             </div>
-            <p>{language === 'ru' ? 'Записывайте голосовые реплики — бот распознает их локально и ответит.' : 'Record voice messages — bot transcribes them offline and replies.'}</p>
+            <p>{language === 'ru' ? 'Показывает имя текущей загруженной модели локального сервера.' : 'Shows currently loaded model name on local server.'}</p>
           </div>
           <div className="space-y-1">
             <div className="font-semibold text-[var(--theme-text)] flex items-center gap-1">

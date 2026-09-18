@@ -17,7 +17,7 @@
 │ │ React 19 + TypeScript + Vite       │ │ │ Express REST API (:3001) & WS (/ws)       │ │
 │ │ ├─ ChatArea (Timeline & Reasoning) │ │ │ ├─ Agent Orchestrator (agent.ts)          │ │
 │ │ ├─ Monaco Code Editor              │ │ │ ├─ Memory Engine v1.0 (SQLite WAL + FTS5) │ │
-│ │ ├─ Jarvis Sanctuary Visualizer     │ │ │ ├─ Jarvis Supervisor (Sparks & Voice)     │ │
+│ │ ├─ Floating Command Bar & Plans    │ │ │ ├─ Telegram Bot Subsystem (GrammY)        │ │
 │ │ ├─ Knowledge Vault (RAG)           │ │ │ ├─ FastMTP Speculative Decoding Manager   │ │
 │ │ ├─ Settings Tabs (LLM, Personas)   │ │ │ ├─ Sandboxed Tool Dispatcher & Spiller    │ │
 │ │ └─ Memory & Skills Modal           │ │ │ └─ llama.cpp Child Process Supervisor     │ │
@@ -76,6 +76,7 @@
 │   ├── agent/                   — Prompt builder, memory worker, compactor, loop breaker
 │   ├── memory.ts                — Memory Engine API, Write Policy, Deterministic Router
 │   ├── memoryDb.ts              — Native node:sqlite database manager & FTS5 triggers
+│   ├── telegram/                — Standalone Telegram bot, chat formatters, user whitelist
 │   ├── personas.ts              — Persona manager (SOUL, USER, TOOLS profiles)
 │   ├── knowledgeBase.ts         — Knowledge Vault manager and manifest index
 │   ├── hardware.ts              — GPU & VRAM hardware detection (Win32_VideoController)
@@ -89,7 +90,7 @@
 │   ├── components/chat/         — Chat timeline, reasoning HUD, floating command bar
 │   ├── components/settings/     — Tabbed configuration views
 │   └── i18n/                    — Bilingual translation dictionaries (en.ts, ru.ts)
-└── tests/                       — Automated test suites (100+ tests)
+└── tests/                       — Automated test suites (170+ tests, 52 suites)
 ```
 
 ---

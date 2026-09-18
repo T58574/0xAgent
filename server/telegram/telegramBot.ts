@@ -1,8 +1,6 @@
 import { Bot } from 'grammy';
-import fs from 'node:fs';
 import { loadConfig } from '../config';
 import { escapeHtml, markdownToTelegramHtml, splitHtmlIntoBalancedChunks } from './telegramUtils';
-import { telegramVoiceService } from './voiceService';
 
 let botInstance: Bot | null = null;
 let botUsername: string | null = null;
@@ -120,8 +118,8 @@ export function initTelegramBot(): Bot | null {
         `Я работаю <b>100% локально</b> на вашем компьютере без облаков и утечек данных.`,
         ``,
         `💬 <b>Как общаться:</b>`,
-        `• Просто отправьте мне текстовый вопрос или задачу.`,
-        `• Запишите голосовое сообщение (оно расшифруется локально).`,
+        `• Отправьте мне текстовый вопрос или задачу.`,
+        `• Используйте /model для просмотра активной модели.`,
         `• Используйте /reset для очистки контекста диалога.`,
         `• Используйте /status для проверки состояния сервера.`,
       ].filter(Boolean).join('\n');
@@ -217,73 +215,9 @@ export function initTelegramBot(): Bot | null {
       }
     });
 
-    // Voice & Audio messages
+    // Voice & Audio messages fallback
     bot.on(['message:voice', 'message:audio'], async (ctx) => {
-      const userId = ctx.from.id;
-      const voice = ctx.message.voice || ctx.message.audio;
-      if (!voice) return;
-
-      const statusMsg = await ctx.reply('🎙️ <i>Слушаю и расшифровываю голосовое сообщение...</i>', { parse_mode: 'HTML' });
-
-      try {
-        await ctx.replyWithChatAction('record_voice').catch(() => {});
-        const file = await ctx.getFile();
-        if (!file.file_path) {
-          throw new Error('Не удалось получить файл голосового сообщения.');
-        }
-
-        const tempAudioPath = await telegramVoiceService.downloadTelegramAudio(cleanToken, file.file_path);
-        let transcribedText = '';
-
-        try {
-          const res = await telegramVoiceService.transcribeAudio(tempAudioPath);
-          transcribedText = (res.text || '').trim();
-        } finally {
-          if (fs.existsSync(tempAudioPath)) {
-            try { await fs.promises.unlink(tempAudioPath); } catch {}
-          }
-        }
-
-        if (!transcribedText) {
-          await ctx.api.editMessageText(
-            ctx.chat.id,
-            statusMsg.message_id,
-            '⚠️ <i>Речь не распознана или аудиодорожка слишком тихая.</i>',
-            { parse_mode: 'HTML' }
-          );
-          return;
-        }
-
-        await ctx.api.editMessageText(
-          ctx.chat.id,
-          statusMsg.message_id,
-          `🗣️ <i>«${escapeHtml(transcribedText)}»</i>\n\n🧠 <i>Генерирую ответ...</i>`,
-          { parse_mode: 'HTML' }
-        );
-
-        const history = getUserHistory(userId);
-        history.push({ role: 'user', content: transcribedText });
-
-        const replyText = await callLocalLlm(history);
-        history.push({ role: 'assistant', content: replyText });
-
-        const htmlReply = markdownToTelegramHtml(replyText);
-        const chunks = splitHtmlIntoBalancedChunks(htmlReply);
-
-        for (const chunk of chunks) {
-          await ctx.reply(chunk, { parse_mode: 'HTML' }).catch(async () => {
-            await ctx.reply(replyText);
-          });
-        }
-      } catch (err: any) {
-        console.error('[Telegram Bot] Voice handling error:', err);
-        await ctx.api.editMessageText(
-          ctx.chat.id,
-          statusMsg.message_id,
-          `⚠️ <i>Ошибка обработки голосового сообщения:</i> ${escapeHtml(err?.message || err)}`,
-          { parse_mode: 'HTML' }
-        ).catch(() => {});
-      }
+      await ctx.reply('🎙️ <i>Голосовые сообщения не поддерживаются. Пожалуйста, отправьте текстовый запрос.</i>', { parse_mode: 'HTML' });
     });
 
     // Start background polling

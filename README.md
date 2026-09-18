@@ -9,11 +9,12 @@
 [![Vite](https://img.shields.io/badge/Vite-7.0-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vitejs.dev/)
 [![Express](https://img.shields.io/badge/Express-4.21-000000?style=flat-square&logo=express&logoColor=white)](https://expressjs.com/)
 [![llama.cpp](https://img.shields.io/badge/llama.cpp-Builtin_Supervisor-FFA500?style=flat-square)](https://github.com/ggerganov/llama.cpp)
+[![Tests](https://img.shields.io/badge/Tests-171%20Passed-success?style=flat-square)](tests/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 
 **Next-generation autonomous AI coding platform and Web-IDE with a built-in local inference engine (`llama.cpp`), full zero-config agent harness pipeline, and hybrid cloud fallback.**
 
-[Quick Start](#-1-click-quick-start) • [CLI & Tray Hub](#-cli-supervisor--tray-hub) • [Features & Harness](#-key-features--agent-harness) • [Architecture](#-architecture) • [Configuration](#-configuration) • [License](#-license)
+[Quick Start](#-1-click-quick-start) • [Terminal CUI](#-terminal-cui--cli-agent) • [Key Features](#-key-features--agent-harness) • [Architecture](#-architecture) • [Configuration](#-configuration) • [License](#-license)
 
 **[English](README.md)** • **[Русский](README.ru.md)**
 
@@ -62,7 +63,7 @@ curl -fsSL https://raw.githubusercontent.com/T58574/0xAgent/main/install.sh | ba
 0xagent "Analyze this project and suggest architectural improvements"
 0xagent -p "Fix type errors in server/agent.ts"
 
-# Quiet output for script automation & piping (e.g. Veron / CI):
+# Quiet output for script automation & piping (e.g. CI / Headless scripts):
 0xagent -p "Summarize git diff" --quiet
 git diff | 0xagent "Explain these changes"
 
@@ -110,33 +111,36 @@ When running `0xagent`, type `/` to bring up the command picker or use slash com
 
 ## 🚀 Key Features & Agent Harness
 
-Unlike conventional wrappers requiring external servers (like Ollama or vLLM), **0xAgent is the first all-in-one platform featuring a native, built-in inference supervisor**, a 24/7 personal assistant module (**Veronica**), and a production-grade autonomous agent harness out of the box with zero complex setup.
+Unlike conventional wrappers requiring external servers (like Ollama or vLLM), **0xAgent is the first all-in-one platform featuring a native, built-in inference supervisor**, a standalone Telegram bot, a persistent SQLite memory engine, and a production-grade autonomous agent harness out of the box with zero complex setup.
 
-### 🤖 Module «Veronica» — Personal AI Assistant & Telegram Supervisor
-*See full guide: [docs/veronica.md](docs/veronica.md)*
-- **Deterministic SQLite Audit Journal**: All background tasks, heartbeats, git commits, and project states are stored in an isolated `veronica.db` (WAL mode) with an In-Memory Single-Writer FIFO queue.
-- **Telegram Bot Gateway (`grammy`)**: Control tasks, query project progress, and receive instant proactive notifications on completion, crashes, or timeouts (`/status`, `/projects`, `/today`, `/yesterday`, `/run`, `/kill`).
-- **Unified Web-IDE Action Strip & Task Modal**: Launch background tasks with custom prompts, autonomy levels (L0–L5), and project binding directly from the Web-IDE interface.
-- **Token-Dense Context Engine & 4-Phase Prompting**: Generates ultra-compact project summaries (~150-250 tokens) via `0xagent veronica context <project>` and injects project passports into headless tasks.
-- **Watchdog & Process Supervisor**: Automatic PID verification, inactivity timeout tracking (300s), Tree-Kill of hanging subprocesses, and crash state self-healing on boot.
-- **Single-Agent Project Mutex**: Exclusive project locks preventing race conditions and git corruption.
-- **Autonomy Levels (L0–L5)**: Hardware-enforced privilege boundaries restricting automated git commits to L3+.
+### 📱 Standalone Telegram Bot Subsystem
+- **Direct Local Model Querying**: Built with GrammY, the bot connects directly to the local `llama-server` (`127.0.0.1:11434`), delivering 100% private, cloud-free inference.
+- **Hardware-Enforced Security Whitelist**: Strict Telegram ID filtering (`telegram.whitelist`) ensures only authorized user IDs can query the bot.
+- **Multi-Turn Context & Smart Splitting**: Retains conversational context with automatic window management and converts Markdown into clean Telegram HTML cards with syntax highlighting, blockquotes, and balanced message chunking (<4096 chars).
+- **Built-in Commands**: `/start`, `/help`, `/status` (server & model health check), `/model` (active LLM inspection), `/reset`, `/clear` (context flush).
 
-### 🧠 Dual Inference & Unified Model Selector
-- **Unified Multi-Engine Model Selector**: Seamlessly switch between Antigravity Cloud models (Gemini 3.7/3.6/3.1 Pro, Claude Sonnet 4.6 & Opus Thinking, GPT-OSS 120B) and Local GGUF weights with inline reasoning effort toggles (`off`, `low`, `medium`, `high`).
-- **24-Hour Persistent Model Caching**: High-performance `localStorage` cache with auto-invalidation and 1-click manual refresh.
-- **24/7 Low-Power Laptop Mode**: Run 0xAgent and Veronica on a low-spec laptop 24/7 (~150 MB RAM) while offloading heavy LLM inference to a powerful GPU workstation over LAN (`0xagent node probe`).
-- **Native `llama-server` Supervisor**: 1-click binary downloader and automatic GPU layer offloading (`-ngl`), Flash Attention (`-fa on`), quantized KV cache (`-ctk q8_0 -ctv q8_0`), and automated VRAM reclamation.
-- **Local GGUF Model Hub**: Direct support for Qwen 2.5 Coder, Gemma 4, DeepSeek, and Llama 3.3.
+### 🧠 Memory Engine v1.0 & Scoped SQLite Architecture
+- **Native SQLite WAL Store**: All memories, audit trails, and episodes persist in `~/.0xagent/memory.db` with native `node:sqlite` speed and FTS5 full-text indexing.
+- **Dual-Scope Isolation**: Strict physical partition between global user preferences and project-specific knowledge (`project_id`), resolving workspace path aliases automatically.
+- **Dynamic Token Budget Allocator**: Automatically scales context memory injection (0..400 tokens) — allocating 0 memories during casual dialogue to maximize KV cache throughput.
+- **Memory Decay & Conflict Resolution**: Automatically decays confidence scores over time, archives stale memories (< 0.1), and supersedes duplicates deterministically.
+- **Dynamic USER.md Compiler**: Compiles living user preferences directly into the system prompt with zero manual file editing.
 
-### 🛠 Complete Zero-Config Agent Harness
+### ⚡ Dual Inference & Unified Model Hub
+- **Native `llama-server` Supervisor**: 1-click binary downloader and automatic GPU layer offloading (`-ngl`), Flash Attention (`-fa on`), quantized KV cache (`-ctk q8_0 -ctv q8_0`), and automated VRAM release when idle or switching to cloud.
+- **Local GGUF Model Hub**: Direct zero-config support for Qwen 2.5 Coder, Gemma 4, DeepSeek, and Llama 3.3.
+- **Hybrid Cloud Fallback**: Instant toggle to Google AI Studio (Gemini 3.7/3.6/3.1 Pro, Flash Lite) with inline reasoning effort toggles (`off`, `low`, `medium`, `high`).
+- **LAN Remote Workstation Mode**: Run the lightweight Web IDE / CUI on an ultrabook (~150 MB RAM) while offloading heavy LLM inference to a dedicated GPU workstation on your local network.
+
+### 🛠 Production-Grade Zero-Slop Agent Harness
 - **Concurrent Tool Execution**: Read-only exploration tools (`read_file`, `list_dir`, `grep_search`, `fff_search`, `web_search`) execute in parallel via `Promise.all()`, speeding up repository scans by 3-5x.
-- **Whitespace-Tolerant Patching (`patch_file`)**: Robust multi-chunk search/replace block patcher ensuring precise refactoring with zero data loss or file truncations.
+- **Whitespace-Tolerant Patching (`patch_file`)**: Robust multi-chunk search/replace block patcher ensuring surgical edits with zero data loss or file truncations.
 - **Sandboxed Code Mode (`<code_run>`)**: In-memory VM runtime enabling the agent to execute complex Node.js automation scripts with async host tool bindings in a single turn.
+- **Two-Tier Approval Protocol**: Non-blocking intent suggestions (`<quick_replies>`) and cryptographic approval gates (`<request_approval>`) with SHA-256 validation for destructive operations.
+- **Self-Improvement & Staged Proposals (`selfPatchEngine.ts`)**: Core system modifications are automatically intercepted, isolated into staged proposals, and can be reviewed, applied, or rolled back safely.
 - **Oscillation & Loop Breaker (`loopBreaker.ts`)**: 8-step rolling history tracking with canonical argument sorting, preventing repetitive tool cycling.
 - **4-Tier Context Compaction (`compactionPipeline.ts`)**: Coordinated token optimization featuring zero-token tool pruning with error retention, CoT thought stripping, bounded windowing, and milestone summarization.
 - **Output Spiller (`outputSpiller.ts`)**: Automatically offloads massive terminal outputs (>24 KB) to disk (`~/.0xagent/spill/*.log`) to shield the LLM context window.
-- **Interactive Question Cards (`<ask_user_question>`)**: Agent can pause mid-flight to ask clarifying multi-choice questions or present interactive plan reviews.
 - **Privacy Web Search & Fast File Finder**: Local SearXNG / DuckDuckGo web research with Markdown scrapers and sub-3ms Rust-accelerated file finder (`@ff-labs/fff-node`).
 
 ---
@@ -233,8 +237,9 @@ All runtime configurations, model weights, personas, and memory are stored in `~
 
 | Directory / File | Description |
 |---|---|
-| `~/.0xagent/config.json` | Global settings, API keys, active models, and security permissions |
-| `~/.0xagent/veronica/` | Veronica SQLite audit journal (`veronica.db`), backups & task history |
+| `~/.0xagent/config.json` | Global settings, API keys, active models, proxies, and security permissions |
+| `~/.0xagent/memory.db` | Canonical SQLite database (WAL mode: memories, episodes, relationships, FTS5) |
+| `~/.0xagent/certs/` | Local SSL development CA and self-signed certificates for HTTPS / WSS |
 | `~/.0xagent/models/` | Local GGUF model files repository |
 | `~/.0xagent/llama/` | Managed `llama-server.exe` binary builds |
 | `~/.0xagent/personas/` | System personas & memory (`SOUL.md`, `USER.md`, `TOOLS.md`) |

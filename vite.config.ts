@@ -23,6 +23,23 @@ function getCerts() {
   return null;
 }
 
+function getLocalLanIps(): string[] {
+  const ips: string[] = ['localhost', '127.0.0.1'];
+  try {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      const netList = interfaces[name];
+      if (!netList) continue;
+      for (const net of netList) {
+        if (net.family === 'IPv4' && !net.internal) {
+          ips.push(net.address);
+        }
+      }
+    }
+  } catch {}
+  return Array.from(new Set(ips));
+}
+
 // https://vite.dev/config/
 export default defineConfig(() => {
   const useHttps = process.env.DISABLE_HTTPS !== 'true';
@@ -32,7 +49,7 @@ export default defineConfig(() => {
     plugins: [
       react(),
       tailwindcss(),
-      ...(useHttps ? [basicSsl({ domains: ['192.168.4.24', '198.18.0.1', 'localhost', '127.0.0.1'] })] : []),
+      ...(useHttps ? [basicSsl({ domains: getLocalLanIps() })] : []),
     ],
     clearScreen: false,
     server: {

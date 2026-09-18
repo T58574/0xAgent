@@ -215,7 +215,7 @@ namespace OxAgent.Launcher
             }
             catch {}
 
-            return "192.168.4.24";
+            return "127.0.0.1";
         }
 
         private string GetAppLanguage()

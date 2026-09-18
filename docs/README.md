@@ -11,7 +11,7 @@ docs/
 ├── README.md               ← You are here: Master Documentation Hub & Index
 ├── architecture.md         ← High-level System Architecture & Core Subsystems
 ├── memory-engine.md        ← Memory Engine v1.0 (SQLite, FTS5, Write Policy, Router)
-├── jarvis-companion.md     ← Jarvis Proactive Voice Companion & Intercom System
+├── proxies.md              ← Proxy configuration & batch import guide
 ├── LOCAL_MODELS_GUIDE.md   ← Local LLM Guide (llama.cpp, FastMTP, Speculative Decoding)
 ├── GEMINI.md               ← Developer & AI Agent Invariants Blueprint
 └── api/
@@ -26,7 +26,7 @@ docs/
 | :--- | :--- | :--- |
 | **System Overview & Components** | Overall architecture, processes, data directory layout, and execution loop | [`architecture.md`](./architecture.md) |
 | **Memory & Personalization** | SQLite canonical store, Write Policy, Deterministic Router, Episodes & Persona views | [`memory-engine.md`](./memory-engine.md) |
-| **Voice & Proactive Sparks** | Voice daemon, intercom, TTS synthesis, OS macros, and autonomous sparks | [`jarvis-companion.md`](./jarvis-companion.md) |
+| **Proxy & Network Management** | Tor, SOCKS5, HTTP proxies, routing rules, and batch import format | [`proxies.md`](./proxies.md) |
 | **Local Models & Inference** | Hardware detection, llama.cpp flags, FastMTP speculative decoding, and VRAM tuning | [`LOCAL_MODELS_GUIDE.md`](./LOCAL_MODELS_GUIDE.md) |
 | **REST & WebSocket API** | Endpoints for sessions, memories, personas, knowledge vault, and realtime events | [`api/README.md`](./api/README.md) |
 | **Developer Guidelines** | Core invariants, single source of truth rules, and zero-slop standards | [`GEMINI.md`](./GEMINI.md) |
@@ -42,13 +42,13 @@ docs/
 │   Frontend (React 19 + Vite) ◄───[ WebSocket / REST ]───► Backend API  │
 │   - Monaco Code Editor                                 (Express :3001) │
 │   - Chat Timeline & Reasoning HUD                                      │
-│   - Jarvis Sanctuary Visualizer                                        │
-│   - Memory & Skills Modal                                              │
+│   - Memory & Skills Management                                         │
+│   - Knowledge Vault & RAG Index                                        │
 │                                                                        │
 │   Backend Subsystems:                                                  │
 │   ├─ Agent Orchestrator (agent.ts, loopBreaker, outputSpiller)         │
 │   ├─ Memory Engine v1.0 (SQLite WAL, FTS5, Deterministic Router)       │
-│   ├─ Jarvis Supervisor (Sparks Engine, TTS, Voice Daemon)              │
+│   ├─ Telegram Bot Subsystem (GrammY, Private Local Assistant)          │
 │   ├─ FastMTP Manager (Speculative Draft Decoding)                      │
 │   └─ llama.cpp Supervisor (Hardware Detection & GGUF Parser)           │
 └────────────────────────────────────────────────────────────────────────┘

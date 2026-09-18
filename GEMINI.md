@@ -40,7 +40,6 @@
 ### Standalone Telegram Bot Subsystem (`server/telegram/`)
 - `telegramBot.ts` — Lightweight GrammY-based Telegram bot querying local llama.cpp directly with multi-turn conversation memory, user whitelist, and `/start`, `/reset`, `/status`, `/help` commands.
 - `telegramUtils.ts` — Markdown-to-HTML parser, balanced chunk splitter, code block & table card formatters for Telegram.
-- `voiceService.ts` — Offline local STT bridge calling `scripts/transcribe_audio.py` (Vosk / Qwen-ASR) without external cloud APIs.
 - `index.ts` — Subsystem lifecycle controller (`initTelegramBot`, `stopTelegramBot`, `restartTelegramBot`, `isTelegramBotRunning`).
 
 ### Frontend (`src/`)

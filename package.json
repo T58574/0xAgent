@@ -1,6 +1,6 @@
 {
   "name": "0xagent",
-  "version": "0.1.20",
+  "version": "0.2.0",
   "description": "Autonomous AI Coding Agent & Web-IDE platform powered by local llama.cpp (100% local-first & private)",
   "type": "module",
   "bin": {
@@ -39,7 +39,7 @@
     "preview": "vite preview",
     "stop": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/cleanup.ps1",
     "audit:security": "node ./scripts/security_audit.cjs",
-    "test": "node -e \"console.log('Tests disabled.')\"",
+    "test": "tsx --test tests/**/*.test.ts",
     "test:all": "tsx --test tests/**/*.test.ts",
     "release": "node ./scripts/release.cjs",
     "release:patch": "node ./scripts/release.cjs patch",
