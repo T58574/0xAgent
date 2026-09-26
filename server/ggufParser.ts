@@ -105,7 +105,7 @@ export function detectModelReasoningCapabilities(
       family: 'qwen',
       supportsReasoning: true,
       recommendedReasoningEffort: 'xhigh',
-      supportedReasoningLevels: ['off', 'low', 'medium', 'xhigh'],
+      supportedReasoningLevels: ['off', 'low', 'medium', 'high', 'xhigh'],
     };
   }
 
@@ -190,7 +190,7 @@ export function detectModelReasoningCapabilities(
     family: 'unknown',
     supportsReasoning: false,
     recommendedReasoningEffort: 'auto',
-    supportedReasoningLevels: ['auto', 'off', 'low', 'medium', 'high'],
+    supportedReasoningLevels: ['auto', 'off', 'low', 'medium', 'high', 'xhigh'],
   };
 }
 

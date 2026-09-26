@@ -161,7 +161,8 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
     if (modelPath) {
       modelName = path.basename(modelPath).replace(/\.gguf$/i, '').replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim();
     }
-    res.json({ running: isRunning, host, port, modelPath, modelName });
+    const reasoningEffort = lastLaunchParams?.reasoningEffort || cfg.local_server?.reasoning_effort || cfg.reasoning_effort || null;
+    res.json({ running: isRunning, host, port, modelPath, modelName, reasoningEffort });
   });
 
   router.post('/start-local-server', (req, res) => {
@@ -188,6 +189,10 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       if (!cfg.local_server) cfg.local_server = {};
       cfg.local_server.exe_path = targetExe;
       cfg.local_server.model_path = targetModel;
+      if (body.reasoningEffort) {
+        cfg.local_server.reasoning_effort = body.reasoningEffort;
+        cfg.reasoning_effort = body.reasoningEffort;
+      }
       cfg.model_name = `local:${path.basename(targetModel)}`;
       saveConfig(cfg);
       broadcast('config-changed', cfg);
@@ -195,7 +200,8 @@ export function createLlamaRouter(broadcast: BroadcastFn): Router {
       const { args } = buildLlamaServerArgs({ targetModel, host, port, body, localServerConfig: cfg.local_server, workspaceDir: cfg.workspace_dir, onLog: appendServerLog });
       const launchTimestamp = Date.now();
       isIntentionalStop = false;
-      lastLaunchParams = { targetExe, args, host, port };
+      const resolvedEffort = body.reasoningEffort || cfg.local_server?.reasoning_effort || cfg.reasoning_effort || null;
+      lastLaunchParams = { targetExe, args, host, port, reasoningEffort: resolvedEffort };
 
       appendServerLog(`[CMD] ${path.basename(targetExe)} ${args.join(' ')}`);
       const spawnedProc = spawn(targetExe, args, { cwd: path.dirname(targetExe), windowsHide: true });

@@ -122,13 +122,16 @@ export const FloatingCommandBar: React.FC<FloatingCommandBarProps> = React.memo(
 
   const handleSelectReasoningEffort = async (effort: ReasoningEffortLevel) => {
     setReasoningEffort(effort);
-    setOpenMenu('none');
     try {
       const baseCfg = (config || (await api.get_config())) as AppConfig;
       const updated: AppConfig = {
         ...baseCfg,
         reasoning_effort: effort,
         reasoning_enabled: effort !== 'off',
+        local_server: {
+          ...(baseCfg?.local_server || {}),
+          reasoning_effort: effort,
+        },
       };
       if (onConfigChanged) onConfigChanged(updated);
       await api.save_config(updated);

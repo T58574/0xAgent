@@ -216,8 +216,8 @@ export interface CloudModelItem {
   speed?: string;
   provider: string;
   isAudio?: boolean;
-  supportedEfforts?: ('low' | 'medium' | 'high')[];
-  defaultEffort?: 'low' | 'medium' | 'high';
+  supportedEfforts?: ('low' | 'medium' | 'high' | 'xhigh')[];
+  defaultEffort?: 'low' | 'medium' | 'high' | 'xhigh';
 }
 
 export interface LocalModelItem {

@@ -38,6 +38,30 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
 }) => {
   const { language } = useI18n();
 
+  const activeModel = modelsData.local.find(
+    (m) =>
+      activeModelId === m.id ||
+      activeModelId === m.fileName ||
+      activeModelId === `local:${m.fileName}` ||
+      activeModelId === m.filePath
+  );
+  const isRunningActiveModel = Boolean(
+    serverStatus.running &&
+    serverStatus.modelPath &&
+    activeModel &&
+    (
+      (activeModel.filePath && serverStatus.modelPath.toLowerCase().replace(/\\/g, '/') === activeModel.filePath.toLowerCase().replace(/\\/g, '/')) ||
+      (activeModel.fileName && (serverStatus.modelPath.split(/[\\/]/).pop() || '').toLowerCase() === activeModel.fileName.toLowerCase())
+    )
+  );
+  const isEffortChanged = Boolean(
+    serverStatus.running &&
+    serverStatus.reasoningEffort &&
+    reasoningEffort &&
+    serverStatus.reasoningEffort !== reasoningEffort
+  );
+  const isRestartNeeded = serverStatus.running && (!isRunningActiveModel || isEffortChanged);
+
   return (
     <>
       {/* Mobile Backdrop */}
@@ -64,17 +88,26 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
               type="button"
               onClick={onToggleServer}
               disabled={isStartingServer}
+              title={
+                isRestartNeeded
+                  ? (language === 'ru' ? 'Перезапустить сервер с новыми параметрами' : 'Restart server with new parameters')
+                  : undefined
+              }
               className="px-2 py-0.5 rounded-lg bg-[var(--theme-card-bg)] hover:bg-[var(--theme-border-subtle)] border border-[var(--theme-border)] text-[var(--theme-text)] font-semibold text-[9px] font-mono flex items-center gap-1 cursor-pointer transition-colors shadow-xs"
             >
               {isStartingServer ? (
                 <RefreshCw size={8} className="animate-spin" />
+              ) : isRestartNeeded ? (
+                <RefreshCw size={7} />
               ) : serverStatus.running ? (
                 <Square size={7} fill="currentColor" />
               ) : (
                 <Play size={7} fill="currentColor" />
               )}
               <span>
-                {serverStatus.running
+                {isRestartNeeded
+                  ? (language === 'ru' ? 'Перезапуск' : 'Restart')
+                  : serverStatus.running
                   ? (language === 'ru' ? 'Стоп' : 'Stop')
                   : (language === 'ru' ? 'Старт' : 'Start')}
               </span>
@@ -144,12 +177,12 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
 
                     {/* Inline Effort Selector for Local Model when active */}
                     {isActive && onSelectReasoningEffort && (
-                      <div className="px-3 pb-2 pt-1 flex items-center justify-between gap-2 border-t border-[var(--theme-border)]/40">
-                        <span className="text-[9px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider">
+                      <div className="px-3 pb-2 pt-1 flex items-center justify-between gap-1.5 border-t border-[var(--theme-border)]/40 flex-wrap">
+                        <span className="text-[9px] font-mono text-[var(--theme-text-muted)] uppercase tracking-wider shrink-0">
                           {language === 'ru' ? 'Effort (Рассуждения):' : 'Reasoning Effort:'}
                         </span>
-                        <div className="flex items-center gap-1">
-                          {(['off', 'low', 'medium', 'high'] as const).map((eff) => {
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {(['off', 'low', 'medium', 'high', 'xhigh'] as const).map((eff) => {
                             const isEffActive = (reasoningEffort || 'off') === eff;
                             return (
                               <button
@@ -159,7 +192,7 @@ export const ModelPopover: React.FC<ModelPopoverProps> = ({
                                   e.stopPropagation();
                                   onSelectReasoningEffort(eff);
                                 }}
-                                className={`px-2 py-0.5 rounded-md text-[10px] font-mono transition-colors cursor-pointer border ${
+                                className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono transition-colors cursor-pointer border ${
                                   isEffActive
                                     ? 'bg-[var(--theme-panel)] text-[var(--theme-text)] font-bold border-[var(--theme-border)] shadow-xs'
                                     : 'text-[var(--theme-text-muted)] hover:text-[var(--theme-text)] border-transparent hover:bg-[var(--theme-border-subtle)]'

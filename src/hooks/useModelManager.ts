@@ -10,6 +10,7 @@ export interface ServerStatusData {
   port: number;
   modelPath?: string | null;
   modelName?: string | null;
+  reasoningEffort?: string | null;
 }
 
 // 24-hour localStorage + memory cache for models list
@@ -150,53 +151,32 @@ export function useModelManager(
       setModelsData((prev) => ({ ...prev, activeModelId: model.id }));
       if (onConfigChanged) onConfigChanged(updatedCfg);
       if (onModelChanged) onModelChanged(model.id);
-
-      if (!serverStatus.running || !isModelRunning(model)) {
-        setIsStartingServer(true);
-        showToast(formatString(t.toasts.startingLlama, { model: model.title || model.fileName }), 'info');
-        try {
-          const ls = updatedCfg.local_server;
-          await api.start_local_server({
-            modelPath: model.filePath,
-            exePath: ls?.exe_path,
-            host: ls?.host || '127.0.0.1',
-            port: ls?.port || 11434,
-            ctxSize: ls?.ctx_size,
-            gpuLayers: ls?.gpu_layers,
-            threads: ls?.threads,
-            flashAttn: ls?.flash_attn,
-            specDraftModel: ls?.spec_draft_model,
-            specType: ls?.spec_type,
-            specDraftNgl: ls?.spec_draft_ngl,
-            specDraftNMax: ls?.spec_draft_n_max,
-            specDraftPMin: ls?.spec_draft_p_min,
-            jinja: ls?.jinja,
-            reasoningPreserve: ls?.reasoning_preserve,
-            reasoningFormat: ls?.reasoning_format,
-          });
-          setServerStatus((prev) => ({
-            ...prev,
-            running: true,
-            modelPath: model.filePath,
-            modelName: model.title || model.fileName,
-          }));
-          showToast(t.toasts.serverReady, 'success');
-        } catch (serverErr: any) {
-          showToast(formatString(t.toasts.serverStartError, { error: serverErr.message || serverErr }), 'error');
-        } finally {
-          setIsStartingServer(false);
-        }
-      } else {
-        showToast(formatString(t.toasts.localModelSelected, { model: model.title || model.fileName }), 'success');
-      }
+      showToast(formatString(t.toasts.localModelSelected, { model: model.title || model.fileName }), 'success');
     } catch (err: any) {
       showToast(formatString(t.toasts.modelSwitchError, { error: err.message || err }), 'error');
     }
-  }, [config, isModelRunning, onModelChanged, serverStatus.running, showToast, t, formatString]);
+  }, [config, onModelChanged, onConfigChanged, showToast, t, formatString]);
 
   const toggleServer = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (serverStatus.running) {
+    let currentCfg = config;
+    if (!currentCfg) currentCfg = await api.get_config();
+
+    const activeModel = modelsData.local.find(
+      (m) =>
+        activeModelId === m.id ||
+        activeModelId === m.fileName ||
+        activeModelId === `local:${m.fileName}` ||
+        activeModelId === m.filePath
+    );
+    const isRunningCurrentModel = Boolean(
+      serverStatus.running &&
+      serverStatus.modelPath &&
+      activeModel &&
+      isModelRunning(activeModel)
+    );
+
+    if (serverStatus.running && isRunningCurrentModel) {
       try {
         await api.stop_local_server();
         setServerStatus((prev) => ({ ...prev, running: false }));
@@ -207,11 +187,14 @@ export function useModelManager(
     } else {
       setIsStartingServer(true);
       try {
-        let currentCfg = config;
-        if (!currentCfg) currentCfg = await api.get_config();
+        if (serverStatus.running) {
+          try { await api.stop_local_server(); } catch {}
+        }
+        const targetModelPath = activeModel?.filePath || currentCfg?.local_server?.model_path;
+        const targetEffort = currentCfg?.reasoning_effort || currentCfg?.local_server?.reasoning_effort;
         const ls = currentCfg?.local_server;
         const res = await api.start_local_server({
-          modelPath: ls?.model_path,
+          modelPath: targetModelPath,
           exePath: ls?.exe_path,
           host: ls?.host || '127.0.0.1',
           port: ls?.port || 11434,
@@ -227,9 +210,17 @@ export function useModelManager(
           jinja: ls?.jinja,
           reasoningPreserve: ls?.reasoning_preserve,
           reasoningFormat: ls?.reasoning_format,
+          reasoningEffort: targetEffort,
         });
         if (res?.success) {
-          setServerStatus((prev) => ({ ...prev, running: true }));
+          const modelDisplayName = activeModel?.title || activeModel?.fileName || (targetModelPath ? targetModelPath.split(/[\\/]/).pop()?.replace(/\.gguf$/i, '') : null);
+          setServerStatus((prev) => ({
+            ...prev,
+            running: true,
+            modelPath: targetModelPath,
+            modelName: modelDisplayName,
+            reasoningEffort: targetEffort,
+          }));
           showToast(t.toasts.serverRunning, 'success');
         }
       } catch (err: any) {
@@ -238,7 +229,7 @@ export function useModelManager(
         setIsStartingServer(false);
       }
     }
-  }, [config, serverStatus.running, showToast, t, formatString]);
+  }, [config, serverStatus.running, serverStatus.modelPath, activeModelId, modelsData.local, isModelRunning, showToast, t, formatString]);
 
   const getDisplayTitle = useCallback((id: string): string => {
     const cloudMatch = modelsData.cloud.find((m) => m.id === id);

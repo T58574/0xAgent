@@ -1583,7 +1583,7 @@ export class ModelTui {
     this.client = client;
     this.onDone = onDone;
     this.cfg = client.loadConfig();
-    this.effortOptions = ['low', 'medium', 'high', 'auto'];
+    this.effortOptions = ['off', 'low', 'medium', 'high', 'xhigh', 'auto'];
     this.effort = this.cfg.reasoning_effort || 'auto';
     this.models = [];
     this.selectedIndex = 0;

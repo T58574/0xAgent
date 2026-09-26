@@ -16,6 +16,7 @@ export const ReasoningPopover: React.FC<ReasoningPopoverProps> = ({
   onClose,
 }) => {
   const items: { id: ReasoningEffortLevel; title: string; desc: string }[] = [
+    { id: 'xhigh', title: 'Экстремальная (xHigh)', desc: 'Максимальная глубина рассуждений для моделей Qwen 3.8 / Raven' },
     { id: 'high', title: 'Высокая (High)', desc: 'Глубокий анализ, решение сложных задач и архитектуры' },
     { id: 'medium', title: 'Средняя (Medium)', desc: 'Сбалансированные рассуждения для большинства задач' },
     { id: 'low', title: 'Низкая (Low)', desc: 'Краткий ход мыслей, быстрый ответ' },
@@ -47,7 +48,7 @@ export const ReasoningPopover: React.FC<ReasoningPopoverProps> = ({
         </div>
         <div className="max-h-56 sm:max-h-72 overflow-y-auto space-y-1 scrollbar-thin">
           {items.map((item) => {
-            const isActive = reasoningEffort === item.id || (reasoningEffort === 'auto' && item.id === 'high') || (reasoningEffort === 'xhigh' && item.id === 'high');
+            const isActive = reasoningEffort === item.id || (reasoningEffort === 'auto' && item.id === 'high');
             return (
               <button
                 key={item.id}

@@ -87,6 +87,22 @@ describe('Llama Args Builder Test Suite', () => {
     assert.ok(res.args.includes('1.05'));
   });
 
+  it('should support explicit xhigh reasoning effort for Qwen 3.8 models', () => {
+    const res = buildLlamaServerArgs({
+      targetModel: 'C:/models/Qwen3.8-27B-CRACK.gguf',
+      host: '127.0.0.1',
+      port: 11434,
+      body: { reasoningEffort: 'xhigh' },
+      localServerConfig: {},
+    });
+
+    assert.ok(res.args.includes('--reasoning'));
+    assert.ok(res.args.includes('on'));
+    const effortIdx = res.args.indexOf('--reasoning-effort');
+    assert.ok(effortIdx !== -1);
+    assert.equal(res.args[effortIdx + 1], 'xhigh');
+  });
+
   it('should round top-k to integer', () => {
     const res = buildLlamaServerArgs({
       targetModel: 'C:/models/model.gguf',
